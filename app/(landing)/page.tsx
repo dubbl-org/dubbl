@@ -1,5 +1,5 @@
 import { Hero } from "@/components/landing/hero";
-import { TrustBar } from "@/components/landing/trust-bar";
+import { HowItWorks } from "@/components/landing/how-it-works";
 import { BentoFeatures } from "@/components/landing/bento-features";
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
 import { FeatureSections } from "@/components/landing/feature-sections";
@@ -13,10 +13,10 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <TrustBar />
+      <HowItWorks />
       <BentoFeatures />
-      <DashboardPreview />
       <FeatureSections />
+      <DashboardPreview />
       <OpenSource />
       <Integrations />
       <Testimonials />

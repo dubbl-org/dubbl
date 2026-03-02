@@ -1,105 +1,223 @@
 "use client";
 
+import { motion } from "motion/react";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { GitBranch, Terminal, Star, Users, Shield } from "lucide-react";
 
-const testimonials = [
+const cards = [
   {
-    quote:
-      "dubbl replaced our entire accounting stack. The API-first approach meant we could integrate it into our workflow in a single afternoon.",
-    name: "Sarah Chen",
-    role: "CTO at FlowMetrics",
-    initials: "SC",
-    color: "bg-emerald-100 text-emerald-700",
+    id: "api",
+    icon: GitBranch,
+    label: "API Example",
+    content: (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block size-2 rounded-full bg-emerald-500" />
+          <span className="font-mono">index.ts</span>
+        </div>
+        <pre className="overflow-x-auto rounded-lg bg-muted/60 p-4 font-mono text-[13px] leading-relaxed text-foreground">
+          <code>
+            <span className="text-muted-foreground">{"// Fetch recent entries"}</span>
+            {"\n"}
+            <span className="text-emerald-600 dark:text-emerald-400">const</span>
+            {" entries "}
+            <span className="text-muted-foreground">=</span>
+            {" "}
+            <span className="text-emerald-600 dark:text-emerald-400">await</span>
+            {" dubbl.entries."}
+            <span className="text-foreground">list</span>
+            {"({\n  limit: "}
+            <span className="text-amber-600 dark:text-amber-400">10</span>
+            {",\n  status: "}
+            <span className="text-amber-600 dark:text-amber-400">{'"posted"'}</span>
+            {"\n});\n\n"}
+            <span className="text-muted-foreground">{"// Each entry is double-entry balanced"}</span>
+            {"\n"}
+            <span className="text-emerald-600 dark:text-emerald-400">const</span>
+            {" total "}
+            <span className="text-muted-foreground">=</span>
+            {" entries."}
+            <span className="text-foreground">reduce</span>
+            {"(\n  ("}
+            <span className="text-foreground">sum</span>
+            {", "}
+            <span className="text-foreground">e</span>
+            {") "}
+            <span className="text-muted-foreground">{"=>"}</span>
+            {" sum "}
+            <span className="text-muted-foreground">+</span>
+            {" e.amount, "}
+            <span className="text-amber-600 dark:text-amber-400">0</span>
+            {"\n);"}
+          </code>
+        </pre>
+      </div>
+    ),
   },
   {
-    quote:
-      "Finally, bookkeeping software that developers actually enjoy using. The double-entry enforcement has caught errors our old system never would.",
-    name: "Marcus Rivera",
-    role: "Lead Engineer at Stackwise",
-    initials: "MR",
-    color: "bg-blue-100 text-blue-700",
+    id: "terminal",
+    icon: Terminal,
+    label: "Production Stats",
+    content: (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block size-2 rounded-full bg-emerald-500" />
+          <span className="font-mono">terminal</span>
+        </div>
+        <div className="rounded-lg bg-muted/60 p-4 font-mono text-[13px] leading-loose text-foreground">
+          <p>
+            <span className="text-muted-foreground">$</span> dubbl status
+            --production
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            ────────────────────────────────
+          </p>
+          <p>
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓
+            </span>{" "}
+            12 transactions processed
+          </p>
+          <p>
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓
+            </span>{" "}
+            100% accuracy · 0 imbalances
+          </p>
+          <p>
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓
+            </span>{" "}
+            P95 latency: 12ms
+          </p>
+          <p>
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓
+            </span>{" "}
+            Uptime: 99.99% (last 90 days)
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            ────────────────────────────────
+          </p>
+          <p className="text-muted-foreground">
+            All systems operational.
+          </p>
+        </div>
+      </div>
+    ),
   },
   {
-    quote:
-      "We self-host dubbl for our fintech startup. Having full control over our financial data with zero vendor lock-in is invaluable.",
-    name: "Aisha Patel",
-    role: "Founder at LedgerLoop",
-    initials: "AP",
-    color: "bg-amber-100 text-amber-700",
-  },
-  {
-    quote:
-      "The multi-currency support is flawless. We operate in 12 countries and dubbl handles all the complexity without breaking a sweat.",
-    name: "Erik Johansson",
-    role: "Finance Director at NordPay",
-    initials: "EJ",
-    color: "bg-purple-100 text-purple-700",
-  },
-  {
-    quote:
-      "I contributed a feature on Monday and it was merged by Wednesday. The community is incredibly responsive and welcoming.",
-    name: "Priya Sharma",
-    role: "Open Source Contributor",
-    initials: "PS",
-    color: "bg-rose-100 text-rose-700",
-  },
-  {
-    quote:
-      "dubbl's audit trail saved us during our last compliance review. Every transaction change is tracked with full accountability.",
-    name: "James O'Sullivan",
-    role: "CFO at AuditReady",
-    initials: "JO",
-    color: "bg-teal-100 text-teal-700",
-  },
-  {
-    quote:
-      "We migrated from QuickBooks to dubbl in two weeks. The import tools and documentation made it surprisingly painless.",
-    name: "Lin Zhao",
-    role: "Engineering Manager at BookBase",
-    initials: "LZ",
-    color: "bg-indigo-100 text-indigo-700",
-  },
-  {
-    quote:
-      "The webhooks and event system let us build real-time dashboards that update the moment a transaction is recorded. Incredible DX.",
-    name: "Rachel Kim",
-    role: "Senior Developer at PayStream",
-    initials: "RK",
-    color: "bg-orange-100 text-orange-700",
+    id: "github",
+    icon: Star,
+    label: "Open Source",
+    content: (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block size-2 rounded-full bg-emerald-500" />
+          <span className="font-mono">dubbl-org/dubbl</span>
+        </div>
+        <div className="rounded-lg bg-muted/60 p-4">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="flex items-center justify-center gap-1.5">
+                <Star className="size-4 text-amber-500" />
+                <span className="text-lg font-bold text-foreground">0</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Stars</p>
+            </div>
+            <div>
+              <div className="flex items-center justify-center gap-1.5">
+                <Users className="size-4 text-muted-foreground" />
+                <span className="text-lg font-bold text-foreground">1</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Contributors</p>
+            </div>
+            <div>
+              <div className="flex items-center justify-center gap-1.5">
+                <Shield className="size-4 text-muted-foreground" />
+                <span className="text-lg font-bold text-foreground">Apache</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">License</p>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-2.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Latest release</span>
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                v0.1.0
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Last commit</span>
+              <span className="font-mono text-xs text-foreground">2 hours ago</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Open issues</span>
+              <span className="font-mono text-xs text-foreground">0</span>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Language breakdown
+            </p>
+            <div className="flex h-2 overflow-hidden rounded-full">
+              <div className="bg-blue-500" style={{ width: "78%" }} />
+              <div className="bg-amber-500" style={{ width: "14%" }} />
+              <div className="bg-emerald-500" style={{ width: "8%" }} />
+            </div>
+            <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="inline-block size-2 rounded-full bg-blue-500" />
+                TypeScript 78%
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block size-2 rounded-full bg-amber-500" />
+                CSS 14%
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block size-2 rounded-full bg-emerald-500" />
+                Other 8%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
   },
 ];
 
 export function Testimonials() {
   return (
-    <section id="community" className="bg-muted/30 py-20 md:py-28">
+    <section id="community" className="py-16 md:py-20">
       <Container>
         <SectionHeader
-          badge="Community"
-          title="Loved by developers"
-          subtitle="Join thousands of developers and finance teams using dubbl worldwide."
+          badge="Trusted by developers"
+          title="Built with the community"
+          subtitle="Open source, battle-tested, and designed for production workloads."
         />
 
-        <div className="columns-1 gap-4 space-y-4 md:columns-2 lg:columns-3">
-          {testimonials.map((t, i) => (
-            <ScrollReveal key={i} delay={i * 0.05}>
-              <div className="break-inside-avoid rounded-xl border bg-card p-6">
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div className="mt-4 flex items-center gap-3">
-                  <div
-                    className={`flex size-9 items-center justify-center rounded-full text-xs font-bold ${t.color}`}
-                  >
-                    {t.initials}
+        <div className="grid gap-6 md:grid-cols-3">
+          {cards.map((card, i) => (
+            <ScrollReveal key={card.id} delay={i * 0.1}>
+              <motion.div
+                whileHover={{ y: -4 }}
+                transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                className="h-full rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
+              >
+                <div className="mb-4 flex items-center gap-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
+                    <card.icon className="size-4 text-muted-foreground" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{t.name}</p>
-                    <p className="text-xs text-muted-foreground">{t.role}</p>
-                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {card.label}
+                  </span>
                 </div>
-              </div>
+                {card.content}
+              </motion.div>
             </ScrollReveal>
           ))}
         </div>

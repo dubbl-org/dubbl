@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/shared/theme-provider";
 import "fumadocs-ui/style.css";
 import "./globals.css";
 
@@ -32,10 +33,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <RootProvider>
-          <SessionProvider>{children}</SessionProvider>
-        </RootProvider>
-        <Toaster richColors position="bottom-right" />
+        <ThemeProvider>
+          <RootProvider>
+            <SessionProvider>{children}</SessionProvider>
+          </RootProvider>
+          <Toaster richColors position="bottom-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

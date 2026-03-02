@@ -1,13 +1,12 @@
 "use client";
 
-import { motion } from "motion/react";
 import {
   CreditCard,
   FileText,
   ArrowLeftRight,
+  Building2,
   Wallet,
   ShoppingBag,
-  Building2,
   Send,
   Store,
   Receipt,
@@ -18,48 +17,66 @@ import {
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import type { LucideIcon } from "lucide-react";
 
-const integrations = [
-  { name: "Stripe", icon: CreditCard },
-  { name: "QuickBooks", icon: FileText },
-  { name: "Xero", icon: ArrowLeftRight },
-  { name: "Plaid", icon: Building2 },
-  { name: "PayPal", icon: Wallet },
-  { name: "Shopify", icon: ShoppingBag },
-  { name: "Wise", icon: Send },
-  { name: "Square", icon: Store },
-  { name: "FreshBooks", icon: Receipt },
-  { name: "Wave", icon: Waves },
-  { name: "Banks", icon: Landmark },
-  { name: "REST API", icon: Code2 },
+interface Integration {
+  name: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+const integrations: Integration[] = [
+  { name: "Stripe", description: "Payments", icon: CreditCard },
+  { name: "QuickBooks", description: "Accounting", icon: FileText },
+  { name: "Xero", description: "Accounting", icon: ArrowLeftRight },
+  { name: "Plaid", description: "Banking", icon: Building2 },
+  { name: "PayPal", description: "Payments", icon: Wallet },
+  { name: "Shopify", description: "E-commerce", icon: ShoppingBag },
+  { name: "Wise", description: "Transfers", icon: Send },
+  { name: "Square", description: "POS", icon: Store },
+  { name: "FreshBooks", description: "Invoicing", icon: Receipt },
+  { name: "Wave", description: "Accounting", icon: Waves },
+  { name: "Banks", description: "12,000+", icon: Landmark },
+  { name: "REST API", description: "Custom", icon: Code2 },
 ];
 
 export function Integrations() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-16 md:py-20">
       <Container>
         <SectionHeader
           badge="Integrations"
-          title="Connect to your existing tools"
+          title="Connect to your stack"
           subtitle="Seamlessly sync with the platforms and services you already use."
         />
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {integrations.map((item, i) => (
-            <ScrollReveal key={i} delay={i * 0.04}>
-              <motion.div
-                whileHover={{ scale: 1.04, y: -2 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col items-center gap-3 rounded-xl border bg-card p-6 transition-shadow hover:shadow-md"
-              >
-                <div className="flex size-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <item.icon className="size-6" />
+        <ScrollReveal>
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/30">
+            {/* Blueprint hash overlay */}
+            <div className="blueprint-hash pointer-events-none absolute inset-0" />
+
+            <div className="relative grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6">
+              {integrations.map((item) => (
+                <div
+                  key={item.name}
+                  className="group flex flex-col items-center gap-2.5 border-b border-r border-border/50 px-4 py-8 text-center transition-colors last:border-r-0 hover:bg-background/60 md:[&:nth-child(6n)]:border-r-0 sm:[&:nth-child(4n)]:border-r-0 max-sm:[&:nth-child(3n)]:border-r-0"
+                >
+                  <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-background shadow-sm transition-all group-hover:border-emerald-300 group-hover:shadow-md dark:group-hover:border-emerald-700">
+                    <item.icon className="size-5 text-muted-foreground transition-colors group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {item.name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-sm font-medium">{item.name}</span>
-              </motion.div>
-            </ScrollReveal>
-          ))}
-        </div>
+              ))}
+            </div>
+          </div>
+        </ScrollReveal>
       </Container>
     </section>
   );
