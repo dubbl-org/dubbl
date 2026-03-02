@@ -96,9 +96,14 @@ export function Footer() {
 
         {/* Bottom row */}
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-xs text-white/40">
-            &copy; 2026 dubbl. Apache 2.0 License.
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-white/40">
+              &copy; 2026 dubbl. Apache 2.0 License.
+            </p>
+            <p className="text-[11px] text-white/25">
+              Mindroot Ltd &middot; Registered in England and Wales &middot; Company No. 16543299 &middot; 71-75 Shelton Street, London, WC2H 9JQ
+            </p>
+          </div>
           <div className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5">
             <ShieldCheck className="size-3.5 text-emerald-400" />
             <span className="text-xs font-medium text-white/60">
