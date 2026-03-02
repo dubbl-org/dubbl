@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "index",
+    "chart-of-accounts",
+    "journal-entries",
+    "contacts",
+    "invoicing",
+    "bills",
+    "banking",
+    "expenses",
+    "projects",
+    "inventory",
+    "fixed-assets",
+    "payroll",
+    "budgets",
+    "reports",
+    "tax-rates"
+  ]
+}

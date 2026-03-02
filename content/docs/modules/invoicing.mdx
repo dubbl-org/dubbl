@@ -1,0 +1,59 @@
+---
+title: Invoicing
+description: Create, send, and manage invoices for accounts receivable.
+---
+
+The invoicing module handles your accounts receivable workflow.
+
+## Invoice Lifecycle
+
+```
+Draft → Sent → Partial/Paid
+              → Overdue
+              → Void
+```
+
+1. **Draft** — Create and edit freely
+2. **Sent** — Invoice finalized, journal entry created (DR Accounts Receivable, CR Revenue)
+3. **Partial** — Some payment received
+4. **Paid** — Fully paid
+5. **Overdue** — Past due date and unpaid
+6. **Void** — Cancelled
+
+## Creating an Invoice
+
+1. Navigate to **Sales → Invoices → New Invoice**
+2. Select a **contact** (customer)
+3. Set **issue date** and **due date**
+4. Add **line items** with description, quantity, unit price, and account
+5. Save as draft or send immediately
+
+## Line Items
+
+Each line item includes:
+
+| Field | Description |
+|-------|-------------|
+| Description | What you're billing for |
+| Quantity | Number of units (stored as qty × 100) |
+| Unit Price | Price per unit in cents |
+| Account | Revenue account to credit |
+| Tax Rate | Optional tax rate |
+| Amount | Auto-calculated: qty × price |
+
+## Recording Payments
+
+From the invoice detail page, click **Record Payment** and enter:
+
+- **Amount** — Payment amount in cents
+- **Date** — Payment date
+
+This creates a payment journal entry (DR Bank, CR Accounts Receivable) and updates the invoice balance.
+
+## Invoice Numbering
+
+Invoices are auto-numbered sequentially: `INV-00001`, `INV-00002`, etc. The prefix can be configured.
+
+## Quotes to Invoices
+
+Accepted quotes can be converted directly to invoices, copying all line items.

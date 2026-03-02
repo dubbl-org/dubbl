@@ -1,0 +1,44 @@
+---
+title: Tax Rates
+description: Configure tax rates for invoices and bills.
+---
+
+## Managing Tax Rates
+
+Navigate to **Settings → Tax Rates** to manage your organization's tax rates.
+
+### Tax Rate Fields
+
+| Field | Description |
+|-------|-------------|
+| Name | Descriptive name (e.g., "GST 10%") |
+| Rate | Rate in basis points (1000 = 10.00%) |
+| Type | Sales, Purchase, or Both |
+| Default | Whether this is the default rate |
+
+### Rate Storage
+
+Rates are stored as **basis points** (integer) for precision:
+
+| Display | Stored Value |
+|---------|-------------|
+| 10.00% | 1000 |
+| 5.00% | 500 |
+| 20.00% | 2000 |
+| 0.00% | 0 |
+
+### Tax Types
+
+- **Sales** — Applied to invoices and quotes
+- **Purchase** — Applied to bills and purchase orders
+- **Both** — Available for both sales and purchases
+
+## Tax in Transactions
+
+When a tax rate is applied to a line item:
+
+1. Tax amount is calculated: `lineAmount × rate / 10000`
+2. The tax is tracked separately in the transaction totals
+3. Journal entries debit/credit the appropriate tax accounts:
+   - Sales tax → Tax Payable (2200)
+   - Purchase tax → Input Tax Credits (1500)

@@ -1,0 +1,52 @@
+---
+title: Banking & Reconciliation
+description: Manage bank accounts, import transactions, and reconcile.
+---
+
+## Bank Accounts
+
+Create bank accounts linked to your chart of accounts. Each bank account maps to a GL account (e.g., Checking Account → 1100).
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| Account Name | Display name (e.g., "Business Checking") |
+| Account Number | Masked number for display |
+| Bank Name | Name of the bank |
+| Currency | Account currency |
+| GL Account | Chart of accounts link |
+
+## Importing Transactions
+
+Import bank statements via CSV:
+
+1. Navigate to your bank account
+2. Click **Import CSV**
+3. Paste or upload CSV data
+4. The parser auto-detects column formats
+
+Supported CSV formats:
+- Date, Description, Amount
+- Date, Description, Debit, Credit
+- Date, Reference, Description, Debit, Credit
+
+## Reconciliation
+
+Reconciliation matches bank transactions to your accounting records.
+
+### Transaction Statuses
+
+- **Unreconciled** — Not yet matched
+- **Reconciled** — Matched to a journal entry
+- **Excluded** — Intentionally ignored (e.g., transfers between own accounts)
+
+### Reconciliation Workflow
+
+1. Navigate to the bank account → **Reconcile**
+2. Create a new reconciliation session with date range
+3. Review unreconciled transactions
+4. Match each transaction to invoices, bills, or journal entries
+5. Mark as reconciled or excluded
+
+The fuzzy matcher suggests matches based on amount, date, reference, and description.

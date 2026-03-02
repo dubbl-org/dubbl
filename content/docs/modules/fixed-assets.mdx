@@ -1,0 +1,65 @@
+---
+title: Fixed Assets
+description: Track capital assets and calculate depreciation.
+---
+
+## Fixed Assets
+
+Track equipment, vehicles, furniture, and other capital assets over their useful life.
+
+### Asset Fields
+
+| Field | Description |
+|-------|-------------|
+| Name | Asset description |
+| Asset Number | Unique identifier (FA-001, etc.) |
+| Purchase Date | When the asset was acquired |
+| Purchase Price | Original cost (cents) |
+| Residual Value | Expected value at end of life (cents) |
+| Useful Life | Expected life in months |
+| Depreciation Method | Straight line or declining balance |
+
+## Depreciation Methods
+
+### Straight Line
+
+Equal monthly depreciation:
+
+```
+Monthly = (Purchase Price - Residual Value) / Useful Life Months
+```
+
+### Declining Balance
+
+Double-declining rate applied to net book value:
+
+```
+Monthly Rate = (2 / Useful Life Months)
+Monthly = Net Book Value × Monthly Rate
+```
+
+## Recording Depreciation
+
+Click **Record Depreciation** on an asset to:
+
+1. Calculate the monthly depreciation amount
+2. Create a journal entry (DR Depreciation Expense, CR Accumulated Depreciation)
+3. Update the asset's accumulated depreciation and net book value
+
+Use **Run Depreciation** on the assets list page to process all active assets at once.
+
+## Disposal
+
+When disposing of an asset:
+
+1. Enter the disposal date and sale amount
+2. A journal entry records:
+   - DR Accumulated Depreciation (to remove)
+   - CR Fixed Asset (to remove)
+   - DR/CR Gain or Loss on Disposal
+
+## Asset Status
+
+- **Active** — In use, being depreciated
+- **Fully Depreciated** — Net book value equals residual value
+- **Disposed** — Asset sold or scrapped

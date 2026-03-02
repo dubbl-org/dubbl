@@ -1,0 +1,45 @@
+---
+title: Bills & Purchase Orders
+description: Manage supplier bills and purchase orders for accounts payable.
+---
+
+## Bills
+
+Bills track what you owe to suppliers.
+
+### Bill Lifecycle
+
+```
+Draft → Received → Partial/Paid
+                 → Overdue
+                 → Void
+```
+
+When a bill is **received**, a journal entry is created:
+- **Debit** Expense accounts (per line item)
+- **Credit** Accounts Payable
+
+### Recording Payments
+
+Click **Record Payment** on a bill to:
+- Create a journal entry (DR Accounts Payable, CR Bank)
+- Update the bill's paid amount and status
+
+## Purchase Orders
+
+Purchase orders formalize purchases before they become bills.
+
+### PO Lifecycle
+
+```
+Draft → Sent → Partial/Received → Closed
+                                 → Void
+```
+
+### Converting to Bills
+
+Accepted purchase orders can be **converted to bills**, copying all line items. The PO status updates to "closed" after conversion.
+
+## Bill Numbering
+
+Bills use the prefix `BILL-` and purchase orders use `PO-`, both auto-numbered sequentially.

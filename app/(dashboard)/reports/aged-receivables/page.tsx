@@ -1,0 +1,89 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { DollarSign } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { DataTable, type Column } from "@/components/dashboard/data-table";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { formatMoney } from "@/lib/money";
+
+interface InvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  contactName: string;
+  dueDate: string;
+  amountDue: number;
+  daysOverdue: number;
+}
+
+interface AgingBucket {
+  label: string;
+  total: number;
+  count: number;
+  invoices: InvoiceRow[];
+}
+
+const columns: Column<InvoiceRow>[] = [
+  { key: "number", header: "Invoice", className: "w-32", render: (r) => <span className="font-mono text-sm">{r.invoiceNumber}</span> },
+  { key: "contact", header: "Customer", render: (r) => <span className="text-sm font-medium">{r.contactName}</span> },
+  { key: "due", header: "Due Date", className: "w-28", render: (r) => <span className="text-sm">{r.dueDate}</span> },
+  { key: "days", header: "Days Overdue", className: "w-28", render: (r) => <span className="text-sm tabular-nums">{r.daysOverdue}</span> },
+  { key: "amount", header: "Amount Due", className: "w-32 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.amountDue)}</span> },
+];
+
+export default function AgedReceivablesPage() {
+  const [buckets, setBuckets] = useState<AgingBucket[]>([]);
+  const [grandTotal, setGrandTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/reports/aged-receivables", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setBuckets(data.buckets || []);
+        setGrandTotal(data.grandTotal || 0);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const allInvoices = buckets.flatMap((b) =>
+    b.invoices.map((inv) => ({ ...inv, bucket: b.label }))
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Aged Receivables"
+        description="Outstanding invoices grouped by aging buckets."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        {buckets.map((b) => (
+          <StatCard
+            key={b.label}
+            title={b.label}
+            value={formatMoney(b.total)}
+            change={`${b.count} invoices`}
+            icon={DollarSign}
+          />
+        ))}
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-sm font-medium text-muted-foreground mb-1">Total Outstanding</p>
+        <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(grandTotal)}</p>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={allInvoices}
+        loading={loading}
+        emptyMessage="No outstanding receivables."
+      />
+    </div>
+  );
+}

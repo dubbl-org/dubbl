@@ -1,0 +1,44 @@
+---
+title: Contacts
+description: Manage customers, suppliers, and contacts.
+---
+
+Contacts represent the people and companies you do business with.
+
+## Contact Types
+
+- **Customer** — People you sell to (appears on invoices and quotes)
+- **Supplier** — People you buy from (appears on bills and purchase orders)
+- **Both** — Contacts that are both customers and suppliers
+
+## Contact Fields
+
+| Field | Description |
+|-------|-------------|
+| Name | Contact or company name |
+| Email | Primary email address |
+| Phone | Phone number |
+| Type | Customer, Supplier, or Both |
+| Tax Number | ABN, VAT number, etc. |
+| Payment Terms | Default days until payment due |
+| Currency | Default currency for transactions |
+| Addresses | Billing and shipping addresses (JSON) |
+| Notes | Internal notes |
+
+## Using Contacts
+
+Contacts are referenced throughout dubbl:
+
+- **Invoices** — Select a customer when creating invoices
+- **Quotes** — Send quotes to customers
+- **Bills** — Record bills from suppliers
+- **Purchase Orders** — Order from suppliers
+- **Projects** — Associate projects with clients
+
+## Searching & Filtering
+
+The contacts list supports:
+
+- **Search** — Filter by name or email
+- **Type tabs** — All, Customers, Suppliers
+- **Pagination** — Navigate through large contact lists

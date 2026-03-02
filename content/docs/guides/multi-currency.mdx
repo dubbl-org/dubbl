@@ -1,0 +1,30 @@
+---
+title: Multi-Currency
+description: Set up multi-currency support for international transactions.
+---
+
+dubbl supports 30+ currencies out of the box.
+
+## Organization Currency
+
+Each organization has a **default currency** set during registration (Settings → General). All reports use this currency.
+
+## Contact Currency
+
+Assign a default currency to contacts. When creating invoices or bills for that contact, the currency is pre-selected.
+
+## Exchange Rates
+
+Exchange rates are stored as integers with 6 decimal places of precision:
+
+| Rate | Stored Value |
+|------|-------------|
+| 1.000000 | 1,000,000 |
+| 1.350000 | 1,350,000 |
+| 0.850000 | 850,000 |
+
+Journal line items include `currencyCode` and `exchangeRate` fields for proper multi-currency tracking.
+
+## Available Currencies
+
+dubbl seeds 30 currencies including USD, EUR, GBP, JPY, CHF, CAD, AUD, CNY, INR, BRL, and more. View and manage currencies in **Settings → Currencies**.

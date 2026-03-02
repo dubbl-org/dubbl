@@ -1,0 +1,40 @@
+---
+title: Budgets
+description: Create budgets and track performance with variance analysis.
+---
+
+## Creating a Budget
+
+1. Navigate to **Budgets → New Budget**
+2. Enter a name and date range
+3. Add budget lines for each account
+4. Enter monthly amounts for each line
+
+Each budget line has 12 monthly columns (Jan-Dec) with amounts in cents, plus an auto-calculated total.
+
+## Budget Lines
+
+A budget line maps a GL account to monthly spending targets:
+
+| Field | Description |
+|-------|-------------|
+| Account | Chart of accounts reference |
+| Jan-Dec | Monthly budgeted amounts (cents) |
+| Total | Auto-calculated annual total |
+
+## Budget vs Actual Report
+
+The **Budget vs Actual** report compares budgeted amounts against actual GL balances:
+
+| Column | Description |
+|--------|-------------|
+| Account | Account name and code |
+| Budgeted | Total from budget lines |
+| Actual | Sum from posted journal entries |
+| Variance | Budgeted - Actual |
+| Variance % | (Variance / Budgeted) × 100 |
+
+Color coding:
+- **Green** — Under budget (< 80%)
+- **Amber** — Near budget (80-100%)
+- **Red** — Over budget (> 100%)

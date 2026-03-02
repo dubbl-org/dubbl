@@ -1,0 +1,180 @@
+---
+title: API Reference
+description: REST API documentation for dubbl.
+---
+
+dubbl provides a full REST API for programmatic access to all features.
+
+## Authentication
+
+All API requests require authentication via one of:
+
+### Session Cookie
+Automatically included when making requests from the dubbl web app.
+
+### API Key (Bearer Token)
+Create API keys in **Settings → API Keys**, then include in requests:
+
+```bash
+curl -H "Authorization: Bearer your-api-key" \
+     -H "x-organization-id: org-id" \
+     https://your-instance.com/api/v1/contacts
+```
+
+### Organization Context
+
+All API routes require an organization context via the `x-organization-id` header:
+
+```
+x-organization-id: your-org-id
+```
+
+## Base URL
+
+```
+/api/v1/
+```
+
+## Response Format
+
+Successful responses return JSON:
+
+```json
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5
+  }
+}
+```
+
+Error responses:
+
+```json
+{
+  "error": "Description of the error"
+}
+```
+
+## Endpoints
+
+### Contacts
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/contacts` | List contacts |
+| POST | `/api/v1/contacts` | Create contact |
+| GET | `/api/v1/contacts/:id` | Get contact |
+| PATCH | `/api/v1/contacts/:id` | Update contact |
+| DELETE | `/api/v1/contacts/:id` | Delete contact |
+
+### Invoices
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/invoices` | List invoices |
+| POST | `/api/v1/invoices` | Create invoice |
+| GET | `/api/v1/invoices/:id` | Get invoice |
+| PATCH | `/api/v1/invoices/:id` | Update invoice |
+| DELETE | `/api/v1/invoices/:id` | Delete invoice |
+| POST | `/api/v1/invoices/:id/send` | Send invoice |
+| POST | `/api/v1/invoices/:id/pay` | Record payment |
+| POST | `/api/v1/invoices/:id/void` | Void invoice |
+
+### Quotes
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/quotes` | List quotes |
+| POST | `/api/v1/quotes` | Create quote |
+| GET | `/api/v1/quotes/:id` | Get quote |
+| POST | `/api/v1/quotes/:id/send` | Send quote |
+| POST | `/api/v1/quotes/:id/accept` | Accept quote |
+| POST | `/api/v1/quotes/:id/decline` | Decline quote |
+| POST | `/api/v1/quotes/:id/convert` | Convert to invoice |
+
+### Bills
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/bills` | List bills |
+| POST | `/api/v1/bills` | Create bill |
+| GET | `/api/v1/bills/:id` | Get bill |
+| POST | `/api/v1/bills/:id/receive` | Receive bill |
+| POST | `/api/v1/bills/:id/pay` | Record payment |
+| POST | `/api/v1/bills/:id/void` | Void bill |
+
+### Purchase Orders
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/purchase-orders` | List POs |
+| POST | `/api/v1/purchase-orders` | Create PO |
+| GET | `/api/v1/purchase-orders/:id` | Get PO |
+| POST | `/api/v1/purchase-orders/:id/send` | Send PO |
+| POST | `/api/v1/purchase-orders/:id/convert` | Convert to bill |
+
+### Chart of Accounts
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/accounts` | List accounts |
+| POST | `/api/v1/accounts` | Create account |
+| GET | `/api/v1/accounts/:id` | Get account |
+| PATCH | `/api/v1/accounts/:id` | Update account |
+
+### Journal Entries
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/entries` | List entries |
+| POST | `/api/v1/entries` | Create entry |
+| GET | `/api/v1/entries/:id` | Get entry |
+| POST | `/api/v1/entries/:id/post` | Post entry |
+| POST | `/api/v1/entries/:id/void` | Void entry |
+
+### Banking
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/bank-accounts` | List bank accounts |
+| POST | `/api/v1/bank-accounts` | Create bank account |
+| GET | `/api/v1/bank-accounts/:id/transactions` | List transactions |
+| POST | `/api/v1/bank-accounts/:id/transactions/import` | Import CSV |
+| POST | `/api/v1/bank-transactions/:id/reconcile` | Reconcile |
+| POST | `/api/v1/bank-transactions/:id/exclude` | Exclude |
+
+### Expenses
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/expenses` | List claims |
+| POST | `/api/v1/expenses` | Create claim |
+| POST | `/api/v1/expenses/:id/submit` | Submit |
+| POST | `/api/v1/expenses/:id/approve` | Approve |
+| POST | `/api/v1/expenses/:id/reject` | Reject |
+| POST | `/api/v1/expenses/:id/pay` | Mark paid |
+
+### Reports
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/reports/trial-balance` | Trial Balance |
+| GET | `/api/v1/reports/balance-sheet` | Balance Sheet |
+| GET | `/api/v1/reports/income-statement` | Income Statement |
+| GET | `/api/v1/reports/profit-and-loss` | Profit & Loss |
+| GET | `/api/v1/reports/aged-receivables` | Aged Receivables |
+| GET | `/api/v1/reports/aged-payables` | Aged Payables |
+| GET | `/api/v1/reports/general-ledger` | General Ledger |
+| GET | `/api/v1/reports/cash-flow` | Cash Flow |
+| GET | `/api/v1/reports/budget-vs-actual` | Budget vs Actual |
+
+### Other Modules
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/v1/inventory` | Inventory CRUD |
+| POST | `/api/v1/inventory/:id/adjust` | Adjust stock |
+| GET/POST | `/api/v1/projects` | Projects CRUD |
+| GET/POST | `/api/v1/projects/:id/time-entries` | Time entries |
+| POST | `/api/v1/projects/:id/invoice` | Generate invoice |
+| GET/POST | `/api/v1/fixed-assets` | Fixed assets CRUD |
+| POST | `/api/v1/fixed-assets/:id/depreciate` | Depreciate |
+| POST | `/api/v1/fixed-assets/:id/dispose` | Dispose |
+| GET/POST | `/api/v1/payroll/employees` | Employees CRUD |
+| GET/POST | `/api/v1/payroll/runs` | Payroll runs |
+| POST | `/api/v1/payroll/runs/:id/process` | Process payroll |
+| GET/POST | `/api/v1/budgets` | Budgets CRUD |
+| GET | `/api/v1/audit-log` | Audit log |

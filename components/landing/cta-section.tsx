@@ -1,18 +1,16 @@
 "use client";
 
-import { Github } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Github, ArrowRight } from "lucide-react";
+import { Button3D } from "@/components/ui/button-3d";
 import { Container } from "@/components/shared/container";
+import { HeroBackground } from "@/components/shared/hero-background";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 
 export function CTASection() {
   return (
     <section className="noise-overlay relative overflow-hidden py-20 md:py-28">
-      {/* Grid background */}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
-
-      {/* Glow blob */}
-      <div className="animate-pulse-glow pointer-events-none absolute top-1/2 left-1/2 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400/20 blur-[120px]" />
+      {/* Architectural background */}
+      <HeroBackground />
 
       <Container className="relative">
         <ScrollReveal>
@@ -25,13 +23,11 @@ export function CTASection() {
               dubbl. Open source, forever free.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button
-                size="lg"
-                className="bg-emerald-600 px-8 hover:bg-emerald-700"
-              >
+              <Button3D variant="primary" size="lg">
                 Get Started
-              </Button>
-              <Button variant="outline" size="lg" asChild>
+                <ArrowRight className="size-4" />
+              </Button3D>
+              <Button3D variant="secondary" size="lg" asChild>
                 <a
                   href="https://github.com"
                   target="_blank"
@@ -40,7 +36,7 @@ export function CTASection() {
                   <Github className="size-4" />
                   View on GitHub
                 </a>
-              </Button>
+              </Button3D>
             </div>
           </div>
         </ScrollReveal>

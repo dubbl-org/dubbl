@@ -1,0 +1,53 @@
+---
+title: Payroll
+description: Manage employees and process payroll runs.
+---
+
+## Employees
+
+Register employees with their compensation details.
+
+### Employee Fields
+
+| Field | Description |
+|-------|-------------|
+| Name | Employee name |
+| Email | Contact email |
+| Employee Number | Unique identifier |
+| Position | Job title |
+| Annual Salary | Yearly compensation (cents) |
+| Pay Frequency | Weekly, Biweekly, or Monthly |
+| Tax Rate | Tax rate in basis points (2200 = 22%) |
+| Start Date | Employment start date |
+
+## Payroll Runs
+
+### Creating a Run
+
+1. Navigate to **Payroll → Runs → New Payroll Run**
+2. Set the pay period start and end dates
+3. The system auto-generates payroll items for all active employees
+4. Gross pay is calculated from annual salary divided by pay frequency
+
+### Processing
+
+Click **Process Payroll** to finalize the run:
+
+1. Creates a journal entry:
+   - **Debit** Wages & Salaries (5100) — total gross
+   - **Credit** Tax Payable (2200) — total tax
+   - **Credit** Bank (1100) — total net pay
+2. Marks the run as completed
+
+### Pay Calculations
+
+```
+Gross = Annual Salary / Pay Periods per Year
+Tax = Gross × (Tax Rate / 10000)
+Net = Gross - Tax - Deductions
+```
+
+Pay periods per year:
+- Monthly = 12
+- Biweekly = 26
+- Weekly = 52

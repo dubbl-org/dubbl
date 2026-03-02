@@ -1,0 +1,50 @@
+---
+title: Chart of Accounts
+description: Set up and manage your general ledger accounts.
+---
+
+The Chart of Accounts is the foundation of your bookkeeping system. Every financial transaction references an account.
+
+## Account Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **Asset** | What you own | Cash, Accounts Receivable, Equipment |
+| **Liability** | What you owe | Accounts Payable, Loans, Tax Payable |
+| **Equity** | Owner's stake | Owner's Equity, Retained Earnings |
+| **Revenue** | Income earned | Sales Revenue, Service Revenue |
+| **Expense** | Costs incurred | Rent, Salaries, Office Supplies |
+
+## Account Codes
+
+Accounts use numeric codes for organization:
+
+- `1xxx` — Assets
+- `2xxx` — Liabilities
+- `3xxx` — Equity
+- `4xxx` — Revenue
+- `5xxx` — Expenses
+
+## Creating an Account
+
+Navigate to **Accounts** in the sidebar and click **New Account**. Provide:
+
+- **Code** — Unique numeric code (e.g., `1200`)
+- **Name** — Descriptive name (e.g., "Accounts Receivable")
+- **Type** — One of the five account types
+- **Sub-type** — Optional classification (e.g., "current", "fixed", "operating")
+
+## Default Accounts
+
+The seed script creates 60+ standard accounts. Key accounts used by automations:
+
+| Code | Name | Used By |
+|------|------|---------|
+| `1100` | Checking Account | Bank reconciliation, payments |
+| `1200` | Accounts Receivable | Invoice journal entries |
+| `1500` | Input Tax Credits | Bill tax calculations |
+| `2100` | Accounts Payable | Bill journal entries |
+| `2200` | Tax Payable | Invoice tax calculations |
+| `4010` | Service Revenue | Invoice line items |
+| `5000` | Cost of Goods Sold | Bill line items |
+| `5100` | Wages & Salaries | Payroll journal entries |

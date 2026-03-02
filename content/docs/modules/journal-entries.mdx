@@ -1,0 +1,51 @@
+---
+title: Journal Entries
+description: Record double-entry transactions in the general ledger.
+---
+
+Journal entries are the core of double-entry bookkeeping. Every transaction must have equal debits and credits.
+
+## Entry Lifecycle
+
+1. **Draft** — Entry created but not yet finalized
+2. **Posted** — Entry finalized and reflected in account balances
+3. **Void** — Entry reversed (with reason)
+
+## Creating a Journal Entry
+
+Navigate to **Transactions → New Entry**. Each entry requires:
+
+- **Date** — Transaction date
+- **Description** — What the transaction represents
+- **Reference** — Optional reference number
+- **Lines** — At least two lines with debit/credit amounts
+
+### Important Rules
+
+- Total debits **must equal** total credits
+- All amounts are stored as **integer cents** (e.g., $100.00 = 10000)
+- Draft entries can be edited; posted entries cannot
+
+## Automated Journal Entries
+
+Many modules automatically create journal entries:
+
+| Action | Debit | Credit |
+|--------|-------|--------|
+| Send Invoice | Accounts Receivable | Revenue + Tax Payable |
+| Receive Bill | Expense + Tax Input | Accounts Payable |
+| Record Payment (AR) | Bank | Accounts Receivable |
+| Record Payment (AP) | Accounts Payable | Bank |
+| Pay Expense Claim | Expense accounts | Bank |
+| Process Payroll | Salary Expense | Tax Payable + Bank |
+| Record Depreciation | Depreciation Expense | Accumulated Depreciation |
+
+## Source Tracking
+
+Each journal entry tracks its source:
+
+- `manual` — Created by user
+- `invoice` — Generated from an invoice
+- `bill` — Generated from a bill
+- `expense` — Generated from an expense claim
+- `bank` — Generated from bank reconciliation

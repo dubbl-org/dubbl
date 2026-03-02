@@ -1,0 +1,106 @@
+---
+title: API Integration
+description: Build integrations using the dubbl REST API.
+---
+
+## Creating an API Key
+
+1. Navigate to **Settings → API Keys**
+2. Click **Create API Key**
+3. Copy the key — it won't be shown again
+
+## Making Requests
+
+Include the API key and organization ID in every request:
+
+```bash
+curl -X GET \
+  -H "Authorization: Bearer your-api-key-here" \
+  -H "x-organization-id: your-org-id" \
+  https://your-instance.com/api/v1/contacts
+```
+
+## Example: Create an Invoice
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer your-api-key" \
+  -H "x-organization-id: your-org-id" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contactId": "contact-id",
+    "issueDate": "2026-03-01",
+    "dueDate": "2026-03-31",
+    "lines": [
+      {
+        "description": "Web Development",
+        "quantity": 100,
+        "unitPrice": 15000,
+        "accountId": "revenue-account-id"
+      }
+    ]
+  }' \
+  https://your-instance.com/api/v1/invoices
+```
+
+## Example: List Contacts with Filtering
+
+```bash
+# Search for customers
+curl -H "Authorization: Bearer your-api-key" \
+  -H "x-organization-id: your-org-id" \
+  "https://your-instance.com/api/v1/contacts?type=customer&search=acme&page=1&limit=20"
+```
+
+## Pagination
+
+List endpoints support pagination:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `page` | 1 | Page number |
+| `limit` | 20 | Items per page (max 100) |
+
+Response includes pagination metadata:
+
+```json
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 45,
+    "totalPages": 3
+  }
+}
+```
+
+## Error Handling
+
+API errors return appropriate HTTP status codes:
+
+| Code | Description |
+|------|-------------|
+| 400 | Validation error (check `error` field) |
+| 401 | Missing or invalid authentication |
+| 403 | Insufficient permissions |
+| 404 | Resource not found |
+| 500 | Internal server error |
+
+## Permissions
+
+API key access inherits the creating user's role. Available permissions:
+
+- `manage:contacts` — CRUD contacts
+- `manage:invoices` — CRUD invoices
+- `approve:invoices` — Send/void invoices
+- `manage:bills` — CRUD bills
+- `manage:banking` — Bank account operations
+- `manage:expenses` — Expense claims
+- `approve:expenses` — Approve/reject expenses
+- `manage:inventory` — Inventory operations
+- `manage:projects` — Project management
+- `manage:assets` — Fixed asset operations
+- `manage:payroll` — Payroll management
+- `manage:budgets` — Budget operations
+- `view:audit-log` — Read audit trail

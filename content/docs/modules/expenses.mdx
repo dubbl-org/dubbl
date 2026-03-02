@@ -1,0 +1,42 @@
+---
+title: Expense Claims
+description: Submit and approve employee expense claims.
+---
+
+## Expense Claim Lifecycle
+
+```
+Draft → Submitted → Approved → Paid
+                  → Rejected
+```
+
+## Creating an Expense Claim
+
+1. Navigate to **Expenses → New Claim**
+2. Add a title and description
+3. Add expense items with:
+   - **Date** — When the expense occurred
+   - **Description** — What the expense was for
+   - **Amount** — Cost in dollars
+   - **Category** — Travel, Meals, Software, etc.
+   - **Account** — GL expense account
+   - **Receipt** — Upload via drag-and-drop
+
+## Approval Workflow
+
+| Action | Permission Required |
+|--------|-------------------|
+| Create / Edit / Submit | `manage:expenses` (member+) |
+| Approve / Reject | `approve:expenses` (admin+) |
+| Mark as Paid | `approve:expenses` (admin+) |
+
+## Payment Processing
+
+When an approved claim is marked as **Paid**, a journal entry is automatically created:
+
+- **Debit** Each expense account (per item)
+- **Credit** Bank/Cash account
+
+## Rejection
+
+Rejected claims include a **reason** that is displayed to the submitter. The claim can be edited and resubmitted.

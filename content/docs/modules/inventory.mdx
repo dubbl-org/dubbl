@@ -1,0 +1,41 @@
+---
+title: Inventory
+description: Manage products, stock levels, and reorder points.
+---
+
+## Inventory Items
+
+Track physical products with purchase prices, sale prices, and stock levels.
+
+### Item Fields
+
+| Field | Description |
+|-------|-------------|
+| Code | Unique product code |
+| Name | Product name |
+| SKU | Stock keeping unit |
+| Purchase Price | Cost to buy (cents) |
+| Sale Price | Price to sell (cents) |
+| Quantity on Hand | Current stock level |
+| Reorder Point | Low stock threshold |
+
+## Stock Adjustments
+
+Adjust quantities from the item detail page:
+
+- Enter a **positive number** to add stock
+- Enter a **negative number** to remove stock
+- Provide a **reason** for the adjustment
+
+The system prevents negative stock levels.
+
+## Low Stock Alerts
+
+Items at or below their reorder point are highlighted with a **Low Stock** badge on the inventory list page.
+
+## Dashboard Stats
+
+The inventory page shows:
+- **Total Items** — Number of active products
+- **Total Value** — Sum of (quantity × purchase price)
+- **Low Stock** — Count of items at/below reorder point
