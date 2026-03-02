@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,17 +52,19 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6 shadow-sm">
-      <div className="mb-6 text-center">
-        <h1 className="text-xl font-bold tracking-tight">Create an account</h1>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Create your account
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Get started with dubbl
+          Get started with dubbl for free
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
             {error}
           </div>
         )}
@@ -75,6 +78,7 @@ export default function SignUpPage() {
             placeholder="Your name"
             required
             autoFocus
+            className="h-11 rounded-lg"
           />
         </div>
 
@@ -87,6 +91,7 @@ export default function SignUpPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             required
+            className="h-11 rounded-lg"
           />
         </div>
 
@@ -100,26 +105,27 @@ export default function SignUpPage() {
             placeholder="At least 8 characters"
             required
             minLength={8}
+            className="h-11 rounded-lg"
           />
         </div>
 
         <Button
           type="submit"
-          className="w-full bg-emerald-600 hover:bg-emerald-700"
+          className="h-11 w-full rounded-lg bg-emerald-600 hover:bg-emerald-700"
           disabled={loading}
         >
           {loading ? "Creating account..." : "Create account"}
         </Button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-muted-foreground">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <a
+        <Link
           href="/sign-in"
           className="font-medium text-emerald-600 hover:text-emerald-700"
         >
           Sign in
-        </a>
+        </Link>
       </p>
     </div>
   );

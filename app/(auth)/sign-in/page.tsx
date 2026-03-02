@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,9 +72,9 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="rounded-lg border bg-card p-6 shadow-sm">
-      <div className="mb-6 text-center">
-        <h1 className="text-xl font-bold tracking-tight">Welcome back</h1>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Sign in to your account
         </p>
@@ -84,13 +85,13 @@ export default function SignInPage() {
           <Button
             type="button"
             variant="outline"
-            className="w-full border-dashed border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
+            className="w-full rounded-lg border-dashed border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
             onClick={handleDevLogin}
             disabled={devLoading}
           >
             {devLoading ? "Setting up..." : "Dev Login (test account)"}
           </Button>
-          <div className="my-4 flex items-center gap-3">
+          <div className="my-5 flex items-center gap-3">
             <Separator className="flex-1" />
             <span className="text-xs text-muted-foreground">or</span>
             <Separator className="flex-1" />
@@ -100,7 +101,7 @@ export default function SignInPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
             {error}
           </div>
         )}
@@ -115,6 +116,7 @@ export default function SignInPage() {
             placeholder="you@example.com"
             required
             autoFocus
+            className="h-11 rounded-lg"
           />
         </div>
 
@@ -127,26 +129,27 @@ export default function SignInPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Your password"
             required
+            className="h-11 rounded-lg"
           />
         </div>
 
         <Button
           type="submit"
-          className="w-full bg-emerald-600 hover:bg-emerald-700"
+          className="h-11 w-full rounded-lg bg-emerald-600 hover:bg-emerald-700"
           disabled={loading}
         >
           {loading ? "Signing in..." : "Sign in"}
         </Button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-muted-foreground">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
-        <a
+        <Link
           href="/sign-up"
           className="font-medium text-emerald-600 hover:text-emerald-700"
         >
           Sign up
-        </a>
+        </Link>
       </p>
     </div>
   );

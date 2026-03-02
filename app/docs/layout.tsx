@@ -12,7 +12,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       }}
       links={[
         { text: "App", url: "/dashboard" },
-        { text: "GitHub", url: "https://github.com/dubbl", external: true },
+        { text: "GitHub", url: "https://github.com/dubbl-org/dubbl", external: true },
       ]}
     >
       {children}

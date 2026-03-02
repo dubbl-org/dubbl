@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/accordion";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import { GridBackground } from "@/components/shared/grid-background";
+import Link from "next/link";
 
 const faqs = [
   {
@@ -53,31 +53,50 @@ const faqs = [
 
 export function FAQ() {
   return (
-    <GridBackground variant="dots">
-      <section className="py-20 md:py-28">
-        <Container>
-          <SectionHeader
-            badge="FAQ"
-            title="Frequently asked questions"
-            subtitle="Everything you need to know about dubbl."
-          />
+    <section className="py-16 md:py-20">
+      <Container>
+        <div className="grid gap-12 lg:grid-cols-[1fr_2fr]">
+          {/* Left column */}
+          <div>
+            <SectionHeader
+              badge="FAQs"
+              title="Frequently asked questions"
+              align="left"
+              className="mb-6"
+            />
+            <p className="text-sm text-muted-foreground">
+              Can&apos;t find what you&apos;re looking for?{" "}
+              <Link
+                href="/contact"
+                className="text-emerald-600 underline underline-offset-4 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+              >
+                Contact us
+              </Link>
+              .
+            </p>
+          </div>
 
-          <div className="mx-auto max-w-3xl">
+          {/* Right column */}
+          <div>
             <Accordion type="single" collapsible className="w-full">
               {faqs.map((faq, i) => (
-                <AccordionItem key={i} value={`item-${i}`}>
-                  <AccordionTrigger className="text-left text-base font-medium">
+                <AccordionItem
+                  key={i}
+                  value={`item-${i}`}
+                  className="border-b border-border"
+                >
+                  <AccordionTrigger className="py-5 text-left text-base font-medium text-foreground hover:no-underline md:text-lg">
                     {faq.question}
                   </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground">
+                  <AccordionContent className="pb-5 text-muted-foreground">
                     {faq.answer}
                   </AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>
           </div>
-        </Container>
-      </section>
-    </GridBackground>
+        </div>
+      </Container>
+    </section>
   );
 }

@@ -1,49 +1,66 @@
-import { Github, Twitter, MessageCircle } from "lucide-react";
+import Link from "next/link";
+import { Github, Twitter, MessageCircle, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Container } from "@/components/shared/container";
 import { Separator } from "@/components/ui/separator";
 
 const footerLinks = {
-  Product: ["Features", "Pricing", "Self-Hosting", "Changelog", "Roadmap"],
-  Developers: ["Documentation", "API Reference", "SDKs", "Webhooks", "Status"],
-  Community: [
-    "GitHub",
-    "Discord",
-    "Contributing",
-    "Code of Conduct",
-    "Blog",
+  Product: [
+    { label: "Features", href: "/features" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Self-Hosting", href: "/self-hosting" },
+    { label: "Changelog", href: "/changelog" },
+  ],
+  Developers: [
+    { label: "Documentation", href: "/docs" },
+    { label: "API Reference", href: "/docs/api" },
+    { label: "SDKs", href: "/docs/sdks" },
+    { label: "Status", href: "/status" },
+  ],
+  Company: [
+    { label: "About", href: "/about" },
+    { label: "Blog", href: "/blog" },
+    { label: "Careers", href: "/careers" },
+    { label: "Contact", href: "/contact" },
+  ],
+  Legal: [
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Security", href: "/security" },
   ],
 };
 
 const socialLinks = [
-  { icon: Github, href: "https://github.com", label: "GitHub" },
-  { icon: Twitter, href: "#", label: "Twitter" },
+  { icon: Github, href: "https://github.com/dubbl-org/dubbl", label: "GitHub" },
+  { icon: Twitter, href: "#", label: "X" },
   { icon: MessageCircle, href: "#", label: "Discord" },
 ];
 
 export function Footer() {
   return (
-    <footer className="border-t bg-muted/30 pt-16 pb-8">
+    <footer className="bg-[#0a0a0a] pt-16 pb-8 text-white">
       <Container>
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
+        {/* Top section */}
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-5 md:gap-8">
           {/* Brand column */}
-          <div className="col-span-2">
+          <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2">
-              <Logo className="text-emerald-600" />
-              <span className="text-lg font-bold tracking-tight">dubbl</span>
+              <Logo />
+              <span className="text-lg font-bold tracking-tight text-white">
+                dubbl
+              </span>
             </div>
-            <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-              Open source bookkeeping for modern teams. Double-entry accounting
-              that developers love.
+            <p className="mt-3 max-w-[220px] text-sm leading-relaxed text-white/50">
+              Open source double-entry bookkeeping for modern teams.
             </p>
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-5 flex items-center gap-2.5">
               {socialLinks.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex size-9 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:text-foreground"
+                  className="flex size-9 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
                   aria-label={link.label}
                 >
                   <link.icon className="size-4" />
@@ -52,19 +69,21 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Link columns */}
+          {/* Link groups */}
           {Object.entries(footerLinks).map(([title, links]) => (
             <div key={title}>
-              <h3 className="mb-3 text-sm font-semibold">{title}</h3>
-              <ul className="space-y-2">
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-white/70">
+                {title}
+              </h3>
+              <ul className="space-y-2.5">
                 {links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-white/40 transition-colors hover:text-white/70"
                     >
-                      {link}
-                    </a>
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -72,17 +91,19 @@ export function Footer() {
           ))}
         </div>
 
-        <Separator className="my-8" />
+        {/* Bottom separator */}
+        <Separator className="my-8 bg-white/10" />
 
-        <div className="flex flex-col items-center justify-between gap-4 text-xs text-muted-foreground sm:flex-row">
-          <p>&copy; 2026 dubbl. Apache 2.0 License.</p>
-          <div className="flex items-center gap-4">
-            <a href="#" className="transition-colors hover:text-foreground">
-              Privacy Policy
-            </a>
-            <a href="#" className="transition-colors hover:text-foreground">
-              Terms of Service
-            </a>
+        {/* Bottom row */}
+        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+          <p className="text-xs text-white/40">
+            &copy; 2026 dubbl. Apache 2.0 License.
+          </p>
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5">
+            <ShieldCheck className="size-3.5 text-emerald-400" />
+            <span className="text-xs font-medium text-white/60">
+              Open Source &middot; Self-Hostable
+            </span>
           </div>
         </div>
       </Container>
