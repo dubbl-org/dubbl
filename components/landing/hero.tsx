@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Github } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/shared/container";
 import { cn } from "@/lib/utils";
@@ -590,30 +590,56 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <Link
-              href="/sign-up"
-              className={cn(
-                "group relative inline-flex h-13 items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-600 px-10",
-                "text-sm font-semibold text-white shadow-lg shadow-emerald-600/25",
-                "transition-all duration-200 hover:bg-emerald-500 hover:shadow-xl hover:shadow-emerald-600/30",
-                "active:scale-[0.98]"
-              )}
-            >
-              {/* Button shimmer */}
-              <motion.div
-                className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent"
-                animate={{ translateX: ["calc(-100%)", "calc(200%)"] }}
-                transition={{
-                  duration: 2.5,
-                  delay: 2,
-                  repeat: Infinity,
-                  repeatDelay: 4,
-                  ease: "easeInOut",
-                }}
-              />
-              <span className="relative">Get Started Free</span>
-              <ArrowRight className="relative size-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
+              <Link
+                href="/sign-up"
+                className={cn(
+                  "group relative inline-flex h-13 items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-600 px-10",
+                  "text-sm font-semibold text-white shadow-lg shadow-emerald-600/25",
+                  "transition-all duration-200 hover:bg-emerald-500 hover:shadow-xl hover:shadow-emerald-600/30",
+                  "active:scale-[0.98]"
+                )}
+              >
+                {/* Button shimmer */}
+                <motion.div
+                  className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                  animate={{ translateX: ["calc(-100%)", "calc(200%)"] }}
+                  transition={{
+                    duration: 2.5,
+                    delay: 2,
+                    repeat: Infinity,
+                    repeatDelay: 4,
+                    ease: "easeInOut",
+                  }}
+                />
+                <span className="relative">Get Started Free</span>
+                <ArrowRight className="relative size-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+
+              <a
+                href="https://github.com/dubbl-org/dubbl"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "group relative inline-flex h-13 items-center justify-center gap-2.5 overflow-hidden rounded-xl px-8",
+                  "bg-foreground/[0.06] backdrop-blur-sm",
+                  "border border-foreground/[0.08]",
+                  "text-sm font-semibold text-foreground",
+                  "transition-all duration-200 hover:bg-foreground/[0.1] hover:border-foreground/[0.15]",
+                  "active:scale-[0.98]",
+                  "dark:bg-white/[0.06] dark:border-white/[0.08] dark:hover:bg-white/[0.1] dark:hover:border-white/[0.15]"
+                )}
+              >
+                <Github className="relative size-4" />
+                <span className="relative">View on GitHub</span>
+                <span className="relative flex items-center gap-1 rounded-md bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground dark:bg-white/[0.08]">
+                  <svg viewBox="0 0 16 16" className="size-3 fill-current opacity-60" aria-hidden="true">
+                    <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+                  </svg>
+                  Star
+                </span>
+              </a>
+            </div>
 
             <p className="mt-4 text-sm text-muted-foreground">
               No credit card required
