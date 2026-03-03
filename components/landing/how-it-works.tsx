@@ -236,7 +236,7 @@ function CategorizeVisual() {
       >
         <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
         <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-          Balanced &mdash; $2,450.00
+          Balanced · $2,450.00
         </span>
       </motion.div>
     </div>

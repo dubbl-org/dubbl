@@ -50,7 +50,7 @@ export function CTASection() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-white/60">
               Self-host in minutes, extend via API, and own your financial
-              data&mdash;forever free.
+              data. Forever free.
             </p>
             <p className="mt-6 text-sm text-white/40">
               Open source &middot; Self-hostable &middot; Free forever

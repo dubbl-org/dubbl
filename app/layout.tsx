@@ -23,7 +23,7 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "dubbl — Open Source Bookkeeping",
+  title: "dubbl · Open Source Bookkeeping",
   description:
     "Open source, double-entry bookkeeping for modern teams. API-first, developer-friendly, and licensed under Apache 2.0.",
 };

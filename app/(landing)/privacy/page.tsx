@@ -7,7 +7,7 @@ import {
 } from "@/components/legal/legal-page-layout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — dubbl",
+  title: "Privacy Policy ·dubbl",
   description:
     "How dubbl (Mindroot Ltd) collects, uses, and protects your personal data under the UK GDPR.",
 };
@@ -45,24 +45,24 @@ const sections: LegalSection[] = [
         <p>We collect the following categories of personal data:</p>
         <ul>
           <li>
-            <strong>Account data</strong> — name, email address, and
+            <strong>Account data</strong> ·name, email address, and
             authentication credentials when you create an account.
           </li>
           <li>
-            <strong>Usage data</strong> — pages visited, features used, session
+            <strong>Usage data</strong> ·pages visited, features used, session
             duration, device type, browser, and IP address.
           </li>
           <li>
-            <strong>Payment data</strong> — processed securely by Stripe. We
+            <strong>Payment data</strong> ·processed securely by Stripe. We
             store only the last four digits of your card, billing address, and
             transaction history. We never have access to your full card number.
           </li>
           <li>
-            <strong>Communication data</strong> — messages you send us via
+            <strong>Communication data</strong> ·messages you send us via
             email or in-app support.
           </li>
           <li>
-            <strong>Cookies &amp; similar technologies</strong> — see Section 10
+            <strong>Cookies &amp; similar technologies</strong> ·see Section 10
             for details.
           </li>
         </ul>
@@ -77,27 +77,27 @@ const sections: LegalSection[] = [
         <p>We process your personal data for the following purposes:</p>
         <ul>
           <li>
-            <strong>Service delivery</strong> — providing, maintaining, and
+            <strong>Service delivery</strong> ·providing, maintaining, and
             improving the dubbl platform.
           </li>
           <li>
-            <strong>Payments</strong> — processing subscriptions and invoices
+            <strong>Payments</strong> ·processing subscriptions and invoices
             via Stripe.
           </li>
           <li>
-            <strong>Communication</strong> — responding to support requests,
+            <strong>Communication</strong> ·responding to support requests,
             sending service updates, and notifying you of material changes.
           </li>
           <li>
-            <strong>Improvement</strong> — understanding how the service is used
+            <strong>Improvement</strong> ·understanding how the service is used
             to improve features and user experience.
           </li>
           <li>
-            <strong>Security</strong> — detecting, preventing, and responding to
+            <strong>Security</strong> ·detecting, preventing, and responding to
             fraud, abuse, and security incidents.
           </li>
           <li>
-            <strong>Legal compliance</strong> — meeting our obligations under
+            <strong>Legal compliance</strong> ·meeting our obligations under
             applicable law, including tax and accounting requirements.
           </li>
         </ul>
@@ -115,22 +115,22 @@ const sections: LegalSection[] = [
         </p>
         <ul>
           <li>
-            <strong>Contract (Art 6(1)(b))</strong> — processing necessary to
+            <strong>Contract (Art 6(1)(b))</strong> ·processing necessary to
             perform our contract with you, including providing the service and
             managing your account.
           </li>
           <li>
-            <strong>Legitimate interests (Art 6(1)(f))</strong> — improving our
+            <strong>Legitimate interests (Art 6(1)(f))</strong> ·improving our
             service, ensuring security, and preventing fraud, balanced against
             your rights and freedoms.
           </li>
           <li>
-            <strong>Consent (Art 6(1)(a))</strong> — where you opt in to
+            <strong>Consent (Art 6(1)(a))</strong> ·where you opt in to
             optional features such as marketing emails. You may withdraw consent
             at any time.
           </li>
           <li>
-            <strong>Legal obligation (Art 6(1)(c))</strong> — where we are
+            <strong>Legal obligation (Art 6(1)(c))</strong> ·where we are
             required to process data by law, such as tax reporting.
           </li>
         </ul>
@@ -145,15 +145,15 @@ const sections: LegalSection[] = [
         <p>We share personal data only with the following categories of recipients:</p>
         <ul>
           <li>
-            <strong>Hosting providers</strong> — infrastructure and cloud
+            <strong>Hosting providers</strong> ·infrastructure and cloud
             services that store and process data on our behalf.
           </li>
           <li>
-            <strong>Stripe</strong> — payment processing. Stripe acts as an
+            <strong>Stripe</strong> ·payment processing. Stripe acts as an
             independent controller for payment data.
           </li>
           <li>
-            <strong>Analytics providers</strong> — to understand usage patterns
+            <strong>Analytics providers</strong> ·to understand usage patterns
             and improve the service.
           </li>
         </ul>
@@ -197,15 +197,15 @@ const sections: LegalSection[] = [
         <p>We retain personal data only as long as necessary:</p>
         <ul>
           <li>
-            <strong>Account data</strong> — retained while your account is
+            <strong>Account data</strong> ·retained while your account is
             active, plus 30 days after deletion to allow recovery.
           </li>
           <li>
-            <strong>Usage data</strong> — retained for up to 26 months, then
+            <strong>Usage data</strong> ·retained for up to 26 months, then
             anonymised or deleted.
           </li>
           <li>
-            <strong>Payment records</strong> — retained for 7 years to comply
+            <strong>Payment records</strong> ·retained for 7 years to comply
             with UK tax and accounting obligations.
           </li>
         </ul>
@@ -223,12 +223,12 @@ const sections: LegalSection[] = [
         </p>
         <Callout icon={Shield} title="Your Data Rights">
           <ul>
-            <li>Right of access — obtain a copy of your data</li>
-            <li>Right to rectification — correct inaccurate data</li>
-            <li>Right to erasure — request deletion of your data</li>
+            <li>Right of access ·obtain a copy of your data</li>
+            <li>Right to rectification ·correct inaccurate data</li>
+            <li>Right to erasure ·request deletion of your data</li>
             <li>Right to restrict processing</li>
-            <li>Right to data portability — receive data in a portable format</li>
-            <li>Right to object — object to processing based on legitimate interests</li>
+            <li>Right to data portability ·receive data in a portable format</li>
+            <li>Right to object ·object to processing based on legitimate interests</li>
             <li>Rights related to automated decision-making and profiling</li>
             <li>Right to withdraw consent at any time</li>
           </ul>
@@ -283,16 +283,16 @@ const sections: LegalSection[] = [
         <p>We use the following types of cookies:</p>
         <ul>
           <li>
-            <strong>Strictly necessary cookies</strong> — essential for the
+            <strong>Strictly necessary cookies</strong> ·essential for the
             service to function (e.g. session authentication). These do not
             require consent.
           </li>
           <li>
-            <strong>Functional cookies</strong> — remember your preferences such
+            <strong>Functional cookies</strong> ·remember your preferences such
             as theme and language settings.
           </li>
           <li>
-            <strong>Analytics cookies</strong> — help us understand how the
+            <strong>Analytics cookies</strong> ·help us understand how the
             service is used. Under PECR and the Data Use and Access Act 2025
             analytics exemption, certain first-party analytics cookies may be
             set without prior consent where they are used solely for statistical

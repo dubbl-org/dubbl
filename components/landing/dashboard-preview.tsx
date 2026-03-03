@@ -119,12 +119,12 @@ function TransactionsTab() {
               </td>
               <td className="px-4 py-3.5 text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
                 {row.debit || (
-                  <span className="text-muted-foreground/30">&mdash;</span>
+                  <span className="text-muted-foreground/30">-</span>
                 )}
               </td>
               <td className="px-4 py-3.5 text-right font-medium tabular-nums text-red-500 dark:text-red-400">
                 {row.credit || (
-                  <span className="text-muted-foreground/30">&mdash;</span>
+                  <span className="text-muted-foreground/30">-</span>
                 )}
               </td>
               <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-foreground">
@@ -527,7 +527,7 @@ export function DashboardPreview() {
             <div className="size-3 rounded-full bg-[#febc2e]" />
             <div className="size-3 rounded-full bg-[#28c840]" />
             <div className="mx-auto rounded-md bg-muted/80 px-4 py-1 text-xs font-medium text-muted-foreground">
-              dubbl &mdash; {activeTab}
+              dubbl - {activeTab}
             </div>
             {/* Spacer to balance the dots */}
             <div className="w-[52px]" />

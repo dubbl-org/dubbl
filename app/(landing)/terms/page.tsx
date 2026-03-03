@@ -7,7 +7,7 @@ import {
 } from "@/components/legal/legal-page-layout";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — dubbl",
+  title: "Terms of Service ·dubbl",
   description:
     "Terms governing your use of the dubbl hosted service, operated by Mindroot Ltd.",
 };
@@ -211,7 +211,7 @@ const sections: LegalSection[] = [
             open-source licence.
           </li>
           <li>
-            <strong>Your data</strong> — you retain full ownership of all
+            <strong>Your data</strong> ·you retain full ownership of all
             bookkeeping data you enter into the service. We claim no
             intellectual property rights over your content.
           </li>
@@ -298,15 +298,15 @@ const sections: LegalSection[] = [
       <>
         <ul>
           <li>
-            <strong>By you</strong> — you may close your account at any time
+            <strong>By you</strong> ·you may close your account at any time
             from your account settings.
           </li>
           <li>
-            <strong>By us, for breach</strong> — we may suspend or terminate
+            <strong>By us, for breach</strong> ·we may suspend or terminate
             your account immediately if you materially breach these Terms.
           </li>
           <li>
-            <strong>By us, without cause</strong> — we may terminate your
+            <strong>By us, without cause</strong> ·we may terminate your
             account with at least <strong>30 days&apos; written notice</strong>.
           </li>
         </ul>
@@ -380,21 +380,21 @@ const sections: LegalSection[] = [
       <>
         <ul>
           <li>
-            <strong>Severability</strong> — if any provision of these Terms is
+            <strong>Severability</strong> ·if any provision of these Terms is
             found to be unenforceable, the remaining provisions continue in full
             force and effect.
           </li>
           <li>
-            <strong>No waiver</strong> — failure to enforce any provision does
+            <strong>No waiver</strong> ·failure to enforce any provision does
             not constitute a waiver of that provision.
           </li>
           <li>
-            <strong>Entire agreement</strong> — these Terms, together with our
+            <strong>Entire agreement</strong> ·these Terms, together with our
             Privacy Policy, constitute the entire agreement between you and
             Mindroot Ltd regarding the hosted service.
           </li>
           <li>
-            <strong>No assignment</strong> — you may not assign or transfer
+            <strong>No assignment</strong> ·you may not assign or transfer
             your rights under these Terms without our prior written consent.
             We may assign our rights and obligations in connection with a
             merger, acquisition, or sale of assets.

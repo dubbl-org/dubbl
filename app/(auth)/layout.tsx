@@ -25,12 +25,12 @@ const stats = [
 ];
 
 const ledgerRows = [
-  { date: "Mar 01", desc: "Client Payment — Acme Corp", debit: "—", credit: "$12,500.00", bal: "$48,250.00" },
-  { date: "Feb 28", desc: "Office Lease — Q1", debit: "$4,200.00", credit: "—", bal: "$35,750.00" },
-  { date: "Feb 27", desc: "Software License — Figma", debit: "$75.00", credit: "—", bal: "$39,950.00" },
-  { date: "Feb 26", desc: "Consulting Revenue", debit: "—", credit: "$8,500.00", bal: "$40,025.00" },
-  { date: "Feb 25", desc: "Payroll — February", debit: "$15,200.00", credit: "—", bal: "$31,525.00" },
-  { date: "Feb 24", desc: "Cloud Hosting — AWS", debit: "$890.00", credit: "—", bal: "$46,725.00" },
+  { date: "Mar 01", desc: "Client Payment · Acme Corp", debit: "-", credit: "$12,500.00", bal: "$48,250.00" },
+  { date: "Feb 28", desc: "Office Lease · Q1", debit: "$4,200.00", credit: "-", bal: "$35,750.00" },
+  { date: "Feb 27", desc: "Software License · Figma", debit: "$75.00", credit: "-", bal: "$39,950.00" },
+  { date: "Feb 26", desc: "Consulting Revenue", debit: "-", credit: "$8,500.00", bal: "$40,025.00" },
+  { date: "Feb 25", desc: "Payroll · February", debit: "$15,200.00", credit: "-", bal: "$31,525.00" },
+  { date: "Feb 24", desc: "Cloud Hosting · AWS", debit: "$890.00", credit: "-", bal: "$46,725.00" },
 ];
 
 export default function AuthLayout({
@@ -44,7 +44,7 @@ export default function AuthLayout({
       <div className="noise-overlay pointer-events-none fixed inset-0 z-0" />
       <div className="pointer-events-none fixed inset-0 z-0 gradient-mesh" />
 
-      {/* Animated orbital SVGs — same as hero */}
+      {/* Animated orbital SVGs ·same as hero */}
       <OrbitalDecoration className="fixed -right-[10%] -top-[15%] z-0 h-[800px] w-[800px] lg:h-[900px] lg:w-[900px]" />
       <OrbitalDecoration className="fixed -bottom-[20%] -left-[12%] z-0 h-[600px] w-[600px] rotate-180 lg:h-[700px] lg:w-[700px]" />
 
@@ -58,7 +58,7 @@ export default function AuthLayout({
         </div>
       </div>
 
-      {/* Header — uses Container so edges align with card */}
+      {/* Header ·uses Container so edges align with card */}
       <header className="relative z-20">
         <Container className="flex items-center justify-between py-5">
           <Link href="/" className="inline-flex items-center gap-2">
@@ -71,7 +71,7 @@ export default function AuthLayout({
         </Container>
       </header>
 
-      {/* Main — same Container so card edges match header */}
+      {/* Main ·same Container so card edges match header */}
       <main className="relative z-10 flex flex-1 items-center justify-center pb-8">
         <Container>
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-black/5 dark:shadow-black/40">
@@ -166,7 +166,7 @@ export default function AuthLayout({
                         </span>
                         <span
                           className={`text-right tabular-nums font-medium ${
-                            row.credit !== "—"
+                            row.credit !== "-"
                               ? "text-emerald-600 dark:text-emerald-400"
                               : "text-muted-foreground"
                           }`}

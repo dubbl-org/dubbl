@@ -580,7 +580,7 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             Double-entry accounting that developers love. Self-host, extend
-            via API, and own your financial data&mdash;forever free.
+            via API, and own your financial data. Forever free.
           </motion.p>
 
           {/* CTA */}
@@ -621,41 +621,44 @@ export function Hero() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "group relative inline-flex h-13 items-center justify-center gap-2.5 overflow-hidden rounded-xl px-8",
-                  "bg-foreground/[0.06] backdrop-blur-sm",
-                  "border border-foreground/[0.08]",
-                  "text-sm font-semibold text-foreground",
-                  "transition-all duration-200 hover:bg-foreground/[0.1] hover:border-foreground/[0.15]",
+                  "group relative inline-flex h-13 items-center justify-center gap-2 overflow-hidden rounded-xl px-6",
+                  "bg-emerald-950 text-emerald-100",
+                  "font-mono text-sm font-medium",
+                  "shadow-lg shadow-emerald-950/25",
+                  "transition-all duration-200 hover:bg-emerald-900 hover:shadow-xl hover:shadow-emerald-950/30",
                   "active:scale-[0.98]",
-                  "dark:bg-white/[0.06] dark:border-white/[0.08] dark:hover:bg-white/[0.1] dark:hover:border-white/[0.15]"
+                  "dark:bg-emerald-950/80 dark:text-emerald-200 dark:border dark:border-emerald-800/40 dark:shadow-emerald-950/40"
                 )}
               >
+                {/* Animated top-edge scan line */}
+                <motion.div
+                  className="pointer-events-none absolute top-0 left-0 h-px w-8 bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
+                  animate={{ left: ["0%", "100%", "0%"] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                />
                 <Github className="relative size-4" />
-                <span className="relative">View on GitHub</span>
-                <span className="relative flex items-center gap-1 rounded-md bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground dark:bg-white/[0.08]">
-                  <svg viewBox="0 0 16 16" className="size-3 fill-current opacity-60" aria-hidden="true">
-                    <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
-                  </svg>
-                  Star
-                </span>
+                <span className="relative">&gt; git clone</span>
+                <motion.span
+                  className="relative inline-block h-4 w-px bg-emerald-400"
+                  animate={{ opacity: [1, 0, 1] }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "steps(2)" }}
+                />
               </a>
             </div>
 
-            <p className="mt-4 text-sm text-muted-foreground">
-              No credit card required
-            </p>
-
-            {/* Social proof / key points */}
-            <div className="mt-6 flex items-center gap-4 sm:gap-6">
+            {/* Trust signals — terminal style */}
+            <div className="mt-12 flex items-center gap-3 font-mono text-[11px] text-muted-foreground sm:gap-5">
               {[
-                "Open source",
-                "Self-hostable",
-                "Free forever",
+                { icon: "Apache-2.0", label: "Licensed" },
+                { icon: "Self-host", label: "Ready" },
+                { icon: "API-first", label: "Design" },
               ].map((item, i) => (
-                <div key={item} className="flex items-center gap-1.5">
-                  {i > 0 && <span className="mr-2 text-border">|</span>}
-                  <div className="size-1 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-muted-foreground">{item}</span>
+                <div key={item.icon} className="flex items-center gap-2">
+                  {i > 0 && (
+                    <span className="text-border/60">·</span>
+                  )}
+                  <span className="text-emerald-600 dark:text-emerald-400">{item.icon}</span>
+                  <span className="text-muted-foreground/60">{item.label}</span>
                 </div>
               ))}
             </div>
