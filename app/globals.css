@@ -238,9 +238,9 @@
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
-    transparent 4px,
-    rgba(0, 0, 0, 0.18) 4px,
-    rgba(0, 0, 0, 0.18) 4.8px
+    transparent 14px,
+    rgba(0, 0, 0, 0.10) 14px,
+    rgba(0, 0, 0, 0.10) 14.8px
   );
 }
 
@@ -248,9 +248,9 @@
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
-    transparent 4px,
-    rgba(255, 255, 255, 0.1) 4px,
-    rgba(255, 255, 255, 0.1) 4.8px
+    transparent 14px,
+    rgba(255, 255, 255, 0.06) 14px,
+    rgba(255, 255, 255, 0.06) 14.8px
   );
 }
 

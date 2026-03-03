@@ -52,9 +52,6 @@ export function Integrations() {
 
         <ScrollReveal>
           <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/30">
-            {/* Blueprint hash overlay */}
-            <div className="blueprint-hash pointer-events-none absolute inset-0" />
-
             <div className="relative grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6">
               {integrations.map((item) => (
                 <div
