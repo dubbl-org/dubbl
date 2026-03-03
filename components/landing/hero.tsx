@@ -640,8 +640,8 @@ export function Hero() {
                 <span className="relative">&gt; git clone</span>
                 <motion.span
                   className="relative inline-block h-4 w-px bg-emerald-400"
-                  animate={{ opacity: [1, 0, 1] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "steps(2)" }}
+                  animate={{ opacity: [1, 1, 0, 0] }}
+                  transition={{ duration: 1, repeat: Infinity, times: [0, 0.5, 0.5, 1] }}
                 />
               </a>
             </div>

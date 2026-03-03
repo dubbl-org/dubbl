@@ -14,6 +14,7 @@ import {
   DollarSign,
   Percent,
 } from "lucide-react";
+import { GrainGradient } from "@paper-design/shaders-react";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
@@ -46,7 +47,7 @@ const integrations = [
 
 function ConnectVisual() {
   return (
-    <div className="rounded-xl bg-card p-4">
+    <div className="rounded-xl rounded-b-none bg-card p-4">
       {/* Panel header */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -143,7 +144,7 @@ function ConnectVisual() {
 
 function CategorizeVisual() {
   return (
-    <div className="rounded-xl bg-card p-4">
+    <div className="rounded-xl rounded-b-none bg-card p-4">
       {/* Transaction being categorized */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -282,7 +283,7 @@ const chartBars = [
 
 function InsightsVisual() {
   return (
-    <div className="rounded-xl bg-card p-4">
+    <div className="rounded-xl rounded-b-none bg-card p-4">
       {/* Dashboard header */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -488,7 +489,18 @@ export function HowItWorks() {
               >
                 {/* Visual mockup area */}
                 <div className="relative overflow-hidden rounded-t-2xl p-4 pb-0">
-                  <div className="blueprint-hash pointer-events-none absolute inset-0" />
+                  <GrainGradient
+                    className="pointer-events-none !absolute !inset-0 !rounded-none"
+                    width="100%"
+                    height="100%"
+                    colors={["#a7f3d0", "#6ee7b7", "#34d399", "#10b981"]}
+                    colorBack="#d1fae5"
+                    softness={0.4}
+                    intensity={0.5}
+                    noise={0.7}
+                    shape="dots"
+                    speed={0.3}
+                  />
                   <div className="relative">{item.visual}</div>
                 </div>
 
