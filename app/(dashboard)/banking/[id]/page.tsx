@@ -106,7 +106,7 @@ const columns: Column<Transaction>[] = [
     className: "w-32 text-right",
     render: (r) => (
       <span className="font-mono text-sm tabular-nums text-muted-foreground">
-        {r.balance != null ? formatMoney(r.balance) : "—"}
+        {r.balance != null ? formatMoney(r.balance) : "-"}
       </span>
     ),
   },

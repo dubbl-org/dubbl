@@ -90,27 +90,32 @@ function NavGroup({ label, items }: { label: string; items: typeof mainNav }) {
   const pathname = usePathname();
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      <SidebarGroupLabel className="text-[10px] uppercase tracking-widest font-semibold text-sidebar-foreground/50">{label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive(pathname, item.href)}
-                className={cn(
-                  "transition-colors duration-150",
-                  isActive(pathname, item.href) &&
-                    "bg-emerald-50 text-emerald-700 font-medium"
-                )}
-              >
-                <Link href={item.href}>
-                  <item.icon className="size-4" />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={active}
+                  className={cn(
+                    "rounded-lg transition-colors duration-150",
+                    active
+                      ? "bg-emerald-50 text-emerald-700 font-medium border-l-[3px] border-emerald-500 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)] dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-400"
+                      : "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"
+                  )}
+                >
+                  <Link href={item.href}>
+                    {active && <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                    <item.icon className={cn("size-4", active && "text-emerald-600 dark:text-emerald-400")} />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

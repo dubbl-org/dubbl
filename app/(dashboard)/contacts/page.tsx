@@ -30,7 +30,7 @@ const columns: Column<Contact>[] = [
     key: "email",
     header: "Email",
     render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.email || "—"}</span>
+      <span className="text-sm text-muted-foreground">{r.email || "-"}</span>
     ),
   },
   {
@@ -38,7 +38,7 @@ const columns: Column<Contact>[] = [
     header: "Phone",
     className: "w-36",
     render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.phone || "—"}</span>
+      <span className="text-sm text-muted-foreground">{r.phone || "-"}</span>
     ),
   },
   {

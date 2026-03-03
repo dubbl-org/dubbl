@@ -492,7 +492,7 @@ function MarqueeView() {
                 animation: `marquee-${reverse ? "reverse" : "forward"} ${duration}s linear infinite`,
               }}
             >
-              {[...row.pills, ...row.pills].map((pill, j) => {
+              {[...row.pills, ...row.pills, ...row.pills, ...row.pills].map((pill, j) => {
                 const isFeatured = pill.includes("✓") || pill.includes("$") || pill.includes("ready");
                 return (
                   <span
@@ -516,10 +516,10 @@ function MarqueeView() {
       <style>{`
         @keyframes marquee-forward {
           from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
+          to { transform: translateX(-25%); }
         }
         @keyframes marquee-reverse {
-          from { transform: translateX(-50%); }
+          from { transform: translateX(-25%); }
           to { transform: translateX(0); }
         }
       `}</style>

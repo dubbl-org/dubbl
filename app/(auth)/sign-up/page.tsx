@@ -92,17 +92,17 @@ export default function SignUpPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-[28px] font-extrabold tracking-tight text-foreground">
           Create your account
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Get started with dubbl for free
         </p>
       </motion.div>
 
       {/* OAuth providers */}
       <motion.div
-        className="space-y-2.5"
+        className="grid grid-cols-2 gap-2.5"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.05 }}
@@ -110,20 +110,20 @@ export default function SignUpPage() {
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full rounded-lg text-sm font-medium"
+          className="h-11 rounded-lg text-sm font-medium"
           onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
         >
           <GoogleIcon className="size-4" />
-          Continue with Google
+          Google
         </Button>
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full rounded-lg text-sm font-medium"
+          className="h-11 rounded-lg text-sm font-medium"
           onClick={() => signIn("apple", { callbackUrl: "/dashboard" })}
         >
           <AppleIcon className="size-4" />
-          Continue with Apple
+          Apple
         </Button>
       </motion.div>
 
@@ -223,6 +223,15 @@ export default function SignUpPage() {
         >
           Sign in
         </Link>
+      </motion.p>
+
+      <motion.p
+        className="mt-4 text-center text-[11px] text-muted-foreground/60"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+      >
+        Bank-grade encryption &middot; Self-hosted option &middot; Apache 2.0
       </motion.p>
     </div>
   );

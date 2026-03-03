@@ -195,7 +195,7 @@ export default function EntryDetailPage() {
         </div>
         <div>
           <span className="text-muted-foreground">Reference</span>
-          <p className="font-medium">{entry.reference || "—"}</p>
+          <p className="font-medium">{entry.reference || "-"}</p>
         </div>
         <div>
           <span className="text-muted-foreground">Status</span>
@@ -242,7 +242,7 @@ export default function EntryDetailPage() {
                   {line.accountName}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {line.description || "—"}
+                  {line.description || "-"}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
                   {parseFloat(line.debitAmount) > 0

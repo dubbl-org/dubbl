@@ -371,7 +371,7 @@ export default function FixedAssetDetailPage() {
                 <span className="text-right text-sm text-muted-foreground">
                   {entry.journalEntry
                     ? `#${entry.journalEntry.entryNumber}`
-                    : "—"}
+                    : "-"}
                 </span>
               </div>
             ))}

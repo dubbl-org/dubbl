@@ -47,7 +47,7 @@ const columns: Column<Project>[] = [
     key: "contact",
     header: "Client",
     render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.contact?.name || "—"}</span>
+      <span className="text-sm text-muted-foreground">{r.contact?.name || "-"}</span>
     ),
   },
   {
@@ -74,7 +74,7 @@ const columns: Column<Project>[] = [
     className: "w-28 text-right",
     render: (r) => (
       <span className="font-mono text-sm tabular-nums">
-        {r.budget > 0 ? formatMoney(r.budget) : "—"}
+        {r.budget > 0 ? formatMoney(r.budget) : "-"}
       </span>
     ),
   },

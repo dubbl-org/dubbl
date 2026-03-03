@@ -23,9 +23,9 @@ const statusColors: Record<string, string> = {
 
 const columns: Column<PO>[] = [
   { key: "number", header: "Number", className: "w-32", render: (r) => <span className="font-mono text-sm">{r.poNumber}</span> },
-  { key: "contact", header: "Supplier", render: (r) => <span className="text-sm font-medium">{r.contact?.name || "—"}</span> },
+  { key: "contact", header: "Supplier", render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span> },
   { key: "date", header: "Date", className: "w-28", render: (r) => <span className="text-sm">{r.issueDate}</span> },
-  { key: "delivery", header: "Delivery", className: "w-28", render: (r) => <span className="text-sm">{r.deliveryDate || "—"}</span> },
+  { key: "delivery", header: "Delivery", className: "w-28", render: (r) => <span className="text-sm">{r.deliveryDate || "-"}</span> },
   { key: "status", header: "Status", className: "w-24", render: (r) => <Badge variant="outline" className={statusColors[r.status] || ""}>{r.status}</Badge> },
   { key: "total", header: "Total", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.total)}</span> },
 ];

@@ -219,7 +219,7 @@ export default function InvoiceDetailPage() {
             <div>
               <p className="text-sm">{line.description}</p>
               {line.account && (
-                <p className="text-xs text-muted-foreground">{line.account.code} — {line.account.name}</p>
+                <p className="text-xs text-muted-foreground">{line.account.code} &middot; {line.account.name}</p>
               )}
             </div>
             <span className="text-right text-sm font-mono">{(line.quantity / 100).toFixed(0)}</span>

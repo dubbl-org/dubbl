@@ -46,6 +46,19 @@ interface DataTableAdvancedProps<T> {
 
 type SortDir = "asc" | "desc" | null;
 
+function WindowChrome() {
+  return (
+    <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/50">
+      <div className="size-2 rounded-full bg-rose-400/70" />
+      <div className="size-2 rounded-full bg-amber-400/70" />
+      <div className="size-2 rounded-full bg-emerald-400/70" />
+      <span className="ml-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Data
+      </span>
+    </div>
+  );
+}
+
 export function DataTableAdvanced<T>({
   columns,
   data,
@@ -139,12 +152,13 @@ export function DataTableAdvanced<T>({
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-8 w-8" />
         </div>
-        <div className="rounded-lg border">
+        <div className="rounded-xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-sm">
+          <WindowChrome />
           <Table>
             <TableHeader>
-              <TableRow className="h-10 bg-muted/50">
+              <TableRow className="h-10 bg-muted/20 border-b-2 border-emerald-500">
                 {activeCols.map((col) => (
-                  <TableHead key={col.key} className={cn("h-10 text-xs", col.className)}>
+                  <TableHead key={col.key} className={cn("h-10 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground", col.className)}>
                     {col.header}
                   </TableHead>
                 ))}
@@ -152,10 +166,10 @@ export function DataTableAdvanced<T>({
             </TableHeader>
             <TableBody>
               {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i} className="h-10">
-                  {activeCols.map((col) => (
+                <TableRow key={i} className="h-10 even:bg-muted/30">
+                  {activeCols.map((col, ci) => (
                     <TableCell key={col.key} className="py-1.5">
-                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className={`h-4 animate-shimmer ${["w-24", "w-32", "w-20", "w-28", "w-16"][ci % 5]}`} />
                     </TableCell>
                   ))}
                 </TableRow>
@@ -178,13 +192,13 @@ export function DataTableAdvanced<T>({
               setSearch(e.target.value);
               setPage(0);
             }}
-            className="h-8 w-64 text-sm"
+            className="h-8 w-64 text-sm focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500"
           />
           {selectable && selectedIds.size > 0 && bulkActions}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
+            <Button variant="outline" size="sm" className="h-8 hover:bg-emerald-50/50 hover:text-emerald-700 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-400">
               <Settings2 className="mr-1.5 size-3.5" />
               Columns
             </Button>
@@ -208,10 +222,11 @@ export function DataTableAdvanced<T>({
         </DropdownMenu>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-sm">
+        <WindowChrome />
         <Table>
           <TableHeader>
-            <TableRow className="h-10 bg-muted/50">
+            <TableRow className="h-10 bg-muted/20 border-b-2 border-emerald-500">
               {selectable && (
                 <TableHead className="w-10 h-10">
                   <input
@@ -226,7 +241,7 @@ export function DataTableAdvanced<T>({
                 <TableHead
                   key={col.key}
                   className={cn(
-                    "h-10 text-xs font-medium",
+                    "h-10 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground",
                     col.sortable && "cursor-pointer select-none",
                     col.className
                   )}
@@ -264,9 +279,9 @@ export function DataTableAdvanced<T>({
                     key={i}
                     onClick={() => onRowClick?.(row)}
                     className={cn(
-                      "h-10",
+                      "h-10 even:bg-muted/30 transition-colors duration-100 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20",
                       onRowClick && "cursor-pointer",
-                      selectedIds.has(globalIdx) && "bg-muted/50"
+                      selectedIds.has(globalIdx) && "bg-emerald-50/50 dark:bg-emerald-950/20"
                     )}
                   >
                     {selectable && (
@@ -298,27 +313,27 @@ export function DataTableAdvanced<T>({
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-1">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground tabular-nums">
             {sorted.length} result{sorted.length !== 1 ? "s" : ""}
             {search && ` for "${search}"`}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
               size="icon"
-              className="size-7"
+              className="size-7 rounded-lg"
               disabled={page === 0}
               onClick={() => setPage(page - 1)}
             >
               <ChevronLeft className="size-3.5" />
             </Button>
-            <span className="px-2 text-xs text-muted-foreground">
+            <span className="px-2 text-xs text-muted-foreground tabular-nums">
               {page + 1} / {totalPages}
             </span>
             <Button
               variant="outline"
               size="icon"
-              className="size-7"
+              className="size-7 rounded-lg"
               disabled={page >= totalPages - 1}
               onClick={() => setPage(page + 1)}
             >

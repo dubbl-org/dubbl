@@ -32,7 +32,7 @@ const entryColumns: Column<LedgerEntry>[] = [
   { key: "date", header: "Date", className: "w-28", render: (r) => <span className="text-sm">{r.date}</span> },
   { key: "entry", header: "Entry #", className: "w-24", render: (r) => <span className="font-mono text-sm">{r.entryNumber}</span> },
   { key: "desc", header: "Description", render: (r) => <span className="text-sm">{r.description}</span> },
-  { key: "ref", header: "Reference", className: "w-28", render: (r) => <span className="text-sm text-muted-foreground">{r.reference || "—"}</span> },
+  { key: "ref", header: "Reference", className: "w-28", render: (r) => <span className="text-sm text-muted-foreground">{r.reference || "-"}</span> },
   { key: "debit", header: "Debit", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{r.debit ? formatMoney(r.debit) : ""}</span> },
   { key: "credit", header: "Credit", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{r.credit ? formatMoney(r.credit) : ""}</span> },
   { key: "balance", header: "Balance", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.runningBalance)}</span> },

@@ -53,8 +53,8 @@ export function OrgSwitcher() {
           size="lg"
           className="data-[state=open]:bg-sidebar-accent"
         >
-          <div className="flex size-8 items-center justify-center rounded-lg border bg-background">
-            <Building2 className="size-4 text-muted-foreground" />
+          <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50 ring-1 ring-emerald-100 dark:ring-emerald-900/30">
+            <Building2 className="size-4 text-emerald-600" />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">
@@ -80,7 +80,7 @@ export function OrgSwitcher() {
             onClick={() => switchOrg(org)}
             className="gap-2"
           >
-            <div className="flex size-6 items-center justify-center rounded border">
+            <div className="flex size-6 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/50">
               <Building2 className="size-3.5 text-muted-foreground" />
             </div>
             <span>{org.name}</span>
@@ -88,7 +88,7 @@ export function OrgSwitcher() {
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2">
-          <div className="flex size-6 items-center justify-center rounded border bg-background">
+          <div className="flex size-6 items-center justify-center rounded-md border border-dashed border-emerald-300 dark:border-emerald-800">
             <Plus className="size-3.5" />
           </div>
           <span className="text-muted-foreground">New organization</span>

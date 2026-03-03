@@ -101,15 +101,17 @@ export default function ReportsPage() {
 
       {reportCategories.map((category) => (
         <div key={category.title} className="space-y-4">
-          <h2 className="text-lg font-semibold">{category.title}</h2>
+          <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{category.title}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {category.reports.map((report) => (
               <Link
                 key={report.href}
                 href={report.href}
-                className="group rounded-lg border bg-card p-6 shadow-sm transition-colors duration-150 hover:border-emerald-200 hover:bg-emerald-50/30"
+                className="group rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-150 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5"
               >
-                <report.icon className="size-8 text-muted-foreground transition-colors group-hover:text-emerald-600" />
+                <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                  <report.icon className="size-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
                 <h3 className="mt-4 text-sm font-semibold">{report.title}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {report.description}

@@ -41,7 +41,7 @@ const columns: Column<InventoryItem>[] = [
     header: "SKU",
     className: "w-28",
     render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.sku || "—"}</span>
+      <span className="text-sm text-muted-foreground">{r.sku || "-"}</span>
     ),
   },
   {

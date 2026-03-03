@@ -404,12 +404,12 @@ export default function ExpenseDetailPage() {
               <p className="text-sm">{item.description}</p>
               {item.account && (
                 <p className="text-xs text-muted-foreground">
-                  {item.account.code} — {item.account.name}
+                  {item.account.code} &middot; {item.account.name}
                 </p>
               )}
             </div>
             <span className="text-sm text-muted-foreground">
-              {item.category || "—"}
+              {item.category || "-"}
             </span>
             <span className="text-sm">
               {item.receiptFileName ? (
@@ -420,7 +420,7 @@ export default function ExpenseDetailPage() {
                   </span>
                 </span>
               ) : (
-                <span className="text-muted-foreground">—</span>
+                <span className="text-muted-foreground">-</span>
               )}
             </span>
             <span className="text-right text-sm font-mono font-medium">

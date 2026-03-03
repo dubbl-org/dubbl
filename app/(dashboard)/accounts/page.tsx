@@ -240,7 +240,7 @@ function AccountDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-xl">
         <DialogHeader>
           <DialogTitle>New Account</DialogTitle>
         </DialogHeader>

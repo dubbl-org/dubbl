@@ -72,7 +72,7 @@ export default function PODetailPage() {
         </div>
         {po.lines.map((line) => (
           <div key={line.id} className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
-            <div><p className="text-sm">{line.description}</p>{line.account && <p className="text-xs text-muted-foreground">{line.account.code} — {line.account.name}</p>}</div>
+            <div><p className="text-sm">{line.description}</p>{line.account && <p className="text-xs text-muted-foreground">{line.account.code} &middot; {line.account.name}</p>}</div>
             <span className="text-right text-sm font-mono">{(line.quantity / 100).toFixed(0)}</span>
             <span className="text-right text-sm font-mono">{formatMoney(line.unitPrice)}</span>
             <span className="text-right text-sm font-mono font-medium">{formatMoney(line.amount)}</span>

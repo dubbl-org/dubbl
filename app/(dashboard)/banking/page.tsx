@@ -51,7 +51,7 @@ const columns: Column<BankAccount>[] = [
     className: "w-40",
     render: (r) => (
       <span className="font-mono text-sm text-muted-foreground">
-        {r.accountNumber ? `****${r.accountNumber.slice(-4)}` : "—"}
+        {r.accountNumber ? `****${r.accountNumber.slice(-4)}` : "-"}
       </span>
     ),
   },
@@ -61,7 +61,7 @@ const columns: Column<BankAccount>[] = [
     className: "w-40",
     render: (r) => (
       <span className="text-sm text-muted-foreground">
-        {r.chartAccount ? `${r.chartAccount.code} - ${r.chartAccount.name}` : "—"}
+        {r.chartAccount ? `${r.chartAccount.code} - ${r.chartAccount.name}` : "-"}
       </span>
     ),
   },

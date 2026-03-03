@@ -32,7 +32,7 @@ const statusColors: Record<string, string> = {
 
 const columns: Column<Quote>[] = [
   { key: "number", header: "Number", className: "w-32", render: (r) => <span className="font-mono text-sm">{r.quoteNumber}</span> },
-  { key: "contact", header: "Customer", render: (r) => <span className="text-sm font-medium">{r.contact?.name || "—"}</span> },
+  { key: "contact", header: "Customer", render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span> },
   { key: "date", header: "Date", className: "w-28", render: (r) => <span className="text-sm">{r.issueDate}</span> },
   { key: "expiry", header: "Expires", className: "w-28", render: (r) => <span className="text-sm">{r.expiryDate}</span> },
   { key: "status", header: "Status", className: "w-24", render: (r) => <Badge variant="outline" className={statusColors[r.status] || ""}>{r.status}</Badge> },

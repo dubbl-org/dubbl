@@ -37,9 +37,9 @@ export function UserMenu() {
           size="lg"
           className="data-[state=open]:bg-sidebar-accent"
         >
-          <Avatar className="size-8">
+          <Avatar className="size-8 ring-1 ring-emerald-100 dark:ring-emerald-900/30">
             <AvatarImage src={user?.image || undefined} />
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            <AvatarFallback className="text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">{initials}</AvatarFallback>
           </Avatar>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">

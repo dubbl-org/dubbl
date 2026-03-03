@@ -118,7 +118,7 @@ export default function AccountLedgerPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${account.code} — ${account.name}`}
+        title={`${account.code} · ${account.name}`}
         description={`Account ledger for this ${account.type} account.`}
       >
         <div className="text-right">

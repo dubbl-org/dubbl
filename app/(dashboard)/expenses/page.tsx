@@ -42,7 +42,7 @@ const columns: Column<ExpenseClaim>[] = [
     header: "Submitted By",
     render: (r) => (
       <span className="text-sm">
-        {r.submittedByUser?.name || r.submittedByUser?.email || "—"}
+        {r.submittedByUser?.name || r.submittedByUser?.email || "-"}
       </span>
     ),
   },

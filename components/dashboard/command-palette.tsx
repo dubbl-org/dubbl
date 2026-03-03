@@ -92,7 +92,7 @@ export function CommandPalette() {
               value={item.label}
               onSelect={() => navigate(item.href)}
             >
-              <item.icon className="mr-2 size-4" />
+              <item.icon className="mr-2 size-4 text-emerald-600 dark:text-emerald-400" />
               {item.label}
             </CommandItem>
           ))}
@@ -105,7 +105,7 @@ export function CommandPalette() {
               value={item.label}
               onSelect={() => navigate(item.href)}
             >
-              <item.icon className="mr-2 size-4" />
+              <item.icon className="mr-2 size-4 text-emerald-600 dark:text-emerald-400" />
               {item.label}
             </CommandItem>
           ))}

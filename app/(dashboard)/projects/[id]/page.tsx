@@ -207,7 +207,7 @@ export default function ProjectDetailPage() {
         {proj.startDate && (
           <span className="text-sm text-muted-foreground">
             {proj.startDate}
-            {proj.endDate ? ` — ${proj.endDate}` : ""}
+            {proj.endDate ? ` · ${proj.endDate}` : ""}
           </span>
         )}
       </div>
@@ -225,7 +225,7 @@ export default function ProjectDetailPage() {
         />
         <StatCard
           title="Budget Used"
-          value={proj.budget > 0 ? `${budgetUsed}%` : "—"}
+          value={proj.budget > 0 ? `${budgetUsed}%` : "-"}
           icon={FileText}
           changeType={budgetUsed > 90 ? "negative" : "neutral"}
         />

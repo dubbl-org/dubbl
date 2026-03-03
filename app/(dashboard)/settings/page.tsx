@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+
 
 interface OrgSettings {
   id: string;
@@ -88,7 +88,8 @@ export default function SettingsPage() {
         description="Manage your organization details."
       />
 
-      <div className="space-y-4">
+      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
+        <h2 className="text-sm font-semibold">General</h2>
         <div className="space-y-2">
           <Label>Organization Name</Label>
           <Input
@@ -139,9 +140,7 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      <Separator />
-
-      <div className="space-y-4">
+      <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-red-600">Danger Zone</h3>
           <p className="text-sm text-muted-foreground">

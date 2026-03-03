@@ -42,7 +42,7 @@ const columns: Column<Invoice>[] = [
   {
     key: "contact",
     header: "Customer",
-    render: (r) => <span className="text-sm font-medium">{r.contact?.name || "—"}</span>,
+    render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span>,
   },
   {
     key: "date",

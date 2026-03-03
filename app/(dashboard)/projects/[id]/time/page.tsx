@@ -57,14 +57,14 @@ const columns: Column<TimeEntry>[] = [
     header: "User",
     className: "w-36",
     render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.user?.name || "—"}</span>
+      <span className="text-sm text-muted-foreground">{r.user?.name || "-"}</span>
     ),
   },
   {
     key: "description",
     header: "Description",
     render: (r) => (
-      <span className="text-sm">{r.description || "—"}</span>
+      <span className="text-sm">{r.description || "-"}</span>
     ),
   },
   {

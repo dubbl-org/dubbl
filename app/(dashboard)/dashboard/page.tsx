@@ -132,7 +132,7 @@ export default function DashboardPage() {
         description="Your bookkeeping at a glance."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Assets"
           value={formatMoney(Math.round(parseFloat(stats.totalAssets) * 100))}
@@ -155,9 +155,11 @@ export default function DashboardPage() {
         />
       </div>
 
+      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">
+          <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Entries
           </h2>
           <Button
