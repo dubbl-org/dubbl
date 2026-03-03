@@ -60,7 +60,7 @@
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
   --background: #ffffff;
   --foreground: #0a0a0a;
   --card: #ffffff;
@@ -110,6 +110,20 @@
     font-weight: 500;
     letter-spacing: 0.02em;
   }
+}
+
+/* Sidebar icon hover animation */
+[data-sidebar="menu-button"] svg {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.15s ease;
+}
+[data-sidebar="menu-button"]:hover svg {
+  transform: scale(1.12);
+  color: var(--primary);
+}
+
+/* Collapsible group chevron rotation */
+[data-sidebar="group-label"] svg.group-chevron {
+  transition: transform 0.2s ease;
 }
 
 /* Animation keyframes */
@@ -332,29 +346,29 @@
 
 
 .dark {
-  --background: #101212;
+  --background: #0a0d0b;
   --foreground: #f0fdf4;
-  --card: #161a18;
+  --card: #111614;
   --card-foreground: #f0fdf4;
-  --popover: #161a18;
+  --popover: #111614;
   --popover-foreground: #f0fdf4;
   --primary: #10b981;
   --primary-foreground: #ffffff;
-  --secondary: #1e2320;
+  --secondary: #1a1f1c;
   --secondary-foreground: #f0fdf4;
-  --muted: #1e2320;
+  --muted: #1a1f1c;
   --muted-foreground: #94a3b8;
-  --accent: #122b1d;
+  --accent: #0d2818;
   --accent-foreground: #d1fae5;
-  --border: #2a302c;
-  --input: #2a302c;
+  --border: #1e2a24;
+  --input: #1e2a24;
   --ring: #10b981;
-  --sidebar: #0f1311;
+  --sidebar: #080b09;
   --sidebar-foreground: #f0fdf4;
   --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #122b1d;
+  --sidebar-accent: #0d2818;
   --sidebar-accent-foreground: #d1fae5;
-  --sidebar-border: #2a302c;
+  --sidebar-border: #1e2a24;
   --sidebar-ring: #10b981;
 }

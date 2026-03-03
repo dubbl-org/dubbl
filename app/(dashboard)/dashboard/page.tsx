@@ -55,9 +55,9 @@ const columns: Column<Entry>[] = [
         variant="outline"
         className={
           r.status === "posted"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
             : r.status === "void"
-            ? "border-red-200 bg-red-50 text-red-700"
+            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
             : ""
         }
       >
@@ -126,7 +126,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Overview"
         description="Your bookkeeping at a glance."
@@ -155,16 +155,15 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="text-sm font-medium text-muted-foreground">
             Recent Entries
           </h2>
           <Button
             variant="outline"
             size="sm"
+            className="h-7 text-xs"
             onClick={() => router.push("/transactions")}
           >
             View all

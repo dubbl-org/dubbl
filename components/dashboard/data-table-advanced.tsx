@@ -46,19 +46,6 @@ interface DataTableAdvancedProps<T> {
 
 type SortDir = "asc" | "desc" | null;
 
-function WindowChrome() {
-  return (
-    <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/50">
-      <div className="size-2 rounded-full bg-rose-400/70" />
-      <div className="size-2 rounded-full bg-amber-400/70" />
-      <div className="size-2 rounded-full bg-emerald-400/70" />
-      <span className="ml-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        Data
-      </span>
-    </div>
-  );
-}
-
 export function DataTableAdvanced<T>({
   columns,
   data,
@@ -152,13 +139,12 @@ export function DataTableAdvanced<T>({
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-8 w-8" />
         </div>
-        <div className="rounded-xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-sm">
-          <WindowChrome />
+        <div className="rounded-xl border overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="h-10 bg-muted/20 border-b-2 border-emerald-500">
+              <TableRow className="h-10 bg-muted/50 hover:bg-muted/50">
                 {activeCols.map((col) => (
-                  <TableHead key={col.key} className={cn("h-10 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground", col.className)}>
+                  <TableHead key={col.key} className={cn("h-10 text-xs font-medium text-muted-foreground", col.className)}>
                     {col.header}
                   </TableHead>
                 ))}
@@ -166,10 +152,10 @@ export function DataTableAdvanced<T>({
             </TableHeader>
             <TableBody>
               {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i} className="h-10 even:bg-muted/30">
+                <TableRow key={i} className="h-10">
                   {activeCols.map((col, ci) => (
                     <TableCell key={col.key} className="py-1.5">
-                      <Skeleton className={`h-4 animate-shimmer ${["w-24", "w-32", "w-20", "w-28", "w-16"][ci % 5]}`} />
+                      <Skeleton className={`h-4 ${["w-24", "w-32", "w-20", "w-28", "w-16"][ci % 5]}`} />
                     </TableCell>
                   ))}
                 </TableRow>
@@ -192,13 +178,13 @@ export function DataTableAdvanced<T>({
               setSearch(e.target.value);
               setPage(0);
             }}
-            className="h-8 w-64 text-sm focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500"
+            className="h-8 w-64 text-sm"
           />
           {selectable && selectedIds.size > 0 && bulkActions}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 hover:bg-emerald-50/50 hover:text-emerald-700 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-400">
+            <Button variant="outline" size="sm" className="h-8">
               <Settings2 className="mr-1.5 size-3.5" />
               Columns
             </Button>
@@ -222,11 +208,10 @@ export function DataTableAdvanced<T>({
         </DropdownMenu>
       </div>
 
-      <div className="rounded-xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-sm">
-        <WindowChrome />
+      <div className="rounded-xl border overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="h-10 bg-muted/20 border-b-2 border-emerald-500">
+            <TableRow className="h-10 bg-muted/50 hover:bg-muted/50">
               {selectable && (
                 <TableHead className="w-10 h-10">
                   <input
@@ -241,7 +226,7 @@ export function DataTableAdvanced<T>({
                 <TableHead
                   key={col.key}
                   className={cn(
-                    "h-10 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground",
+                    "h-10 text-xs font-medium text-muted-foreground",
                     col.sortable && "cursor-pointer select-none",
                     col.className
                   )}
@@ -279,9 +264,9 @@ export function DataTableAdvanced<T>({
                     key={i}
                     onClick={() => onRowClick?.(row)}
                     className={cn(
-                      "h-10 even:bg-muted/30 transition-colors duration-100 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20",
+                      "h-10 transition-colors",
                       onRowClick && "cursor-pointer",
-                      selectedIds.has(globalIdx) && "bg-emerald-50/50 dark:bg-emerald-950/20"
+                      selectedIds.has(globalIdx) && "bg-muted/50"
                     )}
                   >
                     {selectable && (
@@ -321,7 +306,7 @@ export function DataTableAdvanced<T>({
             <Button
               variant="outline"
               size="icon"
-              className="size-7 rounded-lg"
+              className="size-7 rounded-md"
               disabled={page === 0}
               onClick={() => setPage(page - 1)}
             >
@@ -333,7 +318,7 @@ export function DataTableAdvanced<T>({
             <Button
               variant="outline"
               size="icon"
-              className="size-7 rounded-lg"
+              className="size-7 rounded-md"
               disabled={page >= totalPages - 1}
               onClick={() => setPage(page + 1)}
             >

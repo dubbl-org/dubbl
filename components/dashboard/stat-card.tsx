@@ -47,31 +47,31 @@ export function StatCard({
   sparklineData,
 }: StatCardProps) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border/50 border-t-2 border-t-emerald-500/20 bg-card/80 backdrop-blur-sm p-5 shadow-sm transition-all duration-150 hover:shadow-lg hover:shadow-emerald-500/5">
+    <div className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md hover:shadow-emerald-500/5">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-[13px] font-medium text-muted-foreground">
           {title}
         </p>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
           <Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
         </div>
       </div>
-      <div className="mt-1.5 flex items-baseline justify-between gap-2">
-        <div className="flex items-baseline gap-2">
-          <p className="text-2xl font-bold tracking-tight font-mono tabular-nums">
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div className="space-y-1">
+          <p className="text-2xl font-semibold tracking-tight font-mono tabular-nums">
             {value}
           </p>
           {change && (
-            <span
+            <p
               className={cn(
                 "text-xs font-medium",
-                changeType === "positive" && "text-emerald-600",
-                changeType === "negative" && "text-red-600",
+                changeType === "positive" && "text-emerald-600 dark:text-emerald-400",
+                changeType === "negative" && "text-red-600 dark:text-red-400",
                 changeType === "neutral" && "text-muted-foreground"
               )}
             >
               {change}
-            </span>
+            </p>
           )}
         </div>
         {sparklineData && <Sparkline data={sparklineData} />}

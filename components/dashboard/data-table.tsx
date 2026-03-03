@@ -26,19 +26,6 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-function WindowChrome() {
-  return (
-    <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/50">
-      <div className="size-2 rounded-full bg-rose-400/70" />
-      <div className="size-2 rounded-full bg-amber-400/70" />
-      <div className="size-2 rounded-full bg-emerald-400/70" />
-      <span className="ml-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        Data
-      </span>
-    </div>
-  );
-}
-
 export function DataTable<T>({
   columns,
   data,
@@ -50,13 +37,12 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-sm">
-        <WindowChrome />
+      <div className="rounded-xl border overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/20 border-b-2 border-emerald-500">
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               {columns.map((col) => (
-                <TableHead key={col.key} className={cn("text-[10px] uppercase tracking-wider font-semibold text-muted-foreground", col.className)}>
+                <TableHead key={col.key} className={cn("text-xs font-medium text-muted-foreground", col.className)}>
                   {col.header}
                 </TableHead>
               ))}
@@ -64,10 +50,10 @@ export function DataTable<T>({
           </TableHeader>
           <TableBody>
             {Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i} className="even:bg-muted/30">
+              <TableRow key={i}>
                 {columns.map((col, ci) => (
                   <TableCell key={col.key}>
-                    <Skeleton className={`h-4 animate-shimmer ${skeletonWidths[ci % skeletonWidths.length]}`} />
+                    <Skeleton className={`h-4 ${skeletonWidths[ci % skeletonWidths.length]}`} />
                   </TableCell>
                 ))}
               </TableRow>
@@ -79,13 +65,12 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="rounded-xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-sm">
-      <WindowChrome />
+    <div className="rounded-xl border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/20 border-b-2 border-emerald-500">
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
             {columns.map((col) => (
-              <TableHead key={col.key} className={cn("text-[10px] uppercase tracking-wider font-semibold text-muted-foreground", col.className)}>
+              <TableHead key={col.key} className={cn("text-xs font-medium text-muted-foreground", col.className)}>
                 {col.header}
               </TableHead>
             ))}
@@ -107,7 +92,7 @@ export function DataTable<T>({
                 key={i}
                 onClick={() => onRowClick?.(row)}
                 className={cn(
-                  "even:bg-muted/30 transition-colors duration-100 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20",
+                  "transition-colors",
                   onRowClick && "cursor-pointer"
                 )}
               >

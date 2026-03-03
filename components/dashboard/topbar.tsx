@@ -25,9 +25,28 @@ const LABELS: Record<string, string> = {
   billing: "Billing",
   "api-keys": "API Keys",
   currencies: "Currencies",
+  "tax-rates": "Tax Rates",
   "trial-balance": "Trial Balance",
   "balance-sheet": "Balance Sheet",
   "income-statement": "Income Statement",
+  "profit-and-loss": "Profit & Loss",
+  "cash-flow": "Cash Flow",
+  "general-ledger": "General Ledger",
+  "aged-receivables": "Aged Receivables",
+  "aged-payables": "Aged Payables",
+  "budget-vs-actual": "Budget vs Actual",
+  contacts: "Contacts",
+  invoices: "Invoices",
+  quotes: "Quotes",
+  bills: "Bills",
+  "purchase-orders": "Purchase Orders",
+  expenses: "Expenses",
+  banking: "Banking",
+  budgets: "Budgets",
+  inventory: "Inventory",
+  projects: "Projects",
+  "fixed-assets": "Fixed Assets",
+  payroll: "Payroll",
   new: "New",
 };
 
@@ -42,7 +61,7 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background/60 backdrop-blur-xl shadow-[0_1px_3px_0_rgb(0_0_0/0.02)] px-4">
+    <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 !h-4" />
@@ -59,7 +78,7 @@ export function Topbar() {
                   {isLast ? (
                     <BreadcrumbPage className="font-medium">{label}</BreadcrumbPage>
                   ) : (
-                    <BreadcrumbLink href={href} className="hover:text-emerald-600 dark:hover:text-emerald-400">{label}</BreadcrumbLink>
+                    <BreadcrumbLink href={href} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{label}</BreadcrumbLink>
                   )}
                 </BreadcrumbItem>
               );
@@ -71,11 +90,11 @@ export function Topbar() {
         variant="outline"
         size="sm"
         onClick={openCommandPalette}
-        className="hidden sm:flex items-center gap-2 bg-muted/50 text-muted-foreground text-xs h-8 transition-all duration-150 hover:shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:border-emerald-500/30"
+        className="hidden sm:flex items-center gap-2 text-muted-foreground text-xs h-7 px-2.5 hover:border-emerald-300 hover:text-emerald-700 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
       >
-        <Search className="size-3.5" />
+        <Search className="size-3" />
         <span>Search...</span>
-        <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border border-border/50 bg-muted/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+        <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded-md border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           <span className="text-xs">&#8984;</span>K
         </kbd>
       </Button>

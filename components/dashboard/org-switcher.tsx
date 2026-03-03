@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronsUpDown, Plus, Building2 } from "lucide-react";
+import { ChevronsUpDown, Plus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,10 +51,10 @@ export function OrgSwitcher() {
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-sidebar-accent"
+          className="data-[state=open]:bg-accent"
         >
-          <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50 ring-1 ring-emerald-100 dark:ring-emerald-900/30">
-            <Building2 className="size-4 text-emerald-600" />
+          <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-600 text-white text-xs font-semibold">
+            {activeOrg?.name?.[0]?.toUpperCase() || "D"}
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">
@@ -64,7 +64,7 @@ export function OrgSwitcher() {
               {activeOrg?.slug || ""}
             </span>
           </div>
-          <ChevronsUpDown className="ml-auto size-4" />
+          <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -80,16 +80,16 @@ export function OrgSwitcher() {
             onClick={() => switchOrg(org)}
             className="gap-2"
           >
-            <div className="flex size-6 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/50">
-              <Building2 className="size-3.5 text-muted-foreground" />
+            <div className="flex size-5 items-center justify-center rounded-md bg-emerald-600 text-white text-[10px] font-semibold">
+              {org.name[0]?.toUpperCase()}
             </div>
             <span>{org.name}</span>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2">
-          <div className="flex size-6 items-center justify-center rounded-md border border-dashed border-emerald-300 dark:border-emerald-800">
-            <Plus className="size-3.5" />
+          <div className="flex size-5 items-center justify-center rounded-md border border-dashed border-emerald-300 dark:border-emerald-800">
+            <Plus className="size-3" />
           </div>
           <span className="text-muted-foreground">New organization</span>
         </DropdownMenuItem>
