@@ -663,13 +663,14 @@ export function BentoFeatures() {
                     className="pointer-events-none !absolute !inset-0 !rounded-none"
                     width="100%"
                     height="100%"
-                    colors={["#a7f3d0", "#6ee7b7", "#34d399", "#10b981"]}
-                    colorBack="#d1fae5"
-                    softness={0.4}
-                    intensity={0.5}
-                    noise={0.7}
-                    shape="dots"
-                    speed={0.3}
+                    colors={["#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#34d399", "#a7f3d0"]}
+                    colorBack="#34d399"
+                    softness={1}
+                    intensity={0.8}
+                    noise={0.9}
+                    shape="wave"
+                    scale={3.5}
+                    speed={0.2}
                   />
                   <div className="relative">{feature.mockup}</div>
                 </div>
