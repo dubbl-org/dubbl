@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronsUpDown, Plus, Check } from "lucide-react";
+import { ChevronDown, Plus, ArrowLeftRight, Settings, Users, Check, CreditCard } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { CreateOrgDialog } from "./create-org-dialog";
+import { useRouter } from "next/navigation";
 
 interface Org {
   id: string;
@@ -21,10 +23,17 @@ interface Org {
   memberCount: number;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  member: "Member",
+};
+
 export function OrgSwitcher() {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrg, setActiveOrg] = useState<Org | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/v1/organization")
@@ -51,83 +60,119 @@ export function OrgSwitcher() {
   }
 
   const otherOrgs = orgs.filter((o) => o.id !== activeOrg?.id);
+  const orgDisplayName = activeOrg?.name || activeOrg?.slug || "";
+  const orgInitial = (activeOrg?.name?.[0] || activeOrg?.slug?.[0] || "D").toUpperCase();
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            size="lg"
-            className="data-[state=open]:bg-sidebar-accent"
-          >
-            <div className="flex size-7 items-center justify-center rounded bg-emerald-600 text-white text-[11px] font-medium">
-              {activeOrg?.name?.[0]?.toUpperCase() || "D"}
+          <button className="flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:border-sidebar-border hover:bg-muted data-[state=open]:border-sidebar-border data-[state=open]:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+            <div className="flex size-6 items-center justify-center rounded-md bg-emerald-600 text-[10px] font-semibold text-white">
+              {orgInitial}
             </div>
-            <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate text-sm font-medium text-sidebar-accent-foreground">
-                {activeOrg?.name || "Select org"}
+            <span className="flex-1 truncate text-[13px] font-medium text-sidebar-accent-foreground">
+              {orgDisplayName}
+            </span>
+            {activeOrg && (
+              <span className="rounded bg-sidebar-accent px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {ROLE_LABELS[activeOrg.role] || activeOrg.role}
               </span>
-              <span className="truncate text-[11px] text-sidebar-foreground/50">
-                {activeOrg?.slug || ""}
-              </span>
-            </div>
-            <ChevronsUpDown className="ml-auto size-4 text-sidebar-foreground/30" />
-          </SidebarMenuButton>
+            )}
+            <ChevronDown className="size-3 text-sidebar-foreground/40" />
+          </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
+          className="!w-[15rem] p-0 overflow-hidden"
           align="start"
+          sideOffset={6}
         >
+          {/* Org info header */}
           {activeOrg && (
-            <div className="px-2 py-2">
-              <div className="flex items-center gap-2.5">
-                <div className="flex size-8 items-center justify-center rounded bg-emerald-600 text-white text-xs font-medium">
-                  {activeOrg.name[0]?.toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{activeOrg.name}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {activeOrg.slug} · {activeOrg.memberCount} {activeOrg.memberCount === 1 ? "member" : "members"}
-                  </p>
-                </div>
+            <div className="border-b border-border px-3 py-3">
+              <div className="flex items-center justify-between">
+                <p className="truncate text-[13px] font-semibold">{activeOrg.name || activeOrg.slug}</p>
+                <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                  {ROLE_LABELS[activeOrg.role] || activeOrg.role}
+                </span>
               </div>
+              <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{activeOrg.slug}</p>
             </div>
           )}
-          {otherOrgs.length > 0 && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <p className="px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                  Switch to
-                </p>
-                {otherOrgs.map((org) => (
-                  <DropdownMenuItem
-                    key={org.id}
-                    onClick={() => switchOrg(org)}
-                    className="gap-2.5"
-                  >
-                    <div className="flex size-6 items-center justify-center rounded bg-muted text-[10px] font-medium text-muted-foreground">
-                      {org.name[0]?.toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{org.name}</p>
-                    </div>
-                    {org.id === activeOrg?.id && (
-                      <Check className="size-3.5 shrink-0 text-emerald-600" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            </>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setCreateOpen(true)}
-            className="gap-2 text-muted-foreground"
-          >
-            <Plus className="size-4" />
-            New organization
-          </DropdownMenuItem>
+
+          {/* Actions with inline data */}
+          <div className="p-1">
+            <DropdownMenuItem
+              onClick={() => router.push("/settings")}
+              className="gap-2 text-[13px]"
+            >
+              <Settings className="size-3.5" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => router.push("/settings/members")}
+              className="gap-2 text-[13px]"
+            >
+              <Users className="size-3.5" />
+              Members
+              {activeOrg && (
+                <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
+                  {activeOrg.memberCount}
+                </span>
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => router.push("/settings/billing")}
+              className="gap-2 text-[13px]"
+            >
+              <CreditCard className="size-3.5" />
+              Billing
+              <span className="ml-auto rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                Free
+              </span>
+            </DropdownMenuItem>
+
+            {otherOrgs.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                    <ArrowLeftRight className="size-3.5" />
+                    Switch organization
+                    <span className="ml-auto pr-1 text-[11px] tabular-nums text-muted-foreground">
+                      {otherOrgs.length}
+                    </span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-44" sideOffset={8}>
+                    {otherOrgs.map((org) => (
+                      <DropdownMenuItem
+                        key={org.id}
+                        onClick={() => switchOrg(org)}
+                        className="gap-2"
+                      >
+                        <div className="flex size-5 items-center justify-center rounded bg-muted text-[9px] font-semibold text-muted-foreground">
+                          {(org.name?.[0] || org.slug?.[0] || "?").toUpperCase()}
+                        </div>
+                        <span className="flex-1 truncate text-[13px]">{org.name || org.slug}</span>
+                        {org.id === activeOrg?.id && (
+                          <Check className="size-3 shrink-0 text-emerald-600" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </>
+            )}
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setCreateOpen(true)}
+              className="gap-2 text-[13px] text-muted-foreground"
+            >
+              <Plus className="size-3.5" />
+              New organization
+            </DropdownMenuItem>
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
