@@ -84,6 +84,8 @@ export const organization = pgTable("organization", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
+  country: text("country"),
+  businessType: text("business_type"),
   defaultCurrency: text("default_currency").notNull().default("USD"),
   fiscalYearStartMonth: integer("fiscal_year_start_month")
     .notNull()

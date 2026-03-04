@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +13,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { COUNTRIES } from "@/lib/countries";
-import { LEGAL_ENTITY_TYPES } from "@/lib/legal-entity-types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { COUNTRIES as ALL_COUNTRIES } from "@/lib/countries";
 import { PAYMENT_TERMS } from "@/lib/payment-terms";
+import {
+  COUNTRIES as BUSINESS_COUNTRIES,
+  getBusinessTypesForCountry,
+  getCountryByCode,
+} from "@/lib/data/business-types";
 
 interface OrgSettings {
   id: string;
   name: string;
   slug: string;
+  country: string | null;
+  businessType: string | null;
   defaultCurrency: string;
   fiscalYearStartMonth: number;
   countryCode: string | null;
@@ -48,6 +69,8 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     name: "",
     slug: "",
+    country: "" as string,
+    businessType: "" as string,
     defaultCurrency: "USD",
     fiscalYearStartMonth: "1",
     countryCode: "",
@@ -66,6 +89,12 @@ export default function SettingsPage() {
     industrySector: "",
   });
   const [saving, setSaving] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
+
+  const businessTypes = useMemo(
+    () => (form.country ? getBusinessTypesForCountry(form.country) : []),
+    [form.country]
+  );
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -82,6 +111,8 @@ export default function SettingsPage() {
           setForm({
             name: o.name,
             slug: o.slug,
+            country: o.country ?? "",
+            businessType: o.businessType ?? "",
             defaultCurrency: o.defaultCurrency,
             fiscalYearStartMonth: String(o.fiscalYearStartMonth),
             countryCode: o.countryCode || "",
@@ -103,6 +134,18 @@ export default function SettingsPage() {
       });
   }, []);
 
+  function handleCountryChange(countryCode: string) {
+    const country = getCountryByCode(countryCode);
+    setForm((prev) => ({
+      ...prev,
+      country: countryCode,
+      businessType: "",
+      countryCode: countryCode,
+      ...(country ? { defaultCurrency: country.defaultCurrency } : {}),
+    }));
+    setCountryOpen(false);
+  }
+
   async function save() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
@@ -117,6 +160,8 @@ export default function SettingsPage() {
         body: JSON.stringify({
           name: form.name,
           slug: form.slug,
+          country: form.country || null,
+          businessType: form.businessType || null,
           defaultCurrency: form.defaultCurrency,
           fiscalYearStartMonth: parseInt(form.fiscalYearStartMonth),
           countryCode: form.countryCode || null,
@@ -143,6 +188,10 @@ export default function SettingsPage() {
       setSaving(false);
     }
   }
+
+  const selectedCountry = form.country
+    ? getCountryByCode(form.country)
+    : null;
 
   return (
     <div className="space-y-8">
@@ -177,39 +226,77 @@ export default function SettingsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Country</Label>
-            <Select
-              value={form.countryCode}
-              onValueChange={(v) => setForm({ ...form, countryCode: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select country" />
-              </SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={countryOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  {selectedCountry
+                    ? `${selectedCountry.flag} ${selectedCountry.name}`
+                    : "Select country..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search country..." />
+                  <CommandList>
+                    <CommandEmpty>No country found.</CommandEmpty>
+                    <CommandGroup>
+                      {BUSINESS_COUNTRIES.map((country) => (
+                        <CommandItem
+                          key={country.code}
+                          value={`${country.name} ${country.code}`}
+                          onSelect={() => handleCountryChange(country.code)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              form.country === country.code
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {country.flag} {country.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Entity type</Label>
-            <Select
-              value={form.legalEntityType}
-              onValueChange={(v) => setForm({ ...form, legalEntityType: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {LEGAL_ENTITY_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {form.country ? (
+              <Select
+                value={form.businessType}
+                onValueChange={(v) => setForm({ ...form, businessType: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {businessTypes.map((bt) => (
+                    <SelectItem key={bt.code} value={bt.code}>
+                      <span>{bt.localName}</span>
+                      {bt.localName !== bt.englishName && (
+                        <span className="ml-1 text-muted-foreground">
+                          ({bt.englishName})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="flex h-9 items-center rounded-md border border-input px-3 text-xs text-muted-foreground">
+                Select a country first
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Tax ID / VAT</Label>
@@ -301,7 +388,7 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COUNTRIES.map((c) => (
+                  {ALL_COUNTRIES.map((c) => (
                     <SelectItem key={c.code} value={c.code}>
                       {c.name}
                     </SelectItem>

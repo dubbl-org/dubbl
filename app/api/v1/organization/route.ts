@@ -7,27 +7,40 @@ import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import { isValidBusinessType } from "@/lib/data/business-types";
 
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  slug: z.string().min(1).optional(),
-  defaultCurrency: z.string().min(1).optional(),
-  fiscalYearStartMonth: z.number().min(1).max(12).optional(),
-  countryCode: z.string().max(2).nullable().optional(),
-  taxId: z.string().nullable().optional(),
-  businessRegistrationNumber: z.string().nullable().optional(),
-  legalEntityType: z.string().nullable().optional(),
-  addressStreet: z.string().nullable().optional(),
-  addressCity: z.string().nullable().optional(),
-  addressState: z.string().nullable().optional(),
-  addressPostalCode: z.string().nullable().optional(),
-  addressCountry: z.string().nullable().optional(),
-  contactPhone: z.string().nullable().optional(),
-  contactEmail: z.string().nullable().optional(),
-  contactWebsite: z.string().nullable().optional(),
-  defaultPaymentTerms: z.string().nullable().optional(),
-  industrySector: z.string().nullable().optional(),
-});
+const updateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    slug: z.string().min(1).optional(),
+    country: z.string().min(2).max(2).optional().nullable(),
+    businessType: z.string().min(1).optional().nullable(),
+    defaultCurrency: z.string().min(1).optional(),
+    fiscalYearStartMonth: z.number().min(1).max(12).optional(),
+    countryCode: z.string().max(2).nullable().optional(),
+    taxId: z.string().nullable().optional(),
+    businessRegistrationNumber: z.string().nullable().optional(),
+    legalEntityType: z.string().nullable().optional(),
+    addressStreet: z.string().nullable().optional(),
+    addressCity: z.string().nullable().optional(),
+    addressState: z.string().nullable().optional(),
+    addressPostalCode: z.string().nullable().optional(),
+    addressCountry: z.string().nullable().optional(),
+    contactPhone: z.string().nullable().optional(),
+    contactEmail: z.string().nullable().optional(),
+    contactWebsite: z.string().nullable().optional(),
+    defaultPaymentTerms: z.string().nullable().optional(),
+    industrySector: z.string().nullable().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.businessType && data.country) {
+        return isValidBusinessType(data.country, data.businessType);
+      }
+      return true;
+    },
+    { message: "Invalid business type for the selected country", path: ["businessType"] }
+  );
 
 const createSchema = z.object({
   name: z.string().min(1),
