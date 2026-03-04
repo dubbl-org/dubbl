@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { ScrollText } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +100,7 @@ const columns: Column<AuditEntry>[] = [
     className: "w-32",
     render: (r) => (
       <span className="text-xs text-muted-foreground">
-        {r.ipAddress || "--"}
+        {r.ipAddress || "-"}
       </span>
     ),
   },
@@ -151,27 +150,16 @@ export default function AuditLogPage() {
     actionFilter === "all"
   ) {
     return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Audit Log"
-          description="Track all changes across your organization."
-        />
-        <EmptyState
-          icon={ScrollText}
-          title="No audit entries yet"
-          description="Activity will appear here as changes are made."
-        />
-      </div>
+      <EmptyState
+        icon={ScrollText}
+        title="No audit entries yet"
+        description="Activity will appear here as changes are made."
+      />
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Audit Log"
-        description="Track all changes across your organization."
-      />
-
+    <div className="space-y-4">
       <div className="flex items-center gap-4">
         <Input
           placeholder="Search by user, entity..."

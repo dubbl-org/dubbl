@@ -22,8 +22,8 @@ export default function SettingsLayout({
   const pathname = usePathname();
 
   return (
-    <div className="space-y-6">
-      <nav className="flex gap-1 border-b border-border overflow-x-auto">
+    <div>
+      <nav className="-mt-2 mb-6 flex items-center gap-4 border-b border-border">
         {TABS.map((tab) => {
           const isActive = tab.exact
             ? pathname === tab.href
@@ -33,21 +33,20 @@ export default function SettingsLayout({
               key={tab.href}
               href={tab.href}
               className={cn(
-                "relative shrink-0 px-3 py-2 text-sm transition-colors",
+                "border-b-2 pb-2.5 text-[13px] transition-colors",
                 isActive
-                  ? "text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               {tab.label}
-              {isActive && (
-                <span className="absolute inset-x-0 -bottom-px h-px bg-foreground" />
-              )}
             </Link>
           );
         })}
       </nav>
-      {children}
+      <div className="rounded-lg border border-border bg-card p-6">
+        {children}
+      </div>
     </div>
   );
 }

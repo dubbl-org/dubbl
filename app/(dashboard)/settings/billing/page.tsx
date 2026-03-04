@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -122,14 +121,14 @@ export default function BillingPage() {
   const currentPlan = billing?.plan || "free";
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Billing" description="Manage your plan and billing.">
-        {currentPlan !== "free" && (
-          <Button variant="outline" onClick={openPortal}>
+    <div className="space-y-4">
+      {currentPlan !== "free" && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={openPortal}>
             Manage Billing
           </Button>
-        )}
-      </PageHeader>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {plans.map((plan) => {
@@ -138,7 +137,7 @@ export default function BillingPage() {
             <div
               key={plan.id}
               className={cn(
-                "rounded-lg border p-6 shadow-sm",
+                "rounded-lg border p-6",
                 isCurrent && "border-emerald-300 ring-1 ring-emerald-300"
               )}
             >

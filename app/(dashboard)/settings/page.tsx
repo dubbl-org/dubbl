@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,39 +145,36 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="General"
-        description="Manage your organization details and compliance settings."
-      />
-
-      {/* Organization Identity */}
-      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">Organization Identity</h2>
+    <div className="space-y-8">
+      {/* Organization */}
+      <section className="space-y-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Organization</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Organization Name</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Name</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Slug</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Slug</Label>
             <Input
               value={form.slug}
               onChange={(e) => setForm({ ...form, slug: e.target.value })}
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Legal Information */}
-      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">Legal Information</h2>
+      <div className="h-px bg-border" />
+
+      {/* Legal */}
+      <section className="space-y-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Legal</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Country</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Country</Label>
             <Select
               value={form.countryCode}
               onValueChange={(v) => setForm({ ...form, countryCode: v })}
@@ -195,8 +191,8 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Legal Entity Type</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity type</Label>
             <Select
               value={form.legalEntityType}
               onValueChange={(v) => setForm({ ...form, legalEntityType: v })}
@@ -213,16 +209,16 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Tax ID / VAT Number</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tax ID / VAT</Label>
             <Input
               value={form.taxId}
               onChange={(e) => setForm({ ...form, taxId: e.target.value })}
               placeholder="e.g. US12-3456789"
             />
           </div>
-          <div className="space-y-2">
-            <Label>Business Registration Number</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Registration number</Label>
             <Input
               value={form.businessRegistrationNumber}
               onChange={(e) =>
@@ -230,25 +226,27 @@ export default function SettingsPage() {
               }
             />
           </div>
-          <div className="space-y-2">
-            <Label>Industry Sector</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Industry</Label>
             <Input
               value={form.industrySector}
               onChange={(e) =>
                 setForm({ ...form, industrySector: e.target.value })
               }
-              placeholder="e.g. Technology, Retail"
+              placeholder="e.g. Technology"
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Business Address */}
-      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">Business Address</h2>
+      <div className="h-px bg-border" />
+
+      {/* Address */}
+      <section className="space-y-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Address</p>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Street Address</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Street</Label>
             <Input
               value={form.addressStreet}
               onChange={(e) =>
@@ -257,8 +255,8 @@ export default function SettingsPage() {
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>City</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">City</Label>
               <Input
                 value={form.addressCity}
                 onChange={(e) =>
@@ -266,8 +264,8 @@ export default function SettingsPage() {
                 }
               />
             </div>
-            <div className="space-y-2">
-              <Label>State / Province</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">State / Province</Label>
               <Input
                 value={form.addressState}
                 onChange={(e) =>
@@ -277,8 +275,8 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Postal Code</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Postal code</Label>
               <Input
                 value={form.addressPostalCode}
                 onChange={(e) =>
@@ -286,8 +284,8 @@ export default function SettingsPage() {
                 }
               />
             </div>
-            <div className="space-y-2">
-              <Label>Country</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Country</Label>
               <Select
                 value={form.addressCountry}
                 onValueChange={(v) => setForm({ ...form, addressCountry: v })}
@@ -306,14 +304,16 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Contact Information */}
-      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">Contact Information</h2>
+      <div className="h-px bg-border" />
+
+      {/* Contact */}
+      <section className="space-y-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contact</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Phone</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Phone</Label>
             <Input
               value={form.contactPhone}
               onChange={(e) =>
@@ -322,8 +322,8 @@ export default function SettingsPage() {
               placeholder="+1 (555) 123-4567"
             />
           </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email</Label>
             <Input
               type="email"
               value={form.contactEmail}
@@ -333,8 +333,8 @@ export default function SettingsPage() {
               placeholder="billing@company.com"
             />
           </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Website</Label>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Website</Label>
             <Input
               value={form.contactWebsite}
               onChange={(e) =>
@@ -344,14 +344,16 @@ export default function SettingsPage() {
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Financial Defaults */}
-      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">Financial Defaults</h2>
+      <div className="h-px bg-border" />
+
+      {/* Financials */}
+      <section className="space-y-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Financials</p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Default Currency</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Default currency</Label>
             <Input
               value={form.defaultCurrency}
               onChange={(e) =>
@@ -359,8 +361,8 @@ export default function SettingsPage() {
               }
             />
           </div>
-          <div className="space-y-2">
-            <Label>Fiscal Year Start</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Fiscal year start</Label>
             <Select
               value={form.fiscalYearStartMonth}
               onValueChange={(v) =>
@@ -379,8 +381,8 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Default Payment Terms</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Payment terms</Label>
             <Select
               value={form.defaultPaymentTerms}
               onValueChange={(v) =>
@@ -400,28 +402,33 @@ export default function SettingsPage() {
             </Select>
           </div>
         </div>
+      </section>
+
+      <div className="flex items-center justify-between pt-2">
+        <Button
+          onClick={save}
+          disabled={saving}
+          size="sm"
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          {saving ? "Saving..." : "Save changes"}
+        </Button>
       </div>
 
-      <Button
-        onClick={save}
-        disabled={saving}
-        className="bg-emerald-600 hover:bg-emerald-700"
-      >
-        {saving ? "Saving..." : "Save Changes"}
-      </Button>
+      <div className="h-px bg-border" />
 
-      {/* Danger Zone */}
-      <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
+      {/* Danger zone */}
+      <section className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-red-600">Danger Zone</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete organization</p>
+          <p className="text-xs text-muted-foreground">
             Permanently delete this organization and all its data.
           </p>
         </div>
         <Button variant="destructive" size="sm">
-          Delete Organization
+          Delete
         </Button>
-      </div>
+      </section>
     </div>
   );
 }

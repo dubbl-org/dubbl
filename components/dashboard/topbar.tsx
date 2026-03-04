@@ -40,6 +40,7 @@ const LABELS: Record<string, string> = {
   projects: "Projects",
   "fixed-assets": "Fixed Assets",
   payroll: "Payroll",
+  general: "General",
   new: "New",
 };
 
@@ -58,8 +59,12 @@ export function Topbar() {
   const router = useRouter();
   const segments = pathname.split("/").filter(Boolean);
 
-  const pageTitle = LABELS[segments[segments.length - 1] || ""] || segments[segments.length - 1] || "Overview";
-  const parentLabel = segments.length > 1 ? LABELS[segments[0]] || segments[0] : null;
+  // For settings root, treat it as "Settings / General"
+  const isSettingsRoot = segments.length === 1 && segments[0] === "settings";
+  const effectiveSegments = isSettingsRoot ? ["settings", "general"] : segments;
+
+  const pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
+  const parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
 
   const cta = CTA_MAP[segments[0]];
 
@@ -76,13 +81,13 @@ export function Topbar() {
             <span className="text-[14px] font-semibold tracking-tight">dubbl</span>
           </Link>
           <div className="h-4 w-px bg-border" />
-          {parentLabel && segments.length > 1 && (
+          {parentLabel && effectiveSegments.length > 1 && (
             <>
               <span className="text-[13px] text-muted-foreground">{parentLabel}</span>
               <span className="text-muted-foreground/40">/</span>
             </>
           )}
-          <h1 className="text-[14px] font-semibold">{pageTitle}</h1>
+          <h1 className="text-[14px] text-muted-foreground">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />

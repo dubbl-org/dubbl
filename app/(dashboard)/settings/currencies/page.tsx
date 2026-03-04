@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { DollarSign } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 
@@ -55,24 +54,15 @@ export default function CurrenciesPage() {
 
   if (!loading && currencies.length === 0) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Currencies" description="Available currencies." />
-        <EmptyState
-          icon={DollarSign}
-          title="No currencies"
-          description="Run the seed script to populate ISO 4217 currencies."
-        />
-      </div>
+      <EmptyState
+        icon={DollarSign}
+        title="No currencies"
+        description="Run the seed script to populate ISO 4217 currencies."
+      />
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Currencies"
-        description="Available currencies in the system."
-      />
-      <DataTable columns={columns} data={currencies} loading={loading} />
-    </div>
+    <DataTable columns={columns} data={currencies} loading={loading} />
   );
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Scale } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -50,27 +49,11 @@ const columns: Column<TaxRate>[] = [
   },
 ];
 
-export default function TaxRatesPage() {
-  const [rates, setRates] = useState<TaxRate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolean; setOpen: (v: boolean) => void; onCreated: () => void; orgId: string | null }) {
   const [name, setName] = useState("");
   const [rate, setRate] = useState("");
   const [type, setType] = useState("both");
   const [saving, setSaving] = useState(false);
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  function fetchRates() {
-    if (!orgId) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setRates(data.taxRates); })
-      .finally(() => setLoading(false));
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchRates(); }, [orgId]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -87,61 +70,68 @@ export default function TaxRatesPage() {
       setOpen(false);
       setName("");
       setRate("");
-      fetchRates();
+      onCreated();
     } catch { toast.error("Failed to create tax rate"); }
     finally { setSaving(false); }
   }
 
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+          <Plus className="mr-1.5 size-3.5" />Add Tax Rate
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>New Tax Rate</DialogTitle></DialogHeader>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GST 10%" required /></div>
+          <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required /></div>
+          <div className="space-y-2"><Label>Type</Label>
+            <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <Button type="submit" disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">{saving ? "Creating..." : "Create"}</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function TaxRatesPage() {
+  const [rates, setRates] = useState<TaxRate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  function fetchRates() {
+    if (!orgId) return;
+    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.taxRates) setRates(data.taxRates); })
+      .finally(() => setLoading(false));
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchRates(); }, [orgId]);
+
   if (!loading && rates.length === 0) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Tax Rates" description="Manage tax rates for invoices and bills." />
+      <div className="space-y-4">
         <EmptyState icon={Scale} title="No tax rates" description="Add tax rates to apply taxes on invoices and bills.">
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="mr-2 size-4" />Add Tax Rate</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>New Tax Rate</DialogTitle></DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GST 10%" required /></div>
-                <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required /></div>
-                <div className="space-y-2"><Label>Type</Label>
-                  <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">{saving ? "Creating..." : "Create"}</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
         </EmptyState>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Tax Rates" description="Manage tax rates for invoices and bills.">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="mr-2 size-4" />Add Tax Rate</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>New Tax Rate</DialogTitle></DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GST 10%" required /></div>
-              <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required /></div>
-              <div className="space-y-2"><Label>Type</Label>
-                <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">{saving ? "Creating..." : "Create"}</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </PageHeader>
+    <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
+      </div>
       <DataTable columns={columns} data={rates} loading={loading} emptyMessage="No tax rates found." />
     </div>
   );

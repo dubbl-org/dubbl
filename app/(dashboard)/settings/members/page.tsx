@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,16 +140,17 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Members" description="Manage organization members.">
+    <div className="space-y-4">
+      <div className="flex items-center justify-end">
         <Button
+          size="sm"
           onClick={() => setInviteOpen(true)}
           className="bg-emerald-600 hover:bg-emerald-700"
         >
-          <Plus className="mr-2 size-4" />
+          <Plus className="mr-1.5 size-3.5" />
           Add Member
         </Button>
-      </PageHeader>
+      </div>
 
       {!loading && members.length === 0 ? (
         <EmptyState
