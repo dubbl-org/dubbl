@@ -6,14 +6,13 @@ import { useSession, signOut } from "next-auth/react";
 import {
   LogOut,
   Settings,
-  ChevronsUpDown,
   UserPen,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -45,43 +44,55 @@ export function UserMenu() {
           >
             <Avatar className="size-7">
               <AvatarImage src={user?.image || undefined} />
-              <AvatarFallback className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+              <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium text-sidebar-accent-foreground">
+            <div className="grid flex-1 text-left leading-tight">
+              <span className="truncate text-sm font-medium text-sidebar-accent-foreground">
                 {user?.name || "User"}
               </span>
-              <span className="truncate text-xs text-sidebar-foreground/50">
+              <span className="truncate text-[11px] text-sidebar-foreground/50">
                 {user?.email}
               </span>
             </div>
-            <ChevronsUpDown className="ml-auto size-4 text-sidebar-foreground/40" />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className="w-[--radix-dropdown-menu-trigger-width] min-w-52"
+          className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
           align="start"
           side="top"
         >
-          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal truncate">
-            {user?.email}
-          </DropdownMenuLabel>
+          <div className="px-2 py-2">
+            <div className="flex items-center gap-2.5">
+              <Avatar className="size-8">
+                <AvatarImage src={user?.image || undefined} />
+                <AvatarFallback className="text-xs bg-muted text-muted-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{user?.name || "User"}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{user?.email}</p>
+              </div>
+            </div>
+          </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setEditOpen(true)}
-            className="gap-2"
-          >
-            <UserPen className="size-4" />
-            Edit Profile
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="gap-2">
-              <Settings className="size-4" />
-              Settings
-            </Link>
-          </DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              onClick={() => setEditOpen(true)}
+              className="gap-2"
+            >
+              <UserPen className="size-4" />
+              Edit Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings" className="gap-2">
+                <Settings className="size-4" />
+                Settings
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => signOut({ callbackUrl: "/" })}

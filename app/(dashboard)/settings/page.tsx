@@ -155,6 +155,7 @@ export default function SettingsPage() {
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Acme Inc."
             />
           </div>
           <div className="space-y-1.5">
@@ -162,6 +163,7 @@ export default function SettingsPage() {
             <Input
               value={form.slug}
               onChange={(e) => setForm({ ...form, slug: e.target.value })}
+              placeholder="acme-inc"
             />
           </div>
         </div>
@@ -224,6 +226,7 @@ export default function SettingsPage() {
               onChange={(e) =>
                 setForm({ ...form, businessRegistrationNumber: e.target.value })
               }
+              placeholder="e.g. 12345678"
             />
           </div>
           <div className="space-y-1.5">
@@ -252,6 +255,7 @@ export default function SettingsPage() {
               onChange={(e) =>
                 setForm({ ...form, addressStreet: e.target.value })
               }
+              placeholder="123 Main Street"
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -262,6 +266,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setForm({ ...form, addressCity: e.target.value })
                 }
+                placeholder="San Francisco"
               />
             </div>
             <div className="space-y-1.5">
@@ -271,6 +276,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setForm({ ...form, addressState: e.target.value })
                 }
+                placeholder="California"
               />
             </div>
           </div>
@@ -282,6 +288,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setForm({ ...form, addressPostalCode: e.target.value })
                 }
+                placeholder="94105"
               />
             </div>
             <div className="space-y-1.5">
@@ -359,6 +366,7 @@ export default function SettingsPage() {
               onChange={(e) =>
                 setForm({ ...form, defaultCurrency: e.target.value })
               }
+              placeholder="USD"
             />
           </div>
           <div className="space-y-1.5">
