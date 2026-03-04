@@ -23,7 +23,7 @@ export default function SettingsLayout({
 
   return (
     <div>
-      <nav className="-mt-2 mb-6 flex items-center gap-4 border-b border-border">
+      <nav className="-mt-2 mb-8 flex items-center gap-4 border-b border-border">
         {TABS.map((tab) => {
           const isActive = tab.exact
             ? pathname === tab.href
@@ -44,9 +44,7 @@ export default function SettingsLayout({
           );
         })}
       </nav>
-      <div className="rounded-lg border border-border bg-card p-6">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

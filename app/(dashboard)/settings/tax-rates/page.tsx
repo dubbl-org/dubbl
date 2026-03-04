@@ -117,22 +117,42 @@ export default function TaxRatesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchRates(); }, [orgId]);
 
-  if (!loading && rates.length === 0) {
-    return (
-      <div className="space-y-4">
-        <EmptyState icon={Scale} title="No tax rates" description="Add tax rates to apply taxes on invoices and bills.">
-          <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
-        </EmptyState>
-      </div>
-    );
-  }
+  const salesCount = rates.filter((r) => r.type === "sales" || r.type === "both").length;
+  const purchaseCount = rates.filter((r) => r.type === "purchase" || r.type === "both").length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
-      </div>
-      <DataTable columns={columns} data={rates} loading={loading} emptyMessage="No tax rates found." />
+    <div className="space-y-10">
+      {/* Tax rates section */}
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">Tax rates</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Define tax rates to apply on invoices and bills. Rates can be scoped to sales, purchases, or both.
+          </p>
+        </div>
+        <div className="min-w-0 space-y-4">
+          <div className="flex items-center justify-between">
+            {rates.length > 0 ? (
+              <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+                <span>{rates.length} rate{rates.length !== 1 ? "s" : ""}</span>
+                <span className="text-border">|</span>
+                <span>{salesCount} sales</span>
+                <span className="text-border">|</span>
+                <span>{purchaseCount} purchase</span>
+              </div>
+            ) : (
+              <div />
+            )}
+            <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
+          </div>
+
+          {!loading && rates.length === 0 ? (
+            <EmptyState icon={Scale} title="No tax rates" description="Add tax rates to apply taxes on invoices and bills." />
+          ) : (
+            <DataTable columns={columns} data={rates} loading={loading} emptyMessage="No tax rates found." />
+          )}
+        </div>
+      </section>
     </div>
   );
 }

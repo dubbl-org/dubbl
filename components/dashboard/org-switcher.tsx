@@ -1,19 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, Plus, ArrowLeftRight, Settings, Users, Check, CreditCard } from "lucide-react";
+import { ChevronDown, Plus, Check } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CreateOrgDialog } from "./create-org-dialog";
-import { useRouter } from "next/navigation";
 
 interface Org {
   id: string;
@@ -21,6 +17,9 @@ interface Org {
   slug: string;
   role: "owner" | "admin" | "member";
   memberCount: number;
+  defaultCurrency: string;
+  country: string | null;
+  createdAt: string;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -33,7 +32,6 @@ export function OrgSwitcher() {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrg, setActiveOrg] = useState<Org | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/v1/organization")
@@ -87,84 +85,65 @@ export function OrgSwitcher() {
           align="start"
           sideOffset={6}
         >
-          {/* Org info header */}
           {activeOrg && (
-            <div className="border-b border-border px-3 py-3">
-              <div className="flex items-center justify-between">
-                <p className="truncate text-[13px] font-semibold">{activeOrg.name || activeOrg.slug}</p>
-                <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                  {ROLE_LABELS[activeOrg.role] || activeOrg.role}
-                </span>
+            <>
+              {/* Org header */}
+              <div className="px-3 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="truncate text-[13px] font-semibold">{activeOrg.name || activeOrg.slug}</p>
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                    {ROLE_LABELS[activeOrg.role] || activeOrg.role}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{activeOrg.slug}</p>
               </div>
-              <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{activeOrg.slug}</p>
-            </div>
+
+              {/* Info grid */}
+              <div className="mx-3 mb-3 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border">
+                <div className="bg-card px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-muted-foreground">Members</p>
+                  <p className="text-[12px] font-semibold tabular-nums">{activeOrg.memberCount}</p>
+                </div>
+                <div className="bg-card px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-muted-foreground">Currency</p>
+                  <p className="text-[12px] font-semibold">{activeOrg.defaultCurrency}</p>
+                </div>
+                <div className="bg-card px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-muted-foreground">Plan</p>
+                  <p className="text-[12px] font-semibold">Free</p>
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Actions with inline data */}
-          <div className="p-1">
-            <DropdownMenuItem
-              onClick={() => router.push("/settings")}
-              className="gap-2 text-[13px]"
-            >
-              <Settings className="size-3.5" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => router.push("/settings/members")}
-              className="gap-2 text-[13px]"
-            >
-              <Users className="size-3.5" />
-              Members
-              {activeOrg && (
-                <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
-                  {activeOrg.memberCount}
-                </span>
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => router.push("/settings/billing")}
-              className="gap-2 text-[13px]"
-            >
-              <CreditCard className="size-3.5" />
-              Billing
-              <span className="ml-auto rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                Free
-              </span>
-            </DropdownMenuItem>
+          {/* Other orgs */}
+          {otherOrgs.length > 0 && (
+            <>
+              <div className="border-t border-border px-3 pt-2 pb-1">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Organizations</p>
+              </div>
+              <div className="px-1 pb-1">
+                {otherOrgs.map((org) => (
+                  <DropdownMenuItem
+                    key={org.id}
+                    onClick={() => switchOrg(org)}
+                    className="gap-2"
+                  >
+                    <div className="flex size-5 items-center justify-center rounded bg-border text-[9px] font-semibold text-muted-foreground">
+                      {(org.name?.[0] || org.slug?.[0] || "?").toUpperCase()}
+                    </div>
+                    <span className="flex-1 truncate text-[13px]">{org.name || org.slug}</span>
+                    <Check className="size-3 shrink-0 opacity-0 text-emerald-600" />
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </>
+          )}
 
-            {otherOrgs.length > 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-                    <ArrowLeftRight className="size-3.5" />
-                    Switch organization
-                    <span className="ml-auto pr-1 text-[11px] tabular-nums text-muted-foreground">
-                      {otherOrgs.length}
-                    </span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="min-w-44" sideOffset={8}>
-                    {otherOrgs.map((org) => (
-                      <DropdownMenuItem
-                        key={org.id}
-                        onClick={() => switchOrg(org)}
-                        className="gap-2"
-                      >
-                        <div className="flex size-5 items-center justify-center rounded bg-muted text-[9px] font-semibold text-muted-foreground">
-                          {(org.name?.[0] || org.slug?.[0] || "?").toUpperCase()}
-                        </div>
-                        <span className="flex-1 truncate text-[13px]">{org.name || org.slug}</span>
-                        {org.id === activeOrg?.id && (
-                          <Check className="size-3 shrink-0 text-emerald-600" />
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              </>
-            )}
+          {/* Active org indicator when other orgs shown */}
 
-            <DropdownMenuSeparator />
+          {/* New org */}
+          <div className="border-t border-border p-1">
             <DropdownMenuItem
               onClick={() => setCreateOpen(true)}
               className="gap-2 text-[13px] text-muted-foreground"

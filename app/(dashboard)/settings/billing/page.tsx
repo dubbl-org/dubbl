@@ -121,73 +121,112 @@ export default function BillingPage() {
   const currentPlan = billing?.plan || "free";
 
   return (
-    <div className="space-y-4">
-      {currentPlan !== "free" && (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={openPortal}>
-            Manage Billing
-          </Button>
+    <div className="space-y-10">
+      {/* Current plan overview */}
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">Current plan</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Your organization's subscription and usage.
+          </p>
         </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {plans.map((plan) => {
-          const isCurrent = plan.id === currentPlan;
-          return (
-            <div
-              key={plan.id}
-              className={cn(
-                "rounded-lg border p-6",
-                isCurrent && "border-emerald-300 ring-1 ring-emerald-300"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{plan.name}</h3>
-                {isCurrent && (
-                  <Badge className="bg-emerald-100 text-emerald-700 border-0">
-                    Current
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-2">
-                <span className="text-3xl font-bold tracking-tight">
-                  {plan.price}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {plan.period}
+        <div className="min-w-0">
+          <div className="flex items-center justify-between rounded-lg border border-border p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                <span className="text-lg font-bold text-emerald-600">
+                  {currentPlan === "free" ? "F" : currentPlan === "pro" ? "P" : "B"}
                 </span>
               </div>
-              <ul className="mt-4 space-y-2">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm">
-                    <Check className="size-3.5 text-emerald-600 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6">
-                {isCurrent ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Current Plan
-                  </Button>
-                ) : (
-                  <Button
-                    className={cn(
-                      "w-full",
-                      plan.id !== "free" &&
-                        "bg-emerald-600 hover:bg-emerald-700"
-                    )}
-                    variant={plan.id === "free" ? "outline" : "default"}
-                    onClick={() => checkout(plan.id)}
-                  >
-                    {plan.id === "free" ? "Downgrade" : "Upgrade"}
-                  </Button>
-                )}
+              <div>
+                <p className="text-sm font-semibold capitalize">{currentPlan} plan</p>
+                <p className="text-[12px] text-muted-foreground">
+                  {billing?.seatCount ? `${billing.seatCount} seat${billing.seatCount !== 1 ? "s" : ""}` : "1 seat"}
+                  {billing?.currentPeriodEnd
+                    ? ` · Renews ${new Date(billing.currentPeriodEnd).toLocaleDateString()}`
+                    : ""}
+                </p>
               </div>
             </div>
-          );
-        })}
-      </div>
+            {currentPlan !== "free" && (
+              <Button variant="outline" size="sm" onClick={openPortal}>
+                Manage Billing
+              </Button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="h-px bg-border" />
+
+      {/* Plans */}
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">Plans</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Compare features and choose the right plan for your team.
+          </p>
+        </div>
+        <div className="min-w-0 grid gap-4 lg:grid-cols-3">
+          {plans.map((plan) => {
+            const isCurrent = plan.id === currentPlan;
+            return (
+              <div
+                key={plan.id}
+                className={cn(
+                  "rounded-lg border p-5",
+                  isCurrent && "border-emerald-300 ring-1 ring-emerald-300"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                  {isCurrent && (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                      Current
+                    </Badge>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <span className="text-3xl font-bold tracking-tight">
+                    {plan.price}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {plan.period}
+                  </span>
+                </div>
+                <ul className="mt-4 space-y-2">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-[13px]">
+                      <Check className="size-3.5 text-emerald-600 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-5">
+                  {isCurrent ? (
+                    <Button variant="outline" className="w-full" size="sm" disabled>
+                      Current Plan
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className={cn(
+                        "w-full",
+                        plan.id !== "free" &&
+                          "bg-emerald-600 hover:bg-emerald-700"
+                      )}
+                      variant={plan.id === "free" ? "outline" : "default"}
+                      onClick={() => checkout(plan.id)}
+                    >
+                      {plan.id === "free" ? "Downgrade" : "Upgrade"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

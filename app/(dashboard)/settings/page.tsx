@@ -38,7 +38,6 @@ import {
 interface OrgSettings {
   id: string;
   name: string;
-  slug: string;
   country: string | null;
   businessType: string | null;
   defaultCurrency: string;
@@ -64,11 +63,30 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+      <div className="shrink-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{description}</p>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const [, setOrg] = useState<OrgSettings | null>(null);
   const [form, setForm] = useState({
     name: "",
-    slug: "",
     country: "" as string,
     businessType: "" as string,
     defaultCurrency: "USD",
@@ -110,7 +128,6 @@ export default function SettingsPage() {
           setOrg(o);
           setForm({
             name: o.name,
-            slug: o.slug,
             country: o.country ?? "",
             businessType: o.businessType ?? "",
             defaultCurrency: o.defaultCurrency,
@@ -159,7 +176,6 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           name: form.name,
-          slug: form.slug,
           country: form.country || null,
           businessType: form.businessType || null,
           defaultCurrency: form.defaultCurrency,
@@ -194,53 +210,45 @@ export default function SettingsPage() {
     : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Organization */}
-      <section className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Organization</p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Name</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Acme Inc."
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Slug</Label>
-            <Input
-              value={form.slug}
-              onChange={(e) => setForm({ ...form, slug: e.target.value })}
-              placeholder="acme-inc"
-            />
-          </div>
+      <Section title="Organization" description="Basic details about your organization.">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Acme Inc."
+          />
         </div>
-      </section>
+      </Section>
 
       <div className="h-px bg-border" />
 
       {/* Legal */}
-      <section className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Legal</p>
+      <Section title="Legal" description="Legal entity information, tax IDs, and registration details.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Country</Label>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
+                <button
+                  type="button"
                   role="combobox"
                   aria-expanded={countryOpen}
-                  className="w-full justify-between font-normal"
+                  className={cn(
+                    "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors",
+                    "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    !selectedCountry && "text-muted-foreground"
+                  )}
                 >
                   {selectedCountry
                     ? `${selectedCountry.flag} ${selectedCountry.name}`
                     : "Select country..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
+                </button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+              <PopoverContent className="p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Search country..." />
                   <CommandList>
@@ -327,13 +335,12 @@ export default function SettingsPage() {
             />
           </div>
         </div>
-      </section>
+      </Section>
 
       <div className="h-px bg-border" />
 
       {/* Address */}
-      <section className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Address</p>
+      <Section title="Address" description="Your organization's registered address.">
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Street</Label>
@@ -398,13 +405,12 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </section>
+      </Section>
 
       <div className="h-px bg-border" />
 
       {/* Contact */}
-      <section className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contact</p>
+      <Section title="Contact" description="How customers and partners can reach your organization.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Phone</Label>
@@ -438,13 +444,12 @@ export default function SettingsPage() {
             />
           </div>
         </div>
-      </section>
+      </Section>
 
       <div className="h-px bg-border" />
 
       {/* Financials */}
-      <section className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Financials</p>
+      <Section title="Financials" description="Currency, fiscal year, and default payment terms.">
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Default currency</Label>
@@ -497,9 +502,12 @@ export default function SettingsPage() {
             </Select>
           </div>
         </div>
-      </section>
+      </Section>
 
-      <div className="flex items-center justify-between pt-2">
+      <div className="h-px bg-border" />
+
+      {/* Save */}
+      <div className="flex justify-end">
         <Button
           onClick={save}
           disabled={saving}
@@ -513,17 +521,19 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Danger zone */}
-      <section className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete organization</p>
-          <p className="text-xs text-muted-foreground">
-            Permanently delete this organization and all its data.
-          </p>
+      <Section title="Danger zone" description="Irreversible actions for this organization.">
+        <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+          <div>
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete organization</p>
+            <p className="text-[12px] text-muted-foreground">
+              Permanently delete this organization and all its data.
+            </p>
+          </div>
+          <Button variant="destructive" size="sm">
+            Delete
+          </Button>
         </div>
-        <Button variant="destructive" size="sm">
-          Delete
-        </Button>
-      </section>
+      </Section>
     </div>
   );
 }
