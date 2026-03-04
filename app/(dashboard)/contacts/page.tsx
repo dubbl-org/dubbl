@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Users } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,62 +96,82 @@ export default function ContactsPage() {
       .finally(() => setLoading(false));
   }, [search, typeFilter]);
 
+  const customers = contacts.filter((c) => c.type === "customer" || c.type === "both");
+  const suppliers = contacts.filter((c) => c.type === "supplier" || c.type === "both");
+
   if (!loading && contacts.length === 0 && !search && typeFilter === "all") {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Contacts" description="Manage customers and suppliers." />
-        <EmptyState
-          icon={Users}
-          title="No contacts yet"
-          description="Add your first customer or supplier to get started."
-        >
-          <Button
-            onClick={() => router.push("/contacts/new")}
-            className="bg-emerald-600 hover:bg-emerald-700"
+      <div className="space-y-10">
+        <Section title="Contacts" description="Manage your customers and suppliers in one place.">
+          <EmptyState
+            icon={Users}
+            title="No contacts yet"
+            description="Add your first customer or supplier to get started."
           >
-            <Plus className="mr-2 size-4" />
-            New Contact
-          </Button>
-        </EmptyState>
+            <Button
+              onClick={() => router.push("/contacts/new")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Contact
+            </Button>
+          </EmptyState>
+        </Section>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Contacts" description="Manage customers and suppliers.">
-        <Button
-          onClick={() => router.push("/contacts/new")}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-2 size-4" />
-          New Contact
-        </Button>
-      </PageHeader>
+    <div className="space-y-10">
+      <Section title="Overview" description="Summary of your contacts, including customers and suppliers.">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title="Total Contacts" value={contacts.length.toString()} icon={Users} />
+            <StatCard title="Customers" value={customers.length.toString()} icon={Users} />
+            <StatCard title="Suppliers" value={suppliers.length.toString()} icon={Users} />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={() => router.push("/contacts/new")}
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Contact
+            </Button>
+          </div>
+        </div>
+      </Section>
 
-      <div className="flex items-center gap-4">
-        <Input
-          placeholder="Search contacts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-        <Tabs value={typeFilter} onValueChange={setTypeFilter}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="customer">Customers</TabsTrigger>
-            <TabsTrigger value="supplier">Suppliers</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      <div className="h-px bg-border" />
 
-      <DataTable
-        columns={columns}
-        data={contacts}
-        loading={loading}
-        emptyMessage="No contacts found."
-        onRowClick={(r) => router.push(`/contacts/${r.id}`)}
-      />
+      <Section title="Contacts" description="View, filter, and manage all your contacts.">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Input
+              placeholder="Search contacts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <Tabs value={typeFilter} onValueChange={setTypeFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="customer">Customers</TabsTrigger>
+                <TabsTrigger value="supplier">Suppliers</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={contacts}
+            loading={loading}
+            emptyMessage="No contacts found."
+            onRowClick={(r) => router.push(`/contacts/${r.id}`)}
+          />
+        </div>
+      </Section>
     </div>
   );
 }

@@ -10,15 +10,40 @@ import { usePathname, useRouter } from "next/navigation";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
-  transactions: "Transactions",
-  accounts: "Accounts",
+  sales: "Sales",
+  purchases: "Purchases",
+  contacts: "Contacts",
+  accounting: "Accounting",
+  projects: "Projects",
+  inventory: "Inventory",
+  payroll: "Payroll",
   reports: "Reports",
   settings: "Settings",
+  // Sales subtabs
+  invoices: "Invoices",
+  quotes: "Quotes",
+  new: "New",
+  // Purchases subtabs
+  bills: "Bills",
+  expenses: "Expenses",
+  orders: "Purchase Orders",
+  // Accounting subtabs
+  transactions: "Transactions",
+  accounts: "Accounts",
+  banking: "Banking",
+  "fixed-assets": "Fixed Assets",
+  budgets: "Budgets",
+  // Settings subtabs
   members: "Members",
   billing: "Billing",
   "api-keys": "API Keys",
   currencies: "Currencies",
   "tax-rates": "Tax Rates",
+  "audit-log": "Audit Log",
+  // Payroll sub-pages
+  employees: "Employees",
+  runs: "Pay Runs",
+  // Reports sub-pages
   "trial-balance": "Trial Balance",
   "balance-sheet": "Balance Sheet",
   "income-statement": "Income Statement",
@@ -28,30 +53,17 @@ const LABELS: Record<string, string> = {
   "aged-receivables": "Aged Receivables",
   "aged-payables": "Aged Payables",
   "budget-vs-actual": "Budget vs Actual",
-  contacts: "Contacts",
-  invoices: "Invoices",
-  quotes: "Quotes",
-  bills: "Bills",
-  "purchase-orders": "Purchase Orders",
-  expenses: "Expenses",
-  banking: "Banking",
-  budgets: "Budgets",
-  inventory: "Inventory",
-  projects: "Projects",
-  "fixed-assets": "Fixed Assets",
-  payroll: "Payroll",
   general: "General",
-  new: "New",
+  time: "Time Tracking",
 };
 
 const CTA_MAP: Record<string, { label: string; href: string }> = {
-  invoices: { label: "New Invoice", href: "/invoices/new" },
-  quotes: { label: "New Quote", href: "/quotes/new" },
-  bills: { label: "New Bill", href: "/bills/new" },
-  expenses: { label: "New Expense", href: "/expenses/new" },
-  transactions: { label: "New Entry", href: "/transactions/new" },
-  accounts: { label: "New Account", href: "/accounts/new" },
+  sales: { label: "New Invoice", href: "/sales/new" },
+  purchases: { label: "New Bill", href: "/purchases/new" },
+  accounting: { label: "New Entry", href: "/accounting/new" },
   contacts: { label: "New Contact", href: "/contacts/new" },
+  projects: { label: "New Project", href: "/projects/new" },
+  inventory: { label: "New Item", href: "/inventory/new" },
 };
 
 export function Topbar() {
@@ -59,9 +71,15 @@ export function Topbar() {
   const router = useRouter();
   const segments = pathname.split("/").filter(Boolean);
 
-  // For settings root, treat it as "Settings / General"
-  const isSettingsRoot = segments.length === 1 && segments[0] === "settings";
-  const effectiveSegments = isSettingsRoot ? ["settings", "general"] : segments;
+  // For group roots, show the default subtab in the breadcrumb
+  const DEFAULT_SUBTABS: Record<string, string> = {
+    settings: "general",
+    sales: "invoices",
+    purchases: "bills",
+    accounting: "transactions",
+  };
+  const defaultSub = segments.length === 1 ? DEFAULT_SUBTABS[segments[0]] : undefined;
+  const effectiveSegments = defaultSub ? [segments[0], defaultSub] : segments;
 
   const pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
   const parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;

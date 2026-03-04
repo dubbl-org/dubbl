@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Package, AlertTriangle } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -134,64 +134,75 @@ export default function InventoryPage() {
 
   if (!loading && items.length === 0 && !search) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Inventory" description="Manage products and stock levels." />
-        <EmptyState
-          icon={Package}
-          title="No inventory items yet"
-          description="Add your first product or item to start tracking inventory."
-        >
-          <Button
-            onClick={() => router.push("/inventory/new")}
-            className="bg-emerald-600 hover:bg-emerald-700"
+      <div className="space-y-10">
+        <Section title="Inventory" description="Manage products and stock levels.">
+          <EmptyState
+            icon={Package}
+            title="No inventory items yet"
+            description="Add your first product or item to start tracking inventory."
           >
-            <Plus className="mr-2 size-4" />
-            New Item
-          </Button>
-        </EmptyState>
+            <Button
+              onClick={() => router.push("/inventory/new")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Item
+            </Button>
+          </EmptyState>
+        </Section>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Inventory" description="Manage products and stock levels.">
-        <Button
-          onClick={() => router.push("/inventory/new")}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-2 size-4" />
-          New Item
-        </Button>
-      </PageHeader>
+    <div className="space-y-10">
+      <Section title="Overview" description="A summary of your inventory levels and stock value.">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title="Total Items" value={items.length.toString()} icon={Package} />
+            <StatCard title="Total Value" value={formatMoney(totalValue)} icon={Package} />
+            <StatCard
+              title="Low Stock"
+              value={lowStockCount.toString()}
+              icon={AlertTriangle}
+              changeType={lowStockCount > 0 ? "negative" : "neutral"}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => router.push("/inventory/new")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Item
+            </Button>
+          </div>
+        </div>
+      </Section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard title="Total Items" value={items.length.toString()} icon={Package} />
-        <StatCard title="Total Value" value={formatMoney(totalValue)} icon={Package} />
-        <StatCard
-          title="Low Stock"
-          value={lowStockCount.toString()}
-          icon={AlertTriangle}
-          changeType={lowStockCount > 0 ? "negative" : "neutral"}
-        />
-      </div>
+      <div className="h-px bg-border" />
 
-      <div className="flex items-center gap-4">
-        <Input
-          placeholder="Search items..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
+      <Section title="Items" description="View and manage all inventory items.">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Input
+              placeholder="Search items..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
 
-      <DataTable
-        columns={columns}
-        data={items}
-        loading={loading}
-        emptyMessage="No inventory items found."
-        onRowClick={(r) => router.push(`/inventory/${r.id}`)}
-      />
+          <DataTable
+            columns={columns}
+            data={items}
+            loading={loading}
+            emptyMessage="No inventory items found."
+            onRowClick={(r) => router.push(`/inventory/${r.id}`)}
+          />
+        </div>
+      </Section>
     </div>
   );
 }

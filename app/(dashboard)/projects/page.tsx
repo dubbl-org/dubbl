@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, FolderKanban } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -117,59 +117,70 @@ export default function ProjectsPage() {
 
   if (!loading && projects.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Projects" description="Track projects, time, and billing." />
-        <EmptyState
-          icon={FolderKanban}
-          title="No projects yet"
-          description="Create your first project to start tracking time and billing."
-        >
-          <Button
-            onClick={() => router.push("/projects/new")}
-            className="bg-emerald-600 hover:bg-emerald-700"
+      <div className="space-y-10">
+        <Section title="Projects" description="Create your first project to start tracking time and billing.">
+          <EmptyState
+            icon={FolderKanban}
+            title="No projects yet"
+            description="Create your first project to start tracking time and billing."
           >
-            <Plus className="mr-2 size-4" />
-            New Project
-          </Button>
-        </EmptyState>
+            <Button
+              onClick={() => router.push("/projects/new")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Project
+            </Button>
+          </EmptyState>
+        </Section>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Projects" description="Track projects, time, and billing.">
-        <Button
-          onClick={() => router.push("/projects/new")}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-2 size-4" />
-          New Project
-        </Button>
-      </PageHeader>
+    <div className="space-y-10">
+      <Section title="Overview" description="A summary of your projects, budgets, and billing.">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title="Active Projects" value={activeProjects.length.toString()} icon={FolderKanban} />
+            <StatCard title="Total Budget" value={formatMoney(totalBudget)} icon={FolderKanban} />
+            <StatCard title="Total Billed" value={formatMoney(totalBilled)} icon={FolderKanban} />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => router.push("/projects/new")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Project
+            </Button>
+          </div>
+        </div>
+      </Section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard title="Active Projects" value={activeProjects.length.toString()} icon={FolderKanban} />
-        <StatCard title="Total Budget" value={formatMoney(totalBudget)} icon={FolderKanban} />
-        <StatCard title="Total Billed" value={formatMoney(totalBilled)} icon={FolderKanban} />
-      </div>
+      <div className="h-px bg-border" />
 
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-          <TabsTrigger value="archived">Archived</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <Section title="Projects" description="View and manage all your projects.">
+        <div className="space-y-4">
+          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="archived">Archived</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-      <DataTable
-        columns={columns}
-        data={projects}
-        loading={loading}
-        emptyMessage="No projects found."
-        onRowClick={(r) => router.push(`/projects/${r.id}`)}
-      />
+          <DataTable
+            columns={columns}
+            data={projects}
+            loading={loading}
+            emptyMessage="No projects found."
+            onRowClick={(r) => router.push(`/projects/${r.id}`)}
+          />
+        </div>
+      </Section>
     </div>
   );
 }

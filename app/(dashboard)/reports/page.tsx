@@ -12,11 +12,12 @@ import {
   Clock,
   ArrowDownUp,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Section } from "@/components/dashboard/section";
 
 const reportCategories = [
   {
     title: "Financial",
+    description: "Core financial statements and budget analysis.",
     reports: [
       {
         title: "Profit & Loss",
@@ -52,6 +53,7 @@ const reportCategories = [
   },
   {
     title: "Sales",
+    description: "Receivables aging and customer analysis.",
     reports: [
       {
         title: "Aged Receivables",
@@ -63,6 +65,7 @@ const reportCategories = [
   },
   {
     title: "Purchases",
+    description: "Payables aging and supplier analysis.",
     reports: [
       {
         title: "Aged Payables",
@@ -74,6 +77,7 @@ const reportCategories = [
   },
   {
     title: "Accounting",
+    description: "Trial balance, general ledger, and account details.",
     reports: [
       {
         title: "Trial Balance",
@@ -93,32 +97,29 @@ const reportCategories = [
 
 export default function ReportsPage() {
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Reports"
-        description="Financial reports and analysis."
-      />
-
-      {reportCategories.map((category) => (
-        <div key={category.title} className="space-y-4">
-          <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{category.title}</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {category.reports.map((report) => (
-              <Link
-                key={report.href}
-                href={report.href}
-                className="group rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-150 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5"
-              >
-                <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                  <report.icon className="size-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <h3 className="mt-4 text-sm font-semibold">{report.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {report.description}
-                </p>
-              </Link>
-            ))}
-          </div>
+    <div className="space-y-10">
+      {reportCategories.map((category, i) => (
+        <div key={category.title}>
+          {i > 0 && <div className="mb-10 h-px bg-border" />}
+          <Section title={category.title} description={category.description}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {category.reports.map((report) => (
+                <Link
+                  key={report.href}
+                  href={report.href}
+                  className="group rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-150 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                    <report.icon className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <h3 className="mt-4 text-sm font-semibold">{report.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {report.description}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </Section>
         </div>
       ))}
     </div>

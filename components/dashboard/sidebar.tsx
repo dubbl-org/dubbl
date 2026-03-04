@@ -21,15 +21,15 @@ import { cn } from "@/lib/utils";
 // Animated icons
 import { GaugeIcon } from "@/components/ui/gauge";
 import { FileTextIcon } from "@/components/ui/file-text";
-import { ReceiptAnimatedIcon } from "@/components/ui/receipt-animated";
 import { CartIcon } from "@/components/ui/cart";
 import { HandCoinsIcon } from "@/components/ui/hand-coins";
 import { ArrowLeftRightAnimatedIcon } from "@/components/ui/arrow-left-right-animated";
 import { LayersIcon } from "@/components/ui/layers";
-import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
 import { ChartLineIcon } from "@/components/ui/chart-line";
 import { SettingsIcon } from "@/components/ui/settings";
 import { CircleHelpIcon } from "@/components/ui/circle-help";
+import { ReceiptAnimatedIcon } from "@/components/ui/receipt-animated";
+import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnimatedIcon = React.ForwardRefExoticComponent<any>;
@@ -54,33 +54,28 @@ const sections: NavSection[] = [
   {
     label: "",
     items: [
-      { label: "Overview", href: "/dashboard", icon: GaugeIcon },
+      { label: "Dashboard", href: "/dashboard", icon: GaugeIcon },
+      { label: "Contacts", href: "/contacts", icon: HandCoinsIcon },
     ],
   },
   {
-    label: "Money In",
+    label: "Financials",
     items: [
-      { label: "Invoices", href: "/invoices", icon: FileTextIcon },
-      { label: "Quotes", href: "/quotes", icon: ReceiptAnimatedIcon },
+      { label: "Sales", href: "/sales", icon: FileTextIcon },
+      { label: "Purchases", href: "/purchases", icon: CartIcon },
+      { label: "Accounting", href: "/accounting", icon: ArrowLeftRightAnimatedIcon },
     ],
   },
   {
-    label: "Money Out",
+    label: "Operations",
     items: [
-      { label: "Bills", href: "/bills", icon: CartIcon },
-      { label: "Expenses", href: "/expenses", icon: HandCoinsIcon },
+      { label: "Projects", href: "/projects", icon: LayersIcon },
+      { label: "Inventory", href: "/inventory", icon: ReceiptAnimatedIcon },
+      { label: "Payroll", href: "/payroll", icon: LandmarkAnimatedIcon },
     ],
   },
   {
-    label: "Accounting",
-    items: [
-      { label: "Transactions", href: "/transactions", icon: ArrowLeftRightAnimatedIcon },
-      { label: "Accounts", href: "/accounts", icon: LayersIcon },
-      { label: "Banking", href: "/banking", icon: LandmarkAnimatedIcon },
-    ],
-  },
-  {
-    label: "Reports",
+    label: "",
     items: [
       { label: "Reports", href: "/reports", icon: ChartLineIcon },
     ],
@@ -141,8 +136,8 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="gap-0 px-2">
-        {sections.map((section) => (
-          <SidebarGroup key={section.label || "overview"} className="px-0 py-1">
+        {sections.map((section, i) => (
+          <SidebarGroup key={section.label || `section-${i}`} className="px-0 py-1">
             {section.label && (
               <SidebarGroupLabel className="h-7 px-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
                 {section.label}

@@ -161,7 +161,7 @@ export default function DashboardPage() {
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              onClick={() => router.push("/transactions")}
+              onClick={() => router.push("/accounting")}
             >
               View all
             </Button>
@@ -173,9 +173,9 @@ export default function DashboardPage() {
             emptyMessage="No journal entries yet."
             emptyAction={{
               label: "Create your first entry",
-              onClick: () => router.push("/transactions/new"),
+              onClick: () => router.push("/accounting/new"),
             }}
-            onRowClick={(r) => router.push(`/transactions/${r.id}`)}
+            onRowClick={(r) => router.push(`/accounting/${r.id}`)}
           />
         </div>
 

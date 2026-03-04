@@ -133,7 +133,7 @@ export default function ProjectDetailPage() {
 
       const data = await res.json();
       toast.success("Invoice generated");
-      router.push(`/invoices/${data.invoice.id}`);
+      router.push(`/sales/${data.invoice.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate invoice");
     }
