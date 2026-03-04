@@ -13,7 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import { COUNTRIES } from "@/lib/countries";
+import { LEGAL_ENTITY_TYPES } from "@/lib/legal-entity-types";
+import { PAYMENT_TERMS } from "@/lib/payment-terms";
 
 interface OrgSettings {
   id: string;
@@ -21,6 +23,20 @@ interface OrgSettings {
   slug: string;
   defaultCurrency: string;
   fiscalYearStartMonth: number;
+  countryCode: string | null;
+  taxId: string | null;
+  businessRegistrationNumber: string | null;
+  legalEntityType: string | null;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  contactWebsite: string | null;
+  defaultPaymentTerms: string | null;
+  industrySector: string | null;
 }
 
 const MONTHS = [
@@ -30,7 +46,26 @@ const MONTHS = [
 
 export default function SettingsPage() {
   const [, setOrg] = useState<OrgSettings | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", defaultCurrency: "USD", fiscalYearStartMonth: "1" });
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    defaultCurrency: "USD",
+    fiscalYearStartMonth: "1",
+    countryCode: "",
+    taxId: "",
+    businessRegistrationNumber: "",
+    legalEntityType: "",
+    addressStreet: "",
+    addressCity: "",
+    addressState: "",
+    addressPostalCode: "",
+    addressCountry: "",
+    contactPhone: "",
+    contactEmail: "",
+    contactWebsite: "",
+    defaultPaymentTerms: "",
+    industrySector: "",
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -43,12 +78,27 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.organization) {
-          setOrg(data.organization);
+          const o = data.organization;
+          setOrg(o);
           setForm({
-            name: data.organization.name,
-            slug: data.organization.slug,
-            defaultCurrency: data.organization.defaultCurrency,
-            fiscalYearStartMonth: String(data.organization.fiscalYearStartMonth),
+            name: o.name,
+            slug: o.slug,
+            defaultCurrency: o.defaultCurrency,
+            fiscalYearStartMonth: String(o.fiscalYearStartMonth),
+            countryCode: o.countryCode || "",
+            taxId: o.taxId || "",
+            businessRegistrationNumber: o.businessRegistrationNumber || "",
+            legalEntityType: o.legalEntityType || "",
+            addressStreet: o.addressStreet || "",
+            addressCity: o.addressCity || "",
+            addressState: o.addressState || "",
+            addressPostalCode: o.addressPostalCode || "",
+            addressCountry: o.addressCountry || "",
+            contactPhone: o.contactPhone || "",
+            contactEmail: o.contactEmail || "",
+            contactWebsite: o.contactWebsite || "",
+            defaultPaymentTerms: o.defaultPaymentTerms || "",
+            industrySector: o.industrySector || "",
           });
         }
       });
@@ -70,6 +120,20 @@ export default function SettingsPage() {
           slug: form.slug,
           defaultCurrency: form.defaultCurrency,
           fiscalYearStartMonth: parseInt(form.fiscalYearStartMonth),
+          countryCode: form.countryCode || null,
+          taxId: form.taxId || null,
+          businessRegistrationNumber: form.businessRegistrationNumber || null,
+          legalEntityType: form.legalEntityType || null,
+          addressStreet: form.addressStreet || null,
+          addressCity: form.addressCity || null,
+          addressState: form.addressState || null,
+          addressPostalCode: form.addressPostalCode || null,
+          addressCountry: form.addressCountry || null,
+          contactPhone: form.contactPhone || null,
+          contactEmail: form.contactEmail || null,
+          contactWebsite: form.contactWebsite || null,
+          defaultPaymentTerms: form.defaultPaymentTerms || null,
+          industrySector: form.industrySector || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -82,41 +146,226 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <PageHeader
-        title="Organization Settings"
-        description="Manage your organization details."
+        title="General"
+        description="Manage your organization details and compliance settings."
       />
 
+      {/* Organization Identity */}
       <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold">General</h2>
-        <div className="space-y-2">
-          <Label>Organization Name</Label>
-          <Input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Slug</Label>
-          <Input
-            value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
-          />
-        </div>
+        <h2 className="text-sm font-semibold">Organization Identity</h2>
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Organization Name</Label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Slug</Label>
+            <Input
+              value={form.slug}
+              onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Legal Information */}
+      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
+        <h2 className="text-sm font-semibold">Legal Information</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Country</Label>
+            <Select
+              value={form.countryCode}
+              onValueChange={(v) => setForm({ ...form, countryCode: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                {COUNTRIES.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Legal Entity Type</Label>
+            <Select
+              value={form.legalEntityType}
+              onValueChange={(v) => setForm({ ...form, legalEntityType: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {LEGAL_ENTITY_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Tax ID / VAT Number</Label>
+            <Input
+              value={form.taxId}
+              onChange={(e) => setForm({ ...form, taxId: e.target.value })}
+              placeholder="e.g. US12-3456789"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Business Registration Number</Label>
+            <Input
+              value={form.businessRegistrationNumber}
+              onChange={(e) =>
+                setForm({ ...form, businessRegistrationNumber: e.target.value })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Industry Sector</Label>
+            <Input
+              value={form.industrySector}
+              onChange={(e) =>
+                setForm({ ...form, industrySector: e.target.value })
+              }
+              placeholder="e.g. Technology, Retail"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Business Address */}
+      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
+        <h2 className="text-sm font-semibold">Business Address</h2>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Street Address</Label>
+            <Input
+              value={form.addressStreet}
+              onChange={(e) =>
+                setForm({ ...form, addressStreet: e.target.value })
+              }
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>City</Label>
+              <Input
+                value={form.addressCity}
+                onChange={(e) =>
+                  setForm({ ...form, addressCity: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>State / Province</Label>
+              <Input
+                value={form.addressState}
+                onChange={(e) =>
+                  setForm({ ...form, addressState: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Postal Code</Label>
+              <Input
+                value={form.addressPostalCode}
+                onChange={(e) =>
+                  setForm({ ...form, addressPostalCode: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Country</Label>
+              <Select
+                value={form.addressCountry}
+                onValueChange={(v) => setForm({ ...form, addressCountry: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contact Information */}
+      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
+        <h2 className="text-sm font-semibold">Contact Information</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Phone</Label>
+            <Input
+              value={form.contactPhone}
+              onChange={(e) =>
+                setForm({ ...form, contactPhone: e.target.value })
+              }
+              placeholder="+1 (555) 123-4567"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={form.contactEmail}
+              onChange={(e) =>
+                setForm({ ...form, contactEmail: e.target.value })
+              }
+              placeholder="billing@company.com"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Website</Label>
+            <Input
+              value={form.contactWebsite}
+              onChange={(e) =>
+                setForm({ ...form, contactWebsite: e.target.value })
+              }
+              placeholder="https://company.com"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Financial Defaults */}
+      <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
+        <h2 className="text-sm font-semibold">Financial Defaults</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label>Default Currency</Label>
             <Input
               value={form.defaultCurrency}
-              onChange={(e) => setForm({ ...form, defaultCurrency: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, defaultCurrency: e.target.value })
+              }
             />
           </div>
           <div className="space-y-2">
             <Label>Fiscal Year Start</Label>
             <Select
               value={form.fiscalYearStartMonth}
-              onValueChange={(v) => setForm({ ...form, fiscalYearStartMonth: v })}
+              onValueChange={(v) =>
+                setForm({ ...form, fiscalYearStartMonth: v })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
@@ -130,16 +379,38 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label>Default Payment Terms</Label>
+            <Select
+              value={form.defaultPaymentTerms}
+              onValueChange={(v) =>
+                setForm({ ...form, defaultPaymentTerms: v })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select terms" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_TERMS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <Button
-          onClick={save}
-          disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
       </div>
 
+      <Button
+        onClick={save}
+        disabled={saving}
+        className="bg-emerald-600 hover:bg-emerald-700"
+      >
+        {saving ? "Saving..." : "Save Changes"}
+      </Button>
+
+      {/* Danger Zone */}
       <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-card/80 backdrop-blur-sm p-6 shadow-sm space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-red-600">Danger Zone</h3>

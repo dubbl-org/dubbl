@@ -94,7 +94,7 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <PageHeader title="API Keys" description="Manage programmatic access keys.">
         <Button
           onClick={() => {

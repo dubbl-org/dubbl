@@ -122,7 +122,7 @@ export default function BillingPage() {
   const currentPlan = billing?.plan || "free";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <PageHeader title="Billing" description="Manage your plan and billing.">
         {currentPlan !== "free" && (
           <Button variant="outline" onClick={openPortal}>

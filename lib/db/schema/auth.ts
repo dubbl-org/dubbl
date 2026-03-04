@@ -88,6 +88,21 @@ export const organization = pgTable("organization", {
   fiscalYearStartMonth: integer("fiscal_year_start_month")
     .notNull()
     .default(1),
+  // Bookkeeping compliance fields
+  countryCode: text("country_code"),
+  taxId: text("tax_id"),
+  businessRegistrationNumber: text("business_registration_number"),
+  legalEntityType: text("legal_entity_type"),
+  addressStreet: text("address_street"),
+  addressCity: text("address_city"),
+  addressState: text("address_state"),
+  addressPostalCode: text("address_postal_code"),
+  addressCountry: text("address_country"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  contactWebsite: text("contact_website"),
+  defaultPaymentTerms: text("default_payment_terms"),
+  industrySector: text("industry_sector"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),

@@ -67,7 +67,7 @@ export default function CurrenciesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Currencies"
         description="Available currencies in the system."

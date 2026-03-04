@@ -22,9 +22,10 @@ const CART_VARIANTS: Variants = {
     scale: 1.1,
     y: [0, -5, 0],
     transition: {
+      type: "tween",
       duration: 0.3,
       ease: "easeInOut",
-      y: { repeat: 1, delay: 0.1, duration: 0.4 },
+      y: { type: "tween", repeat: 1, delay: 0.1, duration: 0.4 },
     },
   },
 };

@@ -15,8 +15,8 @@ export default function DashboardLayout({
       <AppSidebar />
       <SidebarInset className="bg-content-bg">
         <Topbar />
-        <div className="flex-1 p-6">
-          <div className="mx-auto max-w-[1100px]">{children}</div>
+        <div className="mx-auto w-full max-w-[1100px] flex-1 px-6 py-6">
+          {children}
         </div>
       </SidebarInset>
       <CommandPalette />

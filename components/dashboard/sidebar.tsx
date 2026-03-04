@@ -1,13 +1,8 @@
 "use client";
 
+import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Receipt,
-  ArrowLeftRight,
-  Landmark,
-  type LucideIcon,
-} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +11,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
@@ -24,21 +18,31 @@ import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
 import { cn } from "@/lib/utils";
 
-// Animated icons (lucide-animated)
+// Animated icons
 import { GaugeIcon } from "@/components/ui/gauge";
 import { FileTextIcon } from "@/components/ui/file-text";
+import { ReceiptAnimatedIcon } from "@/components/ui/receipt-animated";
 import { CartIcon } from "@/components/ui/cart";
 import { HandCoinsIcon } from "@/components/ui/hand-coins";
+import { ArrowLeftRightAnimatedIcon } from "@/components/ui/arrow-left-right-animated";
 import { LayersIcon } from "@/components/ui/layers";
+import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
 import { ChartLineIcon } from "@/components/ui/chart-line";
 import { SettingsIcon } from "@/components/ui/settings";
 import { CircleHelpIcon } from "@/components/ui/circle-help";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnimatedIcon = React.ForwardRefExoticComponent<any>;
+
+interface IconHandle {
+  startAnimation: () => void;
+  stopAnimation: () => void;
+}
+
 interface NavItem {
   label: string;
   href: string;
-  icon?: LucideIcon;
-  animatedIcon?: React.ComponentType<{ size?: number; className?: string }>;
+  icon: AnimatedIcon;
 }
 
 interface NavSection {
@@ -50,42 +54,42 @@ const sections: NavSection[] = [
   {
     label: "",
     items: [
-      { label: "Overview", href: "/dashboard", animatedIcon: GaugeIcon },
+      { label: "Overview", href: "/dashboard", icon: GaugeIcon },
     ],
   },
   {
     label: "Money In",
     items: [
-      { label: "Invoices", href: "/invoices", animatedIcon: FileTextIcon },
-      { label: "Quotes", href: "/quotes", icon: Receipt },
+      { label: "Invoices", href: "/invoices", icon: FileTextIcon },
+      { label: "Quotes", href: "/quotes", icon: ReceiptAnimatedIcon },
     ],
   },
   {
     label: "Money Out",
     items: [
-      { label: "Bills", href: "/bills", animatedIcon: CartIcon },
-      { label: "Expenses", href: "/expenses", animatedIcon: HandCoinsIcon },
+      { label: "Bills", href: "/bills", icon: CartIcon },
+      { label: "Expenses", href: "/expenses", icon: HandCoinsIcon },
     ],
   },
   {
     label: "Accounting",
     items: [
-      { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
-      { label: "Accounts", href: "/accounts", animatedIcon: LayersIcon },
-      { label: "Banking", href: "/banking", icon: Landmark },
+      { label: "Transactions", href: "/transactions", icon: ArrowLeftRightAnimatedIcon },
+      { label: "Accounts", href: "/accounts", icon: LayersIcon },
+      { label: "Banking", href: "/banking", icon: LandmarkAnimatedIcon },
     ],
   },
   {
     label: "Reports",
     items: [
-      { label: "Reports", href: "/reports", animatedIcon: ChartLineIcon },
+      { label: "Reports", href: "/reports", icon: ChartLineIcon },
     ],
   },
 ];
 
 const footerItems: NavItem[] = [
-  { label: "Settings", href: "/settings", animatedIcon: SettingsIcon },
-  { label: "Help", href: "/help", animatedIcon: CircleHelpIcon },
+  { label: "Settings", href: "/settings", icon: SettingsIcon },
+  { label: "Help", href: "/help", icon: CircleHelpIcon },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -94,30 +98,35 @@ function isActive(pathname: string, href: string) {
 }
 
 function NavItemLink({ item, active }: { item: NavItem; active: boolean }) {
-  const IconComponent = item.icon;
-  const AnimatedIconComponent = item.animatedIcon;
+  const [hovered, setHovered] = useState(false);
+  const iconRef = useRef<IconHandle>(null);
+  const IconComp = item.icon;
+
+  useEffect(() => {
+    if (hovered) {
+      iconRef.current?.startAnimation();
+    } else {
+      iconRef.current?.stopAnimation();
+    }
+  }, [hovered]);
 
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={active}
+    <SidebarMenuItem
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <Link
+        href={item.href}
         className={cn(
-          "h-8 rounded-lg text-[13px] transition-colors",
+          "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
           active
-            ? "bg-[rgba(255,255,255,0.08)] text-white font-medium border-l-2 border-emerald-400"
-            : "text-[rgba(255,255,255,0.65)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+            : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
         )}
       >
-        <Link href={item.href}>
-          {AnimatedIconComponent ? (
-            <AnimatedIconComponent size={16} className="shrink-0" />
-          ) : IconComponent ? (
-            <IconComponent className="size-4 shrink-0" />
-          ) : null}
-          <span>{item.label}</span>
-        </Link>
-      </SidebarMenuButton>
+        <IconComp ref={iconRef} size={16} className="shrink-0" />
+        <span>{item.label}</span>
+      </Link>
     </SidebarMenuItem>
   );
 }
@@ -126,21 +135,21 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon" className="shadow-[1px_0_0_rgba(255,255,255,0.06)]">
+    <Sidebar collapsible="none">
       <SidebarHeader>
         <OrgSwitcher />
       </SidebarHeader>
 
-      <SidebarContent className="gap-0">
+      <SidebarContent className="gap-0 px-2">
         {sections.map((section) => (
-          <SidebarGroup key={section.label || "overview"} className="py-1">
+          <SidebarGroup key={section.label || "overview"} className="px-0 py-1">
             {section.label && (
-              <SidebarGroupLabel className="h-7 px-3 text-[10.5px] font-semibold uppercase tracking-wider text-[rgba(255,255,255,0.35)]">
+              <SidebarGroupLabel className="h-7 px-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
                 {section.label}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-0.5">
                 {section.items.map((item) => (
                   <NavItemLink
                     key={item.href}
@@ -154,8 +163,8 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
+      <SidebarFooter className="px-2">
+        <SidebarMenu className="gap-0.5">
           {footerItems.map((item) => (
             <NavItemLink
               key={item.href}
