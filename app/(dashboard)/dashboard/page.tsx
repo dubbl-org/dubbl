@@ -8,9 +8,9 @@ import {
   BookOpen,
   TrendingUp,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
@@ -126,12 +126,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Overview"
-        description="Your bookkeeping at a glance."
-      />
-
+    <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Assets"
@@ -155,27 +150,39 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            Recent Entries
-          </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => router.push("/transactions")}
-          >
-            View all
-          </Button>
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+        {/* Left: Recent Entries */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[13px] font-semibold">
+              Recent Entries
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => router.push("/transactions")}
+            >
+              View all
+            </Button>
+          </div>
+          <DataTable
+            columns={columns}
+            data={entries}
+            loading={loading}
+            emptyMessage="No journal entries yet."
+            emptyAction={{
+              label: "Create your first entry",
+              onClick: () => router.push("/transactions/new"),
+            }}
+            onRowClick={(r) => router.push(`/transactions/${r.id}`)}
+          />
         </div>
-        <DataTable
-          columns={columns}
-          data={entries}
-          loading={loading}
-          emptyMessage="No journal entries yet."
-          onRowClick={(r) => router.push(`/transactions/${r.id}`)}
-        />
+
+        {/* Right: Activity Feed */}
+        <div>
+          <ActivityFeed />
+        </div>
       </div>
     </div>
   );

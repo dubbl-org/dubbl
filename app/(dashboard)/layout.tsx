@@ -13,11 +13,11 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="bg-content-bg">
         <Topbar />
-        <main className="flex-1 p-6">
-          <div className="mx-auto max-w-[1400px]">{children}</div>
-        </main>
+        <div className="flex-1 p-6">
+          <div className="mx-auto max-w-[1100px]">{children}</div>
+        </div>
       </SidebarInset>
       <CommandPalette />
     </SidebarProvider>

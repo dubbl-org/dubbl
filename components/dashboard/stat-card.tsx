@@ -47,18 +47,16 @@ export function StatCard({
   sparklineData,
 }: StatCardProps) {
   return (
-    <div className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md hover:shadow-emerald-500/5">
+    <div className="rounded-lg border bg-card p-5">
       <div className="flex items-center justify-between">
-        <p className="text-[13px] font-medium text-muted-foreground">
+        <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
           {title}
         </p>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-          <Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
-        </div>
+        <Icon className="size-4 text-muted-foreground/50" />
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
         <div className="space-y-1">
-          <p className="text-2xl font-semibold tracking-tight font-mono tabular-nums">
+          <p className="text-[24px] font-bold tracking-tight font-mono tabular-nums">
             {value}
           </p>
           {change && (

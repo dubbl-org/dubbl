@@ -51,20 +51,20 @@ export function OrgSwitcher() {
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-accent"
+          className="data-[state=open]:bg-[rgba(255,255,255,0.08)]"
         >
           <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-600 text-white text-xs font-semibold">
             {activeOrg?.name?.[0]?.toUpperCase() || "D"}
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">
+            <span className="truncate font-semibold text-white">
               {activeOrg?.name || "Select org"}
             </span>
-            <span className="truncate text-xs text-muted-foreground">
+            <span className="truncate text-xs text-[rgba(255,255,255,0.45)]">
               {activeOrg?.slug || ""}
             </span>
           </div>
-          <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+          <ChevronsUpDown className="ml-auto size-4 text-[rgba(255,255,255,0.35)]" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent

@@ -35,21 +35,21 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-accent"
+          className="data-[state=open]:bg-[rgba(255,255,255,0.08)]"
         >
           <Avatar className="size-7">
             <AvatarImage src={user?.image || undefined} />
-            <AvatarFallback className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">{initials}</AvatarFallback>
+            <AvatarFallback className="text-[10px] bg-emerald-900/50 text-emerald-300">{initials}</AvatarFallback>
           </Avatar>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">
+            <span className="truncate font-medium text-white">
               {user?.name || "User"}
             </span>
-            <span className="truncate text-xs text-muted-foreground">
+            <span className="truncate text-xs text-[rgba(255,255,255,0.45)]">
               {user?.email}
             </span>
           </div>
-          <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+          <ChevronsUpDown className="ml-auto size-4 text-[rgba(255,255,255,0.35)]" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent

@@ -3,17 +3,9 @@
 import { useCallback } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Search, Plus } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -50,9 +42,26 @@ const LABELS: Record<string, string> = {
   new: "New",
 };
 
+const CTA_MAP: Record<string, { label: string; href: string }> = {
+  invoices: { label: "New Invoice", href: "/invoices/new" },
+  quotes: { label: "New Quote", href: "/quotes/new" },
+  bills: { label: "New Bill", href: "/bills/new" },
+  expenses: { label: "New Expense", href: "/expenses/new" },
+  transactions: { label: "New Entry", href: "/transactions/new" },
+  accounts: { label: "New Account", href: "/accounts/new" },
+  contacts: { label: "New Contact", href: "/contacts/new" },
+};
+
 export function Topbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const segments = pathname.split("/").filter(Boolean);
+
+  const pageTitle = LABELS[segments[segments.length - 1] || ""] || segments[segments.length - 1] || "Overview";
+  const parentLabel = segments.length > 1 ? LABELS[segments[0]] || segments[0] : null;
+
+  // Find contextual CTA based on first path segment
+  const cta = CTA_MAP[segments[0]];
 
   const openCommandPalette = useCallback(() => {
     document.dispatchEvent(
@@ -61,43 +70,44 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
+    <header className="flex h-[52px] shrink-0 items-center justify-between gap-2 border-b px-4">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 !h-4" />
-        <Breadcrumb>
-          <BreadcrumbList>
-            {segments.map((segment, i) => {
-              const href = "/" + segments.slice(0, i + 1).join("/");
-              const isLast = i === segments.length - 1;
-              const label = LABELS[segment] || segment;
-
-              return (
-                <BreadcrumbItem key={href}>
-                  {i > 0 && <BreadcrumbSeparator />}
-                  {isLast ? (
-                    <BreadcrumbPage className="font-medium">{label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink href={href} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{label}</BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-              );
-            })}
-          </BreadcrumbList>
-        </Breadcrumb>
+        <div className="flex items-center gap-2">
+          {parentLabel && segments.length > 1 && (
+            <>
+              <span className="text-[13px] text-muted-foreground">{parentLabel}</span>
+              <span className="text-muted-foreground/50">/</span>
+            </>
+          )}
+          <h1 className="text-[15px] font-semibold">{pageTitle}</h1>
+        </div>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={openCommandPalette}
-        className="hidden sm:flex items-center gap-2 text-muted-foreground text-xs h-7 px-2.5 hover:border-emerald-300 hover:text-emerald-700 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
-      >
-        <Search className="size-3" />
-        <span>Search...</span>
-        <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded-md border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-          <span className="text-xs">&#8984;</span>K
-        </kbd>
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openCommandPalette}
+          className="hidden sm:flex items-center gap-2 text-muted-foreground text-xs h-7 px-2.5"
+        >
+          <Search className="size-3" />
+          <span>Search...</span>
+          <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded-md border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <span className="text-xs">&#8984;</span>K
+          </kbd>
+        </Button>
+        {cta && (
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => router.push(cta.href)}
+          >
+            <Plus className="size-3" />
+            {cta.label}
+          </Button>
+        )}
+      </div>
     </header>
   );
 }
