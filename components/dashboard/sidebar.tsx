@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronRight, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,10 +13,19 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
+import { useCreateDrawer } from "./create-drawer";
 import { cn } from "@/lib/utils";
 
 // Animated icons
@@ -69,7 +79,6 @@ const sections: NavSection[] = [
   {
     label: "Operations",
     items: [
-      { label: "Projects", href: "/projects", icon: LayersIcon },
       { label: "Inventory", href: "/inventory", icon: ReceiptAnimatedIcon },
       { label: "Payroll", href: "/payroll", icon: LandmarkAnimatedIcon },
     ],
@@ -126,6 +135,93 @@ function NavItemLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
+interface ProjectListItem {
+  id: string;
+  name: string;
+}
+
+function ProjectsCollapsible({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(() => pathname.startsWith("/projects"));
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
+  const [fetched, setFetched] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const iconRef = useRef<IconHandle>(null);
+  const { open: openDrawer } = useCreateDrawer();
+
+  useEffect(() => {
+    if (hovered) iconRef.current?.startAnimation();
+    else iconRef.current?.stopAnimation();
+  }, [hovered]);
+
+  useEffect(() => {
+    if (!open || fetched) return;
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/projects?status=active", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setProjects(data.data);
+      })
+      .finally(() => setFetched(true));
+  }, [open, fetched]);
+
+  const projectsActive = pathname === "/projects" || pathname.startsWith("/projects/");
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <SidebarMenuItem
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <CollapsibleTrigger
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+            projectsActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+          )}
+        >
+          <LayersIcon ref={iconRef} size={16} className="shrink-0" />
+          <span className="flex-1 text-left">Projects</span>
+          <ChevronRight className={cn(
+            "size-3.5 shrink-0 transition-transform duration-200",
+            open && "rotate-90"
+          )} />
+        </CollapsibleTrigger>
+      </SidebarMenuItem>
+      <CollapsibleContent>
+        <SidebarMenuSub>
+          {projects.map((project) => (
+            <SidebarMenuSubItem key={project.id}>
+              <SidebarMenuSubButton
+                asChild
+                size="sm"
+                isActive={pathname === `/projects/${project.id}`}
+              >
+                <Link href={`/projects/${project.id}`}>
+                  <span className="truncate">{project.name}</span>
+                </Link>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          ))}
+          <SidebarMenuSubItem>
+            <SidebarMenuSubButton
+              size="sm"
+              className="text-muted-foreground cursor-pointer"
+              onClick={() => openDrawer("project")}
+            >
+              <Plus className="size-3.5" />
+              <span>New project</span>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        </SidebarMenuSub>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
 
@@ -145,6 +241,9 @@ export function AppSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
+                {section.label === "Operations" && (
+                  <ProjectsCollapsible pathname={pathname} />
+                )}
                 {section.items.map((item) => (
                   <NavItemLink
                     key={item.href}

@@ -25,6 +25,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { cn } from "@/lib/utils";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 
 const GREETINGS_MORNING = [
   "Good morning",
@@ -226,6 +227,7 @@ function AgingColumn({
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const { data: session } = useSession();
   const firstName = session?.user?.name?.split(" ")[0] || "";
   const [greeting] = useState(() => pickGreeting());
@@ -368,7 +370,7 @@ export default function DashboardPage() {
                   <Button
                     size="sm"
                     className="bg-emerald-950/10 text-emerald-950 hover:bg-emerald-950/20 border-0"
-                    onClick={() => router.push("/accounting/new")}
+                    onClick={() => openDrawer("entry")}
                   >
                     <BookOpen className="mr-1.5 size-3.5" />
                     New entry
@@ -376,7 +378,7 @@ export default function DashboardPage() {
                   <Button
                     size="sm"
                     className="bg-emerald-950/10 text-emerald-950 hover:bg-emerald-950/20 border-0"
-                    onClick={() => router.push("/sales/new")}
+                    onClick={() => openDrawer("invoice")}
                   >
                     <FileText className="mr-1.5 size-3.5" />
                     New invoice
@@ -544,7 +546,7 @@ export default function DashboardPage() {
                   emptyMessage="No journal entries yet."
                   emptyAction={{
                     label: "Create your first entry",
-                    onClick: () => router.push("/accounting/new"),
+                    onClick: () => openDrawer("entry"),
                   }}
                   onRowClick={(r) => router.push(`/accounting/${r.id}`)}
                 />

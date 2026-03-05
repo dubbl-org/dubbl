@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { OrgLoader } from "@/components/dashboard/org-loader";
+import { CreateDrawerProvider } from "@/components/dashboard/create-drawer";
 
 export default function DashboardLayout({
   children,
@@ -14,14 +15,16 @@ export default function DashboardLayout({
   return (
     <OrgLoader>
       <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset className="bg-content-bg">
-          <Topbar />
-          <div className="mx-auto w-full max-w-[1100px] flex-1 px-6 py-6">
-            {children}
-          </div>
-        </SidebarInset>
-        <CommandPalette />
+        <CreateDrawerProvider>
+          <AppSidebar />
+          <SidebarInset className="bg-content-bg">
+            <Topbar />
+            <div className="mx-auto w-full max-w-[1100px] flex-1 px-6 py-6">
+              {children}
+            </div>
+          </SidebarInset>
+          <CommandPalette />
+        </CreateDrawerProvider>
       </SidebarProvider>
     </OrgLoader>
   );

@@ -13,6 +13,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 
 import { devDelay } from "@/lib/dev-delay";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 
 interface Contact {
   id: string;
@@ -75,6 +76,7 @@ const columns: Column<Contact>[] = [
 
 export default function ContactsPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -130,7 +132,7 @@ export default function ContactsPage() {
             </p>
             <div className="mt-4">
               <Button
-                onClick={() => router.push("/contacts/new")}
+                onClick={() => openDrawer("contact")}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
                 <Plus className="mr-2 size-4" />
@@ -162,7 +164,7 @@ export default function ContactsPage() {
           </div>
           <div className="flex justify-end">
             <Button
-              onClick={() => router.push("/contacts/new")}
+              onClick={() => openDrawer("contact")}
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
             >

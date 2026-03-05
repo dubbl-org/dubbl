@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 
@@ -94,6 +95,7 @@ const columns: Column<Project>[] = [
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -132,7 +134,7 @@ export default function ProjectsPage() {
             description="Create your first project to start tracking time and billing."
           >
             <Button
-              onClick={() => router.push("/projects/new")}
+              onClick={() => openDrawer("project")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
@@ -157,7 +159,7 @@ export default function ProjectsPage() {
           <div className="flex justify-end">
             <Button
               size="sm"
-              onClick={() => router.push("/projects/new")}
+              onClick={() => openDrawer("project")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />

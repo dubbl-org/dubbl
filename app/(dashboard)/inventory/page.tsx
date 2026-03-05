@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 
@@ -107,6 +108,7 @@ const columns: Column<InventoryItem>[] = [
 
 export default function InventoryPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -149,7 +151,7 @@ export default function InventoryPage() {
             description="Add your first product or item to start tracking inventory."
           >
             <Button
-              onClick={() => router.push("/inventory/new")}
+              onClick={() => openDrawer("inventory")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
@@ -179,7 +181,7 @@ export default function InventoryPage() {
           <div className="flex justify-end">
             <Button
               size="sm"
-              onClick={() => router.push("/inventory/new")}
+              onClick={() => openDrawer("inventory")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />

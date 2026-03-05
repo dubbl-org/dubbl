@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
@@ -90,6 +91,7 @@ const columns: Column<Entry>[] = [
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -151,7 +153,7 @@ export default function TransactionsPage() {
               </p>
               <div className="mt-4">
                 <Button
-                  onClick={() => router.push("/accounting/new")}
+                  onClick={() => openDrawer("entry")}
                   className="bg-emerald-600 hover:bg-emerald-700"
                 >
                   <Plus className="mr-2 size-4" />
@@ -177,7 +179,7 @@ export default function TransactionsPage() {
           </div>
           <div className="flex justify-end">
             <Button
-              onClick={() => router.push("/accounting/new")}
+              onClick={() => openDrawer("entry")}
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
             >
