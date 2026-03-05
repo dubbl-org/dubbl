@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface TaxRate {
   id: string;
@@ -121,7 +122,7 @@ export default function TaxRatesPage() {
   const purchaseCount = rates.filter((r) => r.type === "purchase" || r.type === "both").length;
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       {/* Tax rates section */}
       <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
         <div className="shrink-0">
@@ -153,6 +154,6 @@ export default function TaxRatesPage() {
           )}
         </div>
       </section>
-    </div>
+    </BlurReveal>
   );
 }

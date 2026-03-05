@@ -29,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Member {
   id: string;
@@ -144,7 +145,7 @@ export default function MembersPage() {
   const memberCount = members.filter((m) => m.role === "member").length;
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       {/* Header */}
       <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
         <div className="shrink-0">
@@ -334,6 +335,6 @@ export default function MembersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </BlurReveal>
   );
 }

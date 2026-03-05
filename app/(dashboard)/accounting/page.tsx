@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
 
 interface Entry {
   id: string;
@@ -100,6 +104,7 @@ export default function TransactionsPage() {
       .then((data) => {
         if (data.entries) setEntries(data.entries);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, []);
 
@@ -115,9 +120,11 @@ export default function TransactionsPage() {
       ? entries
       : entries.filter((e) => e.status === statusFilter);
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && entries.length === 0) {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Transactions" description="Create and manage journal entries to track your financial activity.">
           <EmptyState
             icon={ArrowLeftRight}
@@ -133,11 +140,12 @@ export default function TransactionsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
+    <BlurReveal>
     <div className="space-y-10">
       <Section title="Overview" description="Summary of transactions and journal entries across all statuses.">
         <div className="space-y-4">
@@ -173,14 +181,15 @@ export default function TransactionsPage() {
           </Tabs>
 
           <DataTable
-            columns={columns}
-            data={filtered}
-            loading={loading}
-            emptyMessage="No entries found."
-            onRowClick={(r) => router.push(`/accounting/${r.id}`)}
-          />
+              columns={columns}
+              data={filtered}
+              loading={loading}
+              emptyMessage="No entries found."
+              onRowClick={(r) => router.push(`/accounting/${r.id}`)}
+            />
         </div>
       </Section>
     </div>
+    </BlurReveal>
   );
 }

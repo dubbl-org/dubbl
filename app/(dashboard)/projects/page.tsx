@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
 
 interface Project {
   id: string;
@@ -108,6 +112,7 @@ export default function ProjectsPage() {
       .then((data) => {
         if (data.data) setProjects(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, [statusFilter]);
 
@@ -115,9 +120,11 @@ export default function ProjectsPage() {
   const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0);
   const totalBilled = projects.reduce((sum, p) => sum + p.totalBilled, 0);
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && projects.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Projects" description="Create your first project to start tracking time and billing.">
           <EmptyState
             icon={FolderKanban}
@@ -133,11 +140,12 @@ export default function ProjectsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
+    <BlurReveal>
     <div className="space-y-10">
       <Section title="Overview" description="A summary of your projects, budgets, and billing.">
         <div className="space-y-4">
@@ -173,14 +181,15 @@ export default function ProjectsPage() {
           </Tabs>
 
           <DataTable
-            columns={columns}
-            data={projects}
-            loading={loading}
-            emptyMessage="No projects found."
-            onRowClick={(r) => router.push(`/projects/${r.id}`)}
-          />
+              columns={columns}
+              data={projects}
+              loading={loading}
+              emptyMessage="No projects found."
+              onRowClick={(r) => router.push(`/projects/${r.id}`)}
+            />
         </div>
       </Section>
     </div>
+    </BlurReveal>
   );
 }

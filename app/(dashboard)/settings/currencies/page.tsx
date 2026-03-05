@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { DollarSign } from "lucide-react";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Currency {
   id: string;
@@ -53,7 +54,7 @@ export default function CurrenciesPage() {
   }, []);
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
         <div className="shrink-0">
           <p className="text-sm font-medium">Currencies</p>
@@ -78,6 +79,6 @@ export default function CurrenciesPage() {
           )}
         </div>
       </section>
-    </div>
+    </BlurReveal>
   );
 }

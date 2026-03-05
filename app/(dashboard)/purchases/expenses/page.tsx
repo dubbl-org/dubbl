@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface ExpenseClaim {
   id: string;
@@ -107,7 +108,7 @@ export default function ExpensesPage() {
 
   if (!loading && claims.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Expenses" description="Submit and manage expense claims.">
           <EmptyState
             icon={Receipt}
@@ -123,12 +124,12 @@ export default function ExpensesPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="A summary of your expense claims and pending approvals.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -180,6 +181,6 @@ export default function ExpensesPage() {
           />
         </div>
       </Section>
-    </div>
+    </BlurReveal>
   );
 }

@@ -15,6 +15,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface ApiKeyItem {
   id: string;
@@ -93,7 +94,7 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       {/* API Keys section */}
       <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
         <div className="shrink-0">
@@ -254,6 +255,6 @@ export default function ApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </BlurReveal>
   );
 }

@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Account {
   id: string;
@@ -168,7 +169,7 @@ export default function AccountsPage() {
 
   if (!loading && accounts.length === 0) {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Accounts" description="Set up and manage your chart of accounts for recording transactions.">
           <EmptyState
             icon={BookOpen}
@@ -192,12 +193,12 @@ export default function AccountsPage() {
           onSubmit={createAccount}
           loading={saving}
         />
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="Chart of accounts summary across all account types and statuses.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -237,7 +238,7 @@ export default function AccountsPage() {
         onSubmit={createAccount}
         loading={saving}
       />
-    </div>
+    </BlurReveal>
   );
 }
 

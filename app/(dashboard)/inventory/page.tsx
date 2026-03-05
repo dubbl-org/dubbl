@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
 
 interface InventoryItem {
   id: string;
@@ -121,6 +125,7 @@ export default function InventoryPage() {
       .then((data) => {
         if (data.data) setItems(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, [search]);
 
@@ -132,9 +137,11 @@ export default function InventoryPage() {
     (i) => i.quantityOnHand <= i.reorderPoint
   ).length;
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && items.length === 0 && !search) {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Inventory" description="Manage products and stock levels.">
           <EmptyState
             icon={Package}
@@ -150,11 +157,12 @@ export default function InventoryPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
+    <BlurReveal>
     <div className="space-y-10">
       <Section title="Overview" description="A summary of your inventory levels and stock value.">
         <div className="space-y-4">
@@ -162,11 +170,11 @@ export default function InventoryPage() {
             <StatCard title="Total Items" value={items.length.toString()} icon={Package} />
             <StatCard title="Total Value" value={formatMoney(totalValue)} icon={Package} />
             <StatCard
-              title="Low Stock"
-              value={lowStockCount.toString()}
-              icon={AlertTriangle}
-              changeType={lowStockCount > 0 ? "negative" : "neutral"}
-            />
+                title="Low Stock"
+                value={lowStockCount.toString()}
+                icon={AlertTriangle}
+                changeType={lowStockCount > 0 ? "negative" : "neutral"}
+              />
           </div>
           <div className="flex justify-end">
             <Button
@@ -195,14 +203,15 @@ export default function InventoryPage() {
           </div>
 
           <DataTable
-            columns={columns}
-            data={items}
-            loading={loading}
-            emptyMessage="No inventory items found."
-            onRowClick={(r) => router.push(`/inventory/${r.id}`)}
-          />
+              columns={columns}
+              data={items}
+              loading={loading}
+              emptyMessage="No inventory items found."
+              onRowClick={(r) => router.push(`/inventory/${r.id}`)}
+            />
         </div>
       </Section>
     </div>
+    </BlurReveal>
   );
 }

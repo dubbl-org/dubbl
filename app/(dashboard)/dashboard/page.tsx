@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   DollarSign,
   ArrowLeftRight,
@@ -14,6 +15,9 @@ import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+
 
 interface Entry {
   id: string;
@@ -122,68 +126,89 @@ export default function DashboardPage() {
           }));
         }
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total Assets"
-          value={formatMoney(Math.round(parseFloat(stats.totalAssets) * 100))}
-          icon={DollarSign}
-        />
-        <StatCard
-          title="Journal Entries"
-          value={stats.totalEntries.toString()}
-          icon={ArrowLeftRight}
-        />
-        <StatCard
-          title="Accounts"
-          value={stats.totalAccounts.toString()}
-          icon={BookOpen}
-        />
-        <StatCard
-          title="Net Income"
-          value={formatMoney(Math.round(parseFloat(stats.netIncome) * 100))}
-          icon={TrendingUp}
-        />
-      </div>
+    <MotionConfig reducedMotion="never">
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div
+            key="loader"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, filter: "blur(6px)" }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <BrandLoader />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="content"
+            initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-6"
+          >
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Total Assets"
+                value={formatMoney(Math.round(parseFloat(stats.totalAssets) * 100))}
+                icon={DollarSign}
+              />
+              <StatCard
+                title="Journal Entries"
+                value={stats.totalEntries.toString()}
+                icon={ArrowLeftRight}
+              />
+              <StatCard
+                title="Accounts"
+                value={stats.totalAccounts.toString()}
+                icon={BookOpen}
+              />
+              <StatCard
+                title="Net Income"
+                value={formatMoney(Math.round(parseFloat(stats.netIncome) * 100))}
+                icon={TrendingUp}
+              />
+            </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        {/* Left: Recent Entries */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[13px] font-semibold">
-              Recent Entries
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-muted-foreground"
-              onClick={() => router.push("/accounting")}
-            >
-              View all
-            </Button>
-          </div>
-          <DataTable
-            columns={columns}
-            data={entries}
-            loading={loading}
-            emptyMessage="No journal entries yet."
-            emptyAction={{
-              label: "Create your first entry",
-              onClick: () => router.push("/accounting/new"),
-            }}
-            onRowClick={(r) => router.push(`/accounting/${r.id}`)}
-          />
-        </div>
+            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+              {/* Left: Recent Entries */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[13px] font-semibold">Recent Entries</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground"
+                    onClick={() => router.push("/accounting")}
+                  >
+                    View all
+                  </Button>
+                </div>
+                <DataTable
+                  columns={columns}
+                  data={entries}
+                  loading={loading}
+                  emptyMessage="No journal entries yet."
+                  emptyAction={{
+                    label: "Create your first entry",
+                    onClick: () => router.push("/accounting/new"),
+                  }}
+                  onRowClick={(r) => router.push(`/accounting/${r.id}`)}
+                />
+              </div>
 
-        {/* Right: Activity Feed */}
-        <div>
-          <ActivityFeed />
-        </div>
-      </div>
-    </div>
+              {/* Right: Activity Feed */}
+              <div>
+                <ActivityFeed />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </MotionConfig>
   );
 }

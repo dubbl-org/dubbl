@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Quote {
   id: string;
@@ -112,7 +113,7 @@ export default function QuotesPage() {
 
   if (!loading && quotes.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Quotes" description="Create and send quotes to your customers. Track acceptances and conversions.">
           <EmptyState
             icon={FileText}
@@ -128,12 +129,12 @@ export default function QuotesPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="Quotes summary and pending amounts across all proposals.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -176,6 +177,6 @@ export default function QuotesPage() {
           />
         </div>
       </Section>
-    </div>
+    </BlurReveal>
   );
 }

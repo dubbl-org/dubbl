@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface PO {
   id: string; poNumber: string; issueDate: string; deliveryDate: string | null; status: string;
@@ -52,7 +53,7 @@ export default function PurchaseOrdersPage() {
 
   if (!loading && pos.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Purchase Orders" description="Submit and manage purchase orders to suppliers.">
           <EmptyState
             icon={Receipt}
@@ -68,12 +69,12 @@ export default function PurchaseOrdersPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="A summary of your purchase orders and outstanding amounts.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -122,6 +123,6 @@ export default function PurchaseOrdersPage() {
           />
         </div>
       </Section>
-    </div>
+    </BlurReveal>
   );
 }

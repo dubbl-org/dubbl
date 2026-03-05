@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 import Link from "next/link";
 
 interface TimeEntry {
@@ -198,7 +199,7 @@ export default function TimeEntriesPage() {
 
   if (!loading && entries.length === 0) {
     return (
-      <div className="space-y-6">
+      <BlurReveal className="space-y-6">
         <PageHeader title="Time Entries" description="Track time for this project.">
           <Button variant="outline" size="sm" asChild>
             <Link href={`/projects/${id}`}>
@@ -269,12 +270,12 @@ export default function TimeEntriesPage() {
             </DialogContent>
           </Dialog>
         </EmptyState>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <BlurReveal className="space-y-6">
       <PageHeader title="Time Entries" description="Track time for this project.">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/projects/${id}`}>
@@ -357,6 +358,6 @@ export default function TimeEntriesPage() {
         loading={loading}
         emptyMessage="No time entries found."
       />
-    </div>
+    </BlurReveal>
   );
 }

@@ -172,6 +172,105 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes stagger-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Brand loader - two overlapping circles */
+.brand-loader {
+  position: relative;
+  width: 44px;
+  height: 28px;
+}
+
+.brand-loader-circle {
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  opacity: 0.6;
+}
+
+.brand-loader-circle-1 {
+  left: 0;
+  animation: brand-pulse-1 1.4s ease-in-out infinite;
+}
+
+.brand-loader-circle-2 {
+  right: 0;
+  animation: brand-pulse-2 1.4s ease-in-out infinite;
+}
+
+@keyframes brand-pulse-1 {
+  0%, 100% { transform: translateX(0) scale(1); opacity: 0.6; }
+  50% { transform: translateX(4px) scale(1.05); opacity: 1; }
+}
+
+@keyframes brand-pulse-2 {
+  0%, 100% { transform: translateX(0) scale(1); opacity: 0.6; }
+  50% { transform: translateX(-4px) scale(1.05); opacity: 1; }
+}
+
+/* Blur-to-sharp reveal */
+@keyframes blur-reveal {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+.animate-blur-reveal {
+  animation: blur-reveal 500ms ease-out forwards;
+}
+
+/* Org loading overlay */
+.org-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-background);
+}
+
+.org-loader-fade-out {
+  animation: overlay-fade-out 400ms ease-out forwards;
+}
+
+@keyframes overlay-fade-out {
+  to {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader-circle-1,
+  .brand-loader-circle-2 {
+    animation: none;
+    opacity: 1;
+  }
+  .animate-blur-reveal {
+    animation: none;
+    opacity: 1;
+    filter: none;
+  }
+  .org-loader-fade-out {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
@@ -218,6 +317,39 @@
   background-size: 200% 100%;
 }
 
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-accent);
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer-sweep 1.5s ease-in-out infinite;
+}
+
+:is(.dark) .skeleton-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+}
+
+@keyframes shimmer-sweep {
+  100% { transform: translateX(100%); }
+}
+
 .animate-gradient-shift {
   animation: gradient-shift 6s ease-in-out infinite;
   background-size: 200% 200%;
@@ -225,6 +357,19 @@
 
 .animate-fade-in-up {
   animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-stagger-fade-up {
+  opacity: 0;
+  animation: stagger-fade-up 400ms ease-out forwards;
+  animation-delay: calc(var(--stagger-order, 0) * 80ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-stagger-fade-up {
+    opacity: 1;
+    animation: none;
+  }
 }
 
 .animate-scale-in {

@@ -29,6 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface BankAccountDetail {
   id: string;
@@ -284,7 +285,7 @@ export default function BankAccountDetailPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <BlurReveal className="space-y-6">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -414,6 +415,6 @@ export default function BankAccountDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </BlurReveal>
   );
 }

@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
 
 interface Bill {
   id: string;
@@ -104,6 +108,7 @@ export default function BillsPage() {
       .then((data) => {
         if (data.data) setBills(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, [statusFilter]);
 
@@ -111,9 +116,11 @@ export default function BillsPage() {
     .filter((b) => ["received", "partial", "overdue"].includes(b.status))
     .reduce((s, b) => s + b.amountDue, 0);
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && bills.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Bills" description="Track purchase bills from your suppliers and manage payables.">
           <EmptyState
             icon={ShoppingCart}
@@ -129,11 +136,12 @@ export default function BillsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
+    <BlurReveal>
     <div className="space-y-10">
       <Section title="Overview" description="Bills and payables summary across all suppliers.">
         <div className="space-y-4">
@@ -168,14 +176,15 @@ export default function BillsPage() {
           </Tabs>
 
           <DataTable
-            columns={columns}
-            data={bills}
-            loading={loading}
-            emptyMessage="No bills found."
-            onRowClick={(r) => router.push(`/purchases/${r.id}`)}
-          />
+              columns={columns}
+              data={bills}
+              loading={loading}
+              emptyMessage="No bills found."
+              onRowClick={(r) => router.push(`/purchases/${r.id}`)}
+            />
         </div>
       </Section>
     </div>
+    </BlurReveal>
   );
 }

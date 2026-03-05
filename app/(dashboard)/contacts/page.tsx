@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
+import { devDelay } from "@/lib/dev-delay";
 
 interface Contact {
   id: string;
@@ -93,15 +97,18 @@ export default function ContactsPage() {
       .then((data) => {
         if (data.data) setContacts(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, [search, typeFilter]);
 
   const customers = contacts.filter((c) => c.type === "customer" || c.type === "both");
   const suppliers = contacts.filter((c) => c.type === "supplier" || c.type === "both");
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && contacts.length === 0 && !search && typeFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Contacts" description="Manage your customers and suppliers in one place.">
           <EmptyState
             icon={Users}
@@ -117,11 +124,12 @@ export default function ContactsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
+    <BlurReveal>
     <div className="space-y-10">
       <Section title="Overview" description="Summary of your contacts, including customers and suppliers.">
         <div className="space-y-4">
@@ -164,14 +172,15 @@ export default function ContactsPage() {
           </div>
 
           <DataTable
-            columns={columns}
-            data={contacts}
-            loading={loading}
-            emptyMessage="No contacts found."
-            onRowClick={(r) => router.push(`/contacts/${r.id}`)}
-          />
+              columns={columns}
+              data={contacts}
+              loading={loading}
+              emptyMessage="No contacts found."
+              onRowClick={(r) => router.push(`/contacts/${r.id}`)}
+            />
         </div>
       </Section>
     </div>
+    </BlurReveal>
   );
 }

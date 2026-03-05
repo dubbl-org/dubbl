@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface AuditEntry {
   id: string;
@@ -143,7 +144,7 @@ export default function AuditLogPage() {
     : entries;
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
         <div className="shrink-0">
           <p className="text-sm font-medium">Audit log</p>
@@ -211,6 +212,6 @@ export default function AuditLogPage() {
           )}
         </div>
       </section>
-    </div>
+    </BlurReveal>
   );
 }

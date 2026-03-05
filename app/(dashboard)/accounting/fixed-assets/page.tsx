@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface FixedAsset {
   id: string;
@@ -145,7 +146,7 @@ export default function FixedAssetsPage() {
 
   if (!loading && assets.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Fixed Assets" description="Manage capital assets and depreciation.">
           <EmptyState
             icon={Building2}
@@ -161,12 +162,12 @@ export default function FixedAssetsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="A summary of your fixed assets, book values, and accumulated depreciation.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -227,6 +228,6 @@ export default function FixedAssetsPage() {
           />
         </div>
       </Section>
-    </div>
+    </BlurReveal>
   );
 }

@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface BankAccount {
   id: string;
@@ -172,7 +173,7 @@ export default function BankingPage() {
 
   if (!loading && accounts.length === 0) {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Bank Accounts" description="Connect and manage your bank accounts for importing and reconciling transactions.">
           <EmptyState
             icon={Landmark}
@@ -196,12 +197,12 @@ export default function BankingPage() {
           onSubmit={createAccount}
           loading={saving}
         />
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="Banking and connected accounts summary across balances and statuses.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -254,7 +255,7 @@ export default function BankingPage() {
         onSubmit={createAccount}
         loading={saving}
       />
-    </div>
+    </BlurReveal>
   );
 }
 

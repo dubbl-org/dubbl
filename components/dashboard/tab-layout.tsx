@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 import { cn } from "@/lib/utils";
 
 interface Tab {
@@ -42,7 +43,7 @@ export function TabLayout({
           );
         })}
       </nav>
-      {children}
+      <BlurReveal key={pathname}>{children}</BlurReveal>
     </div>
   );
 }

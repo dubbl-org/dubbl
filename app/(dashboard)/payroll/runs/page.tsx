@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface PayrollRun {
   id: string;
@@ -168,7 +169,7 @@ export default function PayrollRunsPage() {
 
   if (!loading && runs.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-6">
+      <BlurReveal className="space-y-6">
         <PageHeader
           title="Payroll Runs"
           description="Create and manage pay runs."
@@ -196,12 +197,12 @@ export default function PayrollRunsPage() {
           onSubmit={handleCreateRun}
           loading={creating}
         />
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <BlurReveal className="space-y-6">
       <PageHeader
         title="Payroll Runs"
         description="Create and manage pay runs."
@@ -242,7 +243,7 @@ export default function PayrollRunsPage() {
         onSubmit={handleCreateRun}
         loading={creating}
       />
-    </div>
+    </BlurReveal>
   );
 }
 

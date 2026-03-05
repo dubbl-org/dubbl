@@ -10,6 +10,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Budget {
   id: string;
@@ -58,7 +59,7 @@ export default function BudgetsPage() {
 
   if (!loading && budgets.length === 0) {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Budgets" description="Plan and track your financial budgets.">
           <EmptyState
             icon={Target}
@@ -74,12 +75,12 @@ export default function BudgetsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="A summary of your budgets and their current status.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -110,6 +111,6 @@ export default function BudgetsPage() {
           onRowClick={(r) => router.push(`/accounting/budgets/${r.id}`)}
         />
       </Section>
-    </div>
+    </BlurReveal>
   );
 }

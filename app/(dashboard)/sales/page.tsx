@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
 
 interface Invoice {
   id: string;
@@ -104,6 +108,7 @@ export default function InvoicesPage() {
       .then((data) => {
         if (data.data) setInvoices(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, [statusFilter]);
 
@@ -115,9 +120,11 @@ export default function InvoicesPage() {
     .filter((i) => i.status === "overdue")
     .reduce((sum, i) => sum + i.amountDue, 0);
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && invoices.length === 0 && statusFilter === "all") {
     return (
-      <div className="space-y-10">
+      <BlurReveal className="space-y-10">
         <Section title="Invoices" description="Create and send invoices to your customers. Track payments and outstanding balances.">
           <EmptyState
             icon={FileText}
@@ -133,12 +140,12 @@ export default function InvoicesPage() {
             </Button>
           </EmptyState>
         </Section>
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <BlurReveal className="space-y-10">
       <Section title="Overview" description="Revenue summary and outstanding amounts across all invoices.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -174,14 +181,14 @@ export default function InvoicesPage() {
           </Tabs>
 
           <DataTable
-            columns={columns}
-            data={invoices}
-            loading={loading}
-            emptyMessage="No invoices found."
-            onRowClick={(r) => router.push(`/sales/${r.id}`)}
-          />
+              columns={columns}
+              data={invoices}
+              loading={loading}
+              emptyMessage="No invoices found."
+              onRowClick={(r) => router.push(`/sales/${r.id}`)}
+            />
         </div>
       </Section>
-    </div>
+    </BlurReveal>
   );
 }
