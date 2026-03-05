@@ -171,7 +171,7 @@ export default function NotesPage() {
           onChange={e => setContent(e.target.value)}
           placeholder="Write a note..."
           rows={3}
-          className="resize-none border-0 p-0 focus-visible:ring-0 shadow-none text-[13px]"
+          className="resize-none border-0 p-0 focus-visible:ring-0 shadow-none text-[13px] bg-transparent dark:bg-transparent"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && content.trim()) handleAdd();
           }}

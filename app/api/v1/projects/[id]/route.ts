@@ -80,6 +80,9 @@ export async function GET(
         notes: {
           with: { author: true },
         },
+        runningTimers: {
+          with: { task: true },
+        },
       },
     });
 

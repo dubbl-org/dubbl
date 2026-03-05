@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -50,7 +50,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { useProject, formatHours, formatDateShort, type TimeEntryData } from "../project-context";
+import { useProject, formatHours, formatDateShort, type TimeEntryData, type RunningTimerData } from "../project-context";
 
 export default function TimePage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
@@ -72,54 +72,168 @@ export default function TimePage() {
   const [filterBillable, setFilterBillable] = useState("all");
   const [filterTask, setFilterTask] = useState("all");
 
-  // Timer state
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [timerPaused, setTimerPaused] = useState(false);
+  // Timer state - synced with DB
+  const [timerData, setTimerData] = useState<RunningTimerData | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerDesc, setTimerDesc] = useState("");
   const [timerTaskId, setTimerTaskId] = useState("none");
   const [timerBillable, setTimerBillable] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<Date | null>(null);
+  const descSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedDescRef = useRef("");
+  const lastSavedTaskRef = useRef("none");
+  const lastSavedBillableRef = useRef(true);
+
+  // Initialize timer from server data
+  useEffect(() => {
+    if (!proj) return;
+    const myTimer = proj.runningTimers?.[0] || null;
+    if (myTimer && !timerData) {
+      setTimerData(myTimer);
+      setTimerDesc(myTimer.description || "");
+      setTimerTaskId(myTimer.taskId || "none");
+      setTimerBillable(myTimer.isBillable);
+      lastSavedDescRef.current = myTimer.description || "";
+      lastSavedTaskRef.current = myTimer.taskId || "none";
+      lastSavedBillableRef.current = myTimer.isBillable;
+
+      // Calculate elapsed seconds
+      if (myTimer.pausedAt) {
+        setTimerSeconds(myTimer.accumulatedSeconds);
+      } else {
+        // Running: accumulated + time since last resume (startedAt is updated on resume)
+        const sinceLast = Math.floor((Date.now() - new Date(myTimer.startedAt).getTime()) / 1000);
+        setTimerSeconds(Math.max(0, myTimer.accumulatedSeconds + sinceLast));
+      }
+    }
+  }, [proj, timerData]);
+
+  // Tick the timer
+  useEffect(() => {
+    if (timerData && !timerData.pausedAt) {
+      timerRef.current = setInterval(() => setTimerSeconds(s => s + 1), 1000);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [timerData, timerData?.pausedAt]);
+
+  // Auto-save description/task/billable every 2s when changed
+  const saveTimerFields = useCallback(async () => {
+    if (!orgId || !timerData) return;
+    const updates: Record<string, unknown> = {};
+    let hasChanges = false;
+
+    if (timerDesc !== lastSavedDescRef.current) {
+      updates.description = timerDesc || null;
+      hasChanges = true;
+    }
+    if (timerTaskId !== lastSavedTaskRef.current) {
+      updates.taskId = timerTaskId === "none" ? null : timerTaskId;
+      hasChanges = true;
+    }
+    if (timerBillable !== lastSavedBillableRef.current) {
+      updates.isBillable = timerBillable;
+      hasChanges = true;
+    }
+
+    if (!hasChanges) return;
+
+    try {
+      await fetch(`/api/v1/projects/${projectId}/timer`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify(updates),
+      });
+      lastSavedDescRef.current = timerDesc;
+      lastSavedTaskRef.current = timerTaskId;
+      lastSavedBillableRef.current = timerBillable;
+    } catch { /* silent */ }
+  }, [orgId, projectId, timerData, timerDesc, timerTaskId, timerBillable]);
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
+    if (!timerData) return;
+    if (descSaveRef.current) clearTimeout(descSaveRef.current);
+    descSaveRef.current = setTimeout(saveTimerFields, 2000);
+    return () => { if (descSaveRef.current) clearTimeout(descSaveRef.current); };
+  }, [timerDesc, timerTaskId, timerBillable, saveTimerFields, timerData]);
 
-  function startTimer() {
-    setTimerRunning(true);
-    setTimerPaused(false);
-    setTimerSeconds(0);
-    startTimeRef.current = new Date();
-    timerRef.current = setInterval(() => setTimerSeconds(s => s + 1), 1000);
+  async function startTimer() {
+    if (!orgId) return;
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/timer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ isBillable: true }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setTimerData(data.timer);
+      setTimerSeconds(0);
+      setTimerDesc("");
+      setTimerTaskId("none");
+      setTimerBillable(true);
+      lastSavedDescRef.current = "";
+      lastSavedTaskRef.current = "none";
+      lastSavedBillableRef.current = true;
+    } catch { toast.error("Failed to start timer"); }
   }
 
-  function pauseTimer() {
+  async function pauseTimer() {
+    if (!orgId || !timerData) return;
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimerPaused(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/timer`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          pausedAt: new Date().toISOString(),
+          accumulatedSeconds: timerSeconds,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setTimerData(data.timer);
+    } catch { toast.error("Failed to pause timer"); }
   }
 
-  function resumeTimer() {
-    setTimerPaused(false);
-    timerRef.current = setInterval(() => setTimerSeconds(s => s + 1), 1000);
+  async function resumeTimer() {
+    if (!orgId || !timerData) return;
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/timer`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          pausedAt: null,
+          accumulatedSeconds: timerSeconds,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setTimerData(data.timer);
+    } catch { toast.error("Failed to resume timer"); }
   }
 
-  function resetTimer() {
+  async function resetTimer() {
+    if (!orgId) return;
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimerRunning(false);
-    setTimerPaused(false);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/timer`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+    } catch { /* silent */ }
+    setTimerData(null);
     setTimerSeconds(0);
     setTimerDesc("");
-    startTimeRef.current = null;
+    setTimerTaskId("none");
+    setTimerBillable(true);
   }
 
   async function stopTimer() {
+    if (!orgId || !timerData) return;
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimerRunning(false);
-    setTimerPaused(false);
     const minutes = Math.max(1, Math.round(timerSeconds / 60));
-    if (!orgId) return;
     try {
+      // Save the time entry
       const res = await fetch(`/api/v1/projects/${projectId}/time-entries`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
@@ -132,11 +246,19 @@ export default function TimePage() {
         }),
       });
       if (!res.ok) throw new Error("Failed");
+
+      // Delete the running timer
+      await fetch(`/api/v1/projects/${projectId}/timer`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+
       toast.success(`Logged ${formatHours(minutes)}`);
-      setTimerDesc("");
+      setTimerData(null);
       setTimerSeconds(0);
+      setTimerDesc("");
       setTimerTaskId("none");
-      startTimeRef.current = null;
+      setTimerBillable(true);
       refresh();
     } catch {
       toast.error("Failed to save time entry");
@@ -332,6 +454,8 @@ export default function TimePage() {
   }
 
   const timerTime = formatTimerDisplay(timerSeconds);
+  const timerIsRunning = !!timerData;
+  const timerIsPaused = !!timerData?.pausedAt;
 
   return (
     <div className="space-y-4">
@@ -340,24 +464,24 @@ export default function TimePage() {
         {/* Timer Card */}
         <div className={cn(
           "rounded-xl border bg-card p-5 flex flex-col",
-          timerRunning && !timerPaused && "border-emerald-300 bg-gradient-to-b from-emerald-50/40 to-card",
-          timerPaused && "border-amber-300 bg-gradient-to-b from-amber-50/30 to-card",
+          timerIsRunning && !timerIsPaused && "border-emerald-300 bg-gradient-to-b from-emerald-50/40 to-card dark:from-emerald-950/20",
+          timerIsPaused && "border-amber-300 bg-gradient-to-b from-amber-50/30 to-card dark:from-amber-950/20",
         )}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className={cn(
                 "size-2 rounded-full",
-                timerRunning && !timerPaused && "bg-emerald-500 animate-pulse",
-                timerPaused && "bg-amber-500",
-                !timerRunning && "bg-muted-foreground/20",
+                timerIsRunning && !timerIsPaused && "bg-emerald-500 animate-pulse",
+                timerIsPaused && "bg-amber-500",
+                !timerIsRunning && "bg-muted-foreground/20",
               )} />
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {timerRunning ? (timerPaused ? "Paused" : "Recording") : "Timer"}
+                {timerIsRunning ? (timerIsPaused ? "Paused" : "Recording") : "Timer"}
               </span>
             </div>
-            {timerRunning && startTimeRef.current && (
+            {timerData && (
               <span className="text-[10px] text-muted-foreground tabular-nums">
-                Started {startTimeRef.current.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                Started {new Date(timerData.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
@@ -367,33 +491,33 @@ export default function TimePage() {
             <div className="flex items-baseline gap-1 select-none">
               <span className={cn(
                 "text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
-                timerRunning && !timerPaused && "text-emerald-700",
-                timerPaused && "text-amber-700",
-                !timerRunning && "text-muted-foreground/30",
+                timerIsRunning && !timerIsPaused && "text-emerald-700 dark:text-emerald-400",
+                timerIsPaused && "text-amber-700 dark:text-amber-400",
+                !timerIsRunning && "text-muted-foreground/30",
               )}>
                 {timerTime.h}
               </span>
               <span className={cn(
                 "text-2xl font-light transition-colors",
-                timerRunning && !timerPaused ? "text-emerald-400 animate-pulse" : "text-muted-foreground/20",
+                timerIsRunning && !timerIsPaused ? "text-emerald-400 animate-pulse" : "text-muted-foreground/20",
               )}>:</span>
               <span className={cn(
                 "text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
-                timerRunning && !timerPaused && "text-emerald-700",
-                timerPaused && "text-amber-700",
-                !timerRunning && "text-muted-foreground/30",
+                timerIsRunning && !timerIsPaused && "text-emerald-700 dark:text-emerald-400",
+                timerIsPaused && "text-amber-700 dark:text-amber-400",
+                !timerIsRunning && "text-muted-foreground/30",
               )}>
                 {timerTime.m}
               </span>
               <span className={cn(
                 "text-2xl font-light transition-colors",
-                timerRunning && !timerPaused ? "text-emerald-400 animate-pulse" : "text-muted-foreground/20",
+                timerIsRunning && !timerIsPaused ? "text-emerald-400 animate-pulse" : "text-muted-foreground/20",
               )}>:</span>
               <span className={cn(
                 "text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
-                timerRunning && !timerPaused && "text-emerald-600",
-                timerPaused && "text-amber-600",
-                !timerRunning && "text-muted-foreground/20",
+                timerIsRunning && !timerIsPaused && "text-emerald-600 dark:text-emerald-500",
+                timerIsPaused && "text-amber-600 dark:text-amber-500",
+                !timerIsRunning && "text-muted-foreground/20",
               )}>
                 {timerTime.s}
               </span>
@@ -401,7 +525,7 @@ export default function TimePage() {
           </div>
 
           {/* Timer Description + Task */}
-          {timerRunning && (
+          {timerIsRunning && (
             <div className="space-y-2 mb-3">
               <Input
                 value={timerDesc}
@@ -427,7 +551,7 @@ export default function TimePage() {
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] rounded-md px-2 py-1 transition-colors w-fit",
                   timerBillable
-                    ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/40"
                     : "text-muted-foreground bg-muted hover:bg-muted/80",
                 )}
               >
@@ -439,7 +563,7 @@ export default function TimePage() {
 
           {/* Timer Controls */}
           <div className="flex items-center gap-2 mt-auto">
-            {!timerRunning ? (
+            {!timerIsRunning ? (
               <Button
                 size="sm"
                 className="flex-1 h-9 bg-emerald-600 hover:bg-emerald-700 gap-2 text-sm font-medium"
@@ -450,7 +574,7 @@ export default function TimePage() {
               </Button>
             ) : (
               <>
-                {timerPaused ? (
+                {timerIsPaused ? (
                   <Button
                     size="sm"
                     variant="outline"

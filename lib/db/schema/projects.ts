@@ -265,6 +265,24 @@ export const timeEntry = pgTable("time_entry", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+export const runningTimer = pgTable("running_timer", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => project.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  startedAt: timestamp("started_at", { mode: "date" }).notNull(),
+  pausedAt: timestamp("paused_at", { mode: "date" }),
+  accumulatedSeconds: integer("accumulated_seconds").notNull().default(0),
+  description: text("description"),
+  taskId: uuid("task_id").references(() => projectTask.id),
+  isBillable: boolean("is_billable").notNull().default(true),
+});
+
 // Relations
 export const projectRelations = relations(project, ({ one, many }) => ({
   organization: one(organization, {
@@ -276,6 +294,7 @@ export const projectRelations = relations(project, ({ one, many }) => ({
     references: [contact.id],
   }),
   timeEntries: many(timeEntry),
+  runningTimers: many(runningTimer),
   members: many(projectMember),
   tasks: many(projectTask),
   milestones: many(projectMilestone),
@@ -394,5 +413,20 @@ export const timeEntryRelations = relations(timeEntry, ({ one }) => ({
   invoice: one(invoice, {
     fields: [timeEntry.invoiceId],
     references: [invoice.id],
+  }),
+}));
+
+export const runningTimerRelations = relations(runningTimer, ({ one }) => ({
+  project: one(project, {
+    fields: [runningTimer.projectId],
+    references: [project.id],
+  }),
+  user: one(users, {
+    fields: [runningTimer.userId],
+    references: [users.id],
+  }),
+  task: one(projectTask, {
+    fields: [runningTimer.taskId],
+    references: [projectTask.id],
   }),
 }));

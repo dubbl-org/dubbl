@@ -106,6 +106,19 @@ export interface TimeEntryData {
   task: { id: string; title: string } | null;
 }
 
+export interface RunningTimerData {
+  id: string;
+  projectId: string;
+  userId: string;
+  startedAt: string;
+  pausedAt: string | null;
+  accumulatedSeconds: number;
+  description: string | null;
+  taskId: string | null;
+  isBillable: boolean;
+  task: { id: string; title: string } | null;
+}
+
 export interface ProjectDetail {
   id: string;
   name: string;
@@ -140,6 +153,7 @@ export interface ProjectDetail {
   timeEntries: TimeEntryData[];
   teams: TeamData[];
   labels: LabelData[];
+  runningTimers: RunningTimerData[];
 }
 
 interface ProjectContextValue {
