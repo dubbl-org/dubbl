@@ -14,6 +14,7 @@ const updateSchema = z.object({
   minutes: z.number().int().min(1).optional(),
   isBillable: z.boolean().optional(),
   hourlyRate: z.number().int().min(0).optional(),
+  taskId: z.string().nullable().optional(),
 });
 
 export async function GET(

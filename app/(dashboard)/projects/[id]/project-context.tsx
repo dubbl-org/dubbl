@@ -100,8 +100,10 @@ export interface TimeEntryData {
   isBillable: boolean;
   hourlyRate: number;
   invoiceId: string | null;
+  taskId: string | null;
+  userId: string;
   user: { name: string | null } | null;
-  task: { title: string } | null;
+  task: { id: string; title: string } | null;
 }
 
 export interface ProjectDetail {

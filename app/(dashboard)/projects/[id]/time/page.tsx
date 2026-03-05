@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -9,12 +9,14 @@ import {
   Clock,
   Pause,
   RotateCcw,
-  TrendingUp,
   CalendarDays,
   Zap,
   DollarSign,
-  Timer,
   CircleDot,
+  Filter,
+  X,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,18 +50,27 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { useProject, formatHours, formatDateShort } from "../project-context";
+import { useProject, formatHours, formatDateShort, type TimeEntryData } from "../project-context";
 
 export default function TimePage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
-  const [addOpen, setAddOpen] = useState(false);
+
+  // Drawer state: "add" for new, entry object for edit
+  const [drawerMode, setDrawerMode] = useState<"add" | "edit" | null>(null);
+  const [editingEntry, setEditingEntry] = useState<TimeEntryData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [entryDate, setEntryDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [entryDesc, setEntryDesc] = useState("");
   const [entryMinutes, setEntryMinutes] = useState("");
   const [entryHours, setEntryHours] = useState("");
   const [entryBillable, setEntryBillable] = useState("true");
   const [entryTaskId, setEntryTaskId] = useState("none");
+
+  // Filters
+  const [filterMember, setFilterMember] = useState("all");
+  const [filterBillable, setFilterBillable] = useState("all");
+  const [filterTask, setFilterTask] = useState("all");
 
   // Timer state
   const [timerRunning, setTimerRunning] = useState(false);
@@ -132,11 +143,46 @@ export default function TimePage() {
     }
   }
 
-  function formatTimer(seconds: number) {
+  function formatTimerDisplay(seconds: number) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return { h: String(h).padStart(2, "0"), m: String(m).padStart(2, "0"), s: String(s).padStart(2, "0") };
+  }
+
+  // Open drawer for adding
+  function openAdd() {
+    setDrawerMode("add");
+    setEditingEntry(null);
+    setEntryDate(new Date().toISOString().split("T")[0]);
+    setEntryDesc("");
+    setEntryMinutes("");
+    setEntryHours("");
+    setEntryBillable("true");
+    setEntryTaskId("none");
+  }
+
+  // Open drawer for editing
+  function openEdit(entry: TimeEntryData) {
+    setDrawerMode("edit");
+    setEditingEntry(entry);
+    setEntryDate(entry.date);
+    setEntryDesc(entry.description || "");
+    const h = entry.minutes / 60;
+    if (h === Math.floor(h)) {
+      setEntryHours(String(h));
+      setEntryMinutes("");
+    } else {
+      setEntryMinutes(String(entry.minutes));
+      setEntryHours("");
+    }
+    setEntryBillable(entry.isBillable ? "true" : "false");
+    setEntryTaskId(entry.taskId || "none");
+  }
+
+  function closeDrawer() {
+    setDrawerMode(null);
+    setEditingEntry(null);
   }
 
   if (!proj) return null;
@@ -149,6 +195,37 @@ export default function TimePage() {
   const billablePct = totalMinutes > 0 ? Math.round((billableMinutes / totalMinutes) * 100) : 0;
   const unbilledMinutes = entries.filter(e => e.isBillable && !e.invoiceId).reduce((sum, e) => sum + e.minutes, 0);
   const unbilledAmount = entries.filter(e => e.isBillable && !e.invoiceId).reduce((sum, e) => sum + Math.round((e.minutes / 60) * e.hourlyRate), 0);
+
+  // Unique members for filter
+  const uniqueMembers = Array.from(
+    new Map(entries.filter(e => e.user?.name).map(e => [e.user!.name, e.user!.name])).values()
+  );
+
+  // Unique tasks for filter
+  const uniqueTasks = Array.from(
+    new Map(entries.filter(e => e.task).map(e => [e.task!.id, e.task!])).values()
+  );
+
+  // Apply filters
+  const filteredEntries = entries.filter(e => {
+    if (filterMember !== "all" && e.user?.name !== filterMember) return false;
+    if (filterBillable === "billable" && !e.isBillable) return false;
+    if (filterBillable === "non-billable" && e.isBillable) return false;
+    if (filterBillable === "invoiced" && !e.invoiceId) return false;
+    if (filterTask !== "all") {
+      if (filterTask === "none" && e.taskId) return false;
+      if (filterTask !== "none" && e.task?.id !== filterTask) return false;
+    }
+    return true;
+  });
+
+  const hasActiveFilters = filterMember !== "all" || filterBillable !== "all" || filterTask !== "all";
+
+  function clearFilters() {
+    setFilterMember("all");
+    setFilterBillable("all");
+    setFilterTask("all");
+  }
 
   // Today's entries
   const today = new Date().toISOString().split("T")[0];
@@ -170,15 +247,14 @@ export default function TimePage() {
     };
   });
   const weekTotalMinutes = weekData.reduce((sum, d) => sum + d.hours * 60, 0);
-  const weekAvgMinutes = Math.round(weekTotalMinutes / weekDays.filter((_, i) => weekData[i].hours > 0).length || 0);
 
-  const columns: Column<typeof entries[0]>[] = [
+  const columns: Column<TimeEntryData>[] = [
     { key: "date", header: "Date", className: "w-24", render: r => <span className="text-[13px] tabular-nums">{formatDateShort(r.date)}</span> },
     { key: "user", header: "User", className: "w-28", render: r => <span className="text-xs text-muted-foreground">{r.user?.name || "-"}</span> },
     { key: "description", header: "Description", render: r => (
       <div>
         <span className="text-[13px]">{r.description || "-"}</span>
-        {r.task && <span className="text-[10px] text-muted-foreground block">Task: {r.task.title}</span>}
+        {r.task && <Badge variant="outline" className="text-[9px] h-4 ml-1.5 align-middle">{r.task.title}</Badge>}
       </div>
     )},
     { key: "duration", header: "Duration", className: "w-20 text-right", render: r => <span className="text-[13px] font-mono tabular-nums font-medium">{formatHours(r.minutes)}</span> },
@@ -208,14 +284,54 @@ export default function TimePage() {
       });
       if (!res.ok) throw new Error("Failed");
       toast.success("Time entry added");
-      setAddOpen(false);
-      setEntryDesc(""); setEntryMinutes(""); setEntryHours(""); setEntryTaskId("none");
+      closeDrawer();
       refresh();
     } catch { toast.error("Failed to add time entry"); }
     finally { setSaving(false); }
   }
 
-  const timerTime = formatTimer(timerSeconds);
+  async function handleUpdate() {
+    if (!orgId || !editingEntry) return;
+    const mins = entryHours ? Math.round(parseFloat(entryHours) * 60) : parseInt(entryMinutes);
+    if (!mins || mins <= 0) { toast.error("Enter a valid duration"); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/time-entries/${editingEntry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          date: entryDate,
+          description: entryDesc || null,
+          minutes: mins,
+          isBillable: entryBillable === "true",
+          taskId: entryTaskId === "none" ? null : entryTaskId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Time entry updated");
+      closeDrawer();
+      refresh();
+    } catch { toast.error("Failed to update time entry"); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    if (!orgId || !editingEntry) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/time-entries/${editingEntry.id}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Time entry deleted");
+      closeDrawer();
+      refresh();
+    } catch { toast.error("Failed to delete time entry"); }
+    finally { setDeleting(false); }
+  }
+
+  const timerTime = formatTimerDisplay(timerSeconds);
 
   return (
     <div className="space-y-4">
@@ -376,7 +492,7 @@ export default function TimePage() {
           </div>
         </div>
 
-        {/* Weekly Chart + Stats */}
+        {/* Weekly Chart */}
         <div className="rounded-xl border bg-card p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -386,7 +502,6 @@ export default function TimePage() {
             <span className="text-xs text-muted-foreground font-mono tabular-nums">{formatHours(Math.round(weekTotalMinutes))} total</span>
           </div>
 
-          {/* Weekly Bar Chart */}
           <div className="flex-1 min-h-[140px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekData} barSize={28} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -456,27 +571,91 @@ export default function TimePage() {
         />
       </div>
 
-      {/* Action bar */}
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          All Entries
-        </p>
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
-          <Plus className="size-3.5" />Log Time
-        </Button>
+      {/* Action bar + Filters */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            All Entries
+            {hasActiveFilters && (
+              <span className="ml-1.5 text-muted-foreground/60">
+                ({filteredEntries.length} of {entries.length})
+              </span>
+            )}
+          </p>
+          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={openAdd}>
+            <Plus className="size-3.5" />Log Time
+          </Button>
+        </div>
+
+        {/* Filter row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="size-3.5 text-muted-foreground/50 shrink-0" />
+
+          {uniqueMembers.length > 0 && (
+            <Select value={filterMember} onValueChange={setFilterMember}>
+              <SelectTrigger className={cn("h-7 text-xs w-auto min-w-[120px]", filterMember !== "all" && "border-blue-300 bg-blue-50/50")}>
+                <SelectValue placeholder="Member" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All members</SelectItem>
+                {uniqueMembers.map(name => (
+                  <SelectItem key={name} value={name!}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Select value={filterBillable} onValueChange={setFilterBillable}>
+            <SelectTrigger className={cn("h-7 text-xs w-auto min-w-[120px]", filterBillable !== "all" && "border-blue-300 bg-blue-50/50")}>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="billable">Billable</SelectItem>
+              <SelectItem value="non-billable">Non-billable</SelectItem>
+              <SelectItem value="invoiced">Invoiced</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {uniqueTasks.length > 0 && (
+            <Select value={filterTask} onValueChange={setFilterTask}>
+              <SelectTrigger className={cn("h-7 text-xs w-auto min-w-[120px]", filterTask !== "all" && "border-blue-300 bg-blue-50/50")}>
+                <SelectValue placeholder="Task" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All tasks</SelectItem>
+                <SelectItem value="none">No task</SelectItem>
+                {uniqueTasks.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground px-2" onClick={clearFilters}>
+              <X className="size-3 mr-1" />Clear
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Log Time Drawer */}
-      <Sheet open={addOpen} onOpenChange={setAddOpen}>
+      {/* Entry Drawer (Add / Edit) */}
+      <Sheet open={drawerMode !== null} onOpenChange={open => { if (!open) closeDrawer(); }}>
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
-                <Clock className="size-5" />
+              <div className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                drawerMode === "edit"
+                  ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400",
+              )}>
+                {drawerMode === "edit" ? <Pencil className="size-5" /> : <Clock className="size-5" />}
               </div>
               <div>
-                <SheetTitle className="text-lg">Log Time Entry</SheetTitle>
-                <SheetDescription>Record time spent on this project.</SheetDescription>
+                <SheetTitle className="text-lg">{drawerMode === "edit" ? "Edit Time Entry" : "Log Time Entry"}</SheetTitle>
+                <SheetDescription>{drawerMode === "edit" ? "Update this time entry." : "Record time spent on this project."}</SheetDescription>
               </div>
             </div>
           </SheetHeader>
@@ -539,16 +718,40 @@ export default function TimePage() {
               </div>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
-            <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? "Adding..." : "Add Entry"}
-            </Button>
+          <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+            {drawerMode === "edit" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 mr-auto h-9"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                <Trash2 className="size-3.5 mr-1.5" />
+                {deleting ? "Deleting..." : "Delete"}
+              </Button>
+            )}
+            <div className={cn("flex items-center gap-3", drawerMode !== "edit" && "ml-auto")}>
+              <Button type="button" variant="outline" onClick={closeDrawer}>Cancel</Button>
+              <Button
+                onClick={drawerMode === "edit" ? handleUpdate : handleAdd}
+                disabled={saving}
+                className={drawerMode === "edit" ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"}
+              >
+                {saving ? "Saving..." : drawerMode === "edit" ? "Update Entry" : "Add Entry"}
+              </Button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
 
-      <DataTable columns={columns} data={entries} emptyMessage="No time entries yet. Start the timer or log time manually." />
+      <DataTable
+        columns={columns}
+        data={filteredEntries}
+        onRowClick={openEdit}
+        emptyMessage={hasActiveFilters ? "No entries match your filters." : "No time entries yet. Start the timer or log time manually."}
+      />
     </div>
   );
 }
