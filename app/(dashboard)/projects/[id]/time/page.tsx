@@ -157,14 +157,14 @@ export default function TimePage() {
                 className="h-7 text-xs"
               />
               <Button size="sm" variant="outline" className="w-full h-7 text-xs border-red-200 text-red-600 hover:bg-red-50" onClick={stopTimer}>
-                <Square className="mr-1.5 size-3" />Stop & Save
+                <Square className="size-3" />Stop & Save
               </Button>
             </div>
           ) : (
             <div className="space-y-2">
               <p className="text-xl font-bold font-mono tabular-nums tracking-tight text-muted-foreground/50">00:00:00</p>
               <Button size="sm" className="w-full h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={startTimer}>
-                <Play className="mr-1.5 size-3" />Start Timer
+                <Play className="size-3" />Start Timer
               </Button>
             </div>
           )}
@@ -189,7 +189,7 @@ export default function TimePage() {
 
       <div className="flex justify-end">
         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
-          <Plus className="mr-1.5 size-3.5" />Log Time
+          <Plus className="size-3.5" />Log Time
         </Button>
       </div>
 

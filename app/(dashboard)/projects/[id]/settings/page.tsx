@@ -216,7 +216,7 @@ export default function SettingsPage() {
 
       <div className="flex justify-end">
         <Button type="submit" disabled={saving} size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-          {saving && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}{saving ? "Saving..." : "Save changes"}
+          {saving ? "Saving..." : "Save changes"}
         </Button>
       </div>
 
@@ -229,7 +229,7 @@ export default function SettingsPage() {
             <p className="text-[12px] text-muted-foreground">Permanently delete this project and all associated data.</p>
           </div>
           <Button type="button" variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-            {deleting ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Trash2 className="mr-1.5 size-3.5" />}{deleting ? "Deleting..." : "Delete"}
+            {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}{deleting ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </Section>

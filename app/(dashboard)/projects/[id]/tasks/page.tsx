@@ -303,7 +303,7 @@ export default function TasksPage() {
             </button>
           </div>
           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
-            <Plus className="mr-1.5 size-3.5" />Task
+            <Plus className="size-3.5" />Task
           </Button>
         </div>
       </div>
@@ -980,7 +980,7 @@ function TaskDetailDrawer({
               onClick={() => onAddComment(task.id)}
               disabled={commentSaving || !newComment.trim()}
             >
-              <Send className="size-3.5 mr-1.5" />{commentSaving ? "Posting..." : "Post Comment"}
+              <Send className="size-3.5" />{commentSaving ? "Posting..." : "Post Comment"}
             </Button>
           </div>
           {comments.length > 0 && (
@@ -1011,7 +1011,7 @@ function TaskDetailDrawer({
       {/* Footer */}
       <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
         <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => onDelete(task.id)} disabled={deletingId === task.id}>
-          <Trash2 className="size-3.5 mr-1.5" />{deletingId === task.id ? "Deleting..." : "Delete"}
+          {deletingId === task.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}{deletingId === task.id ? "Deleting..." : "Delete"}
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>

@@ -104,7 +104,7 @@ export default function MilestonesPage() {
 
       <div className="flex justify-end">
         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
-          <Plus className="mr-1.5 size-3.5" />Milestone
+          <Plus className="size-3.5" />Milestone
         </Button>
       </div>
 

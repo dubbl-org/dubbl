@@ -97,7 +97,7 @@ export default function MembersPage() {
           {viewers.length > 0 && <><span className="text-border">|</span><span>{viewers.length} viewer{viewers.length !== 1 ? "s" : ""}</span></>}
         </div>
         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
-          <Plus className="mr-1.5 size-3.5" />Add Member
+          <Plus className="size-3.5" />Add Member
         </Button>
       </div>
 
