@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, FileText } from "lucide-react";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -82,6 +83,7 @@ const columns: Column<Quote>[] = [
 
 export default function QuotesPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -121,7 +123,7 @@ export default function QuotesPage() {
             description="Create your first quote to send to customers."
           >
             <Button
-              onClick={() => router.push("/sales/quotes/new")}
+              onClick={() => openDrawer("quote")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
@@ -144,7 +146,7 @@ export default function QuotesPage() {
           </div>
           <div className="flex justify-end">
             <Button
-              onClick={() => router.push("/sales/quotes/new")}
+              onClick={() => openDrawer("quote")}
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
             >

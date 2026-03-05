@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Users, DollarSign, FileText } from "lucide-react";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -150,6 +151,7 @@ const runColumns: Column<PayrollRun>[] = [
 
 export default function PayrollPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [tab, setTab] = useState("runs");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
@@ -202,7 +204,7 @@ export default function PayrollPage() {
             description="Add employees to get started with payroll."
           >
             <Button
-              onClick={() => router.push("/payroll/employees/new")}
+              onClick={() => openDrawer("employee")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
@@ -240,7 +242,7 @@ export default function PayrollPage() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => router.push("/payroll/employees/new")}
+              onClick={() => openDrawer("employee")}
             >
               <Plus className="mr-2 size-4" />
               Add Employee

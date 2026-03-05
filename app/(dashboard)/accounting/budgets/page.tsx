@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Target } from "lucide-react";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 
@@ -47,6 +48,7 @@ const columns: Column<Budget>[] = [
 
 export default function BudgetsPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [utilization, setUtilization] = useState<BudgetUtilization[]>([]);
@@ -121,7 +123,7 @@ export default function BudgetsPage() {
               </p>
               <div className="mt-4">
                 <Button
-                  onClick={() => router.push("/accounting/budgets/new")}
+                  onClick={() => openDrawer("budget")}
                   className="bg-emerald-600 hover:bg-emerald-700"
                 >
                   <Plus className="mr-2 size-4" />
@@ -146,7 +148,7 @@ export default function BudgetsPage() {
           <div className="flex justify-end">
             <Button
               size="sm"
-              onClick={() => router.push("/accounting/budgets/new")}
+              onClick={() => openDrawer("budget")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />

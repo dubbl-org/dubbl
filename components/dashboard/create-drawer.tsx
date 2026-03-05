@@ -10,6 +10,11 @@ import {
   ShoppingCart,
   BookOpen,
   Package,
+  Receipt,
+  Building2,
+  Target,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import {
   Sheet,
@@ -33,8 +38,11 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-items-editor";
 import { EntryForm } from "@/components/dashboard/entry-form";
+import { AccountPicker } from "@/components/dashboard/account-picker";
+import { FileUploader } from "@/components/dashboard/file-uploader";
+import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -64,6 +72,12 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <BillDrawer open={activeType === "bill"} onClose={close} />
       <EntryDrawer open={activeType === "entry"} onClose={close} />
       <InventoryDrawer open={activeType === "inventory"} onClose={close} />
+      <QuoteDrawer open={activeType === "quote"} onClose={close} />
+      <PurchaseOrderDrawer open={activeType === "purchaseOrder"} onClose={close} />
+      <ExpenseDrawer open={activeType === "expense"} onClose={close} />
+      <FixedAssetDrawer open={activeType === "fixedAsset"} onClose={close} />
+      <BudgetDrawer open={activeType === "budget"} onClose={close} />
+      <EmployeeDrawer open={activeType === "employee"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -823,6 +837,980 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Item" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quote Drawer
+// ---------------------------------------------------------------------------
+function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [expiryDate, setExpiryDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split("T")[0];
+  });
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<LineItem[]>([
+    { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setContactId(""); setReference(""); setNotes("");
+      setIssueDate(new Date().toISOString().split("T")[0]);
+      const d = new Date(); d.setDate(d.getDate() + 30);
+      setExpiryDate(d.toISOString().split("T")[0]);
+      setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a customer"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId, issueDate, expiryDate,
+          reference: reference || null,
+          notes: notes || null,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create quote");
+      }
+      const data = await res.json();
+      toast.success("Quote created");
+      onClose();
+      router.push(`/sales/quotes/${data.quote.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create quote");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><FileText className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Quote</SheetTitle>
+              <SheetDescription>Create a sales quote for your customer.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Quote Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Customer *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Quote reference" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Expiry Date</Label>
+                  <DatePicker value={expiryDate} onChange={setExpiryDate} placeholder="Expiry date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes to customer..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Quote" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Purchase Order Drawer
+// ---------------------------------------------------------------------------
+function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<LineItem[]>([
+    { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setContactId(""); setReference(""); setNotes(""); setDeliveryDate("");
+      setIssueDate(new Date().toISOString().split("T")[0]);
+      setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a supplier"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/purchase-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId, issueDate,
+          deliveryDate: deliveryDate || null,
+          reference: reference || null,
+          notes: notes || null,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create purchase order");
+      }
+      const data = await res.json();
+      toast.success("Purchase order created");
+      onClose();
+      router.push(`/purchases/orders/${data.purchaseOrder.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create purchase order");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Purchase Order</SheetTitle>
+              <SheetDescription>Create a purchase order for your supplier.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Order Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Supplier *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="supplier" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="PO reference" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Delivery Date</Label>
+                  <DatePicker value={deliveryDate} onChange={setDeliveryDate} placeholder="Expected delivery" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create PO" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Expense Drawer
+// ---------------------------------------------------------------------------
+interface ExpenseItemForm {
+  date: string;
+  description: string;
+  amount: string;
+  category: string;
+  accountId: string;
+  receiptFileKey: string;
+  receiptFileName: string;
+}
+
+const emptyExpenseItem = (): ExpenseItemForm => ({
+  date: new Date().toISOString().split("T")[0],
+  description: "",
+  amount: "",
+  category: "",
+  accountId: "",
+  receiptFileKey: "",
+  receiptFileName: "",
+});
+
+function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [items, setItems] = useState<ExpenseItemForm[]>([emptyExpenseItem()]);
+
+  useEffect(() => {
+    if (!open) {
+      setTitle(""); setDescription("");
+      setItems([emptyExpenseItem()]);
+    }
+  }, [open]);
+
+  function updateItem(index: number, updates: Partial<ExpenseItemForm>) {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
+  }
+
+  const total = items.reduce((sum, item) => sum + decimalToCents(parseFloat(item.amount) || 0), 0);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { toast.error("Please enter a title"); return; }
+    if (items.some((item) => !item.description.trim() || !item.amount)) {
+      toast.error("Please fill in all item descriptions and amounts"); return;
+    }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          title,
+          description: description || null,
+          items: items.map((item) => ({
+            date: item.date,
+            description: item.description,
+            amount: parseFloat(item.amount) || 0,
+            category: item.category || null,
+            accountId: item.accountId || null,
+            receiptFileKey: item.receiptFileKey || null,
+            receiptFileName: item.receiptFileName || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create expense claim");
+      }
+      const data = await res.json();
+      toast.success("Expense claim created");
+      onClose();
+      router.push(`/purchases/expenses/${data.expenseClaim.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create expense claim");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Expense Claim</SheetTitle>
+              <SheetDescription>Submit expenses for reimbursement.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Claim Info</SectionLabel>
+              <div className="space-y-2">
+                <Label>Title *</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Business trip to NYC" />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Optional description" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionLabel>Expense Items</SectionLabel>
+                <Button type="button" variant="outline" size="sm" onClick={() => setItems((prev) => [...prev, emptyExpenseItem()])}>
+                  <Plus className="mr-2 size-3.5" />Add Item
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {items.map((item, index) => (
+                  <div key={index} className="rounded-lg border p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                      {items.length > 1 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))} className="text-red-600 hover:text-red-700">
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label>Date</Label>
+                        <DatePicker value={item.date} onChange={(val) => updateItem(index, { date: val })} placeholder="Expense date" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description *</Label>
+                        <Input value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="What was this for?" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount *</Label>
+                        <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateItem(index, { amount: e.target.value })} placeholder="0.00" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Input value={item.category} onChange={(e) => updateItem(index, { category: e.target.value })} placeholder="e.g. Travel" />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Account</Label>
+                        <AccountPicker value={item.accountId} onChange={(val) => updateItem(index, { accountId: val })} typeFilter={["expense"]} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Receipt</Label>
+                        <FileUploader accept="image/*,.pdf" onUpload={(fileKey, fileName) => updateItem(index, { receiptFileKey: fileKey, receiptFileName: fileName })} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+              <span className="text-sm font-medium">Total</span>
+              <span className="text-lg font-bold font-mono tabular-nums">{formatMoney(total)}</span>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Expense Claim" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Fixed Asset Drawer
+// ---------------------------------------------------------------------------
+interface FixedAssetAccount {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [accounts, setAccounts] = useState<FixedAssetAccount[]>([]);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [assetNumber, setAssetNumber] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [purchasePrice, setPurchasePrice] = useState("");
+  const [residualValue, setResidualValue] = useState("");
+  const [usefulLifeMonths, setUsefulLifeMonths] = useState("60");
+  const [depreciationMethod, setDepreciationMethod] = useState("straight_line");
+  const [assetAccountId, setAssetAccountId] = useState("");
+  const [depreciationAccountId, setDepreciationAccountId] = useState("");
+  const [accumulatedDepAccountId, setAccumulatedDepAccountId] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setName(""); setDescription(""); setAssetNumber("");
+      setPurchaseDate(new Date().toISOString().split("T")[0]);
+      setPurchasePrice(""); setResidualValue(""); setUsefulLifeMonths("60");
+      setDepreciationMethod("straight_line");
+      setAssetAccountId(""); setDepreciationAccountId(""); setAccumulatedDepAccountId("");
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.accounts) setAccounts(data.accounts); });
+  }, [open]);
+
+  const assetAccounts = accounts.filter((a) => a.type === "asset");
+  const expenseAccounts = accounts.filter((a) => a.type === "expense");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name || !assetNumber || !purchasePrice) { toast.error("Please fill in required fields"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/fixed-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name,
+          description: description || null,
+          assetNumber,
+          purchaseDate,
+          purchasePrice: Math.round(parseFloat(purchasePrice) * 100),
+          residualValue: residualValue ? Math.round(parseFloat(residualValue) * 100) : 0,
+          usefulLifeMonths: parseInt(usefulLifeMonths) || 60,
+          depreciationMethod,
+          assetAccountId: assetAccountId || null,
+          depreciationAccountId: depreciationAccountId || null,
+          accumulatedDepAccountId: accumulatedDepAccountId || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create asset");
+      }
+      const data = await res.json();
+      toast.success("Fixed asset created");
+      onClose();
+      router.push(`/accounting/fixed-assets/${data.asset.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create asset");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Building2 className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Fixed Asset</SheetTitle>
+              <SheetDescription>Add a capital asset to track depreciation.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Asset Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Asset Name *</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Office Equipment" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Asset Number *</Label>
+                  <Input value={assetNumber} onChange={(e) => setAssetNumber(e.target.value)} placeholder="FA-001" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description of the asset..." rows={2} />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Purchase</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Purchase Date *</Label>
+                  <DatePicker value={purchaseDate} onChange={setPurchaseDate} placeholder="Purchase date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Purchase Price *</Label>
+                  <Input type="number" step="0.01" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="10000.00" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Depreciation</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Residual Value</Label>
+                  <Input type="number" step="0.01" value={residualValue} onChange={(e) => setResidualValue(e.target.value)} placeholder="500.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Useful Life (months)</Label>
+                  <Input type="number" value={usefulLifeMonths} onChange={(e) => setUsefulLifeMonths(e.target.value)} placeholder="60" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Method</Label>
+                  <Select value={depreciationMethod} onValueChange={setDepreciationMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="straight_line">Straight Line</SelectItem>
+                      <SelectItem value="declining_balance">Declining Balance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Accounts</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Asset Account</Label>
+                  <Select value={assetAccountId} onValueChange={setAssetAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {assetAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Depreciation Expense</Label>
+                  <Select value={depreciationAccountId} onValueChange={setDepreciationAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {expenseAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Accumulated Dep.</Label>
+                  <Select value={accumulatedDepAccountId} onValueChange={setAccumulatedDepAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {assetAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Asset" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Budget Drawer
+// ---------------------------------------------------------------------------
+interface BudgetLineInput {
+  accountId: string;
+  jan: number; feb: number; mar: number; apr: number;
+  may: number; jun: number; jul: number; aug: number;
+  sep: number; oct: number; nov: number; dec: number;
+}
+
+const BUDGET_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
+const BUDGET_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function emptyBudgetLine(): BudgetLineInput {
+  return { accountId: "", jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 };
+}
+
+function budgetLineTotal(line: BudgetLineInput): number {
+  return BUDGET_MONTHS.reduce((s, m) => s + line[m], 0);
+}
+
+interface BudgetAccount {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [budgetName, setBudgetName] = useState("");
+  const [startDate, setStartDate] = useState(`${new Date().getFullYear()}-01-01`);
+  const [endDate, setEndDate] = useState(`${new Date().getFullYear()}-12-31`);
+  const [budgetLines, setBudgetLines] = useState<BudgetLineInput[]>([emptyBudgetLine()]);
+  const [budgetAccounts, setBudgetAccounts] = useState<BudgetAccount[]>([]);
+
+  useEffect(() => {
+    if (!open) {
+      setBudgetName(""); setBudgetLines([emptyBudgetLine()]);
+      setStartDate(`${new Date().getFullYear()}-01-01`);
+      setEndDate(`${new Date().getFullYear()}-12-31`);
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/accounts?limit=500", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.data) setBudgetAccounts(data.data); });
+  }, [open]);
+
+  function updateBudgetLine(index: number, field: string, value: string | number) {
+    setBudgetLines((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  }
+
+  function updateMonthCents(index: number, month: string, value: string) {
+    const cents = Math.round(parseFloat(value || "0") * 100);
+    updateBudgetLine(index, month, cents);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const validLines = budgetLines.filter((l) => l.accountId);
+    if (validLines.length === 0) { toast.error("Add at least one budget line with an account"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/budgets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ name: budgetName, startDate, endDate, lines: validLines }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create budget");
+      }
+      toast.success("Budget created");
+      onClose();
+      router.push("/accounting/budgets");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create budget");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Target className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Budget</SheetTitle>
+              <SheetDescription>Create a budget with monthly allocations.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Budget Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Budget Name *</Label>
+                  <Input value={budgetName} onChange={(e) => setBudgetName(e.target.value)} placeholder="FY 2026 Operating Budget" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionLabel>Budget Lines</SectionLabel>
+                <Button type="button" variant="outline" size="sm" onClick={() => setBudgetLines((prev) => [...prev, emptyBudgetLine()])}>
+                  <Plus className="mr-2 size-3.5" />Add Line
+                </Button>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      <th className="px-3 py-2 text-left font-medium w-48">Account</th>
+                      {BUDGET_MONTH_LABELS.map((m) => (
+                        <th key={m} className="px-2 py-2 text-right font-medium w-20">{m}</th>
+                      ))}
+                      <th className="px-3 py-2 text-right font-medium w-24">Total</th>
+                      <th className="px-2 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {budgetLines.map((line, i) => (
+                      <tr key={i} className="border-b">
+                        <td className="px-3 py-2">
+                          <select
+                            className="h-8 w-full rounded border bg-background px-2 text-sm"
+                            value={line.accountId}
+                            onChange={(e) => updateBudgetLine(i, "accountId", e.target.value)}
+                          >
+                            <option value="">Select account...</option>
+                            {budgetAccounts.map((a) => (
+                              <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {BUDGET_MONTHS.map((m) => (
+                          <td key={m} className="px-1 py-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="h-8 w-full rounded border bg-background px-2 text-right text-sm font-mono tabular-nums"
+                              value={(line[m] / 100).toFixed(2)}
+                              onChange={(e) => updateMonthCents(i, m, e.target.value)}
+                            />
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-right font-mono text-sm tabular-nums font-medium">
+                          ${(budgetLineTotal(line) / 100).toFixed(2)}
+                        </td>
+                        <td className="px-2 py-2">
+                          <button type="button" onClick={() => setBudgetLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-red-600">
+                            <Trash2 className="size-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Budget" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Employee Drawer
+// ---------------------------------------------------------------------------
+function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [empName, setEmpName] = useState("");
+  const [email, setEmail] = useState("");
+  const [employeeNumber, setEmployeeNumber] = useState("");
+  const [position, setPosition] = useState("");
+  const [salary, setSalary] = useState("");
+  const [payFrequency, setPayFrequency] = useState("monthly");
+  const [taxRate, setTaxRate] = useState("20");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [empStartDate, setEmpStartDate] = useState(new Date().toISOString().split("T")[0]);
+
+  useEffect(() => {
+    if (!open) {
+      setEmpName(""); setEmail(""); setEmployeeNumber(""); setPosition("");
+      setSalary(""); setPayFrequency("monthly"); setTaxRate("20");
+      setBankAccountNumber(""); setEmpStartDate(new Date().toISOString().split("T")[0]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!empName || !employeeNumber || !salary) { toast.error("Please fill in required fields"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/payroll/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: empName,
+          email: email || null,
+          employeeNumber,
+          position: position || null,
+          salary: Math.round(parseFloat(salary) * 100),
+          payFrequency,
+          taxRate: Math.round(parseFloat(taxRate) * 100),
+          bankAccountNumber: bankAccountNumber || null,
+          startDate: empStartDate,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add employee");
+      }
+      const data = await res.json();
+      toast.success("Employee added");
+      onClose();
+      router.push(`/payroll/employees/${data.employee.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add employee");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Users className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Employee</SheetTitle>
+              <SheetDescription>Add an employee to the payroll.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Personal Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input value={empName} onChange={(e) => setEmpName(e.target.value)} placeholder="John Doe" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Employee Number *</Label>
+                  <Input value={employeeNumber} onChange={(e) => setEmployeeNumber(e.target.value)} placeholder="EMP-001" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Position</Label>
+                  <Input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Software Engineer" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Compensation</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Annual Salary *</Label>
+                  <Input type="number" step="0.01" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="75000.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pay Frequency</Label>
+                  <Select value={payFrequency} onValueChange={setPayFrequency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="biweekly">Biweekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tax Rate (%)</Label>
+                  <Input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="20.00" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Bank Account Number</Label>
+                  <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} placeholder="Account number" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Start Date *</Label>
+                  <DatePicker value={empStartDate} onChange={setEmpStartDate} placeholder="Start date" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Add Employee" />
         </form>
       </SheetContent>
     </Sheet>

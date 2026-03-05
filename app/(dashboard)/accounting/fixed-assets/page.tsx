@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Building2, Play } from "lucide-react";
 import { toast } from "sonner";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -90,6 +91,7 @@ const columns: Column<FixedAsset>[] = [
 
 export default function FixedAssetsPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -154,7 +156,7 @@ export default function FixedAssetsPage() {
             description="Add your first fixed asset to track depreciation and book value."
           >
             <Button
-              onClick={() => router.push("/accounting/fixed-assets/new")}
+              onClick={() => openDrawer("fixedAsset")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
@@ -196,7 +198,7 @@ export default function FixedAssetsPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => router.push("/accounting/fixed-assets/new")}
+              onClick={() => openDrawer("fixedAsset")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />

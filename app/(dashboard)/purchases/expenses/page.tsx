@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Receipt } from "lucide-react";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +80,7 @@ const columns: Column<ExpenseClaim>[] = [
 
 export default function ExpensesPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [claims, setClaims] = useState<ExpenseClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -133,7 +135,7 @@ export default function ExpensesPage() {
             </p>
             <div className="mt-4">
               <Button
-                onClick={() => router.push("/purchases/expenses/new")}
+                onClick={() => openDrawer("expense")}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
                 <Plus className="mr-2 size-4" />
@@ -172,7 +174,7 @@ export default function ExpensesPage() {
           <div className="flex justify-end">
             <Button
               size="sm"
-              onClick={() => router.push("/purchases/expenses/new")}
+              onClick={() => openDrawer("expense")}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
