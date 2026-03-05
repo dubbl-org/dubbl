@@ -153,8 +153,7 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
     else iconRef.current?.stopAnimation();
   }, [hovered]);
 
-  useEffect(() => {
-    if (!open || fetched) return;
+  const fetchProjects = () => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     fetch("/api/v1/projects?status=active", {
@@ -165,7 +164,19 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
         if (data.data) setProjects(data.data);
       })
       .finally(() => setFetched(true));
+  };
+
+  useEffect(() => {
+    if (!open || fetched) return;
+    fetchProjects();
   }, [open, fetched]);
+
+  // Listen for project changes (create/delete/update)
+  useEffect(() => {
+    const handler = () => fetchProjects();
+    window.addEventListener("projects-changed", handler);
+    return () => window.removeEventListener("projects-changed", handler);
+  }, []);
 
   const projectsActive = pathname === "/projects" || pathname.startsWith("/projects/");
 

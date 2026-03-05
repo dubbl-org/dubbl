@@ -304,6 +304,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
       }
       const data = await res.json();
       toast.success("Project created");
+      window.dispatchEvent(new Event("projects-changed"));
       onClose();
       router.push(`/projects/${data.project.id}`);
     } catch (err) {
