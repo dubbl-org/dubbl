@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, FileText } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
@@ -120,6 +120,24 @@ export default function InvoicesPage() {
     .filter((i) => i.status === "overdue")
     .reduce((sum, i) => sum + i.amountDue, 0);
 
+  const aging = useMemo(() => {
+    const now = new Date();
+    const buckets = { current: { count: 0, amount: 0 }, "1-30": { count: 0, amount: 0 }, "31-60": { count: 0, amount: 0 }, "60+": { count: 0, amount: 0 } };
+    invoices
+      .filter((i) => ["sent", "partial", "overdue"].includes(i.status) && i.amountDue > 0)
+      .forEach((inv) => {
+        const due = new Date(inv.dueDate);
+        const days = Math.floor((now.getTime() - due.getTime()) / 86400000);
+        if (days <= 0) { buckets.current.count++; buckets.current.amount += inv.amountDue; }
+        else if (days <= 30) { buckets["1-30"].count++; buckets["1-30"].amount += inv.amountDue; }
+        else if (days <= 60) { buckets["31-60"].count++; buckets["31-60"].amount += inv.amountDue; }
+        else { buckets["60+"].count++; buckets["60+"].amount += inv.amountDue; }
+      });
+    return buckets;
+  }, [invoices]);
+
+  const agingTotal = aging.current.amount + aging["1-30"].amount + aging["31-60"].amount + aging["60+"].amount;
+
   if (loading) return <BrandLoader />;
 
   if (!loading && invoices.length === 0 && statusFilter === "all") {
@@ -153,6 +171,44 @@ export default function InvoicesPage() {
             <StatCard title="Overdue" value={formatMoney(overdue)} icon={FileText} changeType="negative" />
             <StatCard title="Total Invoices" value={invoices.length.toString()} icon={FileText} />
           </div>
+          {agingTotal > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Aging Breakdown</p>
+              <div className="h-3 w-full rounded-full overflow-hidden flex">
+                {([
+                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
+                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
+                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
+                ] as const).map(({ key, color }) => {
+                  const pct = (aging[key].amount / agingTotal) * 100;
+                  if (pct === 0) return null;
+                  return (
+                    <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
+                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
+                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
+                ] as const).map(({ key, color, label }) => (
+                  <div key={key} className="text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-block size-2 rounded-full ${color}`} />
+                      <span className="text-muted-foreground">{label}</span>
+                    </div>
+                    <p className="font-mono tabular-nums mt-0.5 pl-3.5">
+                      {aging[key].count} · {formatMoney(aging[key].amount)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end">
             <Button
               onClick={() => router.push("/sales/new")}

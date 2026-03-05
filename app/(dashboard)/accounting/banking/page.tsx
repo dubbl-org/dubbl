@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Landmark, Building2 } from "lucide-react";
+import { Plus, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -168,9 +167,6 @@ export default function BankingPage() {
     }
   }
 
-  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
-  const activeCount = accounts.filter((a) => a.isActive).length;
-
   if (!loading && accounts.length === 0) {
     return (
       <BlurReveal className="space-y-10">
@@ -205,22 +201,33 @@ export default function BankingPage() {
     <BlurReveal className="space-y-10">
       <Section title="Overview" description="Banking and connected accounts summary across balances and statuses.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              title="Total Balance"
-              value={formatMoney(totalBalance)}
-              icon={Landmark}
-            />
-            <StatCard
-              title="Active Accounts"
-              value={activeCount.toString()}
-              icon={Building2}
-            />
-            <StatCard
-              title="Total Accounts"
-              value={accounts.length.toString()}
-              icon={Building2}
-            />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {accounts.map((acc) => (
+              <div
+                key={acc.id}
+                className="rounded-lg border bg-card p-4 space-y-2 cursor-pointer hover:border-foreground/20 transition-colors"
+                onClick={() => router.push(`/accounting/banking/${acc.id}`)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Landmark className="size-4 text-muted-foreground shrink-0" />
+                    <p className="text-sm font-medium truncate">{acc.accountName}</p>
+                  </div>
+                  <span className={`size-2 rounded-full shrink-0 ${acc.isActive ? "bg-emerald-500" : "bg-gray-300"}`} />
+                </div>
+                {acc.bankName && (
+                  <p className="text-xs text-muted-foreground">{acc.bankName}</p>
+                )}
+                <div className="flex items-baseline justify-between">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {acc.accountNumber ? `****${acc.accountNumber.slice(-4)}` : "-"}
+                  </span>
+                  <span className={`font-mono text-lg font-semibold tabular-nums ${acc.balance < 0 ? "text-red-600" : ""}`}>
+                    {formatMoney(acc.balance, acc.currencyCode)}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
           <div className="flex justify-end">
             <Button

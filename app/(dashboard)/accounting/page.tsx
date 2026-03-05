@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
 
 
 interface Entry {
@@ -169,26 +170,32 @@ export default function TransactionsPage() {
 
       <div className="h-px bg-border" />
 
-      <Section title="Journal Entries" description="View, filter, and manage all your journal entries.">
-        <div className="space-y-4">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="draft">Draft</TabsTrigger>
-              <TabsTrigger value="posted">Posted</TabsTrigger>
-              <TabsTrigger value="void">Void</TabsTrigger>
-            </TabsList>
-          </Tabs>
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+        <Section title="Journal Entries" description="View, filter, and manage all your journal entries.">
+          <div className="space-y-4">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="draft">Draft</TabsTrigger>
+                <TabsTrigger value="posted">Posted</TabsTrigger>
+                <TabsTrigger value="void">Void</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <DataTable
-              columns={columns}
-              data={filtered}
-              loading={loading}
-              emptyMessage="No entries found."
-              onRowClick={(r) => router.push(`/accounting/${r.id}`)}
-            />
+            <DataTable
+                columns={columns}
+                data={filtered}
+                loading={loading}
+                emptyMessage="No entries found."
+                onRowClick={(r) => router.push(`/accounting/${r.id}`)}
+              />
+          </div>
+        </Section>
+
+        <div className="lg:sticky lg:top-6 lg:self-start">
+          <ActivityFeed />
         </div>
-      </Section>
+      </div>
     </div>
     </BlurReveal>
   );

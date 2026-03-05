@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { StatCard } from "@/components/dashboard/stat-card";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +47,16 @@ const TYPE_COLORS: Record<string, string> = {
   revenue: "border-emerald-200 bg-emerald-50 text-emerald-700",
   expense: "border-red-200 bg-red-50 text-red-700",
 };
+
+const TYPE_BORDER_COLORS: Record<string, string> = {
+  asset: "border-l-blue-500",
+  liability: "border-l-orange-500",
+  equity: "border-l-purple-500",
+  revenue: "border-l-emerald-500",
+  expense: "border-l-red-500",
+};
+
+const ALL_TYPES = ["asset", "liability", "equity", "revenue", "expense"] as const;
 
 const columns: Column<Account>[] = [
   {
@@ -161,7 +171,6 @@ export default function AccountsPage() {
     }
   }
 
-  const activeCount = accounts.filter((a) => a.isActive).length;
   const typeBreakdown = accounts.reduce<Record<string, number>>((acc, a) => {
     acc[a.type] = (acc[a.type] || 0) + 1;
     return acc;
@@ -201,10 +210,16 @@ export default function AccountsPage() {
     <BlurReveal className="space-y-10">
       <Section title="Overview" description="Chart of accounts summary across all account types and statuses.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Total Accounts" value={accounts.length.toString()} icon={BookOpen} />
-            <StatCard title="Active" value={activeCount.toString()} icon={BookOpen} changeType="positive" />
-            <StatCard title="Types Used" value={Object.keys(typeBreakdown).length.toString()} icon={BookOpen} />
+          <div className="grid gap-3 sm:grid-cols-5">
+            {ALL_TYPES.map((type) => (
+              <div
+                key={type}
+                className={`rounded-lg border border-l-4 ${TYPE_BORDER_COLORS[type]} bg-card p-4`}
+              >
+                <p className="text-xs font-medium text-muted-foreground capitalize">{type}</p>
+                <p className="text-2xl font-semibold mt-1 tabular-nums">{typeBreakdown[type] || 0}</p>
+              </div>
+            ))}
           </div>
           <div className="flex justify-end">
             <Button

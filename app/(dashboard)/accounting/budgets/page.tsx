@@ -7,6 +7,7 @@ import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
@@ -20,6 +21,13 @@ interface Budget {
   isActive: boolean;
   createdAt: string;
   lines?: { total: number }[];
+}
+
+interface BudgetUtilization {
+  budgetId: string;
+  name: string;
+  totalBudgeted: number;
+  totalActual: number;
 }
 
 const columns: Column<Budget>[] = [
@@ -41,6 +49,7 @@ export default function BudgetsPage() {
   const router = useRouter();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [utilization, setUtilization] = useState<BudgetUtilization[]>([]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -49,8 +58,27 @@ export default function BudgetsPage() {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setBudgets(data.data);
+      .then(async (data) => {
+        if (data.data) {
+          setBudgets(data.data);
+          const active = (data.data as Budget[]).filter((b) => b.isActive).slice(0, 5);
+          const results = await Promise.all(
+            active.map((b) =>
+              fetch(`/api/v1/reports/budget-vs-actual?budgetId=${b.id}`, {
+                headers: { "x-organization-id": orgId },
+              })
+                .then((r) => r.json())
+                .then((d) => ({
+                  budgetId: b.id,
+                  name: b.name,
+                  totalBudgeted: d.totalBudgeted as number,
+                  totalActual: d.totalActual as number,
+                }))
+                .catch(() => null)
+            )
+          );
+          setUtilization(results.filter((r): r is BudgetUtilization => r !== null));
+        }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -99,6 +127,26 @@ export default function BudgetsPage() {
           </div>
         </div>
       </Section>
+
+      {utilization.length > 0 && (
+        <>
+          <div className="h-px bg-border" />
+
+          <Section title="Budget Utilization" description="Spending progress against active budgets.">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {utilization.map((u) => (
+                <div key={u.budgetId} className="rounded-lg border bg-card p-4">
+                  <BudgetProgressBar
+                    label={u.name}
+                    budgeted={u.totalBudgeted}
+                    actual={u.totalActual}
+                  />
+                </div>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
 
       <div className="h-px bg-border" />
 
