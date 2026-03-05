@@ -1,13 +1,13 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   pgEnum,
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization } from "./auth";
 
 export const contactTypeEnum = pgEnum("contact_type", [
@@ -17,10 +17,10 @@ export const contactTypeEnum = pgEnum("contact_type", [
 ]);
 
 export const contact = pgTable("contact", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  organizationId: text("organization_id")
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),

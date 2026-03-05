@@ -1,25 +1,25 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   boolean,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization } from "./auth";
 import { fiscalYear, chartAccount } from "./bookkeeping";
 
 // Budget
 export const budget = pgTable("budget", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  organizationId: text("organization_id")
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  fiscalYearId: text("fiscal_year_id").references(() => fiscalYear.id),
+  fiscalYearId: uuid("fiscal_year_id").references(() => fiscalYear.id),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   isActive: boolean("is_active").notNull().default(true),
@@ -28,15 +28,15 @@ export const budget = pgTable("budget", {
   deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
 
-// Budget Line — monthly amounts in integer cents
+// Budget Line
 export const budgetLine = pgTable("budget_line", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  budgetId: text("budget_id")
+    .defaultRandom(),
+  budgetId: uuid("budget_id")
     .notNull()
     .references(() => budget.id, { onDelete: "cascade" }),
-  accountId: text("account_id")
+  accountId: uuid("account_id")
     .notNull()
     .references(() => chartAccount.id),
   jan: integer("jan").notNull().default(0),

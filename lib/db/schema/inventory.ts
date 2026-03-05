@@ -1,23 +1,23 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   boolean,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization } from "./auth";
 import { chartAccount } from "./bookkeeping";
 
 export const inventoryItem = pgTable(
   "inventory_item",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
-      .$defaultFn(() => nanoid()),
-    organizationId: text("organization_id")
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     code: text("code").notNull(),
@@ -26,9 +26,9 @@ export const inventoryItem = pgTable(
     sku: text("sku"),
     purchasePrice: integer("purchase_price").notNull().default(0), // cents
     salePrice: integer("sale_price").notNull().default(0), // cents
-    costAccountId: text("cost_account_id").references(() => chartAccount.id),
-    revenueAccountId: text("revenue_account_id").references(() => chartAccount.id),
-    inventoryAccountId: text("inventory_account_id").references(() => chartAccount.id),
+    costAccountId: uuid("cost_account_id").references(() => chartAccount.id),
+    revenueAccountId: uuid("revenue_account_id").references(() => chartAccount.id),
+    inventoryAccountId: uuid("inventory_account_id").references(() => chartAccount.id),
     quantityOnHand: integer("quantity_on_hand").notNull().default(0),
     reorderPoint: integer("reorder_point").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),

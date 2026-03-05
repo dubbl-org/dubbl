@@ -1,13 +1,13 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   date,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization, users } from "./auth";
 import { journalEntry, chartAccount } from "./bookkeeping";
 
@@ -21,16 +21,16 @@ export const expenseStatusEnum = pgEnum("expense_status", [
 
 // Expense Claim
 export const expenseClaim = pgTable("expense_claim", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
-  organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
-  submittedBy: text("submitted_by").notNull().references(() => users.id),
+  submittedBy: uuid("submitted_by").notNull().references(() => users.id),
   status: expenseStatusEnum("status").notNull().default("draft"),
   totalAmount: integer("total_amount").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
-  approvedBy: text("approved_by").references(() => users.id),
-  journalEntryId: text("journal_entry_id").references(() => journalEntry.id),
+  approvedBy: uuid("approved_by").references(() => users.id),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   submittedAt: timestamp("submitted_at", { mode: "date" }),
   approvedAt: timestamp("approved_at", { mode: "date" }),
   rejectedAt: timestamp("rejected_at", { mode: "date" }),
@@ -43,13 +43,13 @@ export const expenseClaim = pgTable("expense_claim", {
 
 // Expense Item
 export const expenseItem = pgTable("expense_item", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
-  expenseClaimId: text("expense_claim_id").notNull().references(() => expenseClaim.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  expenseClaimId: uuid("expense_claim_id").notNull().references(() => expenseClaim.id, { onDelete: "cascade" }),
   date: date("date").notNull(),
   description: text("description").notNull(),
   amount: integer("amount").notNull().default(0),
   category: text("category"),
-  accountId: text("account_id").references(() => chartAccount.id),
+  accountId: uuid("account_id").references(() => chartAccount.id),
   receiptFileKey: text("receipt_file_key"),
   receiptFileName: text("receipt_file_name"),
   sortOrder: integer("sort_order").notNull().default(0),

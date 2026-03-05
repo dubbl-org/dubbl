@@ -1,6 +1,7 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   boolean,
@@ -9,7 +10,6 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization, users, member } from "./auth";
 import { contact } from "./contacts";
 import { invoice } from "./invoicing";
@@ -66,15 +66,15 @@ export const milestoneStatusEnum = pgEnum("milestone_status", [
 ]);
 
 export const project = pgTable("project", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  organizationId: text("organization_id")
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  contactId: text("contact_id").references(() => contact.id),
+  contactId: uuid("contact_id").references(() => contact.id),
   status: projectStatusEnum("status").notNull().default("active"),
   priority: projectPriorityEnum("priority").notNull().default("medium"),
   billingType: projectBillingTypeEnum("billing_type").notNull().default("hourly"),
@@ -107,13 +107,13 @@ export const project = pgTable("project", {
 });
 
 export const projectMember = pgTable("project_member", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
-  memberId: text("member_id")
+  memberId: uuid("member_id")
     .notNull()
     .references(() => member.id, { onDelete: "cascade" }),
   role: projectMemberRoleEnum("role").notNull().default("contributor"),
@@ -121,10 +121,10 @@ export const projectMember = pgTable("project_member", {
 });
 
 export const projectTeam = pgTable("project_team", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -133,32 +133,32 @@ export const projectTeam = pgTable("project_team", {
 });
 
 export const projectTeamMember = pgTable("project_team_member", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  teamId: text("team_id")
+    .defaultRandom(),
+  teamId: uuid("team_id")
     .notNull()
     .references(() => projectTeam.id, { onDelete: "cascade" }),
-  memberId: text("member_id")
+  memberId: uuid("member_id")
     .notNull()
     .references(() => member.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const projectTask = pgTable("project_task", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   status: taskStatusEnum("status").notNull().default("todo"),
   priority: taskPriorityEnum("priority").notNull().default("medium"),
-  assigneeId: text("assignee_id").references(() => member.id),
-  teamId: text("team_id").references(() => projectTeam.id),
-  createdById: text("created_by_id").references(() => users.id),
+  assigneeId: uuid("assignee_id").references(() => member.id),
+  teamId: uuid("team_id").references(() => projectTeam.id),
+  createdById: uuid("created_by_id").references(() => users.id),
   startDate: date("start_date"),
   dueDate: date("due_date"),
   estimatedMinutes: integer("estimated_minutes"),
@@ -171,10 +171,10 @@ export const projectTask = pgTable("project_task", {
 
 // Labels defined at project level
 export const projectLabel = pgTable("project_label", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -184,10 +184,10 @@ export const projectLabel = pgTable("project_label", {
 
 // Subtasks / Checklist items within a task
 export const taskChecklist = pgTable("task_checklist", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  taskId: text("task_id")
+    .defaultRandom(),
+  taskId: uuid("task_id")
     .notNull()
     .references(() => projectTask.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
@@ -198,13 +198,13 @@ export const taskChecklist = pgTable("task_checklist", {
 
 // Comments on tasks
 export const taskComment = pgTable("task_comment", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  taskId: text("task_id")
+    .defaultRandom(),
+  taskId: uuid("task_id")
     .notNull()
     .references(() => projectTask.id, { onDelete: "cascade" }),
-  authorId: text("author_id")
+  authorId: uuid("author_id")
     .notNull()
     .references(() => users.id),
   content: text("content").notNull(),
@@ -213,10 +213,10 @@ export const taskComment = pgTable("task_comment", {
 });
 
 export const projectMilestone = pgTable("project_milestone", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
@@ -230,13 +230,13 @@ export const projectMilestone = pgTable("project_milestone", {
 });
 
 export const projectNote = pgTable("project_note", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
-  authorId: text("author_id")
+  authorId: uuid("author_id")
     .notNull()
     .references(() => users.id),
   content: text("content").notNull(),
@@ -246,22 +246,22 @@ export const projectNote = pgTable("project_note", {
 });
 
 export const timeEntry = pgTable("time_entry", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  projectId: text("project_id")
+    .defaultRandom(),
+  projectId: uuid("project_id")
     .notNull()
     .references(() => project.id, { onDelete: "cascade" }),
-  userId: text("user_id")
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
-  taskId: text("task_id").references(() => projectTask.id),
+  taskId: uuid("task_id").references(() => projectTask.id),
   date: date("date").notNull(),
   description: text("description"),
   minutes: integer("minutes").notNull().default(0),
   isBillable: boolean("is_billable").notNull().default(true),
   hourlyRate: integer("hourly_rate").notNull().default(0), // cents
-  invoiceId: text("invoice_id").references(() => invoice.id),
+  invoiceId: uuid("invoice_id").references(() => invoice.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

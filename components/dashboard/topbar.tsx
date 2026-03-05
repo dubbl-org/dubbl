@@ -55,6 +55,11 @@ const LABELS: Record<string, string> = {
   "budget-vs-actual": "Budget vs Actual",
   general: "General",
   time: "Time Tracking",
+  // Project subtabs
+  tasks: "Tasks",
+  milestones: "Milestones",
+  notes: "Notes",
+  team: "Team",
 };
 
 const CTA_MAP: Record<string, { label: string; href: string }> = {
@@ -81,8 +86,22 @@ export function Topbar() {
   const defaultSub = segments.length === 1 ? DEFAULT_SUBTABS[segments[0]] : undefined;
   const effectiveSegments = defaultSub ? [segments[0], defaultSub] : segments;
 
-  const pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
-  const parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
+  // For entity detail pages like /projects/[id] or /projects/[id]/time,
+  // detect the pattern and show proper breadcrumbs
+  const isEntityDetail = segments.length >= 2 && segments[0] in LABELS && !(segments[1] in LABELS);
+  let pageTitle: string;
+  let parentLabel: string | null;
+
+  if (isEntityDetail) {
+    // e.g. /projects/[id] → "Projects" or /projects/[id]/time → "Projects / Time Tracking"
+    parentLabel = LABELS[segments[0]] || segments[0];
+    const subTab = segments.length > 2 ? segments[segments.length - 1] : null;
+    pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[0]] || segments[0]);
+    if (!subTab) parentLabel = null; // Don't show "Projects / Projects"
+  } else {
+    pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
+    parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
+  }
 
   const cta = CTA_MAP[segments[0]];
 
@@ -105,7 +124,7 @@ export function Topbar() {
               <span className="text-muted-foreground/40">/</span>
             </>
           )}
-          <h1 className="text-[14px] text-muted-foreground">{pageTitle}</h1>
+          <h1 className="text-[13px] text-muted-foreground">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
