@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -62,18 +63,18 @@ const LABELS: Record<string, string> = {
   team: "Team",
 };
 
-const CTA_MAP: Record<string, { label: string; href: string }> = {
-  sales: { label: "New Invoice", href: "/sales/new" },
-  purchases: { label: "New Bill", href: "/purchases/new" },
-  accounting: { label: "New Entry", href: "/accounting/new" },
-  contacts: { label: "New Contact", href: "/contacts/new" },
-  projects: { label: "New Project", href: "/projects/new" },
-  inventory: { label: "New Item", href: "/inventory/new" },
+const CTA_MAP: Record<string, { label: string; drawer: "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" }> = {
+  sales: { label: "New Invoice", drawer: "invoice" },
+  purchases: { label: "New Bill", drawer: "bill" },
+  accounting: { label: "New Entry", drawer: "entry" },
+  contacts: { label: "New Contact", drawer: "contact" },
+  projects: { label: "New Project", drawer: "project" },
+  inventory: { label: "New Item", drawer: "inventory" },
 };
 
 export function Topbar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const segments = pathname.split("/").filter(Boolean);
 
   // For group roots, show the default subtab in the breadcrumb
@@ -147,7 +148,7 @@ export function Topbar() {
               <Button
                 size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => router.push(cta.href)}
+                onClick={() => openDrawer(cta.drawer)}
               >
                 <Plus className="size-3" />
                 {cta.label}

@@ -87,6 +87,60 @@ export async function POST(
   }
 }
 
+const updateSchema = z.object({
+  content: z.string().min(1).optional(),
+  isPinned: z.boolean().optional(),
+});
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:projects");
+
+    const url = new URL(request.url);
+    const noteId = url.searchParams.get("noteId");
+    if (!noteId) return NextResponse.json({ error: "noteId required" }, { status: 400 });
+
+    const body = await request.json();
+    const parsed = updateSchema.parse(body);
+
+    const proj = await db.query.project.findFirst({
+      where: and(
+        eq(project.id, id),
+        eq(project.organizationId, ctx.organizationId),
+        notDeleted(project.deletedAt)
+      ),
+    });
+
+    if (!proj) return notFound("Project");
+
+    const existing = await db.query.projectNote.findFirst({
+      where: and(eq(projectNote.id, noteId), eq(projectNote.projectId, id)),
+    });
+
+    if (!existing) return notFound("Note");
+
+    const [updated] = await db
+      .update(projectNote)
+      .set({ ...parsed, updatedAt: new Date() })
+      .where(eq(projectNote.id, noteId))
+      .returning();
+
+    const note = await db.query.projectNote.findFirst({
+      where: eq(projectNote.id, updated.id),
+      with: { author: true },
+    });
+
+    return NextResponse.json({ note });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
