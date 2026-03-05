@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2, StickyNote, Pin } from "lucide-react";
+import { Trash2, StickyNote, Pin, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -96,7 +96,7 @@ function NoteCard({ note, onDelete, deleting }: { note: { id: string; content: s
           <p className="text-[13px] whitespace-pre-wrap leading-relaxed text-muted-foreground">{note.content}</p>
         </div>
         <button onClick={() => onDelete(note.id)} disabled={deleting} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity shrink-0 mt-1", deleting && "opacity-50 pointer-events-none")}>
-          <Trash2 className={cn("size-3", deleting && "animate-pulse")} />
+          {deleting ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
         </button>
       </div>
     </div>

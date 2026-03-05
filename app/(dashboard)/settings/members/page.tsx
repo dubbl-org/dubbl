@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -223,7 +223,7 @@ export default function MembersPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="size-8" disabled={actionMemberId === m.id}>
-                              <MoreHorizontal className={actionMemberId === m.id ? "size-4 animate-pulse" : "size-4"} />
+                              {actionMemberId === m.id ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">

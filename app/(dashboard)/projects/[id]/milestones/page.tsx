@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, CheckCircle2, Flag, Target } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Flag, Target, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -141,7 +142,7 @@ export default function MilestonesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Due Date</Label>
-                  <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  <DatePicker value={dueDate} onChange={setDueDate} placeholder="Select due date" />
                 </div>
                 <div className="space-y-2">
                   <Label>Amount</Label>
@@ -172,7 +173,7 @@ export default function MilestonesPage() {
               <div key={ms.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
                 <button onClick={() => toggleComplete(ms)} disabled={togglingId === ms.id} className="shrink-0">
                   {togglingId === ms.id ? (
-                    <Target className="size-5 text-muted-foreground/40 animate-pulse" />
+                    <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />
                   ) : ms.status === "completed" ? (
                     <CheckCircle2 className="size-5 text-emerald-500" />
                   ) : (
@@ -188,7 +189,7 @@ export default function MilestonesPage() {
                 )}
                 {ms.amount > 0 && <span className="text-[11px] font-mono text-muted-foreground shrink-0">{formatMoney(ms.amount)}</span>}
                 <button onClick={() => deleteMilestone(ms.id)} disabled={deletingId === ms.id} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingId === ms.id && "opacity-100 pointer-events-none")}>
-                  <Trash2 className={cn("size-3", deletingId === ms.id && "animate-pulse")} />
+                  {deletingId === ms.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
                 </button>
               </div>
             );

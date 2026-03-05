@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Plus, Play, Square, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -211,7 +212,7 @@ export default function TimePage() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">When</p>
               <div className="space-y-2">
                 <Label>Date</Label>
-                <Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+                <DatePicker value={entryDate} onChange={setEntryDate} placeholder="Select date" />
               </div>
             </div>
 

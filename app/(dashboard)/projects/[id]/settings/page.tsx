@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { Section } from "@/components/dashboard/section";
 import { centsToDecimal } from "@/lib/money";
@@ -26,6 +27,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [contactId, setContactId] = useState(proj?.contactId || "");
+  const [projStartDate, setProjStartDate] = useState(proj?.startDate || "");
+  const [projEndDate, setProjEndDate] = useState(proj?.endDate || "");
 
   if (!proj) return null;
 
@@ -54,8 +57,8 @@ export default function SettingsPage() {
           hourlyRate: Math.round(parseFloat(form.get("hourlyRate") as string || "0") * 100),
           fixedPrice: Math.round(parseFloat(form.get("fixedPrice") as string || "0") * 100),
           estimatedHours: Math.round(parseFloat(form.get("estimatedHours") as string || "0") * 60),
-          startDate: form.get("startDate") || null,
-          endDate: form.get("endDate") || null,
+          startDate: projStartDate || null,
+          endDate: projEndDate || null,
           category: form.get("category") || null,
           tags,
           enableTasks: form.get("enableTasks") === "on",
@@ -181,8 +184,8 @@ export default function SettingsPage() {
 
       <Section title="Timeline" description="Project schedule and time estimates.">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-1.5"><Label className="text-xs">Start Date</Label><Input name="startDate" type="date" defaultValue={proj.startDate || ""} /></div>
-          <div className="space-y-1.5"><Label className="text-xs">End Date</Label><Input name="endDate" type="date" defaultValue={proj.endDate || ""} /></div>
+          <div className="space-y-1.5"><Label className="text-xs">Start Date</Label><DatePicker value={projStartDate} onChange={setProjStartDate} placeholder="Select start date" /></div>
+          <div className="space-y-1.5"><Label className="text-xs">End Date</Label><DatePicker value={projEndDate} onChange={setProjEndDate} placeholder="Select end date" /></div>
           <div className="space-y-1.5"><Label className="text-xs">Estimated Hours</Label><Input name="estimatedHours" type="number" step="0.5" min={0} defaultValue={proj.estimatedHours > 0 ? (proj.estimatedHours / 60).toFixed(1) : ""} /></div>
         </div>
       </Section>
@@ -213,7 +216,7 @@ export default function SettingsPage() {
 
       <div className="flex justify-end">
         <Button type="submit" disabled={saving} size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-          {saving ? "Saving..." : "Save changes"}
+          {saving && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}{saving ? "Saving..." : "Save changes"}
         </Button>
       </div>
 
@@ -226,7 +229,7 @@ export default function SettingsPage() {
             <p className="text-[12px] text-muted-foreground">Permanently delete this project and all associated data.</p>
           </div>
           <Button type="button" variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-            <Trash2 className="mr-1.5 size-3.5" />{deleting ? "Deleting..." : "Delete"}
+            {deleting ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Trash2 className="mr-1.5 size-3.5" />}{deleting ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </Section>

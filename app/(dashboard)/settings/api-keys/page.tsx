@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Key, Copy, Trash2 } from "lucide-react";
+import { Plus, Key, Copy, Trash2, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,7 +154,7 @@ export default function ApiKeysPage() {
                       onClick={() => deleteKey(k.id)}
                       disabled={deletingId === k.id}
                     >
-                      <Trash2 className={deletingId === k.id ? "size-3.5 animate-pulse" : "size-3.5"} />
+                      {deletingId === k.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
                     </Button>
                   </div>
                 </div>

@@ -16,9 +16,11 @@ import {
   Send,
   LayoutList,
   Columns3,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -411,11 +413,11 @@ export default function TasksPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Select start date" />
                 </div>
                 <div className="space-y-2">
                   <Label>Due Date</Label>
-                  <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  <DatePicker value={dueDate} onChange={setDueDate} placeholder="Select due date" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -566,7 +568,7 @@ function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView, togglin
           >
             <button onClick={(e) => { e.stopPropagation(); onToggle(task.id, task.status); }} disabled={togglingId === task.id} className="shrink-0">
               {togglingId === task.id ? (
-                <CircleDashed className="size-4 text-muted-foreground/40 animate-spin" />
+                <Loader2 className="size-4 text-muted-foreground/40 animate-spin" />
               ) : task.status === "done" ? (
                 <CheckCircle2 className="size-4 text-emerald-500" />
               ) : (
@@ -633,7 +635,7 @@ function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView, togglin
               disabled={deletingId === task.id}
               className={cn("opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-600", deletingId === task.id && "opacity-100 pointer-events-none")}
             >
-              <Trash2 className={cn("size-3", deletingId === task.id && "animate-pulse")} />
+              {deletingId === task.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
             </button>
           </div>
         );
@@ -769,7 +771,7 @@ function TaskDetailDrawer({
           <button onClick={() => onToggleStatus(task.id, task.status)} disabled={togglingId === task.id} className="mt-0.5 shrink-0">
             {togglingId === task.id ? (
               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                <CircleDashed className="size-5 animate-spin" />
+                <Loader2 className="size-5 animate-spin" />
               </div>
             ) : task.status === "done" ? (
               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
@@ -938,7 +940,7 @@ function TaskDetailDrawer({
                   disabled={deletingCheckId === item.id}
                   className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingCheckId === item.id && "opacity-100 pointer-events-none")}
                 >
-                  <Trash2 className={cn("size-3", deletingCheckId === item.id && "animate-pulse")} />
+                  {deletingCheckId === item.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
                 </button>
               </div>
             ))}
@@ -952,7 +954,7 @@ function TaskDetailDrawer({
               onKeyDown={e => { if (e.key === "Enter") onAddCheckItem(task.id); }}
             />
             <Button size="sm" variant="outline" className="shrink-0" onClick={() => onAddCheckItem(task.id)} disabled={!newCheckItem.trim() || checkItemSaving}>
-              {checkItemSaving ? <CircleDashed className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+              {checkItemSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
             </Button>
           </div>
         </div>
@@ -994,7 +996,7 @@ function TaskDetailDrawer({
                         disabled={deletingCommentId === c.id}
                         className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingCommentId === c.id && "opacity-100 pointer-events-none")}
                       >
-                        <Trash2 className={cn("size-3", deletingCommentId === c.id && "animate-pulse")} />
+                        {deletingCommentId === c.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
                       </button>
                     </div>
                   </div>
