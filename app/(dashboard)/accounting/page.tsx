@@ -127,7 +127,7 @@ export default function TransactionsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Transactions" description="Create and manage journal entries to track your financial activity.">
-          <div className="space-y-8">
+          <div className="space-y-8 min-h-[50vh] flex flex-col justify-center">
             <div className="grid gap-4 sm:grid-cols-3">
               {[
                 { step: 1, icon: BookOpen, label: "Set up accounts", desc: "Create your chart of accounts to categorize transactions" },

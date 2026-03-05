@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { Plus, Receipt } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,27 +45,40 @@ export default function PurchaseOrdersPage() {
       .then((r) => r.json()).then((data) => { if (data.data) setPos(data.data); }).finally(() => setLoading(false));
   }, [statusFilter]);
 
-  const openTotal = pos
-    .filter((p) => ["draft", "sent", "partial"].includes(p.status))
-    .reduce((s, p) => s + p.total, 0);
-
   if (!loading && pos.length === 0 && statusFilter === "all") {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Purchase Orders" description="Submit and manage purchase orders to suppliers.">
-          <EmptyState
-            icon={Receipt}
-            title="No purchase orders yet"
-            description="Create a PO to order from suppliers."
-          >
-            <Button
-              onClick={() => router.push("/purchases/orders/new")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New PO
-            </Button>
-          </EmptyState>
+          <div className="min-h-[50vh] flex flex-col items-center justify-center text-center py-12">
+            <div className="grid grid-cols-3 gap-3 mb-8 w-full max-w-md opacity-40">
+              {[
+                { label: "Draft", color: "border-l-gray-400" },
+                { label: "Sent", color: "border-l-blue-500" },
+                { label: "Received", color: "border-l-emerald-500" },
+              ].map(({ label, color }) => (
+                <div key={label} className={`rounded-lg border border-dashed border-l-4 ${color} p-3`}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-lg font-semibold tabular-nums text-muted-foreground/40 mt-0.5">0</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+              <Receipt className="size-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h3 className="mt-4 text-sm font-medium">No purchase orders yet</h3>
+            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+              Create a PO to order from suppliers and track fulfillment.
+            </p>
+            <div className="mt-4">
+              <Button
+                onClick={() => router.push("/purchases/orders/new")}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Plus className="mr-2 size-4" />
+                New PO
+              </Button>
+            </div>
+          </div>
         </Section>
       </BlurReveal>
     );
@@ -77,17 +88,23 @@ export default function PurchaseOrdersPage() {
     <BlurReveal className="space-y-10">
       <Section title="Overview" description="A summary of your purchase orders and outstanding amounts.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard
-              title="Open Orders"
-              value={formatMoney(openTotal)}
-              icon={Receipt}
-            />
-            <StatCard
-              title="Total Orders"
-              value={pos.length.toString()}
-              icon={Receipt}
-            />
+          <div className="grid gap-3 sm:grid-cols-4">
+            {([
+              { status: "draft", label: "Draft", color: "border-l-gray-400" },
+              { status: "sent", label: "Sent", color: "border-l-blue-500" },
+              { status: "partial", label: "Partial", color: "border-l-amber-500" },
+              { status: "received", label: "Received", color: "border-l-emerald-500" },
+            ] as const).map(({ status, label, color }) => {
+              const items = pos.filter((p) => p.status === status);
+              const total = items.reduce((s, p) => s + p.total, 0);
+              return (
+                <div key={status} className={`rounded-lg border border-l-4 ${color} bg-card p-4`}>
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="text-xl font-semibold mt-1 tabular-nums">{items.length}</p>
+                  {total > 0 && <p className="text-xs font-mono text-muted-foreground tabular-nums mt-0.5">{formatMoney(total)}</p>}
+                </div>
+              );
+            })}
           </div>
           <div className="flex justify-end">
             <Button

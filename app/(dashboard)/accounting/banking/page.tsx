@@ -171,7 +171,7 @@ export default function BankingPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Bank Accounts" description="Connect and manage your bank accounts for importing and reconciling transactions.">
-          <div className="space-y-6">
+          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
             <div className="grid gap-4 sm:grid-cols-3">
               {[
                 { name: "Checking Account", bank: "Your Bank", balance: "$0.00" },

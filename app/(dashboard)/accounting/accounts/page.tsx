@@ -180,7 +180,7 @@ export default function AccountsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Accounts" description="Set up and manage your chart of accounts for recording transactions.">
-          <div className="space-y-6">
+          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
             <div className="grid gap-3 sm:grid-cols-5">
               {ALL_TYPES.map((type) => (
                 <div

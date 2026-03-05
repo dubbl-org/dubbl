@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { Plus, Users } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,19 +108,36 @@ export default function ContactsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Contacts" description="Manage your customers and suppliers in one place.">
-          <EmptyState
-            icon={Users}
-            title="No contacts yet"
-            description="Add your first customer or supplier to get started."
-          >
-            <Button
-              onClick={() => router.push("/contacts/new")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Contact
-            </Button>
-          </EmptyState>
+          <div className="min-h-[50vh] flex flex-col items-center justify-center text-center py-12">
+            <div className="grid grid-cols-3 gap-3 mb-8 w-full max-w-md opacity-40">
+              {[
+                { label: "Customers", color: "border-l-blue-500" },
+                { label: "Suppliers", color: "border-l-orange-500" },
+                { label: "Both", color: "border-l-purple-500" },
+              ].map(({ label, color }) => (
+                <div key={label} className={`rounded-lg border border-dashed border-l-4 ${color} p-3`}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-lg font-semibold tabular-nums text-muted-foreground/40 mt-0.5">0</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+              <Users className="size-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h3 className="mt-4 text-sm font-medium">No contacts yet</h3>
+            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+              Add your first customer or supplier to get started.
+            </p>
+            <div className="mt-4">
+              <Button
+                onClick={() => router.push("/contacts/new")}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Plus className="mr-2 size-4" />
+                New Contact
+              </Button>
+            </div>
+          </div>
         </Section>
       </BlurReveal>
     );
@@ -133,10 +148,17 @@ export default function ContactsPage() {
     <div className="space-y-10">
       <Section title="Overview" description="Summary of your contacts, including customers and suppliers.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Total Contacts" value={contacts.length.toString()} icon={Users} />
-            <StatCard title="Customers" value={customers.length.toString()} icon={Users} />
-            <StatCard title="Suppliers" value={suppliers.length.toString()} icon={Users} />
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: "Customers", count: customers.length, color: "border-l-blue-500" },
+              { label: "Suppliers", count: suppliers.length, color: "border-l-orange-500" },
+              { label: "Total", count: contacts.length, color: "border-l-emerald-500" },
+            ].map(({ label, count, color }) => (
+              <div key={label} className={`rounded-lg border border-l-4 ${color} bg-card p-4`}>
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="text-2xl font-semibold mt-1 tabular-nums">{count}</p>
+              </div>
+            ))}
           </div>
           <div className="flex justify-end">
             <Button

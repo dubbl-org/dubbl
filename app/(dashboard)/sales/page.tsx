@@ -144,7 +144,7 @@ export default function InvoicesPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Invoices" description="Create and send invoices to your customers. Track payments and outstanding balances.">
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-h-[50vh]">
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
                 <FileText className="size-6 text-emerald-600 dark:text-emerald-400" />

@@ -89,7 +89,7 @@ export default function BudgetsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Budgets" description="Plan and track your financial budgets.">
-          <div className="space-y-6">
+          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
             <div className="rounded-lg border border-dashed bg-card p-6 space-y-4 opacity-60">
               <p className="text-xs font-medium text-muted-foreground">Preview: Budget Utilization</p>
               {[
