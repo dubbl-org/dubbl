@@ -33,6 +33,7 @@ export default function ApiKeysPage() {
   const [name, setName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function fetchKeys() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -79,7 +80,8 @@ export default function ApiKeysPage() {
 
   async function deleteKey(id: string) {
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId || deletingId) return;
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/v1/api-keys/${id}`, {
         method: "DELETE",
@@ -90,7 +92,7 @@ export default function ApiKeysPage() {
       fetchKeys();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete key");
-    }
+    } finally { setDeletingId(null); }
   }
 
   return (
@@ -150,8 +152,9 @@ export default function ApiKeysPage() {
                       size="icon"
                       className="size-8 text-red-600 hover:text-red-700"
                       onClick={() => deleteKey(k.id)}
+                      disabled={deletingId === k.id}
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className={deletingId === k.id ? "size-3.5 animate-pulse" : "size-3.5"} />
                     </Button>
                   </div>
                 </div>

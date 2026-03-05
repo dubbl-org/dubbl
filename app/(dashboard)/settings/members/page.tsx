@@ -59,6 +59,7 @@ export default function MembersPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [saving, setSaving] = useState(false);
+  const [actionMemberId, setActionMemberId] = useState<string | null>(null);
 
   function fetchMembers() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -106,7 +107,8 @@ export default function MembersPage() {
 
   async function removeMember(memberId: string) {
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId || actionMemberId) return;
+    setActionMemberId(memberId);
     try {
       const res = await fetch(`/api/v1/members/${memberId}`, {
         method: "DELETE",
@@ -117,12 +119,13 @@ export default function MembersPage() {
       fetchMembers();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to remove");
-    }
+    } finally { setActionMemberId(null); }
   }
 
   async function changeRole(memberId: string, role: string) {
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId || actionMemberId) return;
+    setActionMemberId(memberId);
     try {
       const res = await fetch(`/api/v1/members/${memberId}`, {
         method: "PATCH",
@@ -137,7 +140,7 @@ export default function MembersPage() {
       fetchMembers();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update role");
-    }
+    } finally { setActionMemberId(null); }
   }
 
   const ownerCount = members.filter((m) => m.role === "owner").length;
@@ -219,8 +222,8 @@ export default function MembersPage() {
                       {m.role !== "owner" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-8">
-                              <MoreHorizontal className="size-4" />
+                            <Button variant="ghost" size="icon" className="size-8" disabled={actionMemberId === m.id}>
+                              <MoreHorizontal className={actionMemberId === m.id ? "size-4 animate-pulse" : "size-4"} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -231,12 +234,14 @@ export default function MembersPage() {
                                   m.role === "admin" ? "member" : "admin"
                                 )
                               }
+                              disabled={actionMemberId !== null}
                             >
                               Make {m.role === "admin" ? "member" : "admin"}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => removeMember(m.id)}
                               className="text-red-600"
+                              disabled={actionMemberId !== null}
                             >
                               Remove
                             </DropdownMenuItem>

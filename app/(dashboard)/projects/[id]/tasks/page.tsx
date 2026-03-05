@@ -83,6 +83,13 @@ export default function TasksPage() {
   const [newComment, setNewComment] = useState("");
   const [commentSaving, setCommentSaving] = useState(false);
 
+  // Loading states for inline actions
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [checkItemSaving, setCheckItemSaving] = useState(false);
+  const [deletingCheckId, setDeletingCheckId] = useState<string | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+
   if (!proj) return null;
 
   const tasks = proj.tasks;
@@ -153,22 +160,30 @@ export default function TasksPage() {
   }
 
   async function toggleStatus(taskId: string, current: string) {
-    const newStatus = current === "done" ? "todo" : "done";
-    await handleUpdate(taskId, { status: newStatus });
+    if (togglingId) return;
+    setTogglingId(taskId);
+    try {
+      const newStatus = current === "done" ? "todo" : "done";
+      await handleUpdate(taskId, { status: newStatus });
+    } finally { setTogglingId(null); }
   }
 
   async function deleteTask(taskId: string) {
-    if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}`, {
-      method: "DELETE",
-      headers: { "x-organization-id": orgId },
-    });
-    setViewTask(null);
-    refresh();
+    if (!orgId || deletingId) return;
+    setDeletingId(taskId);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      setViewTask(null);
+      refresh();
+    } finally { setDeletingId(null); }
   }
 
   async function addChecklistItem(taskId: string) {
-    if (!orgId || !newCheckItem.trim()) return;
+    if (!orgId || !newCheckItem.trim() || checkItemSaving) return;
+    setCheckItemSaving(true);
     try {
       await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/checklist`, {
         method: "POST",
@@ -178,6 +193,7 @@ export default function TasksPage() {
       setNewCheckItem("");
       refresh();
     } catch { toast.error("Failed to add item"); }
+    finally { setCheckItemSaving(false); }
   }
 
   async function toggleChecklistItem(taskId: string, itemId: string, isCompleted: boolean) {
@@ -193,12 +209,15 @@ export default function TasksPage() {
   }
 
   async function deleteChecklistItem(taskId: string, itemId: string) {
-    if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/checklist?itemId=${itemId}`, {
-      method: "DELETE",
-      headers: { "x-organization-id": orgId },
-    });
-    refresh();
+    if (!orgId || deletingCheckId) return;
+    setDeletingCheckId(itemId);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/checklist?itemId=${itemId}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      refresh();
+    } finally { setDeletingCheckId(null); }
   }
 
   async function addComment(taskId: string) {
@@ -217,12 +236,15 @@ export default function TasksPage() {
   }
 
   async function deleteComment(taskId: string, commentId: string) {
-    if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/comments?commentId=${commentId}`, {
-      method: "DELETE",
-      headers: { "x-organization-id": orgId },
-    });
-    refresh();
+    if (!orgId || deletingCommentId) return;
+    setDeletingCommentId(commentId);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/comments?commentId=${commentId}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      refresh();
+    } finally { setDeletingCommentId(null); }
   }
 
   return (
@@ -470,6 +492,11 @@ export default function TasksPage() {
             onAddComment={addComment}
             onDeleteComment={deleteComment}
             onClose={() => setViewTask(null)}
+            togglingId={togglingId}
+            deletingId={deletingId}
+            checkItemSaving={checkItemSaving}
+            deletingCheckId={deletingCheckId}
+            deletingCommentId={deletingCommentId}
           />}
         </SheetContent>
       </Sheet>
@@ -483,6 +510,8 @@ export default function TasksPage() {
           onToggle={toggleStatus}
           onDelete={deleteTask}
           onView={openViewDrawer}
+          togglingId={togglingId}
+          deletingId={deletingId}
         />
       ) : (
         <TaskBoardView
@@ -498,13 +527,15 @@ export default function TasksPage() {
 }
 
 // ── Task List View ──
-function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView }: {
+function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView, togglingId, deletingId }: {
   tasks: TaskData[];
   proj: { color: string };
   labels: { id: string; name: string; color: string }[];
   onToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
   onView: (task: TaskData) => void;
+  togglingId: string | null;
+  deletingId: string | null;
 }) {
   if (tasks.length === 0) {
     return (
@@ -533,8 +564,10 @@ function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView }: {
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors group cursor-pointer"
             onClick={() => onView(task)}
           >
-            <button onClick={(e) => { e.stopPropagation(); onToggle(task.id, task.status); }} className="shrink-0">
-              {task.status === "done" ? (
+            <button onClick={(e) => { e.stopPropagation(); onToggle(task.id, task.status); }} disabled={togglingId === task.id} className="shrink-0">
+              {togglingId === task.id ? (
+                <CircleDashed className="size-4 text-muted-foreground/40 animate-spin" />
+              ) : task.status === "done" ? (
                 <CheckCircle2 className="size-4 text-emerald-500" />
               ) : (
                 <CircleDashed className="size-4 text-muted-foreground/40 hover:text-emerald-400 transition-colors" />
@@ -597,9 +630,10 @@ function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView }: {
             )}
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-600"
+              disabled={deletingId === task.id}
+              className={cn("opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-600", deletingId === task.id && "opacity-100 pointer-events-none")}
             >
-              <Trash2 className="size-3" />
+              <Trash2 className={cn("size-3", deletingId === task.id && "animate-pulse")} />
             </button>
           </div>
         );
@@ -693,6 +727,7 @@ function TaskDetailDrawer({
   members, teams, labels, newCheckItem, setNewCheckItem, newComment, setNewComment,
   commentSaving, onUpdate, onToggleStatus, onDelete, onAddCheckItem,
   onToggleCheckItem, onDeleteCheckItem, onAddComment, onDeleteComment, onClose,
+  togglingId, deletingId, checkItemSaving, deletingCheckId, deletingCommentId,
 }: {
   task: TaskData;
   editStatus: string; setEditStatus: (v: string) => void;
@@ -714,6 +749,11 @@ function TaskDetailDrawer({
   onAddComment: (taskId: string) => void;
   onDeleteComment: (taskId: string, commentId: string) => void;
   onClose: () => void;
+  togglingId: string | null;
+  deletingId: string | null;
+  checkItemSaving: boolean;
+  deletingCheckId: string | null;
+  deletingCommentId: string | null;
 }) {
   const overdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" && task.status !== "cancelled";
   const creator = task.createdBy;
@@ -726,8 +766,12 @@ function TaskDetailDrawer({
     <>
       <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
         <div className="flex items-start gap-3">
-          <button onClick={() => onToggleStatus(task.id, task.status)} className="mt-0.5 shrink-0">
-            {task.status === "done" ? (
+          <button onClick={() => onToggleStatus(task.id, task.status)} disabled={togglingId === task.id} className="mt-0.5 shrink-0">
+            {togglingId === task.id ? (
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                <CircleDashed className="size-5 animate-spin" />
+              </div>
+            ) : task.status === "done" ? (
               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
                 <CheckCircle2 className="size-5" />
               </div>
@@ -891,9 +935,10 @@ function TaskDetailDrawer({
                 <span className={cn("text-[13px] flex-1", item.isCompleted && "line-through text-muted-foreground")}>{item.title}</span>
                 <button
                   onClick={() => onDeleteCheckItem(task.id, item.id)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity"
+                  disabled={deletingCheckId === item.id}
+                  className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingCheckId === item.id && "opacity-100 pointer-events-none")}
                 >
-                  <Trash2 className="size-3" />
+                  <Trash2 className={cn("size-3", deletingCheckId === item.id && "animate-pulse")} />
                 </button>
               </div>
             ))}
@@ -906,8 +951,8 @@ function TaskDetailDrawer({
               className="text-sm"
               onKeyDown={e => { if (e.key === "Enter") onAddCheckItem(task.id); }}
             />
-            <Button size="sm" variant="outline" className="shrink-0" onClick={() => onAddCheckItem(task.id)} disabled={!newCheckItem.trim()}>
-              <Plus className="size-3.5" />
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => onAddCheckItem(task.id)} disabled={!newCheckItem.trim() || checkItemSaving}>
+              {checkItemSaving ? <CircleDashed className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
             </Button>
           </div>
         </div>
@@ -946,9 +991,10 @@ function TaskDetailDrawer({
                       <span className="text-[11px] text-muted-foreground">{new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                       <button
                         onClick={() => onDeleteComment(task.id, c.id)}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity"
+                        disabled={deletingCommentId === c.id}
+                        className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingCommentId === c.id && "opacity-100 pointer-events-none")}
                       >
-                        <Trash2 className="size-3" />
+                        <Trash2 className={cn("size-3", deletingCommentId === c.id && "animate-pulse")} />
                       </button>
                     </div>
                   </div>
@@ -962,13 +1008,13 @@ function TaskDetailDrawer({
 
       {/* Footer */}
       <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
-        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => onDelete(task.id)}>
-          <Trash2 className="size-3.5 mr-1.5" />Delete
+        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => onDelete(task.id)} disabled={deletingId === task.id}>
+          <Trash2 className="size-3.5 mr-1.5" />{deletingId === task.id ? "Deleting..." : "Delete"}
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { onToggleStatus(task.id, task.status); onClose(); }}>
-            {task.status === "done" ? "Reopen Task" : "Mark Done"}
+          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { onToggleStatus(task.id, task.status); onClose(); }} disabled={togglingId === task.id}>
+            {togglingId === task.id ? "Saving..." : task.status === "done" ? "Reopen Task" : "Mark Done"}
           </Button>
         </div>
       </div>

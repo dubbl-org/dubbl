@@ -66,6 +66,8 @@ const plans = [
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [, setLoading] = useState(true);
+  const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -83,7 +85,8 @@ export default function BillingPage() {
 
   async function checkout(plan: string) {
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId || checkoutPlan) return;
+    setCheckoutPlan(plan);
 
     try {
       const res = await fetch("/api/v1/billing/checkout", {
@@ -99,12 +102,14 @@ export default function BillingPage() {
       else throw new Error(data.error);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to start checkout");
+      setCheckoutPlan(null);
     }
   }
 
   async function openPortal() {
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId || portalLoading) return;
+    setPortalLoading(true);
 
     try {
       const res = await fetch("/api/v1/billing/portal", {
@@ -115,6 +120,7 @@ export default function BillingPage() {
       if (data.url) window.location.href = data.url;
     } catch {
       toast.error("Failed to open billing portal");
+      setPortalLoading(false);
     }
   }
 
@@ -149,8 +155,8 @@ export default function BillingPage() {
               </div>
             </div>
             {currentPlan !== "free" && (
-              <Button variant="outline" size="sm" onClick={openPortal}>
-                Manage Billing
+              <Button variant="outline" size="sm" onClick={openPortal} disabled={portalLoading}>
+                {portalLoading ? "Loading..." : "Manage Billing"}
               </Button>
             )}
           </div>
@@ -217,8 +223,9 @@ export default function BillingPage() {
                       )}
                       variant={plan.id === "free" ? "outline" : "default"}
                       onClick={() => checkout(plan.id)}
+                      disabled={checkoutPlan !== null}
                     >
-                      {plan.id === "free" ? "Downgrade" : "Upgrade"}
+                      {checkoutPlan === plan.id ? "Loading..." : plan.id === "free" ? "Downgrade" : "Upgrade"}
                     </Button>
                   )}
                 </div>

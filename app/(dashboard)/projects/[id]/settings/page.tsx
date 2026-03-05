@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [contactId, setContactId] = useState(proj?.contactId || "");
 
   if (!proj) return null;
@@ -79,13 +80,16 @@ export default function SettingsPage() {
   async function handleDelete() {
     if (!confirm("Delete this project? This action cannot be undone.")) return;
     if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}`, {
-      method: "DELETE",
-      headers: { "x-organization-id": orgId },
-    });
-    toast.success("Project deleted");
-    window.dispatchEvent(new Event("projects-changed"));
-    router.push("/projects");
+    setDeleting(true);
+    try {
+      await fetch(`/api/v1/projects/${projectId}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      toast.success("Project deleted");
+      window.dispatchEvent(new Event("projects-changed"));
+      router.push("/projects");
+    } finally { setDeleting(false); }
   }
 
   return (
@@ -221,8 +225,8 @@ export default function SettingsPage() {
             <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete project</p>
             <p className="text-[12px] text-muted-foreground">Permanently delete this project and all associated data.</p>
           </div>
-          <Button type="button" variant="destructive" size="sm" onClick={handleDelete}>
-            <Trash2 className="mr-1.5 size-3.5" />Delete
+          <Button type="button" variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+            <Trash2 className="mr-1.5 size-3.5" />{deleting ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </Section>

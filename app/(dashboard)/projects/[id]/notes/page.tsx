@@ -12,6 +12,7 @@ export default function NotesPage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!proj) return null;
 
@@ -37,9 +38,12 @@ export default function NotesPage() {
   }
 
   async function deleteNote(noteId: string) {
-    if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}/notes?noteId=${noteId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
-    refresh();
+    if (!orgId || deletingId) return;
+    setDeletingId(noteId);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/notes?noteId=${noteId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
+      refresh();
+    } finally { setDeletingId(null); }
   }
 
   return (
@@ -63,13 +67,13 @@ export default function NotesPage() {
         <div className="space-y-2">
           {/* Pinned first */}
           {pinnedNotes.map((note) => (
-            <NoteCard key={note.id} note={note} onDelete={deleteNote} />
+            <NoteCard key={note.id} note={note} onDelete={deleteNote} deleting={deletingId === note.id} />
           ))}
           {pinnedNotes.length > 0 && unpinnedNotes.length > 0 && (
             <div className="h-px bg-border" />
           )}
           {unpinnedNotes.map((note) => (
-            <NoteCard key={note.id} note={note} onDelete={deleteNote} />
+            <NoteCard key={note.id} note={note} onDelete={deleteNote} deleting={deletingId === note.id} />
           ))}
         </div>
       )}
@@ -77,7 +81,7 @@ export default function NotesPage() {
   );
 }
 
-function NoteCard({ note, onDelete }: { note: { id: string; content: string; isPinned: boolean; createdAt: string; author: { name: string | null; email: string } }; onDelete: (id: string) => void }) {
+function NoteCard({ note, onDelete, deleting }: { note: { id: string; content: string; isPinned: boolean; createdAt: string; author: { name: string | null; email: string } }; onDelete: (id: string) => void; deleting: boolean }) {
   return (
     <div className={cn("rounded-lg border bg-card p-3.5 group", note.isPinned && "border-amber-200 bg-amber-50/30")}>
       <div className="flex items-start justify-between gap-3">
@@ -91,8 +95,8 @@ function NoteCard({ note, onDelete }: { note: { id: string; content: string; isP
           </div>
           <p className="text-[13px] whitespace-pre-wrap leading-relaxed text-muted-foreground">{note.content}</p>
         </div>
-        <button onClick={() => onDelete(note.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity shrink-0 mt-1">
-          <Trash2 className="size-3" />
+        <button onClick={() => onDelete(note.id)} disabled={deleting} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity shrink-0 mt-1", deleting && "opacity-50 pointer-events-none")}>
+          <Trash2 className={cn("size-3", deleting && "animate-pulse")} />
         </button>
       </div>
     </div>

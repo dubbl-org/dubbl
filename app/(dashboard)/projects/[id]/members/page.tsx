@@ -36,6 +36,7 @@ export default function MembersPage() {
   const [orgMembers, setOrgMembers] = useState<{ id: string; user: { name: string | null; email: string } }[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState("none");
   const [selectedRole, setSelectedRole] = useState("contributor");
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orgId || !addOpen) return;
@@ -77,10 +78,13 @@ export default function MembersPage() {
   }
 
   async function removeMember(memberId: string) {
-    if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}/members?memberId=${memberId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
-    toast.success("Member removed");
-    refresh();
+    if (!orgId || removingId) return;
+    setRemovingId(memberId);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/members?memberId=${memberId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
+      toast.success("Member removed");
+      refresh();
+    } finally { setRemovingId(null); }
   }
 
   return (
@@ -189,8 +193,8 @@ export default function MembersPage() {
                     {m.role}
                   </Badge>
                 </div>
-                <button onClick={() => removeMember(m.member.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity absolute top-3 right-3">
-                  <Trash2 className="size-3" />
+                <button onClick={() => removeMember(m.member.id)} disabled={removingId === m.member.id} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity absolute top-3 right-3", removingId === m.member.id && "opacity-100 pointer-events-none")}>
+                  <Trash2 className={cn("size-3", removingId === m.member.id && "animate-pulse")} />
                 </button>
               </div>
             </div>

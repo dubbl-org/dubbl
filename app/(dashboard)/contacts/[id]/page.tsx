@@ -36,6 +36,7 @@ export default function ContactDetailPage() {
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -91,13 +92,15 @@ export default function ContactDetailPage() {
     if (!confirm("Delete this contact?")) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-
-    await fetch(`/api/v1/contacts/${id}`, {
-      method: "DELETE",
-      headers: { "x-organization-id": orgId },
-    });
-    toast.success("Contact deleted");
-    router.push("/contacts");
+    setDeleting(true);
+    try {
+      await fetch(`/api/v1/contacts/${id}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      toast.success("Contact deleted");
+      router.push("/contacts");
+    } finally { setDeleting(false); }
   }
 
   if (loading) {
@@ -128,9 +131,9 @@ export default function ContactDetailPage() {
             Back
           </Link>
         </Button>
-        <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600">
+        <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600" disabled={deleting}>
           <Trash2 className="mr-2 size-4" />
-          Delete
+          {deleting ? "Deleting..." : "Delete"}
         </Button>
       </PageHeader>
 

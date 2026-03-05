@@ -26,6 +26,8 @@ export default function MilestonesPage() {
   const [desc, setDesc] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [amount, setAmount] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!proj) return null;
 
@@ -54,20 +56,26 @@ export default function MilestonesPage() {
   }
 
   async function toggleComplete(ms: typeof milestones[0]) {
-    if (!orgId) return;
-    const newStatus = ms.status === "completed" ? "upcoming" : "completed";
-    await fetch(`/api/v1/projects/${projectId}/milestones/${ms.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    refresh();
+    if (!orgId || togglingId) return;
+    setTogglingId(ms.id);
+    try {
+      const newStatus = ms.status === "completed" ? "upcoming" : "completed";
+      await fetch(`/api/v1/projects/${projectId}/milestones/${ms.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      refresh();
+    } finally { setTogglingId(null); }
   }
 
   async function deleteMilestone(msId: string) {
-    if (!orgId) return;
-    await fetch(`/api/v1/projects/${projectId}/milestones/${msId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
-    refresh();
+    if (!orgId || deletingId) return;
+    setDeletingId(msId);
+    try {
+      await fetch(`/api/v1/projects/${projectId}/milestones/${msId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
+      refresh();
+    } finally { setDeletingId(null); }
   }
 
   return (
@@ -162,8 +170,10 @@ export default function MilestonesPage() {
             const overdue = ms.dueDate && new Date(ms.dueDate) < new Date() && ms.status !== "completed";
             return (
               <div key={ms.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
-                <button onClick={() => toggleComplete(ms)} className="shrink-0">
-                  {ms.status === "completed" ? (
+                <button onClick={() => toggleComplete(ms)} disabled={togglingId === ms.id} className="shrink-0">
+                  {togglingId === ms.id ? (
+                    <Target className="size-5 text-muted-foreground/40 animate-pulse" />
+                  ) : ms.status === "completed" ? (
                     <CheckCircle2 className="size-5 text-emerald-500" />
                   ) : (
                     <Target className="size-5 text-muted-foreground/40 hover:text-emerald-400 transition-colors" />
@@ -177,8 +187,8 @@ export default function MilestonesPage() {
                   <span className={cn("text-[11px] tabular-nums shrink-0", overdue ? "text-red-600 font-medium" : "text-muted-foreground")}>{formatDateShort(ms.dueDate)}</span>
                 )}
                 {ms.amount > 0 && <span className="text-[11px] font-mono text-muted-foreground shrink-0">{formatMoney(ms.amount)}</span>}
-                <button onClick={() => deleteMilestone(ms.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity">
-                  <Trash2 className="size-3" />
+                <button onClick={() => deleteMilestone(ms.id)} disabled={deletingId === ms.id} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingId === ms.id && "opacity-100 pointer-events-none")}>
+                  <Trash2 className={cn("size-3", deletingId === ms.id && "animate-pulse")} />
                 </button>
               </div>
             );
