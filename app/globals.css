@@ -395,6 +395,37 @@
   }
 }
 
+/* Collapsible expand/collapse animation */
+[data-slot="collapsible-content"][data-state="open"] {
+  animation: collapsible-open 200ms ease-out;
+}
+
+[data-slot="collapsible-content"][data-state="closed"] {
+  animation: collapsible-closed 200ms ease-out;
+}
+
+@keyframes collapsible-open {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-closed {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
 .animate-scale-in {
   animation: scale-in 0.5s ease-out forwards;
 }

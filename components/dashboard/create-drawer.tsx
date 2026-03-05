@@ -4,6 +4,14 @@ import { createContext, useContext, useState, useCallback, useEffect } from "rea
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Users,
+  FolderKanban,
+  FileText,
+  ShoppingCart,
+  BookOpen,
+  Package,
+} from "lucide-react";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -21,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-items-editor";
 import { EntryForm } from "@/components/dashboard/entry-form";
@@ -60,6 +69,50 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
 }
 
 // ---------------------------------------------------------------------------
+// Shared drawer chrome
+// ---------------------------------------------------------------------------
+function DrawerIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function DrawerFooter({
+  onClose,
+  saving,
+  label,
+}: {
+  onClose: () => void;
+  saving: boolean;
+  label: string;
+}) {
+  return (
+    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+      <Button type="button" variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        disabled={saving}
+        className="bg-emerald-600 hover:bg-emerald-700"
+      >
+        {saving ? "Creating..." : label}
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Contact Drawer
 // ---------------------------------------------------------------------------
 function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -69,7 +122,6 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
-
     const form = new FormData(e.currentTarget);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
@@ -88,12 +140,10 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           notes: form.get("notes") || null,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to create contact");
       }
-
       const data = await res.json();
       toast.success("Contact created");
       onClose();
@@ -107,59 +157,71 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>New Contact</SheetTitle>
-          <SheetDescription>Add a customer or supplier.</SheetDescription>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Users className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Contact</SheetTitle>
+              <SheetDescription>Add a customer or supplier to your organization.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
-          <div className="space-y-2">
-            <Label htmlFor="drawer-contact-name">Name *</Label>
-            <Input id="drawer-contact-name" name="name" required placeholder="Contact name" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-contact-email">Email</Label>
-              <Input id="drawer-contact-email" name="email" type="email" placeholder="email@example.com" />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Basic Info</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-contact-name">Name *</Label>
+                <Input id="drawer-contact-name" name="name" required placeholder="Contact name" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-contact-email">Email</Label>
+                  <Input id="drawer-contact-email" name="email" type="email" placeholder="email@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-contact-phone">Phone</Label>
+                  <Input id="drawer-contact-phone" name="phone" placeholder="+1 (555) 000-0000" />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-contact-phone">Phone</Label>
-              <Input id="drawer-contact-phone" name="phone" placeholder="+1 (555) 000-0000" />
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select name="type" defaultValue="customer">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="supplier">Supplier</SelectItem>
+                      <SelectItem value="both">Both</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-contact-terms">Payment Terms (days)</Label>
+                  <Input id="drawer-contact-terms" name="paymentTermsDays" type="number" min={0} defaultValue={30} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-contact-tax">Tax Number</Label>
+                <Input id="drawer-contact-tax" name="taxNumber" placeholder="Tax ID / VAT number" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea name="notes" placeholder="Internal notes about this contact..." rows={3} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-contact-type">Type</Label>
-              <Select name="type" defaultValue="customer">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="supplier">Supplier</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-contact-terms">Payment Terms (days)</Label>
-              <Input id="drawer-contact-terms" name="paymentTermsDays" type="number" min={0} defaultValue={30} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="drawer-contact-tax">Tax Number</Label>
-            <Input id="drawer-contact-tax" name="taxNumber" placeholder="Tax ID / VAT number" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="drawer-contact-notes">Notes</Label>
-            <Textarea id="drawer-contact-notes" name="notes" placeholder="Internal notes..." rows={3} />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? "Creating..." : "Create Contact"}
-            </Button>
-          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Contact" />
         </form>
       </SheetContent>
     </Sheet>
@@ -173,13 +235,16 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [contactId, setContactId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  useEffect(() => { if (!open) setContactId(""); }, [open]);
+  useEffect(() => {
+    if (!open) { setContactId(""); setStartDate(""); setEndDate(""); }
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
-
     const form = new FormData(e.currentTarget);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
@@ -195,16 +260,14 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           status: form.get("status") || "active",
           budget: Math.round(parseFloat(form.get("budget") as string || "0") * 100),
           hourlyRate: Math.round(parseFloat(form.get("hourlyRate") as string || "0") * 100),
-          startDate: form.get("startDate") || null,
-          endDate: form.get("endDate") || null,
+          startDate: startDate || null,
+          endDate: endDate || null,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to create project");
       }
-
       const data = await res.json();
       toast.success("Project created");
       onClose();
@@ -218,65 +281,83 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>New Project</SheetTitle>
-          <SheetDescription>Create a project to track time and billing.</SheetDescription>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><FolderKanban className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Project</SheetTitle>
+              <SheetDescription>Create a project to track time and billing.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
-          <div className="space-y-2">
-            <Label htmlFor="drawer-project-name">Project Name *</Label>
-            <Input id="drawer-project-name" name="name" required placeholder="Project name" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Client</Label>
-              <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Project Info</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-project-name">Project Name *</Label>
+                <Input id="drawer-project-name" name="name" required placeholder="Project name" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Client</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select name="status" defaultValue="active">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-project-status">Status</Label>
-              <Select name="status" defaultValue="active">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Financials</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-project-budget">Budget</Label>
+                  <Input id="drawer-project-budget" name="budget" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-project-rate">Hourly Rate</Label>
+                  <Input id="drawer-project-rate" name="hourlyRate" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Timeline</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Select start date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="Select end date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Description</SectionLabel>
+              <Textarea name="description" placeholder="Project description..." rows={3} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-project-budget">Budget</Label>
-              <Input id="drawer-project-budget" name="budget" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-project-rate">Hourly Rate</Label>
-              <Input id="drawer-project-rate" name="hourlyRate" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-project-start">Start Date</Label>
-              <Input id="drawer-project-start" name="startDate" type="date" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-project-end">End Date</Label>
-              <Input id="drawer-project-end" name="endDate" type="date" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="drawer-project-desc">Description</Label>
-            <Textarea id="drawer-project-desc" name="description" placeholder="Project description..." rows={3} />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? "Creating..." : "Create Project"}
-            </Button>
-          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Project" />
         </form>
       </SheetContent>
     </Sheet>
@@ -302,9 +383,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
   useEffect(() => {
     if (!open) {
-      setContactId("");
-      setReference("");
-      setNotes("");
+      setContactId(""); setReference(""); setNotes("");
       setIssueDate(new Date().toISOString().split("T")[0]);
       const d = new Date(); d.setDate(d.getDate() + 30);
       setDueDate(d.toISOString().split("T")[0]);
@@ -336,12 +415,10 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           })),
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to create invoice");
       }
-
       const data = await res.json();
       toast.success("Invoice created");
       onClose();
@@ -355,46 +432,57 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>New Invoice</SheetTitle>
-          <SheetDescription>Create a sales invoice.</SheetDescription>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><FileText className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Invoice</SheetTitle>
+              <SheetDescription>Create a sales invoice for your customer.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Customer *</Label>
-              <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Invoice Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Customer *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="PO number, etc." />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Reference</Label>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="PO number, etc." />
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes to customer..." rows={3} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Issue Date</Label>
-              <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Line Items</Label>
-            <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
-          </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes to customer..." rows={3} />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? "Creating..." : "Create Invoice"}
-            </Button>
-          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Invoice" />
         </form>
       </SheetContent>
     </Sheet>
@@ -420,9 +508,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   useEffect(() => {
     if (!open) {
-      setContactId("");
-      setReference("");
-      setNotes("");
+      setContactId(""); setReference(""); setNotes("");
       setIssueDate(new Date().toISOString().split("T")[0]);
       const d = new Date(); d.setDate(d.getDate() + 30);
       setDueDate(d.toISOString().split("T")[0]);
@@ -454,12 +540,10 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
           })),
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to create bill");
       }
-
       const data = await res.json();
       toast.success("Bill created");
       onClose();
@@ -473,46 +557,57 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>New Bill</SheetTitle>
-          <SheetDescription>Record a purchase bill.</SheetDescription>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><ShoppingCart className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Bill</SheetTitle>
+              <SheetDescription>Record a purchase bill from a supplier.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Supplier *</Label>
-              <ContactPicker value={contactId} onChange={setContactId} type="supplier" />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Bill Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Supplier *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="supplier" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bill reference" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Reference</Label>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} />
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." rows={3} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Issue Date</Label>
-              <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Line Items</Label>
-            <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
-          </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? "Creating..." : "Create Bill"}
-            </Button>
-          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Bill" />
         </form>
       </SheetContent>
     </Sheet>
@@ -537,7 +632,6 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
     if (!open) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-
     fetch("/api/v1/accounts", {
       headers: { "x-organization-id": orgId },
     })
@@ -555,7 +649,6 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   }) {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-
     setLoading(true);
     try {
       const res = await fetch("/api/v1/entries", {
@@ -573,12 +666,10 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
           })),
         }),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to create entry");
       }
-
       const { entry } = await res.json();
       toast.success("Journal entry created");
       onClose();
@@ -592,12 +683,17 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>New Journal Entry</SheetTitle>
-          <SheetDescription>Create a balanced double-entry journal entry.</SheetDescription>
+      <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><BookOpen className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Journal Entry</SheetTitle>
+              <SheetDescription>Create a balanced double-entry journal entry.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <div className="px-4 pb-4">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
           <EntryForm
             accounts={accounts}
             onSubmit={handleSubmit}
@@ -621,7 +717,6 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
-
     const form = new FormData(e.currentTarget);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
@@ -641,12 +736,10 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           reorderPoint: parseInt(form.get("reorderPoint") as string) || 0,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to create item");
       }
-
       const data = await res.json();
       toast.success("Inventory item created");
       onClose();
@@ -660,56 +753,76 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>New Inventory Item</SheetTitle>
-          <SheetDescription>Add a product or item to track.</SheetDescription>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Package className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Inventory Item</SheetTitle>
+              <SheetDescription>Add a product or item to track stock.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-inv-code">Code *</Label>
-              <Input id="drawer-inv-code" name="code" required placeholder="ITEM-001" />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Item Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-code">Code *</Label>
+                  <Input id="drawer-inv-code" name="code" required placeholder="ITEM-001" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-name">Name *</Label>
+                  <Input id="drawer-inv-name" name="name" required placeholder="Item name" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-inv-sku">SKU</Label>
+                <Input id="drawer-inv-sku" name="sku" placeholder="Stock keeping unit" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-inv-name">Name *</Label>
-              <Input id="drawer-inv-name" name="name" required placeholder="Item name" />
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Pricing</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-purchase">Purchase Price</Label>
+                  <Input id="drawer-inv-purchase" name="purchasePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-sale">Sale Price</Label>
+                  <Input id="drawer-inv-sale" name="salePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Stock</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-qty">Initial Quantity</Label>
+                  <Input id="drawer-inv-qty" name="quantityOnHand" type="number" min={0} defaultValue={0} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-reorder">Reorder Point</Label>
+                  <Input id="drawer-inv-reorder" name="reorderPoint" type="number" min={0} defaultValue={0} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Description</SectionLabel>
+              <Textarea name="description" placeholder="Item description..." rows={3} />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="drawer-inv-sku">SKU</Label>
-            <Input id="drawer-inv-sku" name="sku" placeholder="Stock keeping unit" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-inv-purchase">Purchase Price</Label>
-              <Input id="drawer-inv-purchase" name="purchasePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-inv-sale">Sale Price</Label>
-              <Input id="drawer-inv-sale" name="salePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="drawer-inv-qty">Initial Quantity</Label>
-              <Input id="drawer-inv-qty" name="quantityOnHand" type="number" min={0} defaultValue={0} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="drawer-inv-reorder">Reorder Point</Label>
-              <Input id="drawer-inv-reorder" name="reorderPoint" type="number" min={0} defaultValue={0} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="drawer-inv-desc">Description</Label>
-            <Textarea id="drawer-inv-desc" name="description" placeholder="Item description..." rows={3} />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? "Creating..." : "Create Item"}
-            </Button>
-          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Item" />
         </form>
       </SheetContent>
     </Sheet>
