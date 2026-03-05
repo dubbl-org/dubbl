@@ -14,12 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useProject } from "../project-context";
 
@@ -34,7 +34,7 @@ export default function MembersPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [orgMembers, setOrgMembers] = useState<{ id: string; user: { name: string | null; email: string } }[]>([]);
-  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("none");
   const [selectedRole, setSelectedRole] = useState("contributor");
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function MembersPage() {
   const viewers = members.filter(m => m.role === "viewer");
 
   async function handleAdd() {
-    if (!orgId || !selectedMemberId) return;
+    if (!orgId || selectedMemberId === "none") return;
     setSaving(true);
     try {
       const res = await fetch(`/api/v1/projects/${projectId}/members`, {
@@ -70,7 +70,7 @@ export default function MembersPage() {
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed"); }
       toast.success("Member added");
       setAddOpen(false);
-      setSelectedMemberId(""); setSelectedRole("contributor");
+      setSelectedMemberId("none"); setSelectedRole("contributor");
       refresh();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
     finally { setSaving(false); }
@@ -85,7 +85,6 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-4">
-      {/* Stats + action */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
           <span>{members.length} total</span>
@@ -93,18 +92,34 @@ export default function MembersPage() {
           {contributors.length > 0 && <><span className="text-border">|</span><span>{contributors.length} contributor{contributors.length !== 1 ? "s" : ""}</span></>}
           {viewers.length > 0 && <><span className="text-border">|</span><span>{viewers.length} viewer{viewers.length !== 1 ? "s" : ""}</span></>}
         </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8"><Plus className="mr-1.5 size-3.5" />Add Member</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add Team Member</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Member</Label>
+        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
+          <Plus className="mr-1.5 size-3.5" />Add Member
+        </Button>
+      </div>
+
+      {/* Add Member Drawer */}
+      <Sheet open={addOpen} onOpenChange={setAddOpen}>
+        <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <Users className="size-5" />
+              </div>
+              <div>
+                <SheetTitle className="text-lg">Add Team Member</SheetTitle>
+                <SheetDescription>Add an organization member to this project.</SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Select Member</p>
+              <div className="space-y-2">
+                <Label>Member</Label>
                 <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
                   <SelectTrigger><SelectValue placeholder="Select member..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none" disabled>Select member...</SelectItem>
                     {availableMembers.length === 0 && <div className="py-2 px-3 text-sm text-muted-foreground">All members already added</div>}
                     {availableMembers.map(m => (
                       <SelectItem key={m.id} value={m.id}>{m.user.name || m.user.email}</SelectItem>
@@ -112,8 +127,14 @@ export default function MembersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Role</Label>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Permissions</p>
+              <div className="space-y-2">
+                <Label>Role</Label>
                 <Select value={selectedRole} onValueChange={setSelectedRole}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -123,13 +144,30 @@ export default function MembersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleAdd} disabled={saving || !selectedMemberId} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                {saving ? "Adding..." : "Add Member"}
-              </Button>
+              <div className="rounded-lg border divide-y text-[12px]">
+                <div className="px-4 py-3">
+                  <span className="font-medium">Manager</span>
+                  <span className="text-muted-foreground ml-2">Full project access. Can manage tasks, time, milestones, and members.</span>
+                </div>
+                <div className="px-4 py-3">
+                  <span className="font-medium">Contributor</span>
+                  <span className="text-muted-foreground ml-2">Can create tasks, log time, and add notes. Cannot manage members.</span>
+                </div>
+                <div className="px-4 py-3">
+                  <span className="font-medium">Viewer</span>
+                  <span className="text-muted-foreground ml-2">Read-only access to project data.</span>
+                </div>
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+            <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAdd} disabled={saving || selectedMemberId === "none"} className="bg-emerald-600 hover:bg-emerald-700">
+              {saving ? "Adding..." : "Add Member"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {members.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center min-h-[30vh] flex flex-col items-center justify-center">
@@ -160,7 +198,6 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* Role descriptions */}
       {members.length > 0 && (
         <>
           <div className="h-px bg-border mt-6" />

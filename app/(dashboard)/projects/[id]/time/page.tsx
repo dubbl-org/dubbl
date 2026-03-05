@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, Play, Square } from "lucide-react";
+import { Plus, Play, Square, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -15,12 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
@@ -33,7 +34,9 @@ export default function TimePage() {
   const [entryDate, setEntryDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [entryDesc, setEntryDesc] = useState("");
   const [entryMinutes, setEntryMinutes] = useState("");
+  const [entryHours, setEntryHours] = useState("");
   const [entryBillable, setEntryBillable] = useState("true");
+  const [entryTaskId, setEntryTaskId] = useState("none");
 
   // Timer state
   const [timerRunning, setTimerRunning] = useState(false);
@@ -87,6 +90,7 @@ export default function TimePage() {
   if (!proj) return null;
 
   const entries = proj.timeEntries;
+  const tasks = proj.tasks || [];
   const totalMinutes = entries.reduce((sum, e) => sum + e.minutes, 0);
   const totalAmount = entries.reduce((sum, e) => sum + Math.round((e.minutes / 60) * e.hourlyRate), 0);
   const billableMinutes = entries.filter(e => e.isBillable).reduce((sum, e) => sum + e.minutes, 0);
@@ -112,19 +116,25 @@ export default function TimePage() {
 
   async function handleAdd() {
     if (!orgId) return;
-    const mins = parseInt(entryMinutes);
+    const mins = entryHours ? Math.round(parseFloat(entryHours) * 60) : parseInt(entryMinutes);
     if (!mins || mins <= 0) { toast.error("Enter a valid duration"); return; }
     setSaving(true);
     try {
       const res = await fetch(`/api/v1/projects/${projectId}/time-entries`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ date: entryDate, description: entryDesc || null, minutes: mins, isBillable: entryBillable === "true" }),
+        body: JSON.stringify({
+          date: entryDate,
+          description: entryDesc || null,
+          minutes: mins,
+          isBillable: entryBillable === "true",
+          taskId: entryTaskId === "none" ? null : entryTaskId,
+        }),
       });
       if (!res.ok) throw new Error("Failed");
       toast.success("Time entry added");
       setAddOpen(false);
-      setEntryDesc(""); setEntryMinutes("");
+      setEntryDesc(""); setEntryMinutes(""); setEntryHours(""); setEntryTaskId("none");
       refresh();
     } catch { toast.error("Failed to add time entry"); }
     finally { setSaving(false); }
@@ -134,7 +144,6 @@ export default function TimePage() {
     <div className="space-y-4">
       {/* Timer + Stats */}
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr]">
-        {/* Live Timer */}
         <div className={cn("rounded-lg border bg-card p-3 sm:col-span-1", timerRunning && "border-emerald-300 bg-emerald-50/30")}>
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Timer</p>
           {timerRunning ? (
@@ -178,28 +187,92 @@ export default function TimePage() {
       </div>
 
       <div className="flex justify-end">
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8">
-              <Plus className="mr-1.5 size-3.5" />Log Time
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Log Time Entry</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5"><Label className="text-xs">Date</Label><Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label className="text-xs">Description</Label><Input value={entryDesc} onChange={e => setEntryDesc(e.target.value)} placeholder="What did you work on?" /></div>
-              <div className="grid gap-3 grid-cols-2">
-                <div className="space-y-1.5"><Label className="text-xs">Duration (minutes) *</Label><Input type="number" min={1} value={entryMinutes} onChange={e => setEntryMinutes(e.target.value)} placeholder="60" /></div>
-                <div className="space-y-1.5"><Label className="text-xs">Billable</Label>
-                  <Select value={entryBillable} onValueChange={setEntryBillable}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>
+        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
+          <Plus className="mr-1.5 size-3.5" />Log Time
+        </Button>
+      </div>
+
+      {/* Log Time Drawer */}
+      <Sheet open={addOpen} onOpenChange={setAddOpen}>
+        <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <Clock className="size-5" />
+              </div>
+              <div>
+                <SheetTitle className="text-lg">Log Time Entry</SheetTitle>
+                <SheetDescription>Record time spent on this project.</SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">When</p>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Details</p>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea value={entryDesc} onChange={e => setEntryDesc(e.target.value)} placeholder="What did you work on?" rows={3} />
+              </div>
+              {tasks.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Related Task</Label>
+                  <Select value={entryTaskId} onValueChange={setEntryTaskId}>
+                    <SelectTrigger><SelectValue placeholder="No task" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No task</SelectItem>
+                      {tasks.map(t => (
+                        <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Duration</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Hours</Label>
+                  <Input type="number" step="0.25" min={0} value={entryHours} onChange={e => { setEntryHours(e.target.value); setEntryMinutes(""); }} placeholder="e.g. 1.5" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Or Minutes</Label>
+                  <Input type="number" min={1} value={entryMinutes} onChange={e => { setEntryMinutes(e.target.value); setEntryHours(""); }} placeholder="e.g. 90" />
                 </div>
               </div>
-              <Button onClick={handleAdd} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">{saving ? "Adding..." : "Add Entry"}</Button>
+              <div className="space-y-2">
+                <Label>Billable</Label>
+                <Select value={entryBillable} onValueChange={setEntryBillable}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes - Billable</SelectItem>
+                    <SelectItem value="false">No - Non-billable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+            <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAdd} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+              {saving ? "Adding..." : "Add Entry"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <DataTable columns={columns} data={entries} emptyMessage="No time entries yet. Start the timer or log time manually." />
     </div>
