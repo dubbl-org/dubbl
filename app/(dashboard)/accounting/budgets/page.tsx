@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Target } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+
 import { StatCard } from "@/components/dashboard/stat-card";
 import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
 import { Badge } from "@/components/ui/badge";
@@ -89,19 +89,47 @@ export default function BudgetsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Budgets" description="Plan and track your financial budgets.">
-          <EmptyState
-            icon={Target}
-            title="No budgets yet"
-            description="Create your first budget to start tracking spending against targets."
-          >
-            <Button
-              onClick={() => router.push("/accounting/budgets/new")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Budget
-            </Button>
-          </EmptyState>
+          <div className="space-y-6">
+            <div className="rounded-lg border border-dashed bg-card p-6 space-y-4 opacity-60">
+              <p className="text-xs font-medium text-muted-foreground">Preview: Budget Utilization</p>
+              {[
+                { label: "Marketing", pct: 65 },
+                { label: "Operations", pct: 82 },
+                { label: "Engineering", pct: 40 },
+              ].map(({ label, pct }) => (
+                <div key={label} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-muted-foreground">{label}</span>
+                    <span className="tabular-nums font-mono text-xs text-muted-foreground">{pct}%</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${pct > 80 ? "bg-amber-500/50" : "bg-emerald-500/50"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col items-center py-4 text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                <Target className="size-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="mt-4 text-sm font-medium">Track spending against targets</h3>
+              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                Create your first budget to monitor how actuals compare to your plan.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => router.push("/accounting/budgets/new")}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  New Budget
+                </Button>
+              </div>
+            </div>
+          </div>
         </Section>
       </BlurReveal>
     );

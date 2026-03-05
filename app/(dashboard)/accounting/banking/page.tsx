@@ -6,7 +6,7 @@ import { Plus, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -171,19 +171,45 @@ export default function BankingPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Bank Accounts" description="Connect and manage your bank accounts for importing and reconciling transactions.">
-          <EmptyState
-            icon={Landmark}
-            title="No bank accounts"
-            description="Add a bank account to start importing and reconciling transactions."
-          >
-            <Button
-              onClick={() => setDialogOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              Add Bank Account
-            </Button>
-          </EmptyState>
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { name: "Checking Account", bank: "Your Bank", balance: "$0.00" },
+                { name: "Savings Account", bank: "Your Bank", balance: "$0.00" },
+                { name: "Credit Card", bank: "Your Bank", balance: "$0.00" },
+              ].map((mock) => (
+                <div
+                  key={mock.name}
+                  className="rounded-lg border border-dashed bg-card p-4 space-y-2 opacity-40"
+                >
+                  <div className="flex items-center gap-2">
+                    <Landmark className="size-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-muted-foreground">{mock.name}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground/60">{mock.bank}</p>
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-mono text-xs text-muted-foreground/60">****0000</span>
+                    <span className="font-mono text-lg font-semibold text-muted-foreground/40 tabular-nums">{mock.balance}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col items-center py-4 text-center">
+              <h3 className="text-sm font-medium">Connect your bank accounts</h3>
+              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                Add your accounts to track balances and reconcile transactions.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => setDialogOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  Add Bank Account
+                </Button>
+              </div>
+            </div>
+          </div>
         </Section>
         <CreateAccountDialog
           open={dialogOpen}

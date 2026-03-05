@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, FileText } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,19 +144,60 @@ export default function InvoicesPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Invoices" description="Create and send invoices to your customers. Track payments and outstanding balances.">
-          <EmptyState
-            icon={FileText}
-            title="No invoices yet"
-            description="Create your first invoice to start billing customers."
-          >
-            <Button
-              onClick={() => router.push("/sales/new")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Invoice
-            </Button>
-          </EmptyState>
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                <FileText className="size-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="mt-4 text-sm font-medium">No invoices yet</h3>
+              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                Create and send professional invoices, then track payments as they come in.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => router.push("/sales/new")}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  New Invoice
+                </Button>
+              </div>
+            </div>
+            <div className="hidden lg:block rounded-lg border border-dashed bg-card p-5 opacity-50">
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="h-3 w-24 rounded bg-muted" />
+                    <div className="h-2 w-16 rounded bg-muted mt-2" />
+                  </div>
+                  <div className="text-right">
+                    <div className="h-3 w-16 rounded bg-muted ml-auto" />
+                    <div className="h-2 w-20 rounded bg-muted mt-2 ml-auto" />
+                  </div>
+                </div>
+                <div className="h-px bg-border" />
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <div className="h-2 w-32 rounded bg-muted" />
+                    <div className="h-2 w-14 rounded bg-muted" />
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="h-2 w-28 rounded bg-muted" />
+                    <div className="h-2 w-14 rounded bg-muted" />
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="h-2 w-36 rounded bg-muted" />
+                    <div className="h-2 w-14 rounded bg-muted" />
+                  </div>
+                </div>
+                <div className="h-px bg-border" />
+                <div className="flex justify-between">
+                  <div className="h-3 w-12 rounded bg-muted" />
+                  <div className="h-3 w-16 rounded bg-emerald-200 dark:bg-emerald-900/40" />
+                </div>
+              </div>
+            </div>
+          </div>
         </Section>
       </BlurReveal>
     );

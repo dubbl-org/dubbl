@@ -6,7 +6,7 @@ import { Plus, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -180,19 +180,37 @@ export default function AccountsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Accounts" description="Set up and manage your chart of accounts for recording transactions.">
-          <EmptyState
-            icon={BookOpen}
-            title="No accounts"
-            description="Set up your chart of accounts to start recording transactions."
-          >
-            <Button
-              onClick={() => setDialogOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Account
-            </Button>
-          </EmptyState>
+          <div className="space-y-6">
+            <div className="grid gap-3 sm:grid-cols-5">
+              {ALL_TYPES.map((type) => (
+                <div
+                  key={type}
+                  className={`rounded-lg border border-dashed border-l-4 ${TYPE_BORDER_COLORS[type]} p-4 opacity-50`}
+                >
+                  <p className="text-xs font-medium text-muted-foreground capitalize">{type}</p>
+                  <p className="text-2xl font-semibold mt-1 tabular-nums text-muted-foreground/40">0</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col items-center py-8 text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                <BookOpen className="size-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="mt-4 text-sm font-medium">Set up your chart of accounts</h3>
+              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                Create accounts for each type to organize your financial records.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => setDialogOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  New Account
+                </Button>
+              </div>
+            </div>
+          </div>
         </Section>
         <AccountDialog
           open={dialogOpen}

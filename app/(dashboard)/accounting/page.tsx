@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowLeftRight } from "lucide-react";
+import { Plus, ArrowLeftRight, BookOpen, BarChart3 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,19 +127,39 @@ export default function TransactionsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Transactions" description="Create and manage journal entries to track your financial activity.">
-          <EmptyState
-            icon={ArrowLeftRight}
-            title="No journal entries"
-            description="Create your first journal entry to start tracking your finances."
-          >
-            <Button
-              onClick={() => router.push("/accounting/new")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Entry
-            </Button>
-          </EmptyState>
+          <div className="space-y-8">
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { step: 1, icon: BookOpen, label: "Set up accounts", desc: "Create your chart of accounts to categorize transactions" },
+                { step: 2, icon: ArrowLeftRight, label: "Record entries", desc: "Create journal entries with balanced debits and credits" },
+                { step: 3, icon: BarChart3, label: "View reports", desc: "Generate financial statements from your recorded data" },
+              ].map(({ step, icon: StepIcon, label, desc }) => (
+                <div key={step} className="relative rounded-lg border bg-card p-5">
+                  <span className="absolute -top-3 left-4 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                    {step}
+                  </span>
+                  <StepIcon className="size-5 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col items-center py-4 text-center">
+              <h3 className="text-sm font-medium">Ready to get started?</h3>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Create your first journal entry to start tracking your finances.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => router.push("/accounting/new")}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  New Entry
+                </Button>
+              </div>
+            </div>
+          </div>
         </Section>
       </BlurReveal>
     );
