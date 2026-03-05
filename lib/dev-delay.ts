@@ -1,5 +1,5 @@
 /** Artificial delay for testing loading states. Set to 0 to disable. */
-const DEV_DELAY_MS = 2000;
+const DEV_DELAY_MS = 0;
 
 export function devDelay(): Promise<void> {
   if (process.env.NODE_ENV !== "development" || DEV_DELAY_MS <= 0)

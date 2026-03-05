@@ -214,6 +214,25 @@
   50% { transform: translateX(-4px) scale(1.05); opacity: 1; }
 }
 
+/* Org loader - logo breathing animation */
+.org-loader-logo {
+  animation: brand-breathe 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 0px transparent);
+}
+
+@keyframes brand-breathe {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.96);
+    filter: drop-shadow(0 0 0px rgba(16, 185, 129, 0));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.2));
+  }
+}
+
 /* Blur-to-sharp reveal */
 @keyframes blur-reveal {
   from {
@@ -257,6 +276,10 @@
 @media (prefers-reduced-motion: reduce) {
   .brand-loader-circle-1,
   .brand-loader-circle-2 {
+    animation: none;
+    opacity: 1;
+  }
+  .org-loader-logo {
     animation: none;
     opacity: 1;
   }

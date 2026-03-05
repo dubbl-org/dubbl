@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Logo } from "@/components/shared/logo";
 
 export function OrgLoader({ children }: { children: React.ReactNode }) {
   const FADE_DURATION_MS = 400;
@@ -11,7 +12,6 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
     let readyTimer: number | null = null;
 
     const startFadeOut = () => {
-      // Start in the next frame so the fade class can be applied reliably.
       requestAnimationFrame(() => {
         if (!isMounted) return;
         setState("fading");
@@ -53,9 +53,11 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
         <div
           className={`org-loader-overlay ${state === "fading" ? "org-loader-fade-out" : ""}`}
         >
-          <div className="brand-loader" aria-label="Loading organization">
-            <div className="brand-loader-circle brand-loader-circle-1" />
-            <div className="brand-loader-circle brand-loader-circle-2" />
+          <div className="flex flex-col items-center gap-4">
+            <Logo className="org-loader-logo h-10 w-auto" />
+            <span className="text-sm font-medium tracking-tight text-muted-foreground/60">
+              dubbl
+            </span>
           </div>
         </div>
       )}
