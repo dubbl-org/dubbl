@@ -120,6 +120,31 @@ export const projectMember = pgTable("project_member", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+export const projectTeam = pgTable("project_team", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => project.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#3b82f6"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const projectTeamMember = pgTable("project_team_member", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  teamId: text("team_id")
+    .notNull()
+    .references(() => projectTeam.id, { onDelete: "cascade" }),
+  memberId: text("member_id")
+    .notNull()
+    .references(() => member.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const projectTask = pgTable("project_task", {
   id: text("id")
     .primaryKey()
@@ -132,10 +157,57 @@ export const projectTask = pgTable("project_task", {
   status: taskStatusEnum("status").notNull().default("todo"),
   priority: taskPriorityEnum("priority").notNull().default("medium"),
   assigneeId: text("assignee_id").references(() => member.id),
+  teamId: text("team_id").references(() => projectTeam.id),
+  createdById: text("created_by_id").references(() => users.id),
+  startDate: date("start_date"),
   dueDate: date("due_date"),
   estimatedMinutes: integer("estimated_minutes"),
+  labels: jsonb("labels").$type<string[]>().notNull().default([]),
   sortOrder: integer("sort_order").notNull().default(0),
   completedAt: timestamp("completed_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Labels defined at project level
+export const projectLabel = pgTable("project_label", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => project.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#6366f1"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Subtasks / Checklist items within a task
+export const taskChecklist = pgTable("task_checklist", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => projectTask.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  isCompleted: boolean("is_completed").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Comments on tasks
+export const taskComment = pgTable("task_comment", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => projectTask.id, { onDelete: "cascade" }),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
+  content: text("content").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -208,6 +280,8 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   tasks: many(projectTask),
   milestones: many(projectMilestone),
   notes: many(projectNote),
+  teams: many(projectTeam),
+  labels: many(projectLabel),
 }));
 
 export const projectMemberRelations = relations(projectMember, ({ one }) => ({
@@ -221,7 +295,33 @@ export const projectMemberRelations = relations(projectMember, ({ one }) => ({
   }),
 }));
 
-export const projectTaskRelations = relations(projectTask, ({ one }) => ({
+export const projectTeamRelations = relations(projectTeam, ({ one, many }) => ({
+  project: one(project, {
+    fields: [projectTeam.projectId],
+    references: [project.id],
+  }),
+  members: many(projectTeamMember),
+}));
+
+export const projectTeamMemberRelations = relations(projectTeamMember, ({ one }) => ({
+  team: one(projectTeam, {
+    fields: [projectTeamMember.teamId],
+    references: [projectTeam.id],
+  }),
+  member: one(member, {
+    fields: [projectTeamMember.memberId],
+    references: [member.id],
+  }),
+}));
+
+export const projectLabelRelations = relations(projectLabel, ({ one }) => ({
+  project: one(project, {
+    fields: [projectLabel.projectId],
+    references: [project.id],
+  }),
+}));
+
+export const projectTaskRelations = relations(projectTask, ({ one, many }) => ({
   project: one(project, {
     fields: [projectTask.projectId],
     references: [project.id],
@@ -229,6 +329,34 @@ export const projectTaskRelations = relations(projectTask, ({ one }) => ({
   assignee: one(member, {
     fields: [projectTask.assigneeId],
     references: [member.id],
+  }),
+  team: one(projectTeam, {
+    fields: [projectTask.teamId],
+    references: [projectTeam.id],
+  }),
+  createdBy: one(users, {
+    fields: [projectTask.createdById],
+    references: [users.id],
+  }),
+  checklist: many(taskChecklist),
+  comments: many(taskComment),
+}));
+
+export const taskChecklistRelations = relations(taskChecklist, ({ one }) => ({
+  task: one(projectTask, {
+    fields: [taskChecklist.taskId],
+    references: [projectTask.id],
+  }),
+}));
+
+export const taskCommentRelations = relations(taskComment, ({ one }) => ({
+  task: one(projectTask, {
+    fields: [taskComment.taskId],
+    references: [projectTask.id],
+  }),
+  author: one(users, {
+    fields: [taskComment.authorId],
+    references: [users.id],
   }),
 }));
 

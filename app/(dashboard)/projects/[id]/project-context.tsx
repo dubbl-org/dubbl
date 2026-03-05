@@ -14,17 +14,64 @@ export interface ProjectMemberData {
   };
 }
 
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+  sortOrder: number;
+}
+
+export interface TaskComment {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: { id: string; name: string | null; email: string };
+}
+
+export interface LabelData {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface TaskData {
   id: string;
   title: string;
   description: string | null;
   status: string;
   priority: string;
+  startDate: string | null;
   dueDate: string | null;
   estimatedMinutes: number | null;
+  labels: string[];
   assigneeId: string | null;
+  teamId: string | null;
+  createdById: string | null;
   completedAt: string | null;
   createdAt: string;
+  assignee: {
+    id: string;
+    role: string;
+    user: { id: string; name: string | null; email: string; image: string | null };
+  } | null;
+  team: { id: string; name: string; color: string } | null;
+  createdBy: { id: string; name: string | null; email: string } | null;
+  checklist: ChecklistItem[];
+  comments: TaskComment[];
+}
+
+export interface TeamData {
+  id: string;
+  name: string;
+  color: string;
+  members: {
+    id: string;
+    member: {
+      id: string;
+      role: string;
+      user: { id: string; name: string | null; email: string; image: string | null };
+    };
+  }[];
 }
 
 export interface MilestoneData {
@@ -89,6 +136,8 @@ export interface ProjectDetail {
   milestones: MilestoneData[];
   notes: NoteData[];
   timeEntries: TimeEntryData[];
+  teams: TeamData[];
+  labels: LabelData[];
 }
 
 interface ProjectContextValue {

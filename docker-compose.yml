@@ -13,27 +13,21 @@ services:
         condition: service_healthy
       minio-setup:
         condition: service_completed_successfully
+    profiles:
+      - web
     environment:
-      # Database — points to the compose postgres service
       DATABASE_URL: postgresql://dubbl:dubbl@postgres:5432/dubbl
-
-      # Auth
       AUTH_SECRET: local-dev-secret-change-me-in-production
       NEXT_PUBLIC_APP_URL: http://localhost:3000
-
-      # OAuth (optional — override in .env.local)
+      WATCHPACK_POLLING: "true"
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
       AUTH_APPLE_ID: ${AUTH_APPLE_ID:-}
       AUTH_APPLE_SECRET: ${AUTH_APPLE_SECRET:-}
-
-      # Stripe (optional — override in .env.local)
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
       STRIPE_BUSINESS_PRICE_ID: ${STRIPE_BUSINESS_PRICE_ID:-}
-
-      # S3 — points to the compose minio service
       S3_REGION: us-east-1
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY_ID: minioadmin

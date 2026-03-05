@@ -14,8 +14,11 @@ const updateSchema = z.object({
   status: z.enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   assigneeId: z.string().nullable().optional(),
+  teamId: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional(),
   estimatedMinutes: z.number().int().min(0).nullable().optional(),
+  labels: z.array(z.string()).optional(),
   sortOrder: z.number().int().optional(),
 });
 

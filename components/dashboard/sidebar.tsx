@@ -140,6 +140,7 @@ interface ProjectListItem {
   name: string;
   color: string;
   status: string;
+  tasks?: { id: string; status: string; dueDate: string | null }[];
 }
 
 function ProjectsCollapsible({ pathname }: { pathname: string }) {
@@ -206,23 +207,35 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
       </SidebarMenuItem>
       <CollapsibleContent>
         <SidebarMenuSub>
-          {projects.map((project) => (
-            <SidebarMenuSubItem key={project.id}>
-              <SidebarMenuSubButton
-                asChild
-                size="sm"
-                isActive={pathname === `/projects/${project.id}` || pathname.startsWith(`/projects/${project.id}/`)}
-              >
-                <Link href={`/projects/${project.id}`}>
-                  <span
-                    className="size-1.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: project.color || "#10b981" }}
-                  />
-                  <span className="truncate">{project.name}</span>
-                </Link>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-          ))}
+          {projects.map((project) => {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const overdue = (project.tasks || []).filter(
+              t => t.dueDate && new Date(t.dueDate) < now && t.status !== "done" && t.status !== "cancelled"
+            ).length;
+            return (
+              <SidebarMenuSubItem key={project.id}>
+                <SidebarMenuSubButton
+                  asChild
+                  size="sm"
+                  isActive={pathname === `/projects/${project.id}` || pathname.startsWith(`/projects/${project.id}/`)}
+                >
+                  <Link href={`/projects/${project.id}`}>
+                    <span
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: project.color || "#10b981" }}
+                    />
+                    <span className="truncate flex-1">{project.name}</span>
+                    {overdue > 0 && (
+                      <span className="size-4 rounded-full bg-red-100 text-red-600 text-[9px] font-medium flex items-center justify-center shrink-0">
+                        {overdue}
+                      </span>
+                    )}
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            );
+          })}
           <SidebarMenuSubItem>
             <SidebarMenuSubButton
               size="sm"

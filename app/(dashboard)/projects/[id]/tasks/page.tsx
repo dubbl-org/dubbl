@@ -46,7 +46,7 @@ export default function TasksPage() {
   const [desc, setDesc] = useState("");
   const [priority, setPriority] = useState("medium");
   const [taskStatus, setTaskStatus] = useState("todo");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeId, setAssigneeId] = useState("none");
   const [dueDate, setDueDate] = useState("");
 
   if (!proj) return null;
@@ -72,14 +72,14 @@ export default function TasksPage() {
           description: desc || null,
           priority,
           status: taskStatus,
-          assigneeId: assigneeId || null,
+          assigneeId: assigneeId === "none" ? null : assigneeId,
           dueDate: dueDate || null,
         }),
       });
       if (!res.ok) throw new Error("Failed to create task");
       toast.success("Task created");
       setAddOpen(false);
-      setTitle(""); setDesc(""); setPriority("medium"); setTaskStatus("todo"); setAssigneeId(""); setDueDate("");
+      setTitle(""); setDesc(""); setPriority("medium"); setTaskStatus("todo"); setAssigneeId("none"); setDueDate("");
       refresh();
     } catch { toast.error("Failed to create task"); }
     finally { setSaving(false); }
@@ -183,7 +183,7 @@ export default function TasksPage() {
                   <Select value={assigneeId} onValueChange={setAssigneeId}>
                     <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="none">Unassigned</SelectItem>
                       {members.map(m => (
                         <SelectItem key={m.member.id} value={m.member.id}>
                           {m.member.user.name || m.member.user.email}

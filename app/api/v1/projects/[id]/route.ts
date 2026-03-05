@@ -59,7 +59,23 @@ export async function GET(
             },
           },
         },
-        tasks: true,
+        tasks: {
+          with: {
+            assignee: { with: { user: true } },
+            team: true,
+            createdBy: true,
+            checklist: true,
+            comments: { with: { author: true } },
+          },
+        },
+        labels: true,
+        teams: {
+          with: {
+            members: {
+              with: { member: { with: { user: true } } },
+            },
+          },
+        },
         milestones: true,
         notes: {
           with: { author: true },

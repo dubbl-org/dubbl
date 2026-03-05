@@ -69,6 +69,7 @@ export async function GET(request: Request) {
             },
           },
         },
+        tasks: true,
       },
     });
 

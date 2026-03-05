@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTask } from "@/lib/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { project, projectTeam, projectTeamMember } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
@@ -9,16 +9,9 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
 const createSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().nullable().optional(),
-  status: z.enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]).default("todo"),
-  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
-  assigneeId: z.string().nullable().optional(),
-  teamId: z.string().nullable().optional(),
-  startDate: z.string().nullable().optional(),
-  dueDate: z.string().nullable().optional(),
-  estimatedMinutes: z.number().int().min(0).nullable().optional(),
-  labels: z.array(z.string()).optional(),
+  name: z.string().min(1),
+  color: z.string().default("#3b82f6"),
+  memberIds: z.array(z.string()).default([]),
 });
 
 export async function GET(
@@ -39,17 +32,16 @@ export async function GET(
 
     if (!proj) return notFound("Project");
 
-    const tasks = await db.query.projectTask.findMany({
-      where: eq(projectTask.projectId, id),
-      orderBy: asc(projectTask.sortOrder),
+    const teams = await db.query.projectTeam.findMany({
+      where: eq(projectTeam.projectId, id),
       with: {
-        assignee: {
-          with: { user: true },
+        members: {
+          with: { member: { with: { user: true } } },
         },
       },
     });
 
-    return NextResponse.json({ tasks });
+    return NextResponse.json({ teams });
   } catch (err) {
     return handleError(err);
   }
@@ -78,24 +70,24 @@ export async function POST(
     if (!proj) return notFound("Project");
 
     const [created] = await db
-      .insert(projectTask)
+      .insert(projectTeam)
       .values({
         projectId: id,
-        title: parsed.title,
-        description: parsed.description || null,
-        status: parsed.status,
-        priority: parsed.priority,
-        assigneeId: parsed.assigneeId || null,
-        teamId: parsed.teamId || null,
-        createdById: ctx.userId,
-        startDate: parsed.startDate || null,
-        dueDate: parsed.dueDate || null,
-        estimatedMinutes: parsed.estimatedMinutes || null,
-        labels: parsed.labels || [],
+        name: parsed.name,
+        color: parsed.color,
       })
       .returning();
 
-    return NextResponse.json({ task: created }, { status: 201 });
+    if (parsed.memberIds.length > 0) {
+      await db.insert(projectTeamMember).values(
+        parsed.memberIds.map((memberId) => ({
+          teamId: created.id,
+          memberId,
+        }))
+      );
+    }
+
+    return NextResponse.json({ team: created }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }
