@@ -1,15 +1,16 @@
 "use client";
 
+import { Settings, Users, CreditCard, Key, Percent, Coins, ScrollText } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
 const TABS = [
-  { href: "/settings", label: "General", exact: true },
-  { href: "/settings/members", label: "Members" },
-  { href: "/settings/billing", label: "Billing" },
-  { href: "/settings/api-keys", label: "API Keys" },
-  { href: "/settings/tax-rates", label: "Tax Rates" },
-  { href: "/settings/currencies", label: "Currencies" },
-  { href: "/settings/audit-log", label: "Audit Log" },
+  { href: "/settings", label: "General", icon: Settings, exact: true },
+  { href: "/settings/members", label: "Members", icon: Users },
+  { href: "/settings/billing", label: "Billing", icon: CreditCard },
+  { href: "/settings/api-keys", label: "API Keys", icon: Key },
+  { href: "/settings/tax-rates", label: "Tax Rates", icon: Percent },
+  { href: "/settings/currencies", label: "Currencies", icon: Coins },
+  { href: "/settings/audit-log", label: "Audit Log", icon: ScrollText },
 ];
 
 export default function SettingsLayout({
