@@ -26,7 +26,6 @@ import {
   priorityConfig,
   formatHours,
   daysUntil,
-  pct,
 } from "./project-context";
 import { formatMoney } from "@/lib/money";
 
@@ -50,7 +49,8 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
   const base = `/projects/${projectId}`;
   const sc = statusConfig[proj.status] || statusConfig.active;
   const daysLeft = daysUntil(proj.endDate);
-
+  const doneTasks = proj.tasks.filter(t => t.status === "done").length;
+  const totalTasks = proj.tasks.length;
   const tabs = [
     { href: base, label: "Overview", icon: CircleDot, exact: true },
     ...(proj.enableTasks ? [{ href: `${base}/tasks`, label: "Tasks", icon: CheckCircle2, count: proj.tasks.filter(t => t.status !== "done" && t.status !== "cancelled").length }] : []),
@@ -78,86 +78,67 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Summary stats strip
-  const doneTasks = proj.tasks.filter(t => t.status === "done").length;
-  const totalTasks = proj.tasks.length;
-
   return (
-    <div className="space-y-0">
-      {/* ── Project Header ── */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 min-w-0">
-          <Button variant="ghost" size="icon" asChild className="shrink-0 -ml-1 size-8 mt-0.5">
-            <Link href="/projects"><ArrowLeft className="size-4" /></Link>
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <div className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: proj.color, boxShadow: `0 0 0 2px white, 0 0 0 3.5px ${proj.color}40` }} />
-              <h1 className="text-lg font-semibold tracking-tight truncate">{proj.name}</h1>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <Badge variant="outline" className={cn("text-[10px] h-5", sc.color)}>
-                <span className={cn("size-1.5 rounded-full mr-1", sc.dot)} />
-                {sc.label}
-              </Badge>
-              <Badge variant="outline" className={cn("text-[10px] h-5", priorityConfig[proj.priority]?.color)}>
-                {priorityConfig[proj.priority]?.label}
-              </Badge>
-              {proj.contact && (
-                <span className="text-[11px] text-muted-foreground ml-1">{proj.contact.name}</span>
-              )}
-              {proj.tags.length > 0 && proj.tags.slice(0, 3).map(t => (
-                <span key={t} className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{t}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {proj.enableBilling && proj.contactId && (
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleGenerateInvoice}>
-              <Receipt className="mr-1.5 size-3" />Invoice
-            </Button>
+    <div>
+      {/* ── Header: full-width spread ── */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <Button variant="ghost" size="icon" asChild className="shrink-0 size-7 -ml-1">
+          <Link href="/projects"><ArrowLeft className="size-3.5" /></Link>
+        </Button>
+        <div className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: proj.color }} />
+        <h1 className="text-base font-semibold tracking-tight truncate">{proj.name}</h1>
+        <Badge variant="outline" className={cn("text-[10px] h-5 shrink-0", sc.color)}>
+          <span className={cn("size-1.5 rounded-full mr-1", sc.dot)} />{sc.label}
+        </Badge>
+        <Badge variant="outline" className={cn("text-[10px] h-5 shrink-0", priorityConfig[proj.priority]?.color)}>
+          {priorityConfig[proj.priority]?.label}
+        </Badge>
+
+        {/* Spacer pushes right-side stats and actions */}
+        <div className="flex-1" />
+
+        {/* Inline stats on the right */}
+        <div className="hidden sm:flex items-center gap-3 text-[11px] text-muted-foreground">
+          {proj.enableTimeTracking && (
+            <span className="flex items-center gap-1 font-mono tabular-nums">
+              <Clock className="size-3" />{formatHours(proj.totalHours)}
+              {proj.estimatedHours > 0 && <span className="text-muted-foreground/50">/{formatHours(proj.estimatedHours)}</span>}
+            </span>
+          )}
+          {proj.enableTasks && totalTasks > 0 && (
+            <span className="flex items-center gap-1 font-mono tabular-nums">
+              <CheckCircle2 className="size-3" />{doneTasks}/{totalTasks}
+            </span>
+          )}
+          {proj.enableBilling && proj.budget > 0 && (
+            <span className="font-mono tabular-nums">{formatMoney(proj.totalBilled)}/{formatMoney(proj.budget)}</span>
+          )}
+          {proj.members.length > 0 && (
+            <span className="flex items-center gap-1"><Users className="size-3" />{proj.members.length}</span>
+          )}
+          {daysLeft !== null && (
+            <span className={cn("font-medium", daysLeft < 0 ? "text-red-600" : daysLeft <= 7 ? "text-amber-600" : "")}>
+              {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? "Today" : `${Math.abs(daysLeft)}d late`}
+            </span>
           )}
         </div>
+
+        {proj.contact && (
+          <span className="text-[11px] text-muted-foreground shrink-0 hidden lg:block border-l pl-3 ml-1">{proj.contact.name}</span>
+        )}
+
+        {proj.enableBilling && proj.contactId && (
+          <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={handleGenerateInvoice}>
+            <Receipt className="mr-1 size-3" />Invoice
+          </Button>
+        )}
       </div>
 
-      {/* ── Stats Strip ── */}
-      <div className="mt-4 flex items-center gap-4 text-[12px] text-muted-foreground overflow-x-auto">
-        {proj.enableTimeTracking && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Clock className="size-3" />
-            <span className="font-mono tabular-nums">{formatHours(proj.totalHours)}</span>
-            {proj.estimatedHours > 0 && <span className="text-muted-foreground/60">/ {formatHours(proj.estimatedHours)}</span>}
-          </div>
-        )}
-        {proj.enableTasks && totalTasks > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <CheckCircle2 className="size-3" />
-            <span className="font-mono tabular-nums">{doneTasks}/{totalTasks} tasks</span>
-            <span className="text-muted-foreground/60">({pct(doneTasks, totalTasks)}%)</span>
-          </div>
-        )}
-        {proj.enableBilling && proj.budget > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="font-mono tabular-nums">{formatMoney(proj.totalBilled)}</span>
-            <span className="text-muted-foreground/60">/ {formatMoney(proj.budget)}</span>
-          </div>
-        )}
-        {proj.members.length > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Users className="size-3" />
-            <span>{proj.members.length}</span>
-          </div>
-        )}
-        {daysLeft !== null && (
-          <span className={cn("shrink-0 font-medium", daysLeft < 0 ? "text-red-600" : daysLeft <= 7 ? "text-amber-600" : "")}>
-            {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? "Due today" : `${Math.abs(daysLeft)}d overdue`}
-          </span>
-        )}
-      </div>
+      {/* ── Gradient divider ── */}
+      <div className="h-px mb-3" style={{ background: `linear-gradient(to right, ${proj.color}30, transparent)` }} />
 
       {/* ── Tabs ── */}
-      <nav className="mt-4 mb-6 flex items-center gap-1 border-b border-border">
+      <nav className="mb-6 flex items-center gap-1 border-b border-border">
         {tabs.map((tab) => {
           const isActive = tab.exact
             ? pathname === tab.href
@@ -184,7 +165,6 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      {/* ── Page Content ── */}
       <BlurReveal key={pathname}>
         {children}
       </BlurReveal>

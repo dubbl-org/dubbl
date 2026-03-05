@@ -138,6 +138,8 @@ function NavItemLink({ item, active }: { item: NavItem; active: boolean }) {
 interface ProjectListItem {
   id: string;
   name: string;
+  color: string;
+  status: string;
 }
 
 function ProjectsCollapsible({ pathname }: { pathname: string }) {
@@ -209,9 +211,13 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
               <SidebarMenuSubButton
                 asChild
                 size="sm"
-                isActive={pathname === `/projects/${project.id}`}
+                isActive={pathname === `/projects/${project.id}` || pathname.startsWith(`/projects/${project.id}/`)}
               >
                 <Link href={`/projects/${project.id}`}>
+                  <span
+                    className="size-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: project.color || "#10b981" }}
+                  />
                   <span className="truncate">{project.name}</span>
                 </Link>
               </SidebarMenuSubButton>
