@@ -15,6 +15,13 @@
       "when": 1772628587658,
       "tag": "0001_oval_roxanne_simpson",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772694436235,
+      "tag": "0002_previous_guardsmen",
+      "breakpoints": true
     }
   ]
 }

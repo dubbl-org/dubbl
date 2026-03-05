@@ -252,6 +252,11 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const PROJECT_COLORS = [
+    "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+    "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+  ];
+
   useEffect(() => {
     if (!open) { setContactId(""); setStartDate(""); setEndDate(""); }
   }, [open]);
@@ -264,6 +269,9 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
     if (!orgId) return;
 
     try {
+      const tagsRaw = (form.get("tags") as string || "").trim();
+      const tags = tagsRaw ? tagsRaw.split(",").map((t: string) => t.trim()).filter(Boolean) : [];
+
       const res = await fetch("/api/v1/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
@@ -272,10 +280,22 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           description: form.get("description") || null,
           contactId: contactId || null,
           status: form.get("status") || "active",
+          priority: form.get("priority") || "medium",
+          billingType: form.get("billingType") || "hourly",
+          color: form.get("color") || "#10b981",
           budget: Math.round(parseFloat(form.get("budget") as string || "0") * 100),
           hourlyRate: Math.round(parseFloat(form.get("hourlyRate") as string || "0") * 100),
+          fixedPrice: Math.round(parseFloat(form.get("fixedPrice") as string || "0") * 100),
+          estimatedHours: Math.round(parseFloat(form.get("estimatedHours") as string || "0") * 60),
+          category: form.get("category") || null,
+          tags,
           startDate: startDate || null,
           endDate: endDate || null,
+          enableTasks: true,
+          enableTimeTracking: true,
+          enableMilestones: false,
+          enableNotes: true,
+          enableBilling: true,
         }),
       });
       if (!res.ok) {
@@ -301,7 +321,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
             <DrawerIcon><FolderKanban className="size-5" /></DrawerIcon>
             <div>
               <SheetTitle className="text-lg">New Project</SheetTitle>
-              <SheetDescription>Create a project to track time and billing.</SheetDescription>
+              <SheetDescription>Create a project to track tasks, time, and billing.</SheetDescription>
             </div>
           </div>
         </SheetHeader>
@@ -324,11 +344,45 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="on_hold">On Hold</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select name="priority" defaultValue="medium">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Input name="category" placeholder="e.g. Development" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="flex gap-2">
+                  {PROJECT_COLORS.map(c => (
+                    <label key={c} className="cursor-pointer">
+                      <input type="radio" name="color" value={c} defaultChecked={c === "#10b981"} className="sr-only peer" />
+                      <div className="size-6 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-gray-400 transition-all" style={{ backgroundColor: c }} />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <Input name="tags" placeholder="Comma separated tags" />
               </div>
             </div>
 
@@ -336,6 +390,18 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
             <div className="space-y-4">
               <SectionLabel>Financials</SectionLabel>
+              <div className="space-y-2">
+                <Label>Billing Type</Label>
+                <Select name="billingType" defaultValue="hourly">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="fixed">Fixed Price</SelectItem>
+                    <SelectItem value="milestone">Milestone</SelectItem>
+                    <SelectItem value="non_billable">Non-Billable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-budget">Budget</Label>
@@ -344,6 +410,16 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-rate">Hourly Rate</Label>
                   <Input id="drawer-project-rate" name="hourlyRate" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Fixed Price</Label>
+                  <Input name="fixedPrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Estimated Hours</Label>
+                  <Input name="estimatedHours" type="number" step="0.5" min={0} placeholder="0" />
                 </div>
               </div>
             </div>

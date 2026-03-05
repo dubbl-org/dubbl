@@ -13,11 +13,25 @@ const createSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   contactId: z.string().nullable().optional(),
-  status: z.enum(["active", "completed", "archived"]).default("active"),
+  status: z.enum(["active", "completed", "on_hold", "cancelled", "archived"]).default("active"),
+  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+  billingType: z.enum(["hourly", "fixed", "milestone", "non_billable"]).default("hourly"),
+  color: z.string().optional(),
   budget: z.number().int().min(0).default(0),
   hourlyRate: z.number().int().min(0).default(0),
+  fixedPrice: z.number().int().min(0).default(0),
+  estimatedHours: z.number().int().min(0).default(0),
+  currency: z.string().default("USD"),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  tags: z.array(z.string()).default([]),
+  enableTimeline: z.boolean().default(true),
+  enableTasks: z.boolean().default(true),
+  enableTimeTracking: z.boolean().default(true),
+  enableMilestones: z.boolean().default(false),
+  enableNotes: z.boolean().default(true),
+  enableBilling: z.boolean().default(true),
 });
 
 export async function GET(request: Request) {
@@ -26,6 +40,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const { page, limit, offset } = parsePagination(url);
     const status = url.searchParams.get("status");
+    const priority = url.searchParams.get("priority");
 
     const conditions = [
       eq(project.organizationId, ctx.organizationId),
@@ -36,12 +51,25 @@ export async function GET(request: Request) {
       conditions.push(eq(project.status, status as typeof project.status.enumValues[number]));
     }
 
+    if (priority) {
+      conditions.push(eq(project.priority, priority as typeof project.priority.enumValues[number]));
+    }
+
     const projects = await db.query.project.findMany({
       where: and(...conditions),
       orderBy: desc(project.createdAt),
       limit,
       offset,
-      with: { contact: true },
+      with: {
+        contact: true,
+        members: {
+          with: {
+            member: {
+              with: { user: true },
+            },
+          },
+        },
+      },
     });
 
     const [countResult] = await db
@@ -73,10 +101,24 @@ export async function POST(request: Request) {
         description: parsed.description || null,
         contactId: parsed.contactId || null,
         status: parsed.status,
+        priority: parsed.priority,
+        billingType: parsed.billingType,
+        color: parsed.color || "#10b981",
         budget: parsed.budget,
         hourlyRate: parsed.hourlyRate,
+        fixedPrice: parsed.fixedPrice,
+        estimatedHours: parsed.estimatedHours,
+        currency: parsed.currency,
         startDate: parsed.startDate || null,
         endDate: parsed.endDate || null,
+        category: parsed.category || null,
+        tags: parsed.tags,
+        enableTimeline: parsed.enableTimeline,
+        enableTasks: parsed.enableTasks,
+        enableTimeTracking: parsed.enableTimeTracking,
+        enableMilestones: parsed.enableMilestones,
+        enableNotes: parsed.enableNotes,
+        enableBilling: parsed.enableBilling,
       })
       .returning();
 
