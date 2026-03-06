@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
+import { processRecurringTemplates } from "@/lib/api/recurring-generate";
 import { decimalToCents } from "@/lib/money";
 import { z } from "zod";
 
@@ -50,6 +51,9 @@ export async function GET(request: Request) {
     const to = url.searchParams.get("to");
     const sortBy = url.searchParams.get("sortBy") || "created";
     const sortOrder = url.searchParams.get("sortOrder") || "desc";
+
+    // Generate any due recurring invoices before listing
+    await processRecurringTemplates(ctx.organizationId);
 
     const conditions = [
       eq(invoice.organizationId, ctx.organizationId),

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { processRecurringTemplates } from "@/lib/api/recurring-generate";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -37,6 +38,9 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const type = url.searchParams.get("type");
     const status = url.searchParams.get("status");
+
+    // Process any due templates before listing
+    await processRecurringTemplates(ctx.organizationId);
 
     const conditions = [
       eq(recurringTemplate.organizationId, ctx.organizationId),
