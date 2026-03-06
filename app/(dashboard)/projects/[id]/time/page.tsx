@@ -83,12 +83,13 @@ export default function TimePage() {
   const lastSavedDescRef = useRef("");
   const lastSavedTaskRef = useRef("none");
   const lastSavedBillableRef = useRef(true);
+  const stoppingRef = useRef(false);
 
   // Initialize timer from server data
   useEffect(() => {
     if (!proj) return;
     const myTimer = proj.runningTimers?.[0] || null;
-    if (myTimer && !timerData) {
+    if (myTimer && !timerData && !stoppingRef.current) {
       setTimerData(myTimer);
       setTimerDesc(myTimer.description || "");
       setTimerTaskId(myTimer.taskId || "none");
@@ -229,8 +230,10 @@ export default function TimePage() {
   }
 
   async function stopTimer() {
-    if (!orgId || !timerData) return;
+    if (!orgId || !timerData || stoppingRef.current) return;
+    stoppingRef.current = true;
     if (timerRef.current) clearInterval(timerRef.current);
+    setTimerData(null);
     const minutes = Math.max(1, Math.round(timerSeconds / 60));
     try {
       // Save the time entry
@@ -254,7 +257,6 @@ export default function TimePage() {
       });
 
       toast.success(`Logged ${formatHours(minutes)}`);
-      setTimerData(null);
       setTimerSeconds(0);
       setTimerDesc("");
       setTimerTaskId("none");
@@ -262,6 +264,8 @@ export default function TimePage() {
       refresh();
     } catch {
       toast.error("Failed to save time entry");
+    } finally {
+      stoppingRef.current = false;
     }
   }
 

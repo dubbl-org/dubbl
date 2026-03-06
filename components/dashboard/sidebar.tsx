@@ -206,7 +206,7 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
         </CollapsibleTrigger>
       </SidebarMenuItem>
       <CollapsibleContent>
-        <SidebarMenuSub>
+        <SidebarMenuSub className="mr-0">
           {projects.map((project) => {
             const now = new Date();
             now.setHours(0, 0, 0, 0);
