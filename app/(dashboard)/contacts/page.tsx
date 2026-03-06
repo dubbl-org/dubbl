@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight } from "lucide-react";
+import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -49,6 +49,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
     {
       key: "name",
       header: "Name",
+      sortKey: "name",
       render: (r) => (
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{r.name}</p>
@@ -79,6 +80,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
     {
       key: "terms",
       header: "Payment Terms",
+      sortKey: "terms",
       className: "w-36",
       render: (r) => (
         <span className="text-sm text-muted-foreground">
@@ -89,6 +91,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
     {
       key: "creditLimit",
       header: "Credit Limit",
+      sortKey: "creditLimit",
       className: "w-32 text-right",
       render: (r) => (
         <span className="text-sm tabular-nums text-muted-foreground">
@@ -127,6 +130,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
     {
       key: "createdAt",
       header: "Created",
+      sortKey: "created",
       className: "w-28 text-right",
       render: (r) => (
         <span className="text-sm tabular-nums text-muted-foreground">
@@ -182,8 +186,11 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("created");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const [refetching, setRefetching] = useState(false);
+  const initialLoad = useRef(true);
   const [fetchKey, setFetchKey] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -201,13 +208,15 @@ export default function ContactsPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    if (!loading) setRefetching(true);
+    if (!initialLoad.current) setRefetching(true);
     setPage(1);
     setHasMore(true);
 
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (typeFilter !== "all") params.set("type", typeFilter);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
     params.set("page", "1");
     params.set("limit", "50");
 
@@ -223,8 +232,8 @@ export default function ContactsPage() {
         }
       })
       .then(() => devDelay())
-      .finally(() => { setLoading(false); setRefetching(false); setFetchKey((k) => k + 1); });
-  }, [debouncedSearch, typeFilter]);
+      .finally(() => { setLoading(false); setRefetching(false); setFetchKey((k) => k + 1); initialLoad.current = false; });
+  }, [debouncedSearch, typeFilter, sortBy, sortOrder]);
 
   // Load next page
   const loadMore = useCallback(() => {
@@ -238,6 +247,8 @@ export default function ContactsPage() {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (typeFilter !== "all") params.set("type", typeFilter);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
     params.set("page", String(nextPage));
     params.set("limit", "50");
 
@@ -254,7 +265,7 @@ export default function ContactsPage() {
         }
       })
       .finally(() => setLoadingMore(false));
-  }, [loadingMore, hasMore, page, debouncedSearch, typeFilter]);
+  }, [loadingMore, hasMore, page, debouncedSearch, typeFilter, sortBy, sortOrder]);
 
   // IntersectionObserver to trigger loadMore
   useEffect(() => {
@@ -287,6 +298,17 @@ export default function ContactsPage() {
       },
     });
   }
+
+  const handleSort = useCallback((key: string) => {
+    setSortBy((prev) => {
+      if (prev === key) {
+        setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
+        return key;
+      }
+      setSortOrder("desc");
+      return key;
+    });
+  }, []);
 
   const columns = buildColumns(handleDelete, (c) => router.push(`/contacts/${c.id}`));
 
@@ -484,6 +506,9 @@ export default function ContactsPage() {
                 loading={loading}
                 emptyMessage="No contacts found."
                 onRowClick={(r) => router.push(`/contacts/${r.id}`)}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={handleSort}
               />
             </motion.div>
           </MotionConfig>
