@@ -106,7 +106,7 @@ export const journalEntry = pgTable(
     reference: text("reference"),
     status: entryStatusEnum("status").notNull().default("draft"),
     fiscalYearId: uuid("fiscal_year_id").references(() => fiscalYear.id),
-    sourceType: text("source_type"), // "invoice", "bill", "expense", "bank", "manual"
+    sourceType: text("source_type"), // "invoice", "bill", "expense", "bank", "payment", "credit_note", "debit_note", "manual"
     sourceId: uuid("source_id"),
     createdBy: uuid("created_by").references(() => users.id),
     postedAt: timestamp("posted_at", { mode: "date" }),
@@ -120,6 +120,31 @@ export const journalEntry = pgTable(
     uniqueIndex("journal_entry_org_number_idx").on(
       table.organizationId,
       table.entryNumber
+    ),
+  ]
+);
+
+// Cost Center / Department
+export const costCenter = pgTable(
+  "cost_center",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    parentId: uuid("parent_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("cost_center_org_code_idx").on(
+      table.organizationId,
+      table.code
     ),
   ]
 );
@@ -140,6 +165,7 @@ export const journalLine = pgTable("journal_line", {
   creditAmount: integer("credit_amount").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
   exchangeRate: integer("exchange_rate").notNull().default(1000000), // 6 decimal places as int (1.000000 = 1000000)
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
 });
 
 // Tax Rate
@@ -171,6 +197,26 @@ export const taxComponent = pgTable("tax_component", {
   rate: integer("rate").notNull(), // basis points
   accountId: uuid("account_id").references(() => chartAccount.id),
 });
+
+// Period Lock - prevents editing entries on or before the lock date
+export const periodLock = pgTable(
+  "period_lock",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    lockDate: date("lock_date").notNull(),
+    lockedBy: uuid("locked_by").references(() => users.id),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("period_lock_org_idx").on(table.organizationId),
+  ]
+);
 
 // Attachment (generalized document)
 export const attachment = pgTable("attachment", {
@@ -247,6 +293,35 @@ export const journalLineRelations = relations(journalLine, ({ one }) => ({
   account: one(chartAccount, {
     fields: [journalLine.accountId],
     references: [chartAccount.id],
+  }),
+  costCenter: one(costCenter, {
+    fields: [journalLine.costCenterId],
+    references: [costCenter.id],
+  }),
+}));
+
+export const costCenterRelations = relations(costCenter, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [costCenter.organizationId],
+    references: [organization.id],
+  }),
+  parent: one(costCenter, {
+    fields: [costCenter.parentId],
+    references: [costCenter.id],
+    relationName: "costCenterParentChild",
+  }),
+  children: many(costCenter, { relationName: "costCenterParentChild" }),
+  journalLines: many(journalLine),
+}));
+
+export const periodLockRelations = relations(periodLock, ({ one }) => ({
+  organization: one(organization, {
+    fields: [periodLock.organizationId],
+    references: [organization.id],
+  }),
+  lockedByUser: one(users, {
+    fields: [periodLock.lockedBy],
+    references: [users.id],
   }),
 }));
 

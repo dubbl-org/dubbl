@@ -4,11 +4,13 @@ import {
   uuid,
   timestamp,
   integer,
+  boolean,
   pgEnum,
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization } from "./auth";
+import { chartAccount, taxRate } from "./bookkeeping";
 
 export const contactTypeEnum = pgEnum("contact_type", [
   "customer",
@@ -35,14 +37,59 @@ export const contact = pgTable("contact", {
   }>(),
   notes: text("notes"),
   currencyCode: text("currency_code").default("USD"),
+  // Bookkeeping defaults
+  creditLimit: integer("credit_limit"), // cents, nullable = no limit
+  isTaxExempt: boolean("is_tax_exempt").notNull().default(false),
+  defaultRevenueAccountId: uuid("default_revenue_account_id").references(() => chartAccount.id),
+  defaultExpenseAccountId: uuid("default_expense_account_id").references(() => chartAccount.id),
+  defaultTaxRateId: uuid("default_tax_rate_id").references(() => taxRate.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
 
-export const contactRelations = relations(contact, ({ one }) => ({
+export const contactPerson = pgTable("contact_person", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  contactId: uuid("contact_id")
+    .notNull()
+    .references(() => contact.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  jobTitle: text("job_title"),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+export const contactRelations = relations(contact, ({ one, many }) => ({
   organization: one(organization, {
     fields: [contact.organizationId],
     references: [organization.id],
+  }),
+  defaultRevenueAccount: one(chartAccount, {
+    fields: [contact.defaultRevenueAccountId],
+    references: [chartAccount.id],
+    relationName: "contactRevenueAccount",
+  }),
+  defaultExpenseAccount: one(chartAccount, {
+    fields: [contact.defaultExpenseAccountId],
+    references: [chartAccount.id],
+    relationName: "contactExpenseAccount",
+  }),
+  defaultTaxRate: one(taxRate, {
+    fields: [contact.defaultTaxRateId],
+    references: [taxRate.id],
+  }),
+  people: many(contactPerson),
+}));
+
+export const contactPersonRelations = relations(contactPerson, ({ one }) => ({
+  contact: one(contact, {
+    fields: [contactPerson.contactId],
+    references: [contact.id],
   }),
 }));
