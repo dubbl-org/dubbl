@@ -49,6 +49,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - name: Generate fumadocs sources
+        run: pnpm fumadocs-mdx
       - run: pnpm tsc --noEmit
 
   build:
