@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowDownRight,
@@ -20,8 +20,11 @@ import {
   XCircle,
   ListFilter,
   History,
+  Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
@@ -182,13 +185,26 @@ const ACCOUNT_COLORS = [
 export default function BankAccountDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [account, setAccount] = useState<BankAccountDetail | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [imports, setImports] = useState<StatementImport[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<string>("overview");
+  const rawTab = searchParams.get("tab") || "overview";
+  const tab = TABS.some((t) => t.value === rawTab) ? rawTab : "overview";
+  const setTab = useCallback((t: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (t === "overview") params.delete("tab");
+    else params.set("tab", t);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [txSearch, setTxSearch] = useState("");
+  const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
+  const [txDateFrom, setTxDateFrom] = useState("");
+  const [txDateTo, setTxDateTo] = useState("");
+  const [txSort, setTxSort] = useState("date:desc");
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -227,6 +243,13 @@ export default function BankAccountDetailPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTxSearch(txSearch), 300);
+    return () => clearTimeout(t);
+  }, [txSearch]);
+
+  const txSearchPending = txSearch !== debouncedTxSearch;
+
   const summary = useMemo(() => {
     const unreconciled = transactions.filter((tx) => tx.status === "unreconciled").length;
     const reconciled = transactions.filter((tx) => tx.status === "reconciled").length;
@@ -241,9 +264,28 @@ export default function BankAccountDetailPage() {
   }, [transactions]);
 
   const filteredTx = useMemo(() => {
-    if (statusFilter === "all") return transactions;
-    return transactions.filter((tx) => tx.status === statusFilter);
-  }, [transactions, statusFilter]);
+    let result = transactions;
+    if (statusFilter !== "all") result = result.filter((tx) => tx.status === statusFilter);
+    if (debouncedTxSearch) {
+      const q = debouncedTxSearch.toLowerCase();
+      result = result.filter(
+        (tx) =>
+          tx.description.toLowerCase().includes(q) ||
+          tx.reference?.toLowerCase().includes(q) ||
+          tx.payee?.toLowerCase().includes(q)
+      );
+    }
+    if (txDateFrom) result = result.filter((tx) => tx.date >= txDateFrom);
+    if (txDateTo) result = result.filter((tx) => tx.date <= txDateTo);
+    const [sortKey, sortDir] = txSort.split(":");
+    result = [...result].sort((a, b) => {
+      const mul = sortDir === "asc" ? 1 : -1;
+      if (sortKey === "date") return mul * a.date.localeCompare(b.date);
+      if (sortKey === "amount") return mul * (Math.abs(a.amount) - Math.abs(b.amount));
+      return 0;
+    });
+    return result;
+  }, [transactions, statusFilter, debouncedTxSearch, txDateFrom, txDateTo, txSort]);
 
   async function readStatementContent(): Promise<{ content: string; fileName: string | null }> {
     if (selectedFile) return { content: await selectedFile.text(), fileName: selectedFile.name };
@@ -586,37 +628,102 @@ export default function BankAccountDetailPage() {
         {/* Transactions tab */}
         {tab === "transactions" && (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {["all", "unreconciled", "reconciled", "excluded"].map((value) => (
-                <button
-                  key={value}
-                  onClick={() => setStatusFilter(value)}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors capitalize",
-                    statusFilter === value
-                      ? "bg-foreground text-background"
-                      : "bg-muted text-muted-foreground hover:bg-muted/70"
-                  )}
-                >
-                  {value}
-                  {value !== "all" && (
-                    <span className="ml-1 tabular-nums">
-                      {value === "unreconciled" ? summary.unreconciled : value === "reconciled" ? summary.reconciled : summary.excluded}
-                    </span>
-                  )}
-                </button>
-              ))}
+            {/* Status tabs + search */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+                <TabsList>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="unreconciled">
+                    Unreconciled
+                    {summary.unreconciled > 0 && <span className="ml-1 tabular-nums text-amber-600">{summary.unreconciled}</span>}
+                  </TabsTrigger>
+                  <TabsTrigger value="reconciled">Reconciled</TabsTrigger>
+                  <TabsTrigger value="excluded">Excluded</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search transactions..."
+                  value={txSearch}
+                  onChange={(e) => setTxSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
 
-            {filteredTx.length === 0 ? (
+            {/* Date range + sort */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground shrink-0">From</span>
+                <DatePicker
+                  value={txDateFrom}
+                  onChange={(v) => setTxDateFrom(v)}
+                  placeholder="Start date"
+                  className="h-8 w-40 text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground shrink-0">To</span>
+                <DatePicker
+                  value={txDateTo}
+                  onChange={(v) => setTxDateTo(v)}
+                  placeholder="End date"
+                  className="h-8 w-40 text-xs"
+                />
+              </div>
+              <Select value={txSort} onValueChange={setTxSort}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date:desc">Newest first</SelectItem>
+                  <SelectItem value="date:asc">Oldest first</SelectItem>
+                  <SelectItem value="amount:desc">Highest amount</SelectItem>
+                  <SelectItem value="amount:asc">Lowest amount</SelectItem>
+                </SelectContent>
+              </Select>
+              {(txDateFrom || txDateTo || txSearch) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={() => { setTxDateFrom(""); setTxDateTo(""); setTxSearch(""); }}
+                >
+                  <X className="mr-1 size-3" />
+                  Clear filters
+                </Button>
+              )}
+            </div>
+
+            {/* Results summary */}
+            <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+              <span className="font-medium text-foreground tabular-nums">{filteredTx.length}</span> transactions
+              {statusFilter !== "all" && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className="capitalize">{statusFilter}</span>
+                </>
+              )}
+            </div>
+
+            {txSearchPending ? (
+              <BrandLoader className="h-auto py-16" />
+            ) : filteredTx.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
                 <Clock3 className="size-8 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  {statusFilter === "all" ? "No transactions yet." : `No ${statusFilter} transactions.`}
+                  {statusFilter === "all" && !txSearch ? "No transactions yet." : "No transactions match your filters."}
                 </p>
               </div>
             ) : (
-              <div className="rounded-lg border">
+              <motion.div
+                key={`${statusFilter}-${debouncedTxSearch}-${txDateFrom}-${txDateTo}-${txSort}`}
+                initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="rounded-lg border"
+              >
                 {filteredTx.map((tx, i) => (
                   <TransactionRow
                     key={tx.id}
@@ -627,7 +734,7 @@ export default function BankAccountDetailPage() {
                     onExclude={handleExclude}
                   />
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
         )}
