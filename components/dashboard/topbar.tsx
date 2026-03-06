@@ -93,14 +93,26 @@ export function Topbar() {
   const defaultSub = segments.length === 1 ? DEFAULT_SUBTABS[segments[0]] : undefined;
   const effectiveSegments = defaultSub ? [segments[0], defaultSub] : segments;
 
-  // For entity detail pages like /projects/[id] or /projects/[id]/time,
+  // For entity detail pages like /projects/[id] or /accounting/banking/[id],
   // detect the pattern and show proper breadcrumbs
   const isEntityDetail = segments.length >= 2 && segments[0] in LABELS && !(segments[1] in LABELS);
+  // Also detect nested entity detail: /accounting/banking/[id] where segments[2] is not a known label
+  const isNestedEntityDetail = segments.length >= 3 && segments[0] in LABELS && segments[1] in LABELS && !(segments[2] in LABELS);
   let pageTitle: string;
   let parentLabel: string | null;
   let parentHref: string | null = null;
 
-  if (isEntityDetail) {
+  if (isNestedEntityDetail) {
+    parentLabel = LABELS[segments[1]] || segments[1];
+    parentHref = `/${segments[0]}/${segments[1]}`;
+    if (entityTitle) {
+      pageTitle = entityTitle;
+    } else {
+      const subTab = segments.length > 3 ? segments[segments.length - 1] : null;
+      pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[1]] || segments[1]);
+      if (!subTab) parentLabel = null;
+    }
+  } else if (isEntityDetail) {
     parentLabel = LABELS[segments[0]] || segments[0];
     parentHref = `/${segments[0]}`;
     if (entityTitle) {

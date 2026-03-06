@@ -62,14 +62,8 @@ const ACCOUNT_TYPE_LABELS: Record<BankAccountType, string> = {
 };
 
 const ACCOUNT_COLORS = [
-  "#10b981",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
-  "#f97316",
+  "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
 ];
 
 export default function BankingPage() {
@@ -442,18 +436,18 @@ function CreateAccountDrawer({
 
           <div className="space-y-4">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Accent Color</p>
-            <div className="flex gap-3">
-              {ACCOUNT_COLORS.map((color) => (
+            <div className="flex gap-2">
+              {ACCOUNT_COLORS.map((c) => (
                 <button
-                  key={color}
+                  key={c}
                   type="button"
-                  onClick={() => setForm({ ...form, color })}
+                  onClick={() => setForm({ ...form, color: c })}
                   className={cn(
-                    "size-8 rounded-full border-2 transition-colors",
-                    form.color === color ? "border-foreground" : "border-transparent"
+                    "size-6 rounded-full ring-2 ring-transparent transition-all",
+                    form.color === c && "ring-offset-2 ring-gray-400"
                   )}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Choose ${color}`}
+                  style={{ backgroundColor: c }}
+                  aria-label={`Choose ${c}`}
                 />
               ))}
             </div>

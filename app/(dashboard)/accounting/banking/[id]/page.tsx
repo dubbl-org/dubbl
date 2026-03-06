@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { toast } from "sonner";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { AnimatePresence, motion } from "motion/react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,14 +175,8 @@ const TABS = [
 ] as const;
 
 const ACCOUNT_COLORS = [
-  "#10b981",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
-  "#f97316",
+  "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
 ];
 
 export default function BankAccountDetailPage() {
@@ -410,68 +404,61 @@ export default function BankAccountDetailPage() {
         Back to banking
       </button>
 
-      {/* Header card */}
-      <div
-        className="relative overflow-hidden rounded-xl border bg-card mb-8"
-        style={{ borderColor: account.color + "30" }}
-      >
-        <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: account.color }} />
-        <div className="px-6 pt-6 pb-5">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex size-12 items-center justify-center rounded-xl"
-                style={{ backgroundColor: account.color + "18", color: account.color }}
-              >
-                <CircleDot className="size-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h1 className="text-xl font-semibold tracking-tight">{account.accountName}</h1>
-                  <Badge variant="outline">{ACCOUNT_TYPE_LABELS[account.accountType]}</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {[account.bankName, account.countryCode, account.accountNumber ? `····${account.accountNumber.slice(-4)}` : null]
-                    .filter(Boolean)
-                    .join(" · ") || "Manual imports"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)}>
-                <RefreshCcw className="mr-2 size-3.5" />
-                Reconcile
-              </Button>
-              <Button size="sm" onClick={() => setImportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
-                <Upload className="mr-2 size-3.5" />
-                Import
-              </Button>
-            </div>
+      {/* Header */}
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg"
+            style={{ backgroundColor: account.color + "18", color: account.color }}
+          >
+            <CircleDot className="size-5" />
           </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-lg font-semibold tracking-tight">{account.accountName}</h1>
+              <Badge variant="outline">{ACCOUNT_TYPE_LABELS[account.accountType]}</Badge>
+              <Badge variant="outline" className="text-[10px]">{account.currencyCode}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {[account.bankName, account.countryCode, account.accountNumber ? `····${account.accountNumber.slice(-4)}` : null]
+                .filter(Boolean)
+                .join(" · ") || "Manual imports"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)}>
+            <RefreshCcw className="mr-2 size-3.5" />
+            Reconcile
+          </Button>
+          <Button size="sm" onClick={() => setImportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Upload className="mr-2 size-3.5" />
+            Import
+          </Button>
+        </div>
+      </div>
 
-          {/* Inline stats */}
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-[11px] text-muted-foreground">Balance</p>
-              <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">{formatMoney(account.balance, cur)}</p>
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-8">
+        <div>
+          <p className="text-[11px] text-muted-foreground">Balance</p>
+          <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">{formatMoney(account.balance, cur)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowDownRight className="size-3 text-emerald-500" />Money In</p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600">{formatMoney(summary.credits, cur)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowUpRight className="size-3 text-red-500" />Money Out</p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-red-600">{formatMoney(summary.debits, cur)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground">Reconciled</p>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${reconciledPct}%` }} />
             </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowDownRight className="size-3 text-emerald-500" />Money In</p>
-              <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600">{formatMoney(summary.credits, cur)}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowUpRight className="size-3 text-red-500" />Money Out</p>
-              <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-red-600">{formatMoney(summary.debits, cur)}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground">Reconciled</p>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${reconciledPct}%` }} />
-                </div>
-                <span className="text-xs font-mono tabular-nums text-muted-foreground">{reconciledPct}%</span>
-              </div>
-            </div>
+            <span className="text-xs font-mono tabular-nums text-muted-foreground">{reconciledPct}%</span>
           </div>
         </div>
       </div>
@@ -505,7 +492,14 @@ export default function BankAccountDetailPage() {
       </nav>
 
       {/* Tab content */}
-      <BlurReveal key={tab}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        >
         {/* Overview tab */}
         {tab === "overview" && (
           <div className="space-y-8">
@@ -730,18 +724,18 @@ export default function BankAccountDetailPage() {
               </div>
               <div className="min-w-0">
                 <input type="hidden" name="color" value={account.color} />
-                <div className="flex gap-3">
-                  {ACCOUNT_COLORS.map((color) => (
+                <div className="flex gap-2">
+                  {ACCOUNT_COLORS.map((c) => (
                     <button
-                      key={color}
+                      key={c}
                       type="button"
-                      onClick={() => setAccount((prev) => prev ? { ...prev, color } : prev)}
+                      onClick={() => setAccount((prev) => prev ? { ...prev, color: c } : prev)}
                       className={cn(
-                        "size-8 rounded-full border-2 transition-colors",
-                        account.color === color ? "border-foreground" : "border-transparent"
+                        "size-6 rounded-full ring-2 ring-transparent transition-all",
+                        account.color === c && "ring-offset-2 ring-gray-400"
                       )}
-                      style={{ backgroundColor: color }}
-                      aria-label={`Choose ${color}`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`Choose ${c}`}
                     />
                   ))}
                 </div>
@@ -775,7 +769,8 @@ export default function BankAccountDetailPage() {
             </div>
           </form>
         )}
-      </BlurReveal>
+        </motion.div>
+      </AnimatePresence>
 
       {confirmDialog}
 
