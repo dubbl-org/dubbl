@@ -213,13 +213,29 @@ export default function BankingPage() {
     );
   }
 
+  const positiveBalance = accounts.filter((a) => a.balance > 0).reduce((s, a) => s + a.balance, 0);
+  const negativeBalance = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + Math.abs(a.balance), 0);
+  const currencies = [...new Set(accounts.map((a) => a.currencyCode))];
+
   return (
     <BlurReveal className="space-y-10">
       <Section title="Overview" description="Total balances and account summary.">
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard title="Total Balance" value={formatMoney(totals.balance)} icon={Building2} />
-          <StatCard title="Accounts" value={accounts.length.toString()} icon={Building2} change={`${totals.active} active`} />
-          <StatCard title="Live Sync" value="Coming Soon" icon={Waves} change="On the roadmap" />
+          <StatCard
+            title="Money In"
+            value={formatMoney(positiveBalance)}
+            icon={Building2}
+            changeType="positive"
+            change={`${accounts.filter((a) => a.balance > 0).length} accounts`}
+          />
+          <StatCard
+            title="Money Out"
+            value={formatMoney(negativeBalance)}
+            icon={Building2}
+            changeType="negative"
+            change={`${accounts.filter((a) => a.balance < 0).length} accounts`}
+          />
         </div>
       </Section>
 
@@ -227,7 +243,18 @@ export default function BankingPage() {
 
       <Section title="Bank Accounts" description="Manage accounts, balances, and statement imports.">
         <div className="space-y-4">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+              <span className="font-medium text-foreground tabular-nums">{accounts.length}</span> accounts
+              <span className="text-border">·</span>
+              <span className="tabular-nums">{totals.active} active</span>
+              {currencies.length > 1 && (
+                <>
+                  <span className="text-border">·</span>
+                  <span>{currencies.length} currencies</span>
+                </>
+              )}
+            </div>
             <Button
               onClick={() => setDrawerOpen(true)}
               size="sm"
@@ -238,61 +265,73 @@ export default function BankingPage() {
             </Button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-lg border divide-y">
             {accounts.map((account) => (
               <button
                 key={account.id}
                 type="button"
                 onClick={() => router.push(`/accounting/banking/${account.id}`)}
-                className="group relative rounded-xl border bg-card p-5 text-left transition-all duration-200 hover:shadow-md hover:border-foreground/15 hover:-translate-y-0.5"
+                className="group flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-muted/40"
               >
-                {/* Color accent bar */}
+                {/* Icon */}
                 <div
-                  className="absolute inset-x-5 top-0 h-[3px] rounded-b-full transition-all duration-200 group-hover:inset-x-3"
-                  style={{ backgroundColor: account.color }}
-                />
-
-                <div className="flex items-start justify-between gap-3 pt-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="flex size-9 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110"
-                      style={{ backgroundColor: account.color + "18", color: account.color }}
-                    >
-                      <CircleDot className="size-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{account.accountName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {account.bankName || ACCOUNT_TYPE_LABELS[account.accountType]}
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowUpRight className="size-4 shrink-0 text-muted-foreground/0 transition-all duration-200 group-hover:text-muted-foreground group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  className="flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105"
+                  style={{ backgroundColor: account.color + "18", color: account.color }}
+                >
+                  <CircleDot className="size-5" />
                 </div>
 
-                <div className="mt-5 flex items-end justify-between">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground">Balance</p>
-                    <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums">
-                      {formatMoney(account.balance, account.currencyCode)}
-                    </p>
-                  </div>
+                {/* Name + bank */}
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px]">
-                      {account.currencyCode}
+                    <p className="text-sm font-medium truncate">{account.accountName}</p>
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      {ACCOUNT_TYPE_LABELS[account.accountType]}
                     </Badge>
-                    {account.accountNumber && (
-                      <span className="font-mono text-[11px] text-muted-foreground">
-                        ····{account.accountNumber.slice(-4)}
-                      </span>
+                    {!account.isActive && (
+                      <Badge variant="outline" className="text-[10px] shrink-0 text-muted-foreground">Inactive</Badge>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {[account.bankName, account.countryCode, account.accountNumber ? `····${account.accountNumber.slice(-4)}` : null]
+                      .filter(Boolean)
+                      .join(" · ") || "Manual imports"}
+                  </p>
                 </div>
+
+                {/* Balance */}
+                <div className="text-right shrink-0">
+                  <p className={cn(
+                    "font-mono text-sm font-semibold tabular-nums",
+                    account.balance > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : account.balance < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-muted-foreground"
+                  )}>
+                    {formatMoney(account.balance, account.currencyCode)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{account.currencyCode}</p>
+                </div>
+
+                {/* Arrow */}
+                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground/0 transition-all duration-200 group-hover:text-muted-foreground" />
               </button>
             ))}
           </div>
         </div>
       </Section>
+
+      {/* Live sync teaser */}
+      <div className="h-px bg-border" />
+      <div className="flex items-center gap-3 rounded-lg border border-dashed px-4 py-3">
+        <Waves className="size-4 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">Live bank sync</p>
+          <p className="text-xs text-muted-foreground">Automatic transaction imports are on the roadmap.</p>
+        </div>
+        <Badge variant="outline" className="text-[10px] shrink-0">Coming Soon</Badge>
+      </div>
 
       <CreateAccountDrawer
         open={drawerOpen}
