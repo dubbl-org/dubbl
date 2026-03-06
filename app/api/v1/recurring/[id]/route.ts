@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { recurringTemplate, recurringTemplateLine } from "@/lib/db/schema";
+import { recurringTemplate } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -11,6 +11,7 @@ import { z } from "zod";
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly", "quarterly", "semi_annual", "annual"]).optional(),
+  status: z.enum(["active", "paused", "completed"]).optional(),
   endDate: z.string().nullable().optional(),
   maxOccurrences: z.number().int().min(1).nullable().optional(),
   reference: z.string().nullable().optional(),

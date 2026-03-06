@@ -1,21 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, X, Banknote } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
-
 
 interface Invoice {
   id: string;
@@ -28,91 +34,193 @@ interface Invoice {
   contact: { name: string } | null;
 }
 
+interface PaymentRecord {
+  id: string;
+  paymentNumber: string;
+  date: string;
+  amount: number;
+  method: string;
+  contact: { name: string } | null;
+  allocations: { documentType: string; documentId: string; amount: number }[];
+}
+
 const statusColors: Record<string, string> = {
   draft: "",
-  sent: "border-blue-200 bg-blue-50 text-blue-700",
-  partial: "border-amber-200 bg-amber-50 text-amber-700",
-  paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  overdue: "border-red-200 bg-red-50 text-red-700",
-  void: "border-gray-200 bg-gray-50 text-gray-700",
+  sent: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  partial: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  overdue: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+  void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
-const columns: Column<Invoice>[] = [
-  {
-    key: "number",
-    header: "Number",
-    className: "w-32",
-    render: (r) => <span className="font-mono text-sm">{r.invoiceNumber}</span>,
-  },
-  {
-    key: "contact",
-    header: "Customer",
-    render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span>,
-  },
-  {
-    key: "date",
-    header: "Date",
-    className: "w-28",
-    render: (r) => <span className="text-sm">{r.issueDate}</span>,
-  },
-  {
-    key: "due",
-    header: "Due",
-    className: "w-28",
-    render: (r) => <span className="text-sm">{r.dueDate}</span>,
-  },
-  {
-    key: "status",
-    header: "Status",
-    className: "w-24",
-    render: (r) => (
-      <Badge variant="outline" className={statusColors[r.status] || ""}>
-        {r.status}
-      </Badge>
-    ),
-  },
-  {
-    key: "total",
-    header: "Total",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">{formatMoney(r.total)}</span>
-    ),
-  },
-  {
-    key: "due-amount",
-    header: "Due",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">{formatMoney(r.amountDue)}</span>
-    ),
-  },
-];
+const methodLabels: Record<string, string> = {
+  bank_transfer: "Bank Transfer",
+  cash: "Cash",
+  check: "Check",
+  card: "Card",
+  other: "Other",
+};
+
+function getOverdueInfo(dueDate: string, status: string) {
+  if (status === "paid" || status === "void" || status === "draft") return null;
+  const now = new Date();
+  const due = new Date(dueDate);
+  const diffMs = now.getTime() - due.getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days <= 0) {
+    const daysLeft = Math.abs(days);
+    if (daysLeft === 0) return { label: "Due today", color: "text-amber-600" };
+    if (daysLeft <= 7) return { label: `Due in ${daysLeft}d`, color: "text-muted-foreground" };
+    return null;
+  }
+  if (days <= 30) return { label: `${days}d overdue`, color: "text-red-500" };
+  if (days <= 90) return { label: `${days}d overdue`, color: "text-red-600 font-medium" };
+  return { label: `${days}d overdue`, color: "text-red-700 font-semibold" };
+}
+
+function buildColumns(): Column<Invoice>[] {
+  return [
+    {
+      key: "number",
+      header: "Number",
+      sortKey: "number",
+      className: "w-32",
+      render: (r) => <span className="font-mono text-sm">{r.invoiceNumber}</span>,
+    },
+    {
+      key: "contact",
+      header: "Customer",
+      render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span>,
+    },
+    {
+      key: "date",
+      header: "Date",
+      sortKey: "date",
+      className: "w-28",
+      render: (r) => <span className="text-sm">{r.issueDate}</span>,
+    },
+    {
+      key: "due",
+      header: "Due",
+      sortKey: "due",
+      className: "w-36",
+      render: (r) => {
+        const info = getOverdueInfo(r.dueDate, r.status);
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{r.dueDate}</span>
+            {info && (
+              <span className={`text-[11px] ${info.color}`}>{info.label}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      className: "w-24",
+      render: (r) => (
+        <Badge variant="outline" className={statusColors[r.status] || ""}>
+          {r.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      sortKey: "total",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="font-mono text-sm tabular-nums">{formatMoney(r.total)}</span>
+      ),
+    },
+    {
+      key: "due-amount",
+      header: "Balance",
+      sortKey: "amountDue",
+      className: "w-28 text-right",
+      render: (r) => {
+        const color = r.amountDue < 0
+          ? "text-emerald-600"
+          : r.amountDue > 0 && r.status !== "draft"
+            ? "text-amber-600"
+            : "";
+        return (
+          <span className={`font-mono text-sm tabular-nums ${color}`}>
+            {formatMoney(r.amountDue)}
+          </span>
+        );
+      },
+    },
+  ];
+}
 
 export default function InvoicesPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("created");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  const columns = useMemo(() => buildColumns(), []);
 
   useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
+    let cancelled = false;
 
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
+    params.set("limit", "200");
 
     fetch(`/api/v1/invoices?${params}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) setInvoices(data.data);
+        if (!cancelled && data.data) setInvoices(data.data);
       })
       .then(() => devDelay())
-      .finally(() => setLoading(false));
-  }, [statusFilter]);
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [orgId, statusFilter, sortBy, sortOrder, dateFrom, dateTo]);
+
+  // Fetch recent payments separately
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/v1/payments?type=received&limit=5`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setPayments(data.data);
+      });
+  }, [orgId]);
+
+  const handleSort = useCallback((key: string) => {
+    setSortBy((prev) => {
+      if (prev === key) {
+        setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
+        return key;
+      }
+      setSortOrder("desc");
+      return key;
+    });
+  }, []);
+
+  const hasFilters = dateFrom || dateTo;
 
   const outstanding = invoices
     .filter((i) => ["sent", "partial", "overdue"].includes(i.status))
@@ -124,7 +232,12 @@ export default function InvoicesPage() {
 
   const aging = useMemo(() => {
     const now = new Date();
-    const buckets = { current: { count: 0, amount: 0 }, "1-30": { count: 0, amount: 0 }, "31-60": { count: 0, amount: 0 }, "60+": { count: 0, amount: 0 } };
+    const buckets = {
+      current: { count: 0, amount: 0 },
+      "1-30": { count: 0, amount: 0 },
+      "31-60": { count: 0, amount: 0 },
+      "60+": { count: 0, amount: 0 },
+    };
     invoices
       .filter((i) => ["sent", "partial", "overdue"].includes(i.status) && i.amountDue > 0)
       .forEach((inv) => {
@@ -140,67 +253,62 @@ export default function InvoicesPage() {
 
   const agingTotal = aging.current.amount + aging["1-30"].amount + aging["31-60"].amount + aging["60+"].amount;
 
-  if (loading) return <BrandLoader />;
+  if (loading && invoices.length === 0) return <BrandLoader />;
 
-  if (!loading && invoices.length === 0 && statusFilter === "all") {
+  if (!loading && invoices.length === 0 && statusFilter === "all" && !hasFilters) {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Invoices" description="Create and send invoices to your customers. Track payments and outstanding balances.">
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-h-[50vh]">
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-                <FileText className="size-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h3 className="mt-4 text-sm font-medium">No invoices yet</h3>
-              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                Create and send professional invoices, then track payments as they come in.
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={() => openDrawer("invoice")}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="mr-2 size-4" />
-                  New Invoice
-                </Button>
-              </div>
-            </div>
-            <div className="hidden lg:block rounded-lg border border-dashed bg-card p-5 opacity-50">
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="h-3 w-24 rounded bg-muted" />
-                    <div className="h-2 w-16 rounded bg-muted mt-2" />
+      <BlurReveal>
+        <div className="flex flex-col items-center gap-10 pt-16 pb-12">
+          {/* Invoice lifecycle stepper */}
+          <div className="w-full max-w-xl">
+            <div className="grid grid-cols-3 gap-0">
+              {[
+                { step: "1", label: "Create", sub: "Draft your invoice with line items and pricing", color: "bg-blue-500", ring: "ring-blue-200 dark:ring-blue-900" },
+                { step: "2", label: "Send", sub: "Email it directly to your customer", color: "bg-amber-500", ring: "ring-amber-200 dark:ring-amber-900" },
+                { step: "3", label: "Get paid", sub: "Track payments and outstanding balances", color: "bg-emerald-500", ring: "ring-emerald-200 dark:ring-emerald-900" },
+              ].map(({ step, label, sub, color, ring }, i) => (
+                <div key={step} className="flex flex-col items-center text-center relative">
+                  {i < 2 && (
+                    <div className="absolute top-4 left-[calc(50%+16px)] w-[calc(100%-32px)] h-px bg-border" />
+                  )}
+                  <div className={`relative z-10 flex size-8 items-center justify-center rounded-full ${color} ring-4 ${ring} text-white text-xs font-bold`}>
+                    {step}
                   </div>
-                  <div className="text-right">
-                    <div className="h-3 w-16 rounded bg-muted ml-auto" />
-                    <div className="h-2 w-20 rounded bg-muted mt-2 ml-auto" />
-                  </div>
+                  <p className="mt-3 text-sm font-medium">{label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-[150px] leading-relaxed">{sub}</p>
                 </div>
-                <div className="h-px bg-border" />
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <div className="h-2 w-32 rounded bg-muted" />
-                    <div className="h-2 w-14 rounded bg-muted" />
-                  </div>
-                  <div className="flex justify-between">
-                    <div className="h-2 w-28 rounded bg-muted" />
-                    <div className="h-2 w-14 rounded bg-muted" />
-                  </div>
-                  <div className="flex justify-between">
-                    <div className="h-2 w-36 rounded bg-muted" />
-                    <div className="h-2 w-14 rounded bg-muted" />
-                  </div>
-                </div>
-                <div className="h-px bg-border" />
-                <div className="flex justify-between">
-                  <div className="h-3 w-12 rounded bg-muted" />
-                  <div className="h-3 w-16 rounded bg-emerald-200 dark:bg-emerald-900/40" />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
-        </Section>
+
+          {/* CTA */}
+          <div className="text-center">
+            <h2 className="text-lg font-semibold tracking-tight">Start getting paid</h2>
+            <p className="mt-1.5 text-sm text-muted-foreground">Create your first invoice to begin tracking revenue.</p>
+            <Button
+              onClick={() => openDrawer("invoice")}
+              size="lg"
+              className="mt-5 bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Invoice
+            </Button>
+          </div>
+
+          {/* Preview stat cards (empty) */}
+          <div className="w-full max-w-lg grid grid-cols-3 gap-3 opacity-40">
+            {[
+              { label: "Outstanding", value: "$0.00" },
+              { label: "Overdue", value: "$0.00" },
+              { label: "Paid this month", value: "$0.00" },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-lg border border-dashed p-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                <p className="mt-1 text-sm font-mono font-medium text-muted-foreground">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </BlurReveal>
     );
   }
@@ -251,8 +359,25 @@ export default function InvoicesPage() {
               </div>
             </div>
           )}
+        </div>
+      </Section>
 
-          <div className="flex justify-end">
+      <div className="h-px bg-border" />
+
+      <Section title="Invoices" description="View, filter, and manage all your invoices.">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="draft">Draft</TabsTrigger>
+                <TabsTrigger value="sent">Sent</TabsTrigger>
+                <TabsTrigger value="partial">Partial</TabsTrigger>
+                <TabsTrigger value="paid">Paid</TabsTrigger>
+                <TabsTrigger value="overdue">Overdue</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <Button
               onClick={() => openDrawer("invoice")}
               size="sm"
@@ -262,32 +387,116 @@ export default function InvoicesPage() {
               New Invoice
             </Button>
           </div>
-        </div>
-      </Section>
 
-      <div className="h-px bg-border" />
-
-      <Section title="Invoices" description="View, filter, and manage all your invoices.">
-        <div className="space-y-4">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="draft">Draft</TabsTrigger>
-              <TabsTrigger value="sent">Sent</TabsTrigger>
-              <TabsTrigger value="paid">Paid</TabsTrigger>
-              <TabsTrigger value="overdue">Overdue</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">From</span>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">To</span>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+            </div>
+            <Select
+              value={`${sortBy}:${sortOrder}`}
+              onValueChange={(v) => {
+                const [key, order] = v.split(":");
+                setSortBy(key);
+                setSortOrder(order as "asc" | "desc");
+              }}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created:desc">Newest first</SelectItem>
+                <SelectItem value="created:asc">Oldest first</SelectItem>
+                <SelectItem value="due:asc">Due soonest</SelectItem>
+                <SelectItem value="due:desc">Due latest</SelectItem>
+                <SelectItem value="total:desc">Highest amount</SelectItem>
+                <SelectItem value="total:asc">Lowest amount</SelectItem>
+                <SelectItem value="amountDue:desc">Highest balance</SelectItem>
+                <SelectItem value="number:desc">Number (desc)</SelectItem>
+                <SelectItem value="number:asc">Number (asc)</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+              >
+                <X className="mr-1 size-3" />
+                Clear dates
+              </Button>
+            )}
+          </div>
 
           <DataTable
-              columns={columns}
-              data={invoices}
-              loading={loading}
-              emptyMessage="No invoices found."
-              onRowClick={(r) => router.push(`/sales/${r.id}`)}
-            />
+            columns={columns}
+            data={invoices}
+            loading={loading}
+            emptyMessage="No invoices match your filters."
+            onRowClick={(r) => router.push(`/sales/${r.id}`)}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+          />
         </div>
       </Section>
+
+      {/* Recent Payments */}
+      {payments.length > 0 && (
+        <>
+          <div className="h-px bg-border" />
+
+          <Section title="Recent Payments" description="Latest payments received against your invoices.">
+            <div className="rounded-lg border">
+              {payments.map((p, i) => (
+                <div
+                  key={p.id}
+                  className={`flex items-center justify-between px-4 py-3 ${i < payments.length - 1 ? "border-b" : ""}`}
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
+                      <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono">{p.paymentNumber}</span>
+                        <span className="text-xs text-muted-foreground">{p.contact?.name || "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted-foreground">{p.date}</span>
+                        <span className="text-xs text-muted-foreground">{methodLabels[p.method] || p.method}</span>
+                        {p.allocations?.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            · {p.allocations.length} invoice{p.allocations.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-sm font-mono font-medium text-emerald-600 shrink-0">
+                    {formatMoney(p.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
     </BlurReveal>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine } from "@/lib/db/schema";
+import { invoice, invoiceLine, paymentAllocation } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -30,7 +30,27 @@ export async function GET(
     });
 
     if (!found) return notFound("Invoice");
-    return NextResponse.json({ invoice: found });
+
+    // Fetch payments allocated to this invoice
+    const allocations = await db.query.paymentAllocation.findMany({
+      where: and(
+        eq(paymentAllocation.documentType, "invoice"),
+        eq(paymentAllocation.documentId, id)
+      ),
+      with: { payment: true },
+    });
+
+    const payments = allocations
+      .filter((a) => a.payment)
+      .map((a) => ({
+        id: a.payment.id,
+        paymentNumber: a.payment.paymentNumber,
+        date: a.payment.date,
+        amount: a.amount,
+        method: a.payment.method,
+      }));
+
+    return NextResponse.json({ invoice: found, payments });
   } catch (err) {
     return handleError(err);
   }

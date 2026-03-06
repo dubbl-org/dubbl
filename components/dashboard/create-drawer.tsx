@@ -15,6 +15,8 @@ import {
   Target,
   Trash2,
   Plus,
+  CreditCard,
+  RefreshCw,
 } from "lucide-react";
 import {
   Sheet,
@@ -42,7 +44,7 @@ import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -78,6 +80,8 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <FixedAssetDrawer open={activeType === "fixedAsset"} onClose={close} />
       <BudgetDrawer open={activeType === "budget"} onClose={close} />
       <EmployeeDrawer open={activeType === "employee"} onClose={close} />
+      <CreditNoteDrawer open={activeType === "creditNote"} onClose={close} />
+      <RecurringDrawer open={activeType === "recurring"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -1888,6 +1892,266 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Add Employee" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Credit Note Drawer
+// ---------------------------------------------------------------------------
+function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<LineItem[]>([
+    { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setContactId(""); setReference(""); setNotes("");
+      setIssueDate(new Date().toISOString().split("T")[0]);
+      setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a customer"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/credit-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId, issueDate,
+          reference: reference || null,
+          notes: notes || null,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create credit note");
+      }
+      const data = await res.json();
+      toast.success("Credit note created");
+      onClose();
+      router.push(`/sales/credit-notes/${data.creditNote.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create credit note");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><CreditCard className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Credit Note</SheetTitle>
+              <SheetDescription>Issue a credit note to reduce a customer's balance.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Credit Note Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Customer *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Original invoice, etc." />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Reason for credit..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Credit Note" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recurring Template Drawer
+// ---------------------------------------------------------------------------
+function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
+  const [contactId, setContactId] = useState("");
+  const [frequency, setFrequency] = useState("monthly");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState("");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<LineItem[]>([
+    { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setName(""); setContactId(""); setFrequency("monthly"); setReference(""); setNotes(""); setEndDate("");
+      setStartDate(new Date().toISOString().split("T")[0]);
+      setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a customer"); return; }
+    if (!name.trim()) { toast.error("Please enter a template name"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/recurring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name, type: "invoice", contactId, frequency, startDate,
+          endDate: endDate || null,
+          reference: reference || null,
+          notes: notes || null,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create recurring template");
+      }
+      toast.success("Recurring template created");
+      onClose();
+      router.push("/sales/recurring");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create template");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><RefreshCw className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Recurring Invoice</SheetTitle>
+              <SheetDescription>Set up a template to automatically generate invoices.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            <div className="space-y-4">
+              <SectionLabel>Template Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Template Name *</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Monthly Retainer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Customer *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Frequency</Label>
+                  <Select value={frequency} onValueChange={setFrequency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="fortnightly">Fortnightly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optional reference" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date (optional)</Label>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="No end date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for generated invoices..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Template" />
         </form>
       </SheetContent>
     </Sheet>

@@ -57,6 +57,10 @@ const LABELS: Record<string, string> = {
   "budget-vs-actual": "Budget vs Actual",
   general: "General",
   time: "Time Tracking",
+  // Sales subtabs
+  "credit-notes": "Credit Notes",
+  recurring: "Recurring",
+  payments: "Payments",
   // Project subtabs
   tasks: "Tasks",
   milestones: "Milestones",

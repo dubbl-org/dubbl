@@ -6,8 +6,6 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { createCreditNoteJournalEntry } from "@/lib/api/journal-automation";
-import { assertNotLocked } from "@/lib/api/period-lock";
 
 export async function POST(
   request: Request,
@@ -24,7 +22,6 @@ export async function POST(
         eq(creditNote.organizationId, ctx.organizationId),
         notDeleted(creditNote.deletedAt)
       ),
-      with: { lines: true },
     });
 
     if (!found) return notFound("Credit note");
@@ -35,31 +32,11 @@ export async function POST(
       );
     }
 
-    await assertNotLocked(ctx.organizationId, found.issueDate);
-
-    // Create journal entry
-    const entry = await createCreditNoteJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        creditNoteNumber: found.creditNoteNumber,
-        total: found.total,
-        taxTotal: found.taxTotal,
-        lines: found.lines.map((l) => ({
-          accountId: l.accountId,
-          amount: l.amount,
-          taxAmount: l.taxAmount,
-        })),
-        date: found.issueDate,
-      }
-    );
-
     const [updated] = await db
       .update(creditNote)
       .set({
         status: "sent",
         sentAt: new Date(),
-        amountRemaining: found.total,
-        journalEntryId: entry?.id || null,
         updatedAt: new Date(),
       })
       .where(eq(creditNote.id, id))

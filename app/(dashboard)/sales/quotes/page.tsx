@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, ScrollText, ArrowRightLeft } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,22 +114,100 @@ export default function QuotesPage() {
 
   if (!loading && quotes.length === 0 && statusFilter === "all") {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Quotes" description="Create and send quotes to your customers. Track acceptances and conversions.">
-          <EmptyState
-            icon={FileText}
-            title="No quotes yet"
-            description="Create your first quote to send to customers."
-          >
-            <Button
-              onClick={() => openDrawer("quote")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Quote
-            </Button>
-          </EmptyState>
-        </Section>
+      <BlurReveal>
+        <div className="flex items-start pt-16 pb-12">
+          <div className="grid w-full gap-10 lg:grid-cols-2 lg:gap-16 items-center">
+            {/* Left: text + CTA */}
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                <ScrollText className="size-3.5 text-purple-500" />
+                Quotes &amp; Proposals
+              </div>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight">Send quotes, win deals</h2>
+              <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-md">
+                Create detailed proposals with line items and pricing. When your customer accepts, convert it to an invoice with one click.
+              </p>
+              <div className="mt-6 flex items-center gap-3">
+                <Button
+                  onClick={() => openDrawer("quote")}
+                  size="lg"
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  New Quote
+                </Button>
+              </div>
+              {/* Mini stats */}
+              <div className="mt-8 flex gap-6 text-center">
+                {[
+                  { label: "Sent", value: "0" },
+                  { label: "Accepted", value: "0" },
+                  { label: "Converted", value: "0" },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <p className="text-xl font-bold font-mono tabular-nums text-muted-foreground/40">{value}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: visual conversion flow */}
+            <div className="relative hidden lg:block">
+              {/* Quote card */}
+              <div className="rounded-xl border bg-card p-5 shadow-sm max-w-xs ml-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <ScrollText className="size-4 text-purple-500" />
+                    <span className="text-xs font-mono text-muted-foreground">QTE-0001</span>
+                  </div>
+                  <span className="rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400">accepted</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Website redesign</span>
+                    <span className="font-mono text-muted-foreground">$2,400.00</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">SEO audit</span>
+                    <span className="font-mono text-muted-foreground">$800.00</span>
+                  </div>
+                  <div className="h-px bg-border my-1" />
+                  <div className="flex justify-between text-xs font-medium">
+                    <span>Total</span>
+                    <span className="font-mono">$3,200.00</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Arrow */}
+              <div className="flex justify-center my-3">
+                <div className="flex flex-col items-center gap-1 text-muted-foreground/40">
+                  <div className="h-4 w-px bg-current" />
+                  <ArrowRightLeft className="size-4 rotate-90" />
+                  <span className="text-[10px] font-medium">Convert</span>
+                </div>
+              </div>
+
+              {/* Invoice card (faded) */}
+              <div className="rounded-xl border border-dashed bg-card/50 p-5 max-w-xs ml-auto opacity-50">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="size-4 text-blue-500" />
+                    <span className="text-xs font-mono text-muted-foreground">INV-0001</span>
+                  </div>
+                  <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">draft</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-2 w-28 rounded bg-muted" />
+                  <div className="h-2 w-20 rounded bg-muted" />
+                  <div className="h-px bg-border my-1" />
+                  <div className="h-2.5 w-24 rounded bg-muted ml-auto" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </BlurReveal>
     );
   }

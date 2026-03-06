@@ -11,12 +11,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FileText } from "lucide-react";
+import { FileText, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 export interface Column<T> {
   key: string;
   header: string;
   className?: string;
+  sortKey?: string;
   render: (row: T) => React.ReactNode;
 }
 
@@ -27,6 +28,9 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   emptyAction?: { label: string; onClick: () => void };
   onRowClick?: (row: T) => void;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  onSort?: (key: string) => void;
 }
 
 export function DataTable<T>({
@@ -36,8 +40,35 @@ export function DataTable<T>({
   emptyMessage = "No data found.",
   emptyAction,
   onRowClick,
+  sortBy,
+  sortOrder,
+  onSort,
 }: DataTableProps<T>) {
   const skeletonWidths = ["w-24", "w-32", "w-20", "w-28", "w-16"];
+
+  function renderHeader(col: Column<T>) {
+    if (col.sortKey && onSort) {
+      const isActive = sortBy === col.sortKey;
+      return (
+        <button
+          onClick={() => onSort(col.sortKey!)}
+          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          {col.header}
+          {isActive ? (
+            sortOrder === "asc" ? (
+              <ArrowUp className="size-3" />
+            ) : (
+              <ArrowDown className="size-3" />
+            )
+          ) : (
+            <ArrowUpDown className="size-3 opacity-40" />
+          )}
+        </button>
+      );
+    }
+    return col.header;
+  }
 
   if (loading) {
     return (
@@ -75,7 +106,7 @@ export function DataTable<T>({
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             {columns.map((col) => (
               <TableHead key={col.key} className={cn("h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground", col.className)}>
-                {col.header}
+                {renderHeader(col)}
               </TableHead>
             ))}
           </TableRow>

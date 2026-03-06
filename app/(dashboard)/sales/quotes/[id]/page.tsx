@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
+import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import Link from "next/link";
 
 interface QuoteDetail {
@@ -27,6 +28,7 @@ export default function QuoteDetailPage() {
   const router = useRouter();
   const [q, setQ] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  useEntityTitle(q?.quoteNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEffect(() => {
