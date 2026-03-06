@@ -401,15 +401,15 @@ function ProblemSection() {
 
 /* --- View 0: Animated Marquee Rows --- */
 const marqueeConfig: { size: "lg" | "md" | "sm"; pills: string[] }[] = [
-  { size: "lg", pills: ["Invoice #2847 — $12,580 sent", "P&L report generated ✓", "Bank feed connected", "Expense claim approved", "Tax return ready ✓"] },
+  { size: "lg", pills: ["Invoice #2847 — $12,580 sent", "P&L report generated ✓", "Statement imported", "Expense claim approved", "Tax return ready ✓"] },
   { size: "sm", pills: ["Categorized", "Sent", "Paid", "Filed", "Logged", "Synced", "Approved", "Imported", "Auto-tagged", "Booked", "Invoiced", "Tracked"] },
-  { size: "md", pills: ["Stripe → Bank feed", "Chase auto-synced", "Bill from AWS — $3,240", "Receipt: $340 office", "PayPal connected", "Shopify → Revenue", "Mercury linked", "Plaid import"] },
+  { size: "md", pills: ["Stripe payout imported", "Chase CSV parsed", "Bill from AWS — $3,240", "Receipt: $340 office", "PayPal export loaded", "Shopify → Revenue", "Mercury statement", "QFX import"] },
   { size: "lg", pills: ["$45,000 payment received ✓", "Balance sheet updated", "Multi-currency enabled", "Payroll processed ✓", "Cash flow forecast ready"] },
   { size: "sm", pills: ["Reconciled", "Updated", "Matched", "Sorted", "Verified", "Closed", "Exported", "Synced", "Tagged", "Archived", "Settled", "Reviewed"] },
   { size: "md", pills: ["Invoice to Acme Corp", "Bill: $1,200 rent", "Expense: $89 SaaS", "Credit note issued", "Recurring invoice set", "Vendor payment sent", "Client deposit logged", "Journal entry posted"] },
-  { size: "lg", pills: ["Year-end close complete ✓", "Auto-categorized $174,900", "GST auto-calculated", "Client portal live ✓", "Real-time bank feeds"] },
+  { size: "lg", pills: ["Year-end close complete ✓", "Auto-categorized $174,900", "GST auto-calculated", "Client portal live ✓", "Global statement imports"] },
   { size: "sm", pills: ["Booked", "Paid", "Sent", "Filed", "Logged", "Tagged", "Approved", "Synced", "Tracked", "Closed", "Imported", "Done"] },
-  { size: "md", pills: ["BofA → Auto-reconciled", "Amex feed active", "Gusto payroll synced", "Wise multi-currency", "Brex → Categorized", "Capital One linked", "US Bank connected", "Regions import"] },
+  { size: "md", pills: ["BofA → Auto-reconciled", "Amex QFX loaded", "Gusto payroll synced", "Wise multi-currency", "Brex → Categorized", "Capital One OFX", "US Bank CSV", "Regions import"] },
 ];
 
 const marqueeSizeClasses = {
@@ -766,7 +766,7 @@ function SolutionSection() {
                 </span>
               </h2>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-emerald-100">
-                dubbl brings invoicing, expenses, bank feeds, and reporting
+                dubbl brings invoicing, expenses, statement imports, and reporting
                 into one place. Automated bookkeeping that keeps your
                 finances organized and tax-ready.
               </p>

@@ -7,6 +7,7 @@ import {
   boolean,
   date,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization } from "./auth";
@@ -32,6 +33,37 @@ export const bankRuleMatchEnum = pgEnum("bank_rule_match", [
   "ends_with",
 ]);
 
+export const bankAccountTypeEnum = pgEnum("bank_account_type", [
+  "checking",
+  "savings",
+  "credit_card",
+  "cash",
+  "loan",
+  "investment",
+  "other",
+]);
+
+export const bankImportStatusEnum = pgEnum("bank_import_status", [
+  "completed",
+  "partial",
+  "failed",
+]);
+
+export const bankImportFormatEnum = pgEnum("bank_import_format", [
+  "csv",
+  "tsv",
+  "qif",
+  "ofx",
+  "qfx",
+  "qbo",
+  "camt052",
+  "camt053",
+  "camt054",
+  "mt940",
+  "mt942",
+  "bai2",
+]);
+
 // Bank Account
 export const bankAccount = pgTable("bank_account", {
   id: uuid("id")
@@ -44,11 +76,61 @@ export const bankAccount = pgTable("bank_account", {
   accountNumber: text("account_number"),
   bankName: text("bank_name"),
   currencyCode: text("currency_code").notNull().default("USD"),
+  countryCode: text("country_code"),
+  accountType: bankAccountTypeEnum("account_type").notNull().default("checking"),
+  color: text("color").notNull().default("#0f766e"),
   chartAccountId: uuid("chart_account_id").references(() => chartAccount.id),
   balance: integer("balance").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+export const bankImportProfile = pgTable("bank_import_profile", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  bankAccountId: uuid("bank_account_id")
+    .notNull()
+    .references(() => bankAccount.id, { onDelete: "cascade" }),
+  dateFormat: text("date_format"),
+  decimalSeparator: text("decimal_separator").notNull().default("."),
+  thousandSeparator: text("thousand_separator").notNull().default(","),
+  timezone: text("timezone").notNull().default("UTC"),
+  debitIsNegative: boolean("debit_is_negative").notNull().default(true),
+  encoding: text("encoding").notNull().default("utf-8"),
+  csvDelimiter: text("csv_delimiter"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const bankStatementImport = pgTable("bank_statement_import", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  bankAccountId: uuid("bank_account_id")
+    .notNull()
+    .references(() => bankAccount.id, { onDelete: "cascade" }),
+  format: bankImportFormatEnum("format").notNull(),
+  fileName: text("file_name").notNull(),
+  contentHash: text("content_hash").notNull(),
+  detectedEncoding: text("detected_encoding").notNull().default("utf-8"),
+  status: bankImportStatusEnum("status").notNull().default("completed"),
+  accountIdentifier: text("account_identifier"),
+  statementCurrency: text("statement_currency"),
+  statementStartDate: date("statement_start_date"),
+  statementEndDate: date("statement_end_date"),
+  openingBalance: integer("opening_balance"),
+  closingBalance: integer("closing_balance"),
+  importedCount: integer("imported_count").notNull().default(0),
+  duplicateCount: integer("duplicate_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  warnings: jsonb("warnings").$type<string[]>().notNull().default([]),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // Bank Transaction
@@ -67,6 +149,17 @@ export const bankTransaction = pgTable("bank_transaction", {
   status: bankTransactionStatusEnum("status").notNull().default("unreconciled"),
   reconciliationId: uuid("reconciliation_id").references(() => bankReconciliation.id),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
+  importId: uuid("import_id").references(() => bankStatementImport.id),
+  sourceType: text("source_type").notNull().default("statement_import"),
+  externalTransactionId: text("external_transaction_id"),
+  statementLineRef: text("statement_line_ref"),
+  payee: text("payee"),
+  counterparty: text("counterparty"),
+  currencyCode: text("currency_code"),
+  postedDate: date("posted_date"),
+  pending: boolean("pending").notNull().default(false),
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>(),
+  dedupeHash: text("dedupe_hash"),
   // Auto-categorization fields (set by bank rules or manual)
   accountId: uuid("account_id").references(() => chartAccount.id),
   contactId: uuid("contact_id").references(() => contact.id),
@@ -124,6 +217,8 @@ export const bankAccountRelations = relations(bankAccount, ({ one, many }) => ({
   }),
   transactions: many(bankTransaction),
   reconciliations: many(bankReconciliation),
+  imports: many(bankStatementImport),
+  importProfiles: many(bankImportProfile),
 }));
 
 export const bankTransactionRelations = relations(bankTransaction, ({ one }) => ({
@@ -138,6 +233,10 @@ export const bankTransactionRelations = relations(bankTransaction, ({ one }) => 
   journalEntry: one(journalEntry, {
     fields: [bankTransaction.journalEntryId],
     references: [journalEntry.id],
+  }),
+  import: one(bankStatementImport, {
+    fields: [bankTransaction.importId],
+    references: [bankStatementImport.id],
   }),
   account: one(chartAccount, {
     fields: [bankTransaction.accountId],
@@ -156,6 +255,25 @@ export const bankTransactionRelations = relations(bankTransaction, ({ one }) => 
 export const bankReconciliationRelations = relations(bankReconciliation, ({ one, many }) => ({
   bankAccount: one(bankAccount, {
     fields: [bankReconciliation.bankAccountId],
+    references: [bankAccount.id],
+  }),
+  transactions: many(bankTransaction),
+}));
+
+export const bankImportProfileRelations = relations(bankImportProfile, ({ one }) => ({
+  bankAccount: one(bankAccount, {
+    fields: [bankImportProfile.bankAccountId],
+    references: [bankAccount.id],
+  }),
+}));
+
+export const bankStatementImportRelations = relations(bankStatementImport, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [bankStatementImport.organizationId],
+    references: [organization.id],
+  }),
+  bankAccount: one(bankAccount, {
+    fields: [bankStatementImport.bankAccountId],
     references: [bankAccount.id],
   }),
   transactions: many(bankTransaction),

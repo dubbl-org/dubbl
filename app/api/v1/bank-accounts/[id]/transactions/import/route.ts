@@ -1,12 +1,53 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankAccount, bankTransaction } from "@/lib/db/schema";
+import { bankAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { parseBankCSV } from "@/lib/banking/csv-parser";
+import {
+  commitBankStatementImport,
+  previewBankStatementImport,
+} from "@/lib/banking/importer";
+import { z } from "zod";
+
+const importSchema = z.object({
+  mode: z.enum(["preview", "commit"]).default("commit"),
+  fileName: z.string().nullable().optional(),
+  content: z.string().min(1).optional(),
+  format: z
+    .enum([
+      "csv",
+      "tsv",
+      "qif",
+      "ofx",
+      "qfx",
+      "qbo",
+      "camt052",
+      "camt053",
+      "camt054",
+      "mt940",
+      "mt942",
+      "bai2",
+    ])
+    .nullable()
+    .optional(),
+  csv: z.string().optional(),
+  mapping: z
+    .object({
+      date: z.string().optional(),
+      description: z.string().optional(),
+      amount: z.string().optional(),
+      debit: z.string().optional(),
+      credit: z.string().optional(),
+      balance: z.string().optional(),
+      reference: z.string().optional(),
+      payee: z.string().optional(),
+      counterparty: z.string().optional(),
+    })
+    .optional(),
+});
 
 export async function POST(
   request: Request,
@@ -28,55 +69,31 @@ export async function POST(
 
     if (!account) return notFound("Bank account");
 
-    const body = await request.json();
-    const csvText = body.csv;
+    const body = importSchema.parse(await request.json());
+    const content = body.content || body.csv;
 
-    if (!csvText || typeof csvText !== "string") {
-      return validationError("CSV data is required");
+    if (!content) {
+      return validationError("Statement content is required");
     }
 
-    let parsed;
-    try {
-      parsed = parseBankCSV(csvText);
-    } catch (err) {
-      return validationError(
-        err instanceof Error ? err.message : "Failed to parse CSV"
-      );
+    if (body.mode === "preview") {
+      const preview = await previewBankStatementImport(id, {
+        fileName: body.fileName,
+        content,
+        format: body.format,
+        mapping: body.mapping,
+      });
+      return NextResponse.json({ preview });
     }
 
-    if (parsed.length === 0) {
-      return validationError("No transactions found in CSV");
-    }
-
-    // Calculate running balance
-    let runningBalance = account.balance;
-    const rows = parsed.map((tx) => {
-      runningBalance += tx.amount;
-      return {
-        bankAccountId: id,
-        date: tx.date,
-        description: tx.description,
-        reference: tx.reference || null,
-        amount: tx.amount,
-        balance: runningBalance,
-      };
+    const result = await commitBankStatementImport(ctx.organizationId, id, {
+      fileName: body.fileName,
+      content,
+      format: body.format,
+      mapping: body.mapping,
     });
 
-    const inserted = await db
-      .insert(bankTransaction)
-      .values(rows)
-      .returning();
-
-    // Update account balance
-    await db
-      .update(bankAccount)
-      .set({ balance: runningBalance })
-      .where(eq(bankAccount.id, id));
-
-    return NextResponse.json(
-      { imported: inserted.length, transactions: inserted },
-      { status: 201 }
-    );
+    return NextResponse.json({ import: result }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }

@@ -13,6 +13,11 @@ const createSchema = z.object({
   accountNumber: z.string().nullable().optional(),
   bankName: z.string().nullable().optional(),
   currencyCode: z.string().default("USD"),
+  countryCode: z.string().length(2).nullable().optional(),
+  accountType: z
+    .enum(["checking", "savings", "credit_card", "cash", "loan", "investment", "other"])
+    .default("checking"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0f766e"),
   chartAccountId: z.string().nullable().optional(),
   balance: z.number().int().default(0),
 });
@@ -52,6 +57,9 @@ export async function POST(request: Request) {
         accountNumber: parsed.accountNumber || null,
         bankName: parsed.bankName || null,
         currencyCode: parsed.currencyCode,
+        countryCode: parsed.countryCode || null,
+        accountType: parsed.accountType,
+        color: parsed.color,
         chartAccountId: parsed.chartAccountId || null,
         balance: parsed.balance,
       })

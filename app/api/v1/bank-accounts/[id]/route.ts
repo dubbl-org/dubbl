@@ -13,6 +13,11 @@ const updateSchema = z.object({
   accountNumber: z.string().nullable().optional(),
   bankName: z.string().nullable().optional(),
   currencyCode: z.string().optional(),
+  countryCode: z.string().length(2).nullable().optional(),
+  accountType: z
+    .enum(["checking", "savings", "credit_card", "cash", "loan", "investment", "other"])
+    .optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   chartAccountId: z.string().nullable().optional(),
   balance: z.number().int().optional(),
   isActive: z.boolean().optional(),

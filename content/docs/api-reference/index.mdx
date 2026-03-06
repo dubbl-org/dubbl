@@ -135,7 +135,9 @@ Error responses:
 | GET | `/api/v1/bank-accounts` | List bank accounts |
 | POST | `/api/v1/bank-accounts` | Create bank account |
 | GET | `/api/v1/bank-accounts/:id/transactions` | List transactions |
-| POST | `/api/v1/bank-accounts/:id/transactions/import` | Import CSV |
+| GET | `/api/v1/bank-accounts/:id/imports` | List statement imports |
+| POST | `/api/v1/bank-accounts/:id/transactions/import` | Preview or import a statement file |
+| GET | `/api/v1/bank-imports/:id` | Get statement import details |
 | POST | `/api/v1/bank-transactions/:id/reconcile` | Reconcile |
 | POST | `/api/v1/bank-transactions/:id/exclude` | Exclude |
 
