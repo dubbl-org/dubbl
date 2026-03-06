@@ -248,7 +248,9 @@ export default function InvoiceDetailPage() {
   if (!inv) return <div className="space-y-6"><PageHeader title="Invoice not found" /></div>;
 
   const overdueInfo = getOverdueInfo(inv.dueDate, inv.status);
-  const paidPercent = inv.total > 0 ? Math.min(100, Math.round((inv.amountPaid / inv.total) * 100)) : 0;
+  const paidPercent = inv.total > 0
+    ? Math.min(100, Math.round((inv.amountPaid / inv.total) * 100))
+    : inv.amountPaid > 0 ? 100 : 0;
   const sc = statusConfig[inv.status] || statusConfig.draft;
 
   return (
