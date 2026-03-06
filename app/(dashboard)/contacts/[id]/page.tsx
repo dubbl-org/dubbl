@@ -32,6 +32,7 @@ import { BlurReveal } from "@/components/ui/blur-reveal";
 import { centsToDecimal, decimalToCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 interface ContactPerson {
   id: string;
@@ -91,6 +92,7 @@ const TABS = [
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -226,20 +228,22 @@ export default function ContactDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this contact?")) return;
-    const orgId = getOrgId();
-    if (!orgId) return;
-    setDeleting(true);
-    try {
-      await fetch(`/api/v1/contacts/${id}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": orgId },
-      });
-      toast.success("Contact deleted");
-      router.push("/contacts");
-    } finally {
-      setDeleting(false);
-    }
+    await confirm({
+      title: "Delete this contact?",
+      description: "This contact and all associated data will be permanently deleted.",
+      confirmLabel: "Delete",
+      destructive: true,
+      onConfirm: async () => {
+        const orgId = getOrgId();
+        if (!orgId) return;
+        await fetch(`/api/v1/contacts/${id}`, {
+          method: "DELETE",
+          headers: { "x-organization-id": orgId },
+        });
+        toast.success("Contact deleted");
+        router.push("/contacts");
+      },
+    });
   }
 
   async function handleAddPerson(e: React.FormEvent) {
@@ -743,6 +747,7 @@ export default function ContactDetailPage() {
           </div>
         )}
       </BlurReveal>
+      {confirmDialog}
     </div>
   );
 }

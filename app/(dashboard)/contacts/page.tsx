@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users, Search, Loader2 } from "lucide-react";
+import { Plus, Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,13 @@ import { motion, MotionConfig } from "motion/react";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useConfirm } from "@/lib/hooks/use-confirm";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Contact {
   id: string;
@@ -36,104 +44,139 @@ const typeBadgeClass: Record<Contact["type"], string> = {
   both: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
 };
 
-const columns: Column<Contact>[] = [
-  {
-    key: "name",
-    header: "Name",
-    render: (r) => (
-      <div className="min-w-0">
-        <p className="text-sm font-medium truncate">{r.name}</p>
-        {r.email && (
-          <p className="text-xs text-muted-foreground truncate">{r.email}</p>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: "type",
-    header: "Type",
-    className: "w-28",
-    render: (r) => (
-      <Badge variant="outline" className={typeBadgeClass[r.type]}>
-        {r.type}
-      </Badge>
-    ),
-  },
-  {
-    key: "phone",
-    header: "Phone",
-    className: "w-36",
-    render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.phone || "-"}</span>
-    ),
-  },
-  {
-    key: "terms",
-    header: "Payment Terms",
-    className: "w-36",
-    render: (r) => (
-      <span className="text-sm text-muted-foreground">
-        {r.paymentTermsDays === 0 ? "Due on receipt" : `Net ${r.paymentTermsDays}`}
-      </span>
-    ),
-  },
-  {
-    key: "creditLimit",
-    header: "Credit Limit",
-    className: "w-32 text-right",
-    render: (r) => (
-      <span className="text-sm tabular-nums text-muted-foreground">
-        {r.creditLimit != null
-          ? formatMoney(r.creditLimit, r.currencyCode || "USD")
-          : "No limit"}
-      </span>
-    ),
-  },
-  {
-    key: "taxExempt",
-    header: "Tax Exempt",
-    className: "w-28 text-center",
-    render: (r) =>
-      r.isTaxExempt ? (
-        <Badge
-          variant="outline"
-          className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-        >
-          Exempt
-        </Badge>
-      ) : (
-        <span className="text-sm text-muted-foreground">-</span>
+function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => void): Column<Contact>[] {
+  return [
+    {
+      key: "name",
+      header: "Name",
+      render: (r) => (
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{r.name}</p>
+          {r.email && (
+            <p className="text-xs text-muted-foreground truncate">{r.email}</p>
+          )}
+        </div>
       ),
-  },
-  {
-    key: "currency",
-    header: "Currency",
-    className: "w-24 text-center",
-    render: (r) => (
-      <span className="text-xs font-medium text-muted-foreground">
-        {r.currencyCode || "-"}
-      </span>
-    ),
-  },
-  {
-    key: "createdAt",
-    header: "Created",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="text-sm tabular-nums text-muted-foreground">
-        {new Date(r.createdAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
-      </span>
-    ),
-  },
-];
+    },
+    {
+      key: "type",
+      header: "Type",
+      className: "w-28",
+      render: (r) => (
+        <Badge variant="outline" className={typeBadgeClass[r.type]}>
+          {r.type}
+        </Badge>
+      ),
+    },
+    {
+      key: "phone",
+      header: "Phone",
+      className: "w-36",
+      render: (r) => (
+        <span className="text-sm text-muted-foreground">{r.phone || "-"}</span>
+      ),
+    },
+    {
+      key: "terms",
+      header: "Payment Terms",
+      className: "w-36",
+      render: (r) => (
+        <span className="text-sm text-muted-foreground">
+          {r.paymentTermsDays === 0 ? "Due on receipt" : `Net ${r.paymentTermsDays}`}
+        </span>
+      ),
+    },
+    {
+      key: "creditLimit",
+      header: "Credit Limit",
+      className: "w-32 text-right",
+      render: (r) => (
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {r.creditLimit != null
+            ? formatMoney(r.creditLimit, r.currencyCode || "USD")
+            : "No limit"}
+        </span>
+      ),
+    },
+    {
+      key: "taxExempt",
+      header: "Tax Exempt",
+      className: "w-28 text-center",
+      render: (r) =>
+        r.isTaxExempt ? (
+          <Badge
+            variant="outline"
+            className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+          >
+            Exempt
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        ),
+    },
+    {
+      key: "currency",
+      header: "Currency",
+      className: "w-24 text-center",
+      render: (r) => (
+        <span className="text-xs font-medium text-muted-foreground">
+          {r.currencyCode || "-"}
+        </span>
+      ),
+    },
+    {
+      key: "createdAt",
+      header: "Created",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {new Date(r.createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "w-10",
+      render: (r) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="size-7 p-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpen(r); }}>
+              <ExternalLink className="size-4" />
+              Open
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={(e) => { e.stopPropagation(); onDelete(r); }}
+            >
+              <Trash2 className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+}
 
 export default function ContactsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -224,6 +267,28 @@ export default function ContactsPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMore]);
+
+  async function handleDelete(c: Contact) {
+    await confirm({
+      title: `Delete "${c.name}"?`,
+      description: "This contact and all associated data will be permanently deleted.",
+      confirmLabel: "Delete",
+      destructive: true,
+      onConfirm: async () => {
+        const orgId = localStorage.getItem("activeOrgId");
+        if (!orgId) return;
+        await fetch(`/api/v1/contacts/${c.id}`, {
+          method: "DELETE",
+          headers: { "x-organization-id": orgId },
+        });
+        setContacts((prev) => prev.filter((x) => x.id !== c.id));
+        setTotal((t) => t - 1);
+        toast.success("Contact deleted");
+      },
+    });
+  }
+
+  const columns = buildColumns(handleDelete, (c) => router.push(`/contacts/${c.id}`));
 
   const customers = contacts.filter(
     (c) => c.type === "customer" || c.type === "both"
@@ -374,6 +439,7 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+      {confirmDialog}
     </BlurReveal>
   );
 }
