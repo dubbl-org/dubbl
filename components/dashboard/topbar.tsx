@@ -8,6 +8,7 @@ import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { usePathname } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -75,6 +76,7 @@ const CTA_MAP: Record<string, { label: string; drawer: "contact" | "project" | "
 export function Topbar() {
   const pathname = usePathname();
   const { open: openDrawer } = useCreateDrawer();
+  const entityTitle = useEntityTitle();
   const segments = pathname.split("/").filter(Boolean);
 
   // For group roots, show the default subtab in the breadcrumb
@@ -92,13 +94,18 @@ export function Topbar() {
   const isEntityDetail = segments.length >= 2 && segments[0] in LABELS && !(segments[1] in LABELS);
   let pageTitle: string;
   let parentLabel: string | null;
+  let parentHref: string | null = null;
 
   if (isEntityDetail) {
-    // e.g. /projects/[id] → "Projects" or /projects/[id]/time → "Projects / Time Tracking"
     parentLabel = LABELS[segments[0]] || segments[0];
-    const subTab = segments.length > 2 ? segments[segments.length - 1] : null;
-    pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[0]] || segments[0]);
-    if (!subTab) parentLabel = null; // Don't show "Projects / Projects"
+    parentHref = `/${segments[0]}`;
+    if (entityTitle) {
+      pageTitle = entityTitle;
+    } else {
+      const subTab = segments.length > 2 ? segments[segments.length - 1] : null;
+      pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[0]] || segments[0]);
+      if (!subTab) parentLabel = null;
+    }
   } else {
     pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
     parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
@@ -113,19 +120,25 @@ export function Topbar() {
   return (
     <header className="shrink-0">
       <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <Logo className="h-5 w-auto" />
             <span className="text-[14px] font-semibold tracking-tight">dubbl</span>
           </Link>
-          <div className="h-4 w-px bg-border" />
+          <div className="h-4 w-px bg-border shrink-0" />
           {parentLabel && effectiveSegments.length > 1 && (
             <>
-              <span className="text-[13px] text-muted-foreground">{parentLabel}</span>
-              <span className="text-muted-foreground/40">/</span>
+              {parentHref ? (
+                <Link href={parentHref} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                  {parentLabel}
+                </Link>
+              ) : (
+                <span className="text-[13px] text-muted-foreground shrink-0">{parentLabel}</span>
+              )}
+              <span className="text-muted-foreground/40 shrink-0">/</span>
             </>
           )}
-          <h1 className="text-[13px] text-muted-foreground">{pageTitle}</h1>
+          <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
