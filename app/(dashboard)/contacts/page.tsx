@@ -190,7 +190,6 @@ export default function ContactsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const [refetching, setRefetching] = useState(false);
-  const initialLoad = useRef(true);
   const [fetchKey, setFetchKey] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -208,9 +207,12 @@ export default function ContactsPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    if (!initialLoad.current) setRefetching(true);
+    let cancelled = false;
+    const isRefetch = !loading;
+
     setPage(1);
     setHasMore(true);
+    if (isRefetch) setRefetching(true);
 
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
@@ -225,6 +227,7 @@ export default function ContactsPage() {
     })
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.data) setContacts(data.data);
         if (data.pagination) {
           setTotal(data.pagination.total);
@@ -232,7 +235,10 @@ export default function ContactsPage() {
         }
       })
       .then(() => devDelay())
-      .finally(() => { setLoading(false); setRefetching(false); setFetchKey((k) => k + 1); initialLoad.current = false; });
+      .finally(() => { if (!cancelled) { setLoading(false); setRefetching(false); setFetchKey((k) => k + 1); } });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, typeFilter, sortBy, sortOrder]);
 
   // Load next page

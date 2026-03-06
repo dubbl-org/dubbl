@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -45,6 +45,14 @@ function AppleIcon({ className }: { className?: string }) {
 }
 
 export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInContent />
+    </Suspense>
+  );
+}
+
+function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";

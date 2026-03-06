@@ -21,66 +21,7 @@ import { cn } from "@/lib/utils";
 /*  Problem Cards — realistic mockup internals                                */
 /* -------------------------------------------------------------------------- */
 
-function SpreadsheetMockup() {
-  const rows = [
-    { a: "Q1 Revenue", b: "$142,500", c: "$138,200", highlight: false },
-    { a: "Q2 Revenue", b: "$156,800", c: "#REF!", highlight: true },
-    { a: "Q3 Revenue", b: "$—", c: "$161,400", highlight: false },
-    { a: "Q4 Revenue", b: "$178,300", c: "$174,900", highlight: false },
-  ];
 
-  return (
-    <div className="overflow-hidden rounded-lg border border-border bg-muted/40">
-      {/* Column headers */}
-      <div className="grid grid-cols-3 border-b border-border bg-muted/60 text-[10px] font-semibold text-muted-foreground">
-        <div className="border-r border-border px-3 py-1.5">Category</div>
-        <div className="border-r border-border px-3 py-1.5">Projected</div>
-        <div className="px-3 py-1.5">Actual</div>
-      </div>
-      {rows.map((row, i) => (
-        <div
-          key={i}
-          className={cn(
-            "grid grid-cols-3 text-[10px]",
-            i < rows.length - 1 && "border-b border-border"
-          )}
-        >
-          <div className="border-r border-border px-3 py-1.5 text-muted-foreground">
-            {row.a}
-          </div>
-          <div className="border-r border-border px-3 py-1.5 text-foreground">
-            {row.b === "$—" ? (
-              <span className="text-muted-foreground/50">$—</span>
-            ) : (
-              row.b
-            )}
-          </div>
-          <div
-            className={cn(
-              "px-3 py-1.5",
-              row.highlight
-                ? "bg-red-500/10 font-semibold text-red-600 dark:text-red-400"
-                : "text-foreground"
-            )}
-          >
-            {row.highlight ? (
-              <motion.span
-                className="inline-flex items-center gap-1"
-                animate={{ opacity: [1, 0.5, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <span className="inline-block size-1.5 rounded-full bg-red-500" />
-                {row.c}
-              </motion.span>
-            ) : (
-              row.c
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function BankTimelineMockup() {
   const events = [

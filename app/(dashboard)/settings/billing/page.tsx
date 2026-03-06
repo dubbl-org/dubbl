@@ -133,7 +133,7 @@ export default function BillingPage() {
         <div className="shrink-0">
           <p className="text-sm font-medium">Current plan</p>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Your organization's subscription and usage.
+            Your organization&apos;s subscription and usage.
           </p>
         </div>
         <div className="min-w-0">

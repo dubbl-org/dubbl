@@ -1967,7 +1967,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
             <DrawerIcon><CreditCard className="size-5" /></DrawerIcon>
             <div>
               <SheetTitle className="text-lg">New Credit Note</SheetTitle>
-              <SheetDescription>Issue a credit note to reduce a customer's balance.</SheetDescription>
+              <SheetDescription>Issue a credit note to reduce a customer&apos;s balance.</SheetDescription>
             </div>
           </div>
         </SheetHeader>

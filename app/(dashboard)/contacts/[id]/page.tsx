@@ -163,7 +163,7 @@ export default function ContactDetailPage() {
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [deleting] = useState(false);
   const [tab, setTab] = useState<string>("details");
 
   const [accounts, setAccounts] = useState<Account[]>([]);
