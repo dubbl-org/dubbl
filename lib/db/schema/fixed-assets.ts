@@ -1,13 +1,13 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   date,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization } from "./auth";
 import { chartAccount, journalEntry } from "./bookkeeping";
 
@@ -25,10 +25,10 @@ export const assetStatusEnum = pgEnum("asset_status", [
 
 // Fixed Asset
 export const fixedAsset = pgTable("fixed_asset", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  organizationId: text("organization_id")
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -45,11 +45,11 @@ export const fixedAsset = pgTable("fixed_asset", {
     .notNull()
     .default(0), // cents
   netBookValue: integer("net_book_value").notNull(), // cents
-  assetAccountId: text("asset_account_id").references(() => chartAccount.id),
-  depreciationAccountId: text("depreciation_account_id").references(
+  assetAccountId: uuid("asset_account_id").references(() => chartAccount.id),
+  depreciationAccountId: uuid("depreciation_account_id").references(
     () => chartAccount.id
   ),
-  accumulatedDepAccountId: text("accumulated_dep_account_id").references(
+  accumulatedDepAccountId: uuid("accumulated_dep_account_id").references(
     () => chartAccount.id
   ),
   status: assetStatusEnum("status").notNull().default("active"),
@@ -62,15 +62,15 @@ export const fixedAsset = pgTable("fixed_asset", {
 
 // Depreciation Entry
 export const depreciationEntry = pgTable("depreciation_entry", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  fixedAssetId: text("fixed_asset_id")
+    .defaultRandom(),
+  fixedAssetId: uuid("fixed_asset_id")
     .notNull()
     .references(() => fixedAsset.id, { onDelete: "cascade" }),
   date: date("date").notNull(),
   amount: integer("amount").notNull(), // cents
-  journalEntryId: text("journal_entry_id").references(() => journalEntry.id),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

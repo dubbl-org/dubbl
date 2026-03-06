@@ -1,5 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import Apple from "next-auth/providers/apple";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db";
 import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
@@ -22,6 +24,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verificationTokensTable: verificationTokens,
   }),
   providers: [
+    Google,
+    Apple,
     Credentials({
       name: "credentials",
       credentials: {

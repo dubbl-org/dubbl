@@ -4,6 +4,8 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
+import { OrgLoader } from "@/components/dashboard/org-loader";
+import { CreateDrawerProvider } from "@/components/dashboard/create-drawer";
 
 export default function DashboardLayout({
   children,
@@ -11,13 +13,19 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <Topbar />
-        <div className="flex-1 p-5">{children}</div>
-      </SidebarInset>
-      <CommandPalette />
-    </SidebarProvider>
+    <OrgLoader>
+      <SidebarProvider>
+        <CreateDrawerProvider>
+          <AppSidebar />
+          <SidebarInset className="bg-content-bg">
+            <Topbar />
+            <div className="mx-auto w-full max-w-[1100px] flex-1 px-6 py-6">
+              {children}
+            </div>
+          </SidebarInset>
+          <CommandPalette />
+        </CreateDrawerProvider>
+      </SidebarProvider>
+    </OrgLoader>
   );
 }

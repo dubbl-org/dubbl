@@ -1,6 +1,7 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   boolean,
@@ -8,7 +9,6 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization } from "./auth";
 import { journalEntry } from "./bookkeeping";
 
@@ -28,10 +28,10 @@ export const payrollRunStatusEnum = pgEnum("payroll_run_status", [
 
 // Payroll Employee
 export const payrollEmployee = pgTable("payroll_employee", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  organizationId: text("organization_id")
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -52,10 +52,10 @@ export const payrollEmployee = pgTable("payroll_employee", {
 
 // Payroll Run
 export const payrollRun = pgTable("payroll_run", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  organizationId: text("organization_id")
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   payPeriodStart: date("pay_period_start").notNull(),
@@ -64,7 +64,7 @@ export const payrollRun = pgTable("payroll_run", {
   totalGross: integer("total_gross").notNull().default(0), // cents
   totalDeductions: integer("total_deductions").notNull().default(0), // cents
   totalNet: integer("total_net").notNull().default(0), // cents
-  journalEntryId: text("journal_entry_id").references(() => journalEntry.id),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   processedAt: timestamp("processed_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
@@ -72,13 +72,13 @@ export const payrollRun = pgTable("payroll_run", {
 
 // Payroll Item
 export const payrollItem = pgTable("payroll_item", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
-  payrollRunId: text("payroll_run_id")
+    .defaultRandom(),
+  payrollRunId: uuid("payroll_run_id")
     .notNull()
     .references(() => payrollRun.id, { onDelete: "cascade" }),
-  employeeId: text("employee_id")
+  employeeId: uuid("employee_id")
     .notNull()
     .references(() => payrollEmployee.id),
   grossAmount: integer("gross_amount").notNull(), // cents

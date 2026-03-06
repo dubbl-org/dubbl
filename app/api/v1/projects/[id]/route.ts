@@ -12,11 +12,25 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   contactId: z.string().nullable().optional(),
-  status: z.enum(["active", "completed", "archived"]).optional(),
+  status: z.enum(["active", "completed", "on_hold", "cancelled", "archived"]).optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  billingType: z.enum(["hourly", "fixed", "milestone", "non_billable"]).optional(),
+  color: z.string().optional(),
   budget: z.number().int().min(0).optional(),
   hourlyRate: z.number().int().min(0).optional(),
+  fixedPrice: z.number().int().min(0).optional(),
+  estimatedHours: z.number().int().min(0).optional(),
+  currency: z.string().optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
+  enableTimeline: z.boolean().optional(),
+  enableTasks: z.boolean().optional(),
+  enableTimeTracking: z.boolean().optional(),
+  enableMilestones: z.boolean().optional(),
+  enableNotes: z.boolean().optional(),
+  enableBilling: z.boolean().optional(),
 });
 
 export async function GET(
@@ -36,7 +50,38 @@ export async function GET(
       with: {
         contact: true,
         timeEntries: {
-          with: { user: true },
+          with: { user: true, task: true },
+        },
+        members: {
+          with: {
+            member: {
+              with: { user: true },
+            },
+          },
+        },
+        tasks: {
+          with: {
+            assignee: { with: { user: true } },
+            team: true,
+            createdBy: true,
+            checklist: true,
+            comments: { with: { author: true } },
+          },
+        },
+        labels: true,
+        teams: {
+          with: {
+            members: {
+              with: { member: { with: { user: true } } },
+            },
+          },
+        },
+        milestones: true,
+        notes: {
+          with: { author: true },
+        },
+        runningTimers: {
+          with: { task: true },
         },
       },
     });

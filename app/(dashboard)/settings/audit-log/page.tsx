@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { ScrollText } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface AuditEntry {
   id: string;
@@ -101,7 +101,7 @@ const columns: Column<AuditEntry>[] = [
     className: "w-32",
     render: (r) => (
       <span className="text-xs text-muted-foreground">
-        {r.ipAddress || "--"}
+        {r.ipAddress || "-"}
       </span>
     ),
   },
@@ -143,76 +143,75 @@ export default function AuditLogPage() {
       )
     : entries;
 
-  if (
-    !loading &&
-    entries.length === 0 &&
-    !search &&
-    entityTypeFilter === "all" &&
-    actionFilter === "all"
-  ) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Audit Log"
-          description="Track all changes across your organization."
-        />
-        <EmptyState
-          icon={ScrollText}
-          title="No audit entries yet"
-          description="Activity will appear here as changes are made."
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Audit Log"
-        description="Track all changes across your organization."
-      />
+    <BlurReveal className="space-y-10">
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">Audit log</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Track all changes made within your organization. Filter by entity type or action.
+          </p>
+        </div>
+        <div className="min-w-0 space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Search by user, entity..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-[220px]"
+            />
+            <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Entity type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All entities</SelectItem>
+                {ENTITY_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t.replace(/_/g, " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={actionFilter} onValueChange={setActionFilter}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Action" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All actions</SelectItem>
+                {ACTIONS.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {entries.length > 0 && (
+              <span className="ml-auto text-[12px] text-muted-foreground">
+                {filtered.length} entr{filtered.length !== 1 ? "ies" : "y"}
+                {filtered.length !== entries.length ? ` of ${entries.length}` : ""}
+              </span>
+            )}
+          </div>
 
-      <div className="flex items-center gap-4">
-        <Input
-          placeholder="Search by user, entity..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-        <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Entity type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All entities</SelectItem>
-            {ENTITY_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t.replace(/_/g, " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={actionFilter} onValueChange={setActionFilter}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Action" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All actions</SelectItem>
-            {ACTIONS.map((a) => (
-              <SelectItem key={a} value={a}>
-                {a}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <DataTable
-        columns={columns}
-        data={filtered}
-        loading={loading}
-        emptyMessage="No audit entries found."
-      />
-    </div>
+          {/* Table or empty */}
+          {!loading && entries.length === 0 && !search && entityTypeFilter === "all" && actionFilter === "all" ? (
+            <EmptyState
+              icon={ScrollText}
+              title="No audit entries yet"
+              description="Activity will appear here as changes are made."
+            />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={filtered}
+              loading={loading}
+              emptyMessage="No audit entries found."
+            />
+          )}
+        </div>
+      </section>
+    </BlurReveal>
   );
 }

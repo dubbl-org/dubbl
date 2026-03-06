@@ -1,6 +1,7 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
+import { Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -43,21 +44,53 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  loading = false,
+  loadingText,
+  loadingIcon,
+  spinnerClassName,
+  disabled,
+  children,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    loading?: boolean
+    loadingText?: React.ReactNode
+    loadingIcon?: React.ReactNode
+    spinnerClassName?: string
   }) {
   const Comp = asChild ? Slot.Root : "button"
+  const childNodes = React.Children.toArray(children)
+  const inferredLoadingText = childNodes.find(
+    (child) => typeof child === "string" && /\.\.\.$/.test(child.trim())
+  )
+  const inferredLoading = !asChild && !!disabled && typeof inferredLoadingText === "string"
+  const isLoading = loading || inferredLoading
+  const resolvedLoadingText =
+    loadingText ??
+    (typeof inferredLoadingText === "string" ? inferredLoadingText : children)
+  const isDisabled = disabled || isLoading
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-loading={isLoading ? "true" : undefined}
+      aria-busy={isLoading ? true : undefined}
       className={cn(buttonVariants({ variant, size, className }))}
+      disabled={!asChild ? isDisabled : undefined}
       {...props}
-    />
+    >
+      {isLoading && !asChild ? (
+        <>
+          {loadingIcon ?? <Loader2 className={cn("size-4 animate-spin", spinnerClassName)} />}
+          {resolvedLoadingText}
+        </>
+      ) : (
+        children
+      )}
+    </Comp>
   )
 }
 

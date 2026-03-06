@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Key, Copy, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Plus, Key, Copy, Trash2, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface ApiKeyItem {
   id: string;
@@ -33,6 +33,7 @@ export default function ApiKeysPage() {
   const [name, setName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function fetchKeys() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -79,7 +80,8 @@ export default function ApiKeysPage() {
 
   async function deleteKey(id: string) {
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId || deletingId) return;
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/v1/api-keys/${id}`, {
         method: "DELETE",
@@ -90,57 +92,102 @@ export default function ApiKeysPage() {
       fetchKeys();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete key");
-    }
+    } finally { setDeletingId(null); }
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="API Keys" description="Manage programmatic access keys.">
-        <Button
-          onClick={() => {
-            setNewKey(null);
-            setCreateOpen(true);
-          }}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-2 size-4" />
-          New Key
-        </Button>
-      </PageHeader>
-
-      {!loading && keys.length === 0 ? (
-        <EmptyState
-          icon={Key}
-          title="No API keys"
-          description="Create an API key to access the dubbl API programmatically."
-        />
-      ) : (
-        <div className="divide-y rounded-lg border">
-          {keys.map((k) => (
-            <div key={k.id} className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-sm font-medium">{k.name}</p>
-                <p className="text-xs font-mono text-muted-foreground">
-                  {k.keyPrefix}...
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {k.lastUsedAt ? `Last used ${k.lastUsedAt}` : "Never used"}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 text-red-600 hover:text-red-700"
-                  onClick={() => deleteKey(k.id)}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
+    <BlurReveal className="space-y-10">
+      {/* API Keys section */}
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">API keys</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Create and manage API keys for programmatic access to the dubbl API.
+          </p>
         </div>
-      )}
+        <div className="min-w-0 space-y-4">
+          <div className="flex items-center justify-between">
+            {keys.length > 0 ? (
+              <p className="text-[12px] text-muted-foreground">
+                {keys.length} key{keys.length !== 1 ? "s" : ""} active
+              </p>
+            ) : (
+              <div />
+            )}
+            <Button
+              size="sm"
+              onClick={() => {
+                setNewKey(null);
+                setCreateOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-1.5 size-3.5" />
+              New Key
+            </Button>
+          </div>
+
+          {!loading && keys.length === 0 ? (
+            <EmptyState
+              icon={Key}
+              title="No API keys"
+              description="Create an API key to access the dubbl API programmatically."
+            />
+          ) : (
+            <div className="divide-y rounded-lg border">
+              {keys.map((k) => (
+                <div key={k.id} className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="text-sm font-medium">{k.name}</p>
+                    <p className="text-xs font-mono text-muted-foreground">
+                      {k.keyPrefix}...
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {k.lastUsedAt ? `Last used ${k.lastUsedAt}` : "Never used"}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-red-600 hover:text-red-700"
+                      onClick={() => deleteKey(k.id)}
+                      disabled={deletingId === k.id}
+                    >
+                      {deletingId === k.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="h-px bg-border" />
+
+      {/* Usage note */}
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">Usage</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            How to authenticate API requests.
+          </p>
+        </div>
+        <div className="min-w-0 rounded-lg border border-border p-4">
+          <p className="text-[12px] text-muted-foreground">
+            Include your API key in the <code className="rounded bg-muted px-1 py-0.5 text-[11px] font-mono">Authorization</code> header:
+          </p>
+          <div className="mt-3 rounded-md bg-muted p-3">
+            <code className="text-[11px] font-mono text-foreground">
+              Authorization: Bearer dk_live_...
+            </code>
+          </div>
+          <p className="mt-3 text-[12px] text-muted-foreground">
+            Keys are scoped to the organization they were created in. Keep them secret and rotate regularly.
+          </p>
+        </div>
+      </section>
 
       <Dialog
         open={createOpen}
@@ -211,6 +258,6 @@ export default function ApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </BlurReveal>
   );
 }

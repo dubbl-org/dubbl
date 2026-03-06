@@ -12,3 +12,5 @@ export * from "./inventory";
 export * from "./projects";
 export * from "./fixed-assets";
 export * from "./payroll";
+export * from "./payments";
+export * from "./recurring";

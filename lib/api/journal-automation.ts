@@ -196,6 +196,168 @@ export async function createBillJournalEntry(
 }
 
 /**
+ * Create journal entry when a credit note is sent.
+ * Reverses the invoice pattern:
+ * DR Revenue (per line account)
+ * DR Tax Liability (if tax)
+ * CR Accounts Receivable
+ */
+export async function createCreditNoteJournalEntry(
+  ctx: JournalAutomationContext,
+  data: {
+    creditNoteNumber: string;
+    total: number;
+    taxTotal: number;
+    lines: { accountId: string | null; amount: number; taxAmount: number }[];
+    date: string;
+  }
+) {
+  const entryNumber = await getNextEntryNumber(ctx.organizationId);
+  const arAccount = await findAccountByCode(ctx.organizationId, "1200");
+  if (!arAccount) return null;
+
+  const [entry] = await db
+    .insert(journalEntry)
+    .values({
+      organizationId: ctx.organizationId,
+      entryNumber,
+      date: data.date,
+      description: `Credit Note ${data.creditNoteNumber}`,
+      reference: data.creditNoteNumber,
+      status: "posted",
+      sourceType: "credit_note",
+      postedAt: new Date(),
+      createdBy: ctx.userId,
+    })
+    .returning();
+
+  const lines: (typeof journalLine.$inferInsert)[] = [];
+
+  // DR Revenue accounts (reverse of invoice CR revenue)
+  for (const line of data.lines) {
+    if (line.accountId && line.amount > 0) {
+      lines.push({
+        journalEntryId: entry.id,
+        accountId: line.accountId,
+        description: `Credit Note ${data.creditNoteNumber}`,
+        debitAmount: line.amount,
+        creditAmount: 0,
+      });
+    }
+  }
+
+  // DR Tax Liability (reverse of invoice CR tax)
+  if (data.taxTotal > 0) {
+    const taxAccount = await findAccountByCode(ctx.organizationId, "2200");
+    if (taxAccount) {
+      lines.push({
+        journalEntryId: entry.id,
+        accountId: taxAccount.id,
+        description: `Tax on ${data.creditNoteNumber}`,
+        debitAmount: data.taxTotal,
+        creditAmount: 0,
+      });
+    }
+  }
+
+  // CR Accounts Receivable (reverse of invoice DR AR)
+  lines.push({
+    journalEntryId: entry.id,
+    accountId: arAccount.id,
+    description: `Credit Note ${data.creditNoteNumber}`,
+    debitAmount: 0,
+    creditAmount: data.total,
+  });
+
+  if (lines.length > 0) {
+    await db.insert(journalLine).values(lines);
+  }
+
+  return entry;
+}
+
+/**
+ * Create journal entry when a debit note is sent.
+ * Reverses the bill pattern:
+ * DR Accounts Payable
+ * CR Expense accounts (per line)
+ * CR Tax Input (if tax)
+ */
+export async function createDebitNoteJournalEntry(
+  ctx: JournalAutomationContext,
+  data: {
+    debitNoteNumber: string;
+    total: number;
+    taxTotal: number;
+    lines: { accountId: string | null; amount: number; taxAmount: number }[];
+    date: string;
+  }
+) {
+  const entryNumber = await getNextEntryNumber(ctx.organizationId);
+  const apAccount = await findAccountByCode(ctx.organizationId, "2100");
+  if (!apAccount) return null;
+
+  const [entry] = await db
+    .insert(journalEntry)
+    .values({
+      organizationId: ctx.organizationId,
+      entryNumber,
+      date: data.date,
+      description: `Debit Note ${data.debitNoteNumber}`,
+      reference: data.debitNoteNumber,
+      status: "posted",
+      sourceType: "debit_note",
+      postedAt: new Date(),
+      createdBy: ctx.userId,
+    })
+    .returning();
+
+  const lines: (typeof journalLine.$inferInsert)[] = [];
+
+  // DR Accounts Payable (reverse of bill CR AP)
+  lines.push({
+    journalEntryId: entry.id,
+    accountId: apAccount.id,
+    description: `Debit Note ${data.debitNoteNumber}`,
+    debitAmount: data.total,
+    creditAmount: 0,
+  });
+
+  // CR Expense accounts (reverse of bill DR expense)
+  for (const line of data.lines) {
+    if (line.accountId && line.amount > 0) {
+      lines.push({
+        journalEntryId: entry.id,
+        accountId: line.accountId,
+        description: `Debit Note ${data.debitNoteNumber}`,
+        debitAmount: 0,
+        creditAmount: line.amount,
+      });
+    }
+  }
+
+  // CR Tax Input (reverse of bill DR tax)
+  if (data.taxTotal > 0) {
+    const taxInputAccount = await findAccountByCode(ctx.organizationId, "1500");
+    if (taxInputAccount) {
+      lines.push({
+        journalEntryId: entry.id,
+        accountId: taxInputAccount.id,
+        description: `Tax on ${data.debitNoteNumber}`,
+        debitAmount: 0,
+        creditAmount: data.taxTotal,
+      });
+    }
+  }
+
+  if (lines.length > 0) {
+    await db.insert(journalLine).values(lines);
+  }
+
+  return entry;
+}
+
+/**
  * Create payment journal entry.
  * For invoice payment: DR Bank, CR Accounts Receivable
  * For bill payment: DR Accounts Payable, CR Bank

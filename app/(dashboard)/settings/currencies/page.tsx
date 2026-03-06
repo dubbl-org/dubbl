@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { DollarSign } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Currency {
   id: string;
@@ -53,26 +53,32 @@ export default function CurrenciesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (!loading && currencies.length === 0) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Currencies" description="Available currencies." />
-        <EmptyState
-          icon={DollarSign}
-          title="No currencies"
-          description="Run the seed script to populate ISO 4217 currencies."
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader
-        title="Currencies"
-        description="Available currencies in the system."
-      />
-      <DataTable columns={columns} data={currencies} loading={loading} />
-    </div>
+    <BlurReveal className="space-y-10">
+      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+        <div className="shrink-0">
+          <p className="text-sm font-medium">Currencies</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            ISO 4217 currencies available for transactions, invoices, and reporting.
+          </p>
+        </div>
+        <div className="min-w-0 space-y-4">
+          {currencies.length > 0 && (
+            <p className="text-[12px] text-muted-foreground">
+              {currencies.length} currenc{currencies.length !== 1 ? "ies" : "y"} available
+            </p>
+          )}
+          {!loading && currencies.length === 0 ? (
+            <EmptyState
+              icon={DollarSign}
+              title="No currencies"
+              description="Run the seed script to populate ISO 4217 currencies."
+            />
+          ) : (
+            <DataTable columns={columns} data={currencies} loading={loading} />
+          )}
+        </div>
+      </section>
+    </BlurReveal>
   );
 }

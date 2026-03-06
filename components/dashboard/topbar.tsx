@@ -1,61 +1,179 @@
 "use client";
 
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { useCallback } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Search, Plus } from "lucide-react";
+import { Logo } from "@/components/shared/logo";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { usePathname } from "next/navigation";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
-  transactions: "Transactions",
-  accounts: "Accounts",
+  sales: "Sales",
+  purchases: "Purchases",
+  contacts: "Contacts",
+  accounting: "Accounting",
+  projects: "Projects",
+  inventory: "Inventory",
+  payroll: "Payroll",
   reports: "Reports",
   settings: "Settings",
+  // Sales subtabs
+  invoices: "Invoices",
+  quotes: "Quotes",
+  new: "New",
+  // Purchases subtabs
+  bills: "Bills",
+  expenses: "Expenses",
+  orders: "Purchase Orders",
+  // Accounting subtabs
+  transactions: "Transactions",
+  accounts: "Accounts",
+  banking: "Banking",
+  "fixed-assets": "Fixed Assets",
+  budgets: "Budgets",
+  // Settings subtabs
   members: "Members",
   billing: "Billing",
   "api-keys": "API Keys",
   currencies: "Currencies",
+  "tax-rates": "Tax Rates",
+  "audit-log": "Audit Log",
+  // Payroll sub-pages
+  employees: "Employees",
+  runs: "Pay Runs",
+  // Reports sub-pages
   "trial-balance": "Trial Balance",
   "balance-sheet": "Balance Sheet",
   "income-statement": "Income Statement",
-  new: "New",
+  "profit-and-loss": "Profit & Loss",
+  "cash-flow": "Cash Flow",
+  "general-ledger": "General Ledger",
+  "aged-receivables": "Aged Receivables",
+  "aged-payables": "Aged Payables",
+  "budget-vs-actual": "Budget vs Actual",
+  general: "General",
+  time: "Time Tracking",
+  // Sales subtabs
+  "credit-notes": "Credit Notes",
+  recurring: "Recurring",
+  payments: "Payments",
+  // Project subtabs
+  tasks: "Tasks",
+  milestones: "Milestones",
+  notes: "Notes",
+  team: "Team",
+};
+
+const CTA_MAP: Record<string, { label: string; drawer: "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" }> = {
+  sales: { label: "New Invoice", drawer: "invoice" },
+  purchases: { label: "New Bill", drawer: "bill" },
+  accounting: { label: "New Entry", drawer: "entry" },
+  contacts: { label: "New Contact", drawer: "contact" },
+  projects: { label: "New Project", drawer: "project" },
+  inventory: { label: "New Item", drawer: "inventory" },
 };
 
 export function Topbar() {
   const pathname = usePathname();
+  const { open: openDrawer } = useCreateDrawer();
+  const entityTitle = useEntityTitle();
   const segments = pathname.split("/").filter(Boolean);
 
-  return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 !h-4" />
-      <Breadcrumb>
-        <BreadcrumbList>
-          {segments.map((segment, i) => {
-            const href = "/" + segments.slice(0, i + 1).join("/");
-            const isLast = i === segments.length - 1;
-            const label = LABELS[segment] || segment;
+  // For group roots, show the default subtab in the breadcrumb
+  const DEFAULT_SUBTABS: Record<string, string> = {
+    settings: "general",
+    sales: "invoices",
+    purchases: "bills",
+    accounting: "transactions",
+  };
+  const defaultSub = segments.length === 1 ? DEFAULT_SUBTABS[segments[0]] : undefined;
+  const effectiveSegments = defaultSub ? [segments[0], defaultSub] : segments;
 
-            return (
-              <BreadcrumbItem key={href}>
-                {i > 0 && <BreadcrumbSeparator />}
-                {isLast ? (
-                  <BreadcrumbPage>{label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink href={href}>{label}</BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            );
-          })}
-        </BreadcrumbList>
-      </Breadcrumb>
+  // For entity detail pages like /projects/[id] or /projects/[id]/time,
+  // detect the pattern and show proper breadcrumbs
+  const isEntityDetail = segments.length >= 2 && segments[0] in LABELS && !(segments[1] in LABELS);
+  let pageTitle: string;
+  let parentLabel: string | null;
+  let parentHref: string | null = null;
+
+  if (isEntityDetail) {
+    parentLabel = LABELS[segments[0]] || segments[0];
+    parentHref = `/${segments[0]}`;
+    if (entityTitle) {
+      pageTitle = entityTitle;
+    } else {
+      const subTab = segments.length > 2 ? segments[segments.length - 1] : null;
+      pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[0]] || segments[0]);
+      if (!subTab) parentLabel = null;
+    }
+  } else {
+    pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
+    parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
+  }
+
+  const cta = CTA_MAP[segments[0]];
+
+  const openCommandPalette = useCallback(() => {
+    document.dispatchEvent(new CustomEvent("open-command-palette"));
+  }, []);
+
+  return (
+    <header className="shrink-0">
+      <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+            <Logo className="h-5 w-auto" />
+            <span className="text-[14px] font-semibold tracking-tight">dubbl</span>
+          </Link>
+          <div className="h-4 w-px bg-border shrink-0" />
+          {parentLabel && effectiveSegments.length > 1 && (
+            <>
+              {parentHref ? (
+                <Link href={parentHref} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                  {parentLabel}
+                </Link>
+              ) : (
+                <span className="text-[13px] text-muted-foreground shrink-0">{parentLabel}</span>
+              )}
+              <span className="text-muted-foreground/40 shrink-0">/</span>
+            </>
+          )}
+          <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
+          <div className="h-4 w-px bg-border" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openCommandPalette}
+            className="hidden sm:flex items-center gap-2 text-muted-foreground text-xs h-7 px-2.5"
+          >
+            <Search className="size-3" />
+            <span>Search...</span>
+            <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <span className="text-xs">&#8984;</span>K
+            </kbd>
+          </Button>
+          {cta && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => openDrawer(cta.drawer)}
+              >
+                <Plus className="size-3" />
+                {cta.label}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
     </header>
   );
 }

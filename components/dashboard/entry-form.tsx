@@ -44,9 +44,11 @@ interface EntryFormProps {
     reference: string;
     lines: Line[];
   };
+  onCancel?: () => void;
+  submitLabel?: string;
 }
 
-export function EntryForm({ accounts, onSubmit, loading, initial }: EntryFormProps) {
+export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, submitLabel }: EntryFormProps) {
   const [date, setDate] = useState(initial?.date || new Date().toISOString().split("T")[0]);
   const [description, setDescription] = useState(initial?.description || "");
   const [reference, setReference] = useState(initial?.reference || "");
@@ -226,15 +228,19 @@ export function EntryForm({ accounts, onSubmit, loading, initial }: EntryFormPro
       </div>
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" asChild>
-          <Link href="/transactions">Cancel</Link>
-        </Button>
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        ) : (
+          <Button type="button" variant="outline" asChild>
+            <Link href="/transactions">Cancel</Link>
+          </Button>
+        )}
         <Button
           type="submit"
           disabled={!isBalanced || loading}
           className="bg-emerald-600 hover:bg-emerald-700"
         >
-          {loading ? "Saving..." : "Save Entry"}
+          {loading ? "Saving..." : (submitLabel || "Save Entry")}
         </Button>
       </div>
     </form>

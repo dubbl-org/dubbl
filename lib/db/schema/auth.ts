@@ -1,6 +1,7 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   primaryKey,
@@ -8,7 +9,6 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 
 // Enums
 export const memberRoleEnum = pgEnum("member_role", [
@@ -19,9 +19,9 @@ export const memberRoleEnum = pgEnum("member_role", [
 
 // NextAuth tables
 export const users = pgTable("users", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
+    .defaultRandom(),
   name: text("name"),
   email: text("email").notNull().unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
@@ -33,10 +33,10 @@ export const users = pgTable("users", {
 export const accounts = pgTable(
   "accounts",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
-      .$defaultFn(() => nanoid()),
-    userId: text("user_id")
+      .defaultRandom(),
+    userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
@@ -60,7 +60,7 @@ export const accounts = pgTable(
 
 export const sessions = pgTable("sessions", {
   sessionToken: text("session_token").primaryKey(),
-  userId: text("user_id")
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   expires: timestamp("expires", { mode: "date" }).notNull(),
@@ -78,16 +78,33 @@ export const verificationTokens = pgTable(
 
 // Organization & Members
 export const organization = pgTable("organization", {
-  id: text("id")
+  id: uuid("id")
     .primaryKey()
-    .$defaultFn(() => nanoid()),
+    .defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
+  country: text("country"),
+  businessType: text("business_type"),
   defaultCurrency: text("default_currency").notNull().default("USD"),
   fiscalYearStartMonth: integer("fiscal_year_start_month")
     .notNull()
     .default(1),
+  // Bookkeeping compliance fields
+  countryCode: text("country_code"),
+  taxId: text("tax_id"),
+  businessRegistrationNumber: text("business_registration_number"),
+  legalEntityType: text("legal_entity_type"),
+  addressStreet: text("address_street"),
+  addressCity: text("address_city"),
+  addressState: text("address_state"),
+  addressPostalCode: text("address_postal_code"),
+  addressCountry: text("address_country"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  contactWebsite: text("contact_website"),
+  defaultPaymentTerms: text("default_payment_terms"),
+  industrySector: text("industry_sector"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
@@ -96,13 +113,13 @@ export const organization = pgTable("organization", {
 export const member = pgTable(
   "member",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
-      .$defaultFn(() => nanoid()),
-    organizationId: text("organization_id")
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: memberRoleEnum("role").notNull().default("member"),

@@ -45,7 +45,7 @@ const columns: Column<PayrollItemRow>[] = [
     header: "Employee",
     render: (r) => (
       <div>
-        <span className="text-sm font-medium">{r.employee?.name || "—"}</span>
+        <span className="text-sm font-medium">{r.employee?.name || "-"}</span>
         <span className="ml-2 text-xs text-muted-foreground">{r.employee?.employeeNumber}</span>
       </div>
     ),

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { invoice, payment, paymentAllocation } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -11,6 +11,8 @@ import { z } from "zod";
 const paySchema = z.object({
   amount: z.number().int().min(1),
   date: z.string().min(1),
+  method: z.enum(["bank_transfer", "cash", "check", "card", "other"]).default("bank_transfer"),
+  reference: z.string().nullable().optional(),
 });
 
 export async function POST(
@@ -44,17 +46,57 @@ export async function POST(
     const newAmountDue = found.total - newAmountPaid;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
+    // Generate payment number
+    const [maxResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(payment)
+      .where(eq(payment.organizationId, ctx.organizationId));
+    const next = (Number(maxResult?.count) || 0) + 1;
+    const paymentNumber = `PAY-${next.toString().padStart(5, "0")}`;
+
+    // Create payment record
+    const [created] = await db
+      .insert(payment)
+      .values({
+        organizationId: ctx.organizationId,
+        contactId: found.contactId,
+        paymentNumber,
+        type: "received",
+        date: parsed.date,
+        amount: parsed.amount,
+        method: parsed.method,
+        reference: parsed.reference || null,
+        createdBy: ctx.userId,
+      })
+      .returning();
+
+    // Create allocation linking payment to this invoice
+    await db.insert(paymentAllocation).values({
+      paymentId: created.id,
+      documentType: "invoice",
+      documentId: id,
+      amount: parsed.amount,
+    });
+
     // Create payment journal entry
-    await createPaymentJournalEntry(
+    const journalEntry = await createPaymentJournalEntry(
       { organizationId: ctx.organizationId, userId: ctx.userId },
       {
         type: "invoice",
-        reference: found.invoiceNumber,
+        reference: paymentNumber,
         amount: parsed.amount,
         date: parsed.date,
       }
     );
 
+    if (journalEntry) {
+      await db
+        .update(payment)
+        .set({ journalEntryId: journalEntry.id })
+        .where(eq(payment.id, created.id));
+    }
+
+    // Update invoice amounts
     const [updated] = await db
       .update(invoice)
       .set({
@@ -67,7 +109,16 @@ export async function POST(
       .where(eq(invoice.id, id))
       .returning();
 
-    return NextResponse.json({ invoice: updated });
+    return NextResponse.json({
+      invoice: updated,
+      payment: {
+        id: created.id,
+        paymentNumber: created.paymentNumber,
+        date: created.date,
+        amount: parsed.amount,
+        method: created.method,
+      },
+    });
   } catch (err) {
     return handleError(err);
   }

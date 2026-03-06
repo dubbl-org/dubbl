@@ -8,6 +8,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { formatMoney } from "@/lib/money";
+import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Budget {
   id: string;
@@ -97,19 +98,19 @@ export default function BudgetVsActualPage() {
 
   if (!loading && budgets.length === 0) {
     return (
-      <div className="space-y-6">
+      <BlurReveal className="space-y-6">
         <PageHeader title="Budget vs Actual" description="Compare budgeted amounts to actual GL balances." />
         <EmptyState
           icon={Target}
           title="No budgets yet"
           description="Create a budget first to see budget vs actual comparisons."
         />
-      </div>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <BlurReveal className="space-y-6">
       <PageHeader
         title="Budget vs Actual"
         description="Compare budgeted amounts to actual GL balances."
@@ -166,6 +167,6 @@ export default function BudgetVsActualPage() {
           {formatMoney(totalVariance)}
         </span>
       </div>
-    </div>
+    </BlurReveal>
   );
 }

@@ -15,6 +15,7 @@ const createSchema = z.object({
   minutes: z.number().int().min(1),
   isBillable: z.boolean().default(true),
   hourlyRate: z.number().int().min(0).optional(),
+  taskId: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -94,6 +95,7 @@ export async function POST(
         minutes: parsed.minutes,
         isBillable: parsed.isBillable,
         hourlyRate: rate,
+        taskId: parsed.taskId || null,
       })
       .returning();
 

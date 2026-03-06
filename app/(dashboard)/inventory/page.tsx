@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Package, AlertTriangle } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -11,6 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
 
 interface InventoryItem {
   id: string;
@@ -41,7 +46,7 @@ const columns: Column<InventoryItem>[] = [
     header: "SKU",
     className: "w-28",
     render: (r) => (
-      <span className="text-sm text-muted-foreground">{r.sku || "—"}</span>
+      <span className="text-sm text-muted-foreground">{r.sku || "-"}</span>
     ),
   },
   {
@@ -103,6 +108,7 @@ const columns: Column<InventoryItem>[] = [
 
 export default function InventoryPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -121,6 +127,7 @@ export default function InventoryPage() {
       .then((data) => {
         if (data.data) setItems(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoading(false));
   }, [search]);
 
@@ -132,66 +139,81 @@ export default function InventoryPage() {
     (i) => i.quantityOnHand <= i.reorderPoint
   ).length;
 
+  if (loading) return <BrandLoader />;
+
   if (!loading && items.length === 0 && !search) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Inventory" description="Manage products and stock levels." />
-        <EmptyState
-          icon={Package}
-          title="No inventory items yet"
-          description="Add your first product or item to start tracking inventory."
-        >
-          <Button
-            onClick={() => router.push("/inventory/new")}
-            className="bg-emerald-600 hover:bg-emerald-700"
+      <BlurReveal className="space-y-10">
+        <Section title="Inventory" description="Manage products and stock levels.">
+          <EmptyState
+            icon={Package}
+            title="No inventory items yet"
+            description="Add your first product or item to start tracking inventory."
           >
-            <Plus className="mr-2 size-4" />
-            New Item
-          </Button>
-        </EmptyState>
-      </div>
+            <Button
+              onClick={() => openDrawer("inventory")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Item
+            </Button>
+          </EmptyState>
+        </Section>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Inventory" description="Manage products and stock levels.">
-        <Button
-          onClick={() => router.push("/inventory/new")}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-2 size-4" />
-          New Item
-        </Button>
-      </PageHeader>
+    <BlurReveal>
+    <div className="space-y-10">
+      <Section title="Overview" description="A summary of your inventory levels and stock value.">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title="Total Items" value={items.length.toString()} icon={Package} />
+            <StatCard title="Total Value" value={formatMoney(totalValue)} icon={Package} />
+            <StatCard
+                title="Low Stock"
+                value={lowStockCount.toString()}
+                icon={AlertTriangle}
+                changeType={lowStockCount > 0 ? "negative" : "neutral"}
+              />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => openDrawer("inventory")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Item
+            </Button>
+          </div>
+        </div>
+      </Section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard title="Total Items" value={items.length.toString()} icon={Package} />
-        <StatCard title="Total Value" value={formatMoney(totalValue)} icon={Package} />
-        <StatCard
-          title="Low Stock"
-          value={lowStockCount.toString()}
-          icon={AlertTriangle}
-          changeType={lowStockCount > 0 ? "negative" : "neutral"}
-        />
-      </div>
+      <div className="h-px bg-border" />
 
-      <div className="flex items-center gap-4">
-        <Input
-          placeholder="Search items..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
+      <Section title="Items" description="View and manage all inventory items.">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Input
+              placeholder="Search items..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
 
-      <DataTable
-        columns={columns}
-        data={items}
-        loading={loading}
-        emptyMessage="No inventory items found."
-        onRowClick={(r) => router.push(`/inventory/${r.id}`)}
-      />
+          <DataTable
+              columns={columns}
+              data={items}
+              loading={loading}
+              emptyMessage="No inventory items found."
+              onRowClick={(r) => router.push(`/inventory/${r.id}`)}
+            />
+        </div>
+      </Section>
     </div>
+    </BlurReveal>
   );
 }

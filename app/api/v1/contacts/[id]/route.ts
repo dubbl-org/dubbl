@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { contact } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { contact, contactPerson } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
@@ -18,6 +18,11 @@ const updateSchema = z.object({
   addresses: z.any().optional(),
   notes: z.string().nullable().optional(),
   currencyCode: z.string().optional(),
+  creditLimit: z.number().int().min(0).nullable().optional(),
+  isTaxExempt: z.boolean().optional(),
+  defaultRevenueAccountId: z.string().uuid().nullable().optional(),
+  defaultExpenseAccountId: z.string().uuid().nullable().optional(),
+  defaultTaxRateId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET(
@@ -34,6 +39,15 @@ export async function GET(
         eq(contact.organizationId, ctx.organizationId),
         notDeleted(contact.deletedAt)
       ),
+      with: {
+        defaultRevenueAccount: true,
+        defaultExpenseAccount: true,
+        defaultTaxRate: true,
+        people: {
+          where: notDeleted(contactPerson.deletedAt),
+          orderBy: desc(contactPerson.createdAt),
+        },
+      },
     });
 
     if (!found) return notFound("Contact");

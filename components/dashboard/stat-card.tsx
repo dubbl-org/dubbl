@@ -47,29 +47,29 @@ export function StatCard({
   sparklineData,
 }: StatCardProps) {
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
+    <div className="rounded-lg border bg-card p-5">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
           {title}
         </p>
-        <Icon className="size-4 text-muted-foreground" />
+        <Icon className="size-4 text-muted-foreground/50" />
       </div>
-      <div className="mt-1.5 flex items-baseline justify-between gap-2">
-        <div className="flex items-baseline gap-2">
-          <p className="text-xl font-bold tracking-tight font-mono tabular-nums">
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div className="space-y-1">
+          <p className="text-[24px] font-bold tracking-tight font-mono tabular-nums">
             {value}
           </p>
           {change && (
-            <span
+            <p
               className={cn(
                 "text-xs font-medium",
-                changeType === "positive" && "text-emerald-600",
-                changeType === "negative" && "text-red-600",
+                changeType === "positive" && "text-emerald-600 dark:text-emerald-400",
+                changeType === "negative" && "text-red-600 dark:text-red-400",
                 changeType === "neutral" && "text-muted-foreground"
               )}
             >
               {change}
-            </span>
+            </p>
           )}
         </div>
         {sparklineData && <Sparkline data={sparklineData} />}

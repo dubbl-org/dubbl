@@ -16,6 +16,7 @@ import {
   Trash2,
   Link2,
 } from "lucide-react";
+import { GrainGradient } from "@paper-design/shaders-react";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
@@ -657,8 +658,20 @@ export function BentoFeatures() {
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card"
               >
                 {/* Mockup visual area */}
-                <div className="relative overflow-hidden border-b border-border bg-muted/30 p-4 md:p-5">
-                  <div className="blueprint-hash pointer-events-none absolute inset-0" />
+                <div className="relative overflow-hidden border-b border-border p-4 md:p-5">
+                  <GrainGradient
+                    className="pointer-events-none !absolute !inset-0 !rounded-none"
+                    width="100%"
+                    height="100%"
+                    colors={["#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#34d399", "#a7f3d0"]}
+                    colorBack="#34d399"
+                    softness={1}
+                    intensity={0.8}
+                    noise={0.9}
+                    shape="wave"
+                    scale={3.5}
+                    speed={0.2}
+                  />
                   <div className="relative">{feature.mockup}</div>
                 </div>
 

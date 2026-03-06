@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contact } from "@/lib/db/schema";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
+import { eq, and, or, ilike, desc, asc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -28,6 +28,17 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const search = url.searchParams.get("search");
     const type = url.searchParams.get("type");
+    const sortBy = url.searchParams.get("sortBy") || "created";
+    const sortOrder = url.searchParams.get("sortOrder") || "desc";
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SORT_COLUMNS: Record<string, any> = {
+      name: contact.name,
+      type: contact.type,
+      terms: contact.paymentTermsDays,
+      creditLimit: contact.creditLimit,
+      created: contact.createdAt,
+    };
 
     const conditions = [
       eq(contact.organizationId, ctx.organizationId),
@@ -46,9 +57,12 @@ export async function GET(request: Request) {
       conditions.push(eq(contact.type, type as "customer" | "supplier" | "both"));
     }
 
+    const sortCol = SORT_COLUMNS[sortBy] || contact.createdAt;
+    const orderFn = sortOrder === "asc" ? asc : desc;
+
     const contacts = await db.query.contact.findMany({
       where: and(...conditions),
-      orderBy: desc(contact.createdAt),
+      orderBy: orderFn(sortCol),
       limit,
       offset,
     });

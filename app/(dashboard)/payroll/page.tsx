@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Users, DollarSign, FileText } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -11,6 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { BlurReveal } from "@/components/ui/blur-reveal";
+
+import { devDelay } from "@/lib/dev-delay";
 
 interface Employee {
   id: string;
@@ -146,6 +151,7 @@ const runColumns: Column<PayrollRun>[] = [
 
 export default function PayrollPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [tab, setTab] = useState("runs");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
@@ -163,6 +169,7 @@ export default function PayrollPage() {
       .then((data) => {
         if (data.data) setEmployees(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoadingEmployees(false));
 
     fetch("/api/v1/payroll/runs", {
@@ -172,6 +179,7 @@ export default function PayrollPage() {
       .then((data) => {
         if (data.data) setRuns(data.data);
       })
+      .then(() => devDelay())
       .finally(() => setLoadingRuns(false));
   }, []);
 
@@ -184,94 +192,102 @@ export default function PayrollPage() {
 
   const hasData = employees.length > 0 || runs.length > 0;
 
+  if (loadingEmployees || loadingRuns) return <BrandLoader />;
+
   if (!loadingEmployees && !loadingRuns && !hasData) {
     return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Payroll"
-          description="Manage employee payroll and pay runs."
-        />
-        <EmptyState
-          icon={Users}
-          title="No payroll data"
-          description="Add employees to get started with payroll."
-        >
-          <Button
-            onClick={() => router.push("/payroll/employees/new")}
-            className="bg-emerald-600 hover:bg-emerald-700"
+      <BlurReveal className="space-y-10">
+        <Section title="Payroll" description="Add employees to get started with payroll.">
+          <EmptyState
+            icon={Users}
+            title="No payroll data"
+            description="Add employees to get started with payroll."
           >
-            <Plus className="mr-2 size-4" />
-            Add Employee
-          </Button>
-        </EmptyState>
-      </div>
+            <Button
+              onClick={() => openDrawer("employee")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              Add Employee
+            </Button>
+          </EmptyState>
+        </Section>
+      </BlurReveal>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Payroll"
-        description="Manage employee payroll and pay runs."
-      >
-        <Button
-          variant="outline"
-          onClick={() => router.push("/payroll/employees/new")}
-        >
-          <Plus className="mr-2 size-4" />
-          Add Employee
-        </Button>
-        <Button
-          onClick={() => router.push("/payroll/runs")}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <FileText className="mr-2 size-4" />
-          Payroll Runs
-        </Button>
-      </PageHeader>
+    <BlurReveal>
+    <div className="space-y-10">
+      <Section title="Overview" description="A summary of your payroll, active employees, and recent pay runs.">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+                title="Active Employees"
+                value={activeEmployees.length.toString()}
+                icon={Users}
+              />
+            <StatCard
+                title="Annual Payroll"
+                value={formatMoney(totalAnnualSalary)}
+                icon={DollarSign}
+              />
+            <StatCard
+                title="Last Run Net"
+                value={lastRun ? formatMoney(lastRun.totalNet) : "$0.00"}
+                icon={FileText}
+              />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openDrawer("employee")}
+            >
+              <Plus className="mr-2 size-4" />
+              Add Employee
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => router.push("/payroll/runs")}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <FileText className="mr-2 size-4" />
+              Payroll Runs
+            </Button>
+          </div>
+        </div>
+      </Section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          title="Active Employees"
-          value={activeEmployees.length.toString()}
-          icon={Users}
-        />
-        <StatCard
-          title="Annual Payroll"
-          value={formatMoney(totalAnnualSalary)}
-          icon={DollarSign}
-        />
-        <StatCard
-          title="Last Run Net"
-          value={lastRun ? formatMoney(lastRun.totalNet) : "$0.00"}
-          icon={FileText}
-        />
-      </div>
+      <div className="h-px bg-border" />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="runs">Recent Runs</TabsTrigger>
-          <TabsTrigger value="employees">Employees</TabsTrigger>
-        </TabsList>
-        <TabsContent value="runs" className="mt-4">
-          <DataTable
-            columns={runColumns}
-            data={runs}
-            loading={loadingRuns}
-            emptyMessage="No payroll runs yet."
-            onRowClick={(r) => router.push(`/payroll/runs/${r.id}`)}
-          />
-        </TabsContent>
-        <TabsContent value="employees" className="mt-4">
-          <DataTable
-            columns={employeeColumns}
-            data={employees}
-            loading={loadingEmployees}
-            emptyMessage="No employees added."
-            onRowClick={(r) => router.push(`/payroll/employees/${r.id}`)}
-          />
-        </TabsContent>
-      </Tabs>
+      <Section title="Payroll" description="View and manage employees and recent pay runs.">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="runs">Recent Runs</TabsTrigger>
+            <TabsTrigger value="employees">Employees</TabsTrigger>
+          </TabsList>
+          <TabsContent value="runs" className="mt-4">
+            <DataTable
+              columns={runColumns}
+              data={runs}
+              loading={loadingRuns}
+              emptyMessage="No payroll runs yet."
+              onRowClick={(r) => router.push(`/payroll/runs/${r.id}`)}
+            />
+          </TabsContent>
+          <TabsContent value="employees" className="mt-4">
+            <DataTable
+              columns={employeeColumns}
+              data={employees}
+              loading={loadingEmployees}
+              emptyMessage="No employees added."
+              onRowClick={(r) => router.push(`/payroll/employees/${r.id}`)}
+            />
+          </TabsContent>
+        </Tabs>
+      </Section>
     </div>
+    </BlurReveal>
   );
 }

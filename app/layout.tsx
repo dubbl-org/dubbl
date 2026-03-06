@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { Toaster } from "sonner";
@@ -17,8 +17,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const playfairDisplay = Playfair_Display({
+  variable: "--font-display",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "dubbl — Open Source Bookkeeping",
+  title: "dubbl · Open Source Bookkeeping",
   description:
     "Open source, double-entry bookkeeping for modern teams. API-first, developer-friendly, and licensed under Apache 2.0.",
 };
@@ -31,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} font-sans antialiased`}
       >
         <ThemeProvider>
           <RootProvider>

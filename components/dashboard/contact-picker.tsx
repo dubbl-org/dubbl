@@ -1,14 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Check, ChevronsUpDown, Plus, Loader2, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 
 interface Contact {
   id: string;
@@ -16,6 +27,21 @@ interface Contact {
   email: string | null;
   type: string;
 }
+
+const typeBadge: Record<string, { class: string; label: string }> = {
+  customer: {
+    class: "border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400",
+    label: "Customer",
+  },
+  supplier: {
+    class: "border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400",
+    label: "Supplier",
+  },
+  both: {
+    class: "border-purple-200 bg-purple-50 text-purple-600 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-400",
+    label: "Both",
+  },
+};
 
 interface ContactPickerProps {
   value: string;
@@ -25,10 +51,17 @@ interface ContactPickerProps {
 }
 
 export function ContactPicker({ value, onChange, type, placeholder = "Select contact..." }: ContactPickerProps) {
+  const [open, setOpen] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const fetchedRef = useRef(false);
+  const { open: openDrawer } = useCreateDrawer();
 
+  // Fetch contacts when popover opens for the first time
   useEffect(() => {
+    if (!open || fetchedRef.current) return;
+    fetchedRef.current = true;
+
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -41,41 +74,97 @@ export function ContactPicker({ value, onChange, type, placeholder = "Select con
       .then((r) => r.json())
       .then((data) => {
         if (data.data) setContacts(data.data);
-      });
-  }, [type]);
+      })
+      .finally(() => setLoading(false));
+  }, [open, type]);
 
-  const filtered = contacts.filter(
-    (c) => c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const selected = contacts.find((c) => c.id === value);
 
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <div className="px-2 pb-2">
-          <Input
-            placeholder="Search contacts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 text-sm"
-          />
-        </div>
-        {filtered.map((c) => (
-          <SelectItem key={c.id} value={c.id}>
-            {c.name}
-            {c.email && (
-              <span className="ml-2 text-xs text-muted-foreground">{c.email}</span>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal h-9"
+        >
+          {selected ? (
+            <span className="flex items-center gap-2 truncate">
+              <span className="truncate">{selected.name}</span>
+              {typeBadge[selected.type] && (
+                <Badge variant="outline" className={cn("shrink-0 text-[10px] px-1.5 py-0", typeBadge[selected.type].class)}>
+                  {typeBadge[selected.type].label}
+                </Badge>
+              )}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search contacts..." />
+          <CommandList>
+            {loading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <CommandEmpty>
+                  <div className="flex flex-col items-center gap-1.5 py-2">
+                    <Users className="size-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">No contacts found</span>
+                  </div>
+                </CommandEmpty>
+                <CommandGroup>
+                  {contacts.map((c) => (
+                    <CommandItem
+                      key={c.id}
+                      value={`${c.name} ${c.email || ""}`}
+                      onSelect={() => {
+                        onChange(c.id === value ? "" : c.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check className={cn("size-4 shrink-0", value === c.id ? "opacity-100" : "opacity-0")} />
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm">{c.name}</span>
+                          {typeBadge[c.type] && (
+                            <Badge variant="outline" className={cn("shrink-0 text-[10px] px-1.5 py-0", typeBadge[c.type].class)}>
+                              {typeBadge[c.type].label}
+                            </Badge>
+                          )}
+                        </div>
+                        {c.email && (
+                          <span className="text-xs text-muted-foreground truncate">{c.email}</span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
             )}
-          </SelectItem>
-        ))}
-        {filtered.length === 0 && (
-          <div className="py-2 text-center text-sm text-muted-foreground">
-            No contacts found
+          </CommandList>
+          <CommandSeparator />
+          <div className="p-1">
+            <button
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+              onClick={() => {
+                setOpen(false);
+                openDrawer("contact");
+              }}
+            >
+              <Plus className="size-4 text-muted-foreground" />
+              Create new contact
+            </button>
           </div>
-        )}
-      </SelectContent>
-    </Select>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

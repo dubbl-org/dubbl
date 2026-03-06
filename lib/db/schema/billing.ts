@@ -1,6 +1,7 @@
 import {
   pgTable,
   text,
+  uuid,
   timestamp,
   integer,
   boolean,
@@ -8,7 +9,6 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { organization } from "./auth";
 
 // Enums
@@ -25,10 +25,10 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
 export const subscription = pgTable(
   "subscription",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
-      .$defaultFn(() => nanoid()),
-    organizationId: text("organization_id")
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     stripeCustomerId: text("stripe_customer_id"),
@@ -54,10 +54,10 @@ export const subscription = pgTable(
 export const apiKey = pgTable(
   "api_key",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
-      .$defaultFn(() => nanoid()),
-    organizationId: text("organization_id")
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
@@ -65,7 +65,7 @@ export const apiKey = pgTable(
     keyPrefix: text("key_prefix").notNull(),
     lastUsedAt: timestamp("last_used_at", { mode: "date" }),
     expiresAt: timestamp("expires_at", { mode: "date" }),
-    createdBy: text("created_by")
+    createdBy: uuid("created_by")
       .notNull()
       .references(() => organization.id),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
