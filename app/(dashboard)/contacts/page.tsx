@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -305,45 +305,104 @@ export default function ContactsPage() {
 
   if (contacts.length === 0 && !search && typeFilter === "all" && !refetching && !pendingSearch) {
     return (
-      <BlurReveal className="space-y-8">
-        <PageHeader
-          title="Contacts"
-          description="Manage your customers and suppliers in one place."
-        />
+      <BlurReveal>
+        <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
+          {/* Background skeleton table */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-6">
+            <div className="w-full max-w-3xl rounded-lg border overflow-hidden">
+              {/* Header row matching DataTable */}
+              <div className="flex items-center gap-4 border-b bg-muted/50 px-4 h-10">
+                <div className="h-2 w-12 rounded bg-muted-foreground/20" />
+                <div className="h-2 w-8 rounded bg-muted-foreground/20" />
+                <div className="h-2 w-10 rounded bg-muted-foreground/20 hidden sm:block" />
+                <div className="ml-auto h-2 w-16 rounded bg-muted-foreground/20 hidden sm:block" />
+                <div className="h-2 w-12 rounded bg-muted-foreground/20" />
+              </div>
+              {/* Data rows */}
+              {[
+                { badge: "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500" },
+                { badge: "bg-orange-100 text-orange-400 dark:bg-orange-900/40 dark:text-orange-500" },
+                { badge: "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500" },
+                { badge: "bg-purple-100 text-purple-400 dark:bg-purple-900/40 dark:text-purple-500" },
+                { badge: "bg-orange-100 text-orange-400 dark:bg-orange-900/40 dark:text-orange-500" },
+                { badge: "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500" },
+                { badge: "bg-purple-100 text-purple-400 dark:bg-purple-900/40 dark:text-purple-500" },
+                { badge: "bg-orange-100 text-orange-400 dark:bg-orange-900/40 dark:text-orange-500" },
+              ].map((row, i) => (
+                <div key={i} className="flex items-center gap-4 border-b last:border-0 px-4 h-12">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className={`h-2.5 rounded bg-muted ${i % 3 === 0 ? "w-28" : i % 3 === 1 ? "w-32" : "w-24"}`} />
+                    <div className={`h-2 rounded bg-muted/50 ${i % 2 === 0 ? "w-36" : "w-28"}`} />
+                  </div>
+                  <div className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${row.badge} hidden sm:block`}>
+                    {i % 3 === 0 ? "customer" : i % 3 === 1 ? "supplier" : "both"}
+                  </div>
+                  <div className={`h-2.5 rounded bg-muted/50 hidden sm:block ${i % 2 === 0 ? "w-20" : "w-16"}`} />
+                  <div className={`h-2.5 rounded bg-muted/40 hidden sm:block ${i % 2 === 0 ? "w-16" : "w-12"}`} />
+                </div>
+              ))}
+            </div>
+            {/* Fade to background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-content-bg/30 via-content-bg/70 to-content-bg" />
+          </div>
 
-        <div className="min-h-[50vh] flex flex-col items-center justify-center text-center py-12">
-          <div className="grid grid-cols-3 gap-3 mb-8 w-full max-w-md opacity-40">
+          {/* Top section */}
+          <div className="relative flex flex-1 flex-col items-center justify-center py-12 text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
+              <Users className="size-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h2 className="mt-5 text-xl font-semibold tracking-tight">Manage your contacts</h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+              Keep track of everyone you do business with. Add customers, suppliers, or contacts that are both.
+            </p>
+            <Button
+              onClick={() => openDrawer("contact")}
+              size="lg"
+              className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+            >
+              <UserPlus className="mr-2 size-4" />
+              Add your first contact
+            </Button>
+          </div>
+
+          {/* Feature cards */}
+          <div className="grid gap-4 sm:grid-cols-3 pb-8">
             {[
-              { label: "Customers", color: "border-l-blue-500" },
-              { label: "Suppliers", color: "border-l-orange-500" },
-              { label: "Both", color: "border-l-purple-500" },
-            ].map(({ label, color }) => (
+              {
+                icon: Building2,
+                title: "Customers",
+                description: "Track who you sell to, their payment terms, and outstanding balances.",
+                color: "text-blue-600 dark:text-blue-400",
+                bg: "bg-blue-50 dark:bg-blue-950/40",
+              },
+              {
+                icon: Truck,
+                title: "Suppliers",
+                description: "Manage your vendors, purchase history, and payable accounts.",
+                color: "text-orange-600 dark:text-orange-400",
+                bg: "bg-orange-50 dark:bg-orange-950/40",
+              },
+              {
+                icon: ArrowRight,
+                title: "Linked data",
+                description: "Contacts connect to invoices, bills, and journal entries automatically.",
+                color: "text-purple-600 dark:text-purple-400",
+                bg: "bg-purple-50 dark:bg-purple-950/40",
+              },
+            ].map(({ icon: Icon, title, description, color, bg }) => (
               <div
-                key={label}
-                className={`rounded-lg border border-dashed border-l-4 ${color} p-3`}
+                key={title}
+                className="group rounded-xl p-5"
               >
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="text-lg font-semibold tabular-nums text-muted-foreground/40 mt-0.5">
-                  0
+                <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
+                  <Icon className={`size-4.5 ${color}`} />
+                </div>
+                <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  {description}
                 </p>
               </div>
             ))}
-          </div>
-          <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-            <Users className="size-6 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <h3 className="mt-4 text-sm font-medium">No contacts yet</h3>
-          <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-            Add your first customer or supplier to get started.
-          </p>
-          <div className="mt-4">
-            <Button
-              onClick={() => openDrawer("contact")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Contact
-            </Button>
           </div>
         </div>
       </BlurReveal>
