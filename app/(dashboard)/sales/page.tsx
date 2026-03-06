@@ -8,8 +8,8 @@ import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -391,20 +391,20 @@ export default function InvoicesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground shrink-0">From</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-8 w-36 text-xs"
+                onChange={(v) => setDateFrom(v)}
+                placeholder="Start date"
+                className="h-8 w-40 text-xs"
               />
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground shrink-0">To</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="h-8 w-36 text-xs"
+                onChange={(v) => setDateTo(v)}
+                placeholder="End date"
+                className="h-8 w-40 text-xs"
               />
             </div>
             <Select

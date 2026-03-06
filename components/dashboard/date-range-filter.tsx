@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type Preset = "this-month" | "last-month" | "this-quarter" | "this-year" | "last-year" | "custom";
 
@@ -85,18 +85,18 @@ export function DateRangeFilter({ startDate, endDate, onDateChange }: DateRangeF
       ))}
       {active === "custom" && (
         <div className="flex items-center gap-2 ml-2">
-          <Input
-            type="date"
+          <DatePicker
             value={startDate}
-            onChange={(e) => onDateChange(e.target.value, endDate)}
-            className="w-36 h-8 text-sm"
+            onChange={(v) => onDateChange(v, endDate)}
+            placeholder="Start date"
+            className="w-40 h-8 text-sm"
           />
           <span className="text-sm text-muted-foreground">to</span>
-          <Input
-            type="date"
+          <DatePicker
             value={endDate}
-            onChange={(e) => onDateChange(startDate, e.target.value)}
-            className="w-36 h-8 text-sm"
+            onChange={(v) => onDateChange(startDate, v)}
+            placeholder="End date"
+            className="w-40 h-8 text-sm"
           />
         </div>
       )}
