@@ -325,15 +325,9 @@ export default function BankingPage() {
         </div>
       </Section>
 
-      {/* Live sync teaser */}
-      <div className="h-px bg-border" />
-      <div className="flex items-center gap-3 rounded-lg border border-dashed px-4 py-3">
-        <Waves className="size-4 text-muted-foreground shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">Live bank sync</p>
-          <p className="text-xs text-muted-foreground">Automatic transaction imports are on the roadmap.</p>
-        </div>
-        <Badge variant="outline" className="text-[10px] shrink-0">Coming Soon</Badge>
+      <div className="flex items-center gap-3 py-2 text-muted-foreground">
+        <Waves className="size-3.5 shrink-0" />
+        <p className="text-xs">Live bank sync coming soon. For now, import statements manually.</p>
       </div>
 
       <CreateAccountDrawer
