@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight } from "lucide-react";
+import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -10,6 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
@@ -188,6 +196,8 @@ export default function ContactsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [refetching, setRefetching] = useState(false);
   const [fetchKey, setFetchKey] = useState(0);
@@ -219,6 +229,8 @@ export default function ContactsPage() {
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (sortBy !== "created") params.set("sortBy", sortBy);
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
     params.set("page", "1");
     params.set("limit", "50");
 
@@ -239,7 +251,7 @@ export default function ContactsPage() {
 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, typeFilter, sortBy, sortOrder]);
+  }, [debouncedSearch, typeFilter, sortBy, sortOrder, dateFrom, dateTo]);
 
   // Load next page
   const loadMore = useCallback(() => {
@@ -255,6 +267,8 @@ export default function ContactsPage() {
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (sortBy !== "created") params.set("sortBy", sortBy);
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
     params.set("page", String(nextPage));
     params.set("limit", "50");
 
@@ -271,7 +285,7 @@ export default function ContactsPage() {
         }
       })
       .finally(() => setLoadingMore(false));
-  }, [loadingMore, hasMore, page, debouncedSearch, typeFilter, sortBy, sortOrder]);
+  }, [loadingMore, hasMore, page, debouncedSearch, typeFilter, sortBy, sortOrder, dateFrom, dateTo]);
 
   // IntersectionObserver to trigger loadMore
   useEffect(() => {
@@ -329,9 +343,10 @@ export default function ContactsPage() {
   if (loading) return <BrandLoader />;
 
   /* ---------- Empty state ---------- */
+  const hasFilters = dateFrom || dateTo;
   const pendingSearch = search !== debouncedSearch;
 
-  if (contacts.length === 0 && !search && typeFilter === "all" && !refetching && !pendingSearch) {
+  if (contacts.length === 0 && !search && typeFilter === "all" && !refetching && !pendingSearch && !hasFilters) {
     return (
       <ContentReveal>
         <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
@@ -478,6 +493,9 @@ export default function ContactsPage() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
@@ -487,6 +505,58 @@ export default function ContactsPage() {
               className="pl-9"
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">From</span>
+            <DatePicker
+              value={dateFrom}
+              onChange={(v) => setDateFrom(v)}
+              placeholder="Start date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">To</span>
+            <DatePicker
+              value={dateTo}
+              onChange={(v) => setDateTo(v)}
+              placeholder="End date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <Select
+            value={`${sortBy}:${sortOrder}`}
+            onValueChange={(v) => {
+              const [key, order] = v.split(":");
+              setSortBy(key);
+              setSortOrder(order as "asc" | "desc");
+            }}
+          >
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created:desc">Newest first</SelectItem>
+              <SelectItem value="created:asc">Oldest first</SelectItem>
+              <SelectItem value="name:asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name:desc">Name (Z-A)</SelectItem>
+              <SelectItem value="terms:asc">Shortest terms</SelectItem>
+              <SelectItem value="terms:desc">Longest terms</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+            >
+              <X className="mr-1 size-3" />
+              Clear dates
+            </Button>
+          )}
         </div>
 
         {/* Table */}
