@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
 import { cn } from "@/lib/utils";
 
 interface BankAccountDetail {
@@ -198,11 +197,10 @@ export default function ReconcilePage() {
 
   const unreconciledTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
 
-  if (loading) return <BrandLoader />;
-
   return (
-    <BlurReveal className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
+      {loading && <BrandLoader />}
+      {!loading && <>
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
@@ -506,6 +504,7 @@ export default function ReconcilePage() {
           </div>
         </SheetContent>
       </Sheet>
-    </BlurReveal>
+      </>}
+    </div>
   );
 }
