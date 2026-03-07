@@ -2,17 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Target } from "lucide-react";
+import { ChevronRight, Plus, Target } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { Section } from "@/components/dashboard/section";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
-
-import { StatCard } from "@/components/dashboard/stat-card";
-import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { cn } from "@/lib/utils";
 
 interface Budget {
   id: string;
@@ -30,21 +27,6 @@ interface BudgetUtilization {
   totalBudgeted: number;
   totalActual: number;
 }
-
-const columns: Column<Budget>[] = [
-  { key: "name", header: "Name", render: (r) => <span className="text-sm font-medium">{r.name}</span> },
-  { key: "start", header: "Start", className: "w-28", render: (r) => <span className="text-sm">{r.startDate}</span> },
-  { key: "end", header: "End", className: "w-28", render: (r) => <span className="text-sm">{r.endDate}</span> },
-  { key: "status", header: "Status", className: "w-24", render: (r) => (
-    <Badge variant="outline" className={r.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>
-      {r.isActive ? "Active" : "Inactive"}
-    </Badge>
-  )},
-  { key: "total", header: "Total Budget", className: "w-32 text-right", render: (r) => {
-    const total = r.lines?.reduce((s, l) => s + l.total, 0) || 0;
-    return <span className="font-mono text-sm tabular-nums">{formatMoney(total)}</span>;
-  }},
-];
 
 export default function BudgetsPage() {
   const router = useRouter();
@@ -85,112 +67,153 @@ export default function BudgetsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const activeBudgets = budgets.filter((b) => b.isActive).length;
+  if (loading) return <BrandLoader />;
 
-  if (!loading && budgets.length === 0) {
+  if (budgets.length === 0) {
     return (
-      <BlurReveal className="space-y-6">
-          <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <div className="flex items-center gap-3">
-                <Target className="size-4 text-muted-foreground" />
-                <div>
-                  <h2 className="text-sm font-semibold">Budget Tracking</h2>
-                  <p className="text-xs text-muted-foreground">Monitor spending against your targets</p>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => openDrawer("budget")}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                <Plus className="mr-2 size-4" />
-                New Budget
-              </Button>
-            </div>
-            <div className="p-5 space-y-5 opacity-40">
-              {[
-                { label: "Marketing", budgeted: "$12,000", actual: "$7,800", pct: 65 },
-                { label: "Operations", budgeted: "$25,000", actual: "$20,500", pct: 82 },
-                { label: "Engineering", budgeted: "$40,000", actual: "$16,000", pct: 40 },
-                { label: "Sales", budgeted: "$18,000", actual: "$9,900", pct: 55 },
-              ].map(({ label, budgeted, actual, pct }) => (
-                <div key={label} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{label}</span>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono tabular-nums">
-                      <span>{actual}</span>
-                      <span className="text-muted-foreground/40">/</span>
-                      <span>{budgeted}</span>
-                      <span className={`font-sans font-medium ${pct > 80 ? "text-amber-500/70" : "text-emerald-500/70"}`}>{pct}%</span>
-                    </div>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${pct > 80 ? "bg-amber-500/50" : "bg-emerald-500/50"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+      <ContentReveal className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">Budgets</h2>
+          <Button
+            onClick={() => openDrawer("budget")}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            New Budget
+          </Button>
+        </div>
+
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 border-b">
+            <Target className="size-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-semibold">Budget Tracking</p>
+              <p className="text-xs text-muted-foreground">Monitor spending against your targets</p>
             </div>
           </div>
-      </BlurReveal>
+          <div className="p-5 space-y-5 opacity-40">
+            {[
+              { label: "Marketing", pct: 65 },
+              { label: "Operations", pct: 82 },
+              { label: "Engineering", pct: 40 },
+              { label: "Sales", pct: 55 },
+            ].map(({ label, pct }) => (
+              <div key={label} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">{label}</span>
+                  <span className={cn("text-xs font-medium", pct > 80 ? "text-amber-500/70" : "text-emerald-500/70")}>{pct}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full", pct > 80 ? "bg-amber-500/50" : "bg-emerald-500/50")}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ContentReveal>
     );
   }
 
+  const activeBudgets = budgets.filter((b) => b.isActive);
+
   return (
-    <BlurReveal className="space-y-6 sm:space-y-10">
-      <Section title="Overview" description="A summary of your budgets and their current status.">
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
-            <StatCard title="Total Budgets" value={budgets.length.toString()} icon={Target} />
-            <StatCard title="Active" value={activeBudgets.toString()} icon={Target} />
-          </div>
-          <div className="flex justify-end flex-wrap">
-            <Button
-              size="sm"
-              onClick={() => openDrawer("budget")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Budget
-            </Button>
-          </div>
+    <ContentReveal className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Budgets</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {budgets.length} budget{budgets.length !== 1 ? "s" : ""} · {activeBudgets.length} active
+          </p>
         </div>
-      </Section>
+        <Button
+          onClick={() => openDrawer("budget")}
+          size="sm"
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Plus className="mr-2 size-4" />
+          New Budget
+        </Button>
+      </div>
 
+      {/* Active budget utilization cards */}
       {utilization.length > 0 && (
-        <>
-          <div className="h-px bg-border" />
-
-          <Section title="Budget Utilization" description="Spending progress against active budgets.">
-            <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {utilization.map((u) => (
-                <div key={u.budgetId} className="rounded-lg border bg-card p-4">
-                  <BudgetProgressBar
-                    label={u.name}
-                    budgeted={u.totalBudgeted}
-                    actual={u.totalActual}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {utilization.map((u) => {
+            const pct = u.totalBudgeted === 0 ? 0 : Math.round((u.totalActual / u.totalBudgeted) * 100);
+            const over = u.totalActual > u.totalBudgeted;
+            return (
+              <button
+                key={u.budgetId}
+                onClick={() => router.push(`/accounting/budgets/${u.budgetId}`)}
+                className="rounded-lg border bg-card p-4 text-left hover:bg-muted/50 transition-colors space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium truncate">{u.name}</p>
+                  <span className={cn(
+                    "text-xs font-mono tabular-nums font-medium",
+                    over ? "text-red-600" : pct > 80 ? "text-amber-600" : "text-emerald-600"
+                  )}>{pct}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                    )}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
-              ))}
-            </div>
-          </Section>
-        </>
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-mono tabular-nums">
+                  <span>{formatMoney(u.totalActual)}</span>
+                  <span>/ {formatMoney(u.totalBudgeted)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
 
-      <div className="h-px bg-border" />
-
-      <Section title="Budgets" description="View and manage all your financial budgets.">
-        <DataTable
-          columns={columns}
-          data={budgets}
-          loading={loading}
-          emptyMessage="No budgets found."
-          onRowClick={(r) => router.push(`/accounting/budgets/${r.id}`)}
-        />
-      </Section>
-    </BlurReveal>
+      {/* All budgets list */}
+      <div className="rounded-lg border overflow-hidden">
+        <div className="divide-y">
+          {budgets.map((b) => {
+            const total = b.lines?.reduce((s, l) => s + l.total, 0) || 0;
+            return (
+              <button
+                key={b.id}
+                onClick={() => router.push(`/accounting/budgets/${b.id}`)}
+                className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">{b.name}</p>
+                    <Badge variant="outline" className={cn(
+                      "text-[10px] shrink-0",
+                      b.isActive
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        : ""
+                    )}>
+                      {b.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {b.startDate} · {b.endDate}
+                  </p>
+                </div>
+                <span className="font-mono text-sm font-medium tabular-nums shrink-0">
+                  {formatMoney(total)}
+                </span>
+                <ChevronRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </ContentReveal>
   );
 }
