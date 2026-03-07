@@ -14,6 +14,8 @@ import {
   BookOpen,
   FileText,
   Users,
+  AlertTriangle,
+  Gauge,
 } from "lucide-react";
 import { GrainGradient } from "@paper-design/shaders-react";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -225,6 +227,20 @@ function AgingColumn({
   );
 }
 
+function KpiItem({ label, value, good }: { label: string; value: string; good: boolean }) {
+  return (
+    <div className="text-center">
+      <p className={cn(
+        "text-lg font-bold font-mono tabular-nums",
+        good ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+      )}>
+        {value}
+      </p>
+      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
@@ -247,6 +263,22 @@ export default function DashboardPage() {
     grandTotal: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [sparklines, setSparklines] = useState<{
+    revenue: number[];
+    expenses: number[];
+    netIncome: number[];
+  }>({ revenue: [], expenses: [], netIncome: [] });
+  const [budgetAlerts, setBudgetAlerts] = useState<
+    { accountName: string; pct: number; budgeted: number; actual: number }[]
+  >([]);
+  const [ratios, setRatios] = useState<{
+    currentRatio: number | null;
+    quickRatio: number | null;
+    grossMargin: number | null;
+    netMargin: number | null;
+    dso: number | null;
+    dpo: number | null;
+  } | null>(null);
 
   useEffect(() => {
     const id = localStorage.getItem("activeOrgId");
@@ -287,6 +319,49 @@ export default function DashboardPage() {
       })
       .then(() => devDelay())
       .finally(() => setLoading(false));
+
+    // Load sparkline trends in background
+    fetch("/api/v1/reports/monthly-trends?months=6", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.revenueSparkline) {
+          setSparklines({
+            revenue: data.revenueSparkline,
+            expenses: data.expenseSparkline,
+            netIncome: data.netIncomeSparkline,
+          });
+        }
+      })
+      .catch(() => {});
+
+    // Load budget alerts in background
+    fetch("/api/v1/reports/budget-vs-actual", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.comparisons) {
+          const alerts = data.comparisons
+            .filter(
+              (c: { budgeted: number; actual: number }) =>
+                c.budgeted > 0 && c.actual / c.budgeted >= 0.9
+            )
+            .map((c: { accountName: string; budgeted: number; actual: number }) => ({
+              accountName: c.accountName,
+              pct: Math.round((c.actual / c.budgeted) * 100),
+              budgeted: c.budgeted,
+              actual: c.actual,
+            }));
+          setBudgetAlerts(alerts);
+        }
+      })
+      .catch(() => {});
+
+    // Load financial ratios in background
+    fetch("/api/v1/reports/financial-ratios", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ratios) setRatios(data.ratios);
+      })
+      .catch(() => {});
   }, []);
 
   const receivablesCount = receivables.buckets.reduce(
@@ -395,23 +470,60 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Budget Alerts */}
+            {budgetAlerts.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="size-4 text-amber-600" />
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Budget Alerts
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  {budgetAlerts.slice(0, 3).map((alert) => (
+                    <div
+                      key={alert.accountName}
+                      className="flex items-center justify-between text-xs"
+                    >
+                      <span className="text-amber-700 dark:text-amber-400">
+                        {alert.accountName}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-mono tabular-nums font-medium",
+                          alert.pct >= 100
+                            ? "text-red-600"
+                            : "text-amber-700 dark:text-amber-400"
+                        )}
+                      >
+                        {alert.pct}% used ({formatMoney(alert.actual)} / {formatMoney(alert.budgeted)})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Section B: Stat Cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <StatCard
                 title="Revenue"
                 value={formatMoney(pnl.totalRevenue)}
                 icon={TrendingUp}
+                sparklineData={sparklines.revenue.length > 1 ? sparklines.revenue : undefined}
               />
               <StatCard
                 title="Expenses"
                 value={formatMoney(pnl.totalExpenses)}
                 icon={TrendingDown}
+                sparklineData={sparklines.expenses.length > 1 ? sparklines.expenses : undefined}
               />
               <StatCard
                 title="Net Income"
                 value={formatMoney(pnl.netIncome)}
                 icon={DollarSign}
                 changeType={pnl.netIncome >= 0 ? "positive" : "negative"}
+                sparklineData={sparklines.netIncome.length > 1 ? sparklines.netIncome : undefined}
               />
               <StatCard
                 title="Receivables"
@@ -524,6 +636,38 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* Financial KPIs */}
+            {ratios && (
+              <div className="rounded-lg border bg-card p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Financial KPIs
+                  </h3>
+                  <Gauge className="size-4 text-muted-foreground/50" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {ratios.currentRatio !== null && (
+                    <KpiItem label="Current Ratio" value={`${ratios.currentRatio}x`} good={ratios.currentRatio >= 1} />
+                  )}
+                  {ratios.quickRatio !== null && (
+                    <KpiItem label="Quick Ratio" value={`${ratios.quickRatio}x`} good={ratios.quickRatio >= 1} />
+                  )}
+                  {ratios.grossMargin !== null && (
+                    <KpiItem label="Gross Margin" value={`${ratios.grossMargin}%`} good={ratios.grossMargin > 0} />
+                  )}
+                  {ratios.netMargin !== null && (
+                    <KpiItem label="Net Margin" value={`${ratios.netMargin}%`} good={ratios.netMargin > 0} />
+                  )}
+                  {ratios.dso !== null && (
+                    <KpiItem label="DSO" value={`${ratios.dso}d`} good={ratios.dso <= 45} />
+                  )}
+                  {ratios.dpo !== null && (
+                    <KpiItem label="DPO" value={`${ratios.dpo}d`} good={ratios.dpo <= 60} />
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Section D: Recent Activity */}
             <div className="grid gap-6 lg:grid-cols-[1fr_340px]">

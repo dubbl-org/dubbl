@@ -11,6 +11,10 @@ import {
   Target,
   Clock,
   ArrowDownUp,
+  Receipt,
+  ArrowLeftRight,
+  Gauge,
+  Layers,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 
@@ -48,6 +52,36 @@ const reportCategories = [
         description: "Compare budgeted amounts against actual GL balances.",
         href: "/reports/budget-vs-actual",
         icon: Target,
+      },
+      {
+        title: "P&L Comparison",
+        description: "Side-by-side period comparison with change amounts and percentages.",
+        href: "/reports/pnl-comparison",
+        icon: ArrowLeftRight,
+      },
+    ],
+  },
+  {
+    title: "Tax & Analytics",
+    description: "Tax reporting, expense breakdowns, and financial KPIs.",
+    reports: [
+      {
+        title: "Tax Summary",
+        description: "Output tax vs input tax by tax rate for the period.",
+        href: "/reports/tax-summary",
+        icon: Receipt,
+      },
+      {
+        title: "Expense Analytics",
+        description: "Spending by category with trends and averages.",
+        href: "/reports/expense-analytics",
+        icon: Layers,
+      },
+      {
+        title: "Financial Ratios",
+        description: "Current ratio, margins, DSO, DPO, and more KPIs.",
+        href: "/reports/financial-ratios",
+        icon: Gauge,
       },
     ],
   },

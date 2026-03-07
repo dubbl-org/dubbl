@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Calendar } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { devDelay } from "@/lib/dev-delay";
+import { formatMoney } from "@/lib/money";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -103,6 +104,9 @@ export default function RecurringInvoicesPage() {
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [upcoming, setUpcoming] = useState<
+    { templateName: string; contactName: string; lineTotal: number; dates: { date: string; occurrence: number }[] }[]
+  >([]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -116,7 +120,28 @@ export default function RecurringInvoicesPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) setTemplates(data.data);
+        if (data.data) {
+          setTemplates(data.data);
+          // Load previews for active templates
+          const active = (data.data as RecurringTemplate[]).filter((t) => t.status === "active");
+          Promise.all(
+            active.slice(0, 5).map((t) =>
+              fetch(`/api/v1/recurring/${t.id}/preview?count=3`, {
+                headers: { "x-organization-id": orgId },
+              })
+                .then((r) => r.json())
+                .then((d) => ({
+                  templateName: d.template?.name || t.name,
+                  contactName: d.template?.contactName || t.contact?.name || "",
+                  lineTotal: d.template?.lineTotal || 0,
+                  dates: d.upcoming || [],
+                }))
+                .catch(() => null)
+            )
+          ).then((results) => {
+            setUpcoming(results.filter((r): r is NonNullable<typeof r> => r !== null && r.dates.length > 0));
+          });
+        }
       })
       .then(() => devDelay())
       .finally(() => setLoading(false));
@@ -280,6 +305,37 @@ export default function RecurringInvoicesPage() {
           />
         </div>
       </Section>
+
+      {upcoming.length > 0 && (
+        <Section
+          title="Upcoming Generations"
+          description="Next scheduled invoice generations from active templates."
+        >
+          <div className="space-y-3">
+            {upcoming.map((u) => (
+              <div key={u.templateName} className="rounded-lg border px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-medium">{u.templateName}</p>
+                    {u.contactName && (
+                      <p className="text-xs text-muted-foreground">{u.contactName}</p>
+                    )}
+                  </div>
+                  <p className="text-sm font-mono font-semibold tabular-nums">{formatMoney(u.lineTotal)}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {u.dates.map((d) => (
+                    <div key={d.date} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Calendar className="size-3" />
+                      <span>{d.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
     </ContentReveal>
   );
 }
