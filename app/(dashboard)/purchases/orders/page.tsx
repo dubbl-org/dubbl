@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -9,6 +9,7 @@ import {
   Package,
   Truck,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
@@ -95,38 +96,97 @@ export default function PurchaseOrdersPage() {
   const { open: openDrawer } = useCreateDrawer();
   const [pos, setPos] = useState<PO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [fetchKey, setFetchKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
+  const buildParams = useCallback((pg: number) => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
-    fetch(`/api/v1/purchase-orders?${params}`, {
+    params.set("page", String(pg));
+    params.set("limit", "50");
+    return params;
+  }, [debouncedSearch]);
+
+  // Reset and fetch page 1 when filters change
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    const isRefetch = !loading;
+
+    setPage(1);
+    setHasMore(true);
+    if (isRefetch) setRefetching(true);
+
+    fetch(`/api/v1/purchase-orders?${buildParams(1)}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled && data.data) setPos(data.data);
+        if (cancelled) return;
+        if (data.data) setPos(data.data);
+        if (data.pagination) {
+          setTotal(data.pagination.total);
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
       })
       .finally(() => {
         if (!cancelled) {
           setLoading(false);
+          setRefetching(false);
           setFetchKey((k) => k + 1);
         }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSearch]);
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, debouncedSearch]);
+
+  // Load next page
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || !orgId) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+
+    fetch(`/api/v1/purchase-orders?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setPos((prev) => [...prev, ...data.data]);
+        if (data.pagination) {
+          setPage(data.pagination.page);
+          setTotal(data.pagination.total);
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [loadingMore, hasMore, orgId, page, buildParams]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const pendingSearch = search !== debouncedSearch;
 
@@ -248,7 +308,7 @@ export default function PurchaseOrdersPage() {
             <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
               <span>
                 <span className="font-medium text-foreground tabular-nums">
-                  {pos.length}
+                  {total || pos.length}
                 </span>{" "}
                 orders
               </span>
@@ -385,7 +445,7 @@ export default function PurchaseOrdersPage() {
             </div>
           </div>
 
-          {pendingSearch ? (
+          {refetching || pendingSearch ? (
             <BrandLoader className="h-40" />
           ) : (
             <MotionConfig reducedMotion="never">
@@ -413,6 +473,15 @@ export default function PurchaseOrdersPage() {
             </MotionConfig>
           )}
         </div>
+
+        {/* Infinite scroll sentinel */}
+        {hasMore && !refetching && (
+          <div ref={sentinelRef} className="flex items-center justify-center py-6">
+            {loadingMore && (
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            )}
+          </div>
+        )}
       </div>
     </BlurReveal>
   );

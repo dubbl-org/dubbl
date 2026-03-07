@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
@@ -161,7 +162,9 @@ export default function BillsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const [bills, setBills] = useState<Bill[]>([]);
+  const [countsData, setCountsData] = useState<{ counts: Record<string, { count: number; amount: number }>; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -170,7 +173,12 @@ export default function BillsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [fetchKey, setFetchKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   const columns = useMemo(() => buildColumns(), []);
 
   useEffect(() => {
@@ -178,11 +186,8 @@ export default function BillsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-
+  // Build params (shared between page 1 fetch and loadMore)
+  const buildParams = useCallback((pg: number) => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (debouncedSearch) params.set("search", debouncedSearch);
@@ -190,26 +195,92 @@ export default function BillsPage() {
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
+    params.set("page", String(pg));
+    params.set("limit", "50");
+    return params;
+  }, [statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
 
-    fetch(`/api/v1/bills?${params}`, {
+  // Fetch status counts via lightweight COUNT(*) endpoint
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    fetch(`/api/v1/bills/counts`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled && data.data) setBills(data.data);
+        if (!cancelled && data.counts) setCountsData(data);
+      });
+    return () => { cancelled = true; };
+  }, [orgId]);
+
+  // Reset and fetch page 1 when filters change
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    const isRefetch = !loading;
+
+    setPage(1);
+    setHasMore(true);
+    if (isRefetch) setRefetching(true);
+
+    fetch(`/api/v1/bills?${buildParams(1)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.data) setBills(data.data);
+        if (data.pagination) {
+
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
       })
       .then(() => devDelay())
       .finally(() => {
         if (!cancelled) {
           setLoading(false);
+          setRefetching(false);
           setFetchKey((k) => k + 1);
         }
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
+
+  // Load next page
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || !orgId) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+
+    fetch(`/api/v1/bills?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setBills((prev) => [...prev, ...data.data]);
+        if (data.pagination) {
+          setPage(data.pagination.page);
+
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [loadingMore, hasMore, orgId, page, buildParams]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const handleSort = useCallback((key: string) => {
     setSortBy((prev) => {
@@ -222,13 +293,14 @@ export default function BillsPage() {
     });
   }, []);
 
-  const outstanding = bills
-    .filter((b) => ["received", "partial", "overdue"].includes(b.status))
-    .reduce((s, b) => s + b.amountDue, 0);
+  const outstanding = useMemo(() => {
+    if (!countsData) return 0;
+    return ["received", "partial", "overdue"].reduce(
+      (s, st) => s + (countsData.counts[st]?.amount || 0), 0
+    );
+  }, [countsData]);
 
-  const overdue = bills
-    .filter((b) => b.status === "overdue")
-    .reduce((s, b) => s + b.amountDue, 0);
+  const overdue = countsData?.counts.overdue?.amount || 0;
 
   const aging = useMemo(() => {
     const now = new Date();
@@ -286,14 +358,17 @@ export default function BillsPage() {
   const pendingSearch = search !== debouncedSearch;
   const hasFilters = dateFrom || dateTo;
   const statusCounts = useMemo(() => {
+    if (!countsData) return {} as Record<string, number>;
     const c: Record<string, number> = {};
-    for (const b of bills) c[b.status] = (c[b.status] || 0) + 1;
+    for (const [status, data] of Object.entries(countsData.counts)) {
+      c[status] = data.count;
+    }
     return c;
-  }, [bills]);
+  }, [countsData]);
 
   if (loading) return <BrandLoader />;
 
-  if (!loading && bills.length === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
+  if (!loading && (countsData?.total || 0) === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
     return (
       <BlurReveal>
         <div className="relative">
@@ -435,7 +510,7 @@ export default function BillsPage() {
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Total Bills</p>
             <p className="text-2xl font-bold tabular-nums tracking-tight">
-              {bills.length}
+              {countsData?.total || 0}
             </p>
           </div>
           <div className="space-y-1">
@@ -551,12 +626,12 @@ export default function BillsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="draft">Draft</TabsTrigger>
-              <TabsTrigger value="received">Received</TabsTrigger>
-              <TabsTrigger value="partial">Partial</TabsTrigger>
-              <TabsTrigger value="paid">Paid</TabsTrigger>
-              <TabsTrigger value="overdue">Overdue</TabsTrigger>
+              <TabsTrigger value="all">All ({countsData?.total || 0})</TabsTrigger>
+              <TabsTrigger value="draft">Draft ({statusCounts.draft || 0})</TabsTrigger>
+              <TabsTrigger value="received">Received ({statusCounts.received || 0})</TabsTrigger>
+              <TabsTrigger value="partial">Partial ({statusCounts.partial || 0})</TabsTrigger>
+              <TabsTrigger value="paid">Paid ({statusCounts.paid || 0})</TabsTrigger>
+              <TabsTrigger value="overdue">Overdue ({statusCounts.overdue || 0})</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="relative w-full sm:max-w-xs">
@@ -629,7 +704,7 @@ export default function BillsPage() {
         </div>
 
         {/* Table */}
-        {pendingSearch ? (
+        {refetching || pendingSearch ? (
           <BrandLoader className="h-40" />
         ) : (
           <MotionConfig reducedMotion="never">
@@ -656,6 +731,15 @@ export default function BillsPage() {
               />
             </motion.div>
           </MotionConfig>
+        )}
+
+        {/* Infinite scroll sentinel */}
+        {hasMore && !refetching && (
+          <div ref={sentinelRef} className="flex items-center justify-center py-6">
+            {loadingMore && (
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            )}
+          </div>
         )}
       </div>
     </BlurReveal>

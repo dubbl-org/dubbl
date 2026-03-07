@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Receipt, Search, X } from "lucide-react";
+import { Plus, Receipt, Search, X, Loader2 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
@@ -101,7 +101,9 @@ export default function ExpensesPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const [claims, setClaims] = useState<ExpenseClaim[]>([]);
+  const [countsData, setCountsData] = useState<{ counts: Record<string, { count: number; amount: number }>; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -110,7 +112,12 @@ export default function ExpensesPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [fetchKey, setFetchKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   const columns = useMemo(() => buildColumns(), []);
 
   useEffect(() => {
@@ -118,10 +125,7 @@ export default function ExpensesPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
+  const buildParams = useCallback((pg: number) => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (debouncedSearch) params.set("search", debouncedSearch);
@@ -129,23 +133,91 @@ export default function ExpensesPage() {
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
-    fetch(`/api/v1/expenses?${params}`, {
+    params.set("page", String(pg));
+    params.set("limit", "50");
+    return params;
+  }, [statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
+
+  // Fetch status counts via lightweight COUNT(*) endpoint
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    fetch(`/api/v1/expenses/counts`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled && data.data) setClaims(data.data);
+        if (!cancelled && data.counts) setCountsData(data);
+      });
+    return () => { cancelled = true; };
+  }, [orgId]);
+
+  // Reset and fetch page 1 when filters change
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    const isRefetch = !loading;
+
+    setPage(1);
+    setHasMore(true);
+    if (isRefetch) setRefetching(true);
+
+    fetch(`/api/v1/expenses?${buildParams(1)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.data) setClaims(data.data);
+        if (data.pagination) {
+
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
       })
       .finally(() => {
         if (!cancelled) {
           setLoading(false);
+          setRefetching(false);
           setFetchKey((k) => k + 1);
         }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
+
+  // Load next page
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || !orgId) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+
+    fetch(`/api/v1/expenses?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setClaims((prev) => [...prev, ...data.data]);
+        if (data.pagination) {
+          setPage(data.pagination.page);
+
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [loadingMore, hasMore, orgId, page, buildParams]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const handleSort = useCallback((key: string) => {
     setSortBy((prev) => {
@@ -161,27 +233,25 @@ export default function ExpensesPage() {
   const pendingSearch = search !== debouncedSearch;
   const hasFilters = dateFrom || dateTo;
 
-  const totalAmount = claims.reduce((s, c) => s + c.totalAmount, 0);
-  const pendingAmount = claims
-    .filter((c) => c.status === "submitted")
-    .reduce((s, c) => s + c.totalAmount, 0);
-  const approvedAmount = claims
-    .filter((c) => c.status === "approved")
-    .reduce((s, c) => s + c.totalAmount, 0);
-
   const statusCounts = useMemo(() => {
-    const map: Record<string, { count: number; amount: number }> = {};
-    for (const c of claims) {
-      if (!map[c.status]) map[c.status] = { count: 0, amount: 0 };
-      map[c.status].count++;
-      map[c.status].amount += c.totalAmount;
+    if (!countsData) return {} as Record<string, number>;
+    const c: Record<string, number> = {};
+    for (const [status, data] of Object.entries(countsData.counts)) {
+      c[status] = data.count;
     }
-    return map;
-  }, [claims]);
+    return c;
+  }, [countsData]);
+
+  const totalAmount = useMemo(() => {
+    if (!countsData) return 0;
+    return Object.values(countsData.counts).reduce((s, d) => s + d.amount, 0);
+  }, [countsData]);
+  const pendingAmount = countsData?.counts.submitted?.amount || 0;
+  const approvedAmount = countsData?.counts.approved?.amount || 0;
 
   if (loading) return <BrandLoader />;
 
-  if (claims.length === 0 && statusFilter === "all" && !debouncedSearch) {
+  if (!loading && (countsData?.total || 0) === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
     return (
       <BlurReveal>
         <div>
@@ -305,40 +375,10 @@ export default function ExpensesPage() {
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Claims</p>
             <p className="text-2xl font-bold tabular-nums tracking-tight">
-              {claims.length}
+              {countsData?.total || 0}
             </p>
           </div>
         </div>
-
-        {/* Status pipeline badges */}
-        {claims.length > 0 && (
-          <div className="flex gap-2">
-            {(
-              [
-                { status: "draft", label: "Draft", color: "bg-gray-400" },
-                { status: "submitted", label: "Submitted", color: "bg-blue-500" },
-                { status: "approved", label: "Approved", color: "bg-emerald-500" },
-                { status: "rejected", label: "Rejected", color: "bg-red-500" },
-                { status: "paid", label: "Paid", color: "bg-purple-500" },
-              ] as const
-            ).map(({ status, label, color }) => {
-              const data = statusCounts[status];
-              if (!data) return null;
-              return (
-                <div
-                  key={status}
-                  className="flex items-center gap-2 rounded-md border px-3 py-1.5"
-                >
-                  <span className={`size-2 rounded-full ${color}`} />
-                  <span className="text-xs font-medium">{label}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {data.count}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <div className="h-px bg-border" />
 
@@ -346,12 +386,12 @@ export default function ExpensesPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="draft">Draft</TabsTrigger>
-              <TabsTrigger value="submitted">Submitted</TabsTrigger>
-              <TabsTrigger value="approved">Approved</TabsTrigger>
-              <TabsTrigger value="rejected">Rejected</TabsTrigger>
-              <TabsTrigger value="paid">Paid</TabsTrigger>
+              <TabsTrigger value="all">All ({countsData?.total || 0})</TabsTrigger>
+              <TabsTrigger value="draft">Draft ({statusCounts.draft || 0})</TabsTrigger>
+              <TabsTrigger value="submitted">Submitted ({statusCounts.submitted || 0})</TabsTrigger>
+              <TabsTrigger value="approved">Approved ({statusCounts.approved || 0})</TabsTrigger>
+              <TabsTrigger value="rejected">Rejected ({statusCounts.rejected || 0})</TabsTrigger>
+              <TabsTrigger value="paid">Paid ({statusCounts.paid || 0})</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="relative w-full sm:max-w-xs">
@@ -421,7 +461,7 @@ export default function ExpensesPage() {
         </div>
 
         {/* Table */}
-        {pendingSearch ? (
+        {refetching || pendingSearch ? (
           <BrandLoader className="h-40" />
         ) : (
           <MotionConfig reducedMotion="never">
@@ -450,6 +490,15 @@ export default function ExpensesPage() {
               />
             </motion.div>
           </MotionConfig>
+        )}
+
+        {/* Infinite scroll sentinel */}
+        {hasMore && !refetching && (
+          <div ref={sentinelRef} className="flex items-center justify-center py-6">
+            {loadingMore && (
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            )}
+          </div>
         )}
       </div>
     </BlurReveal>
