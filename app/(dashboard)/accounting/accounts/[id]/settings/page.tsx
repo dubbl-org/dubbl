@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,51 +14,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
-
-interface AccountDetail {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-  subType?: string | null;
-  description?: string | null;
-  currencyCode?: string;
-  isActive?: boolean;
-}
-
-const TYPE_STYLE: Record<string, string> = {
-  asset: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  liability: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300",
-  equity: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
-  revenue: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  expense: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
-};
+import { useAccountContext } from "../layout";
 
 export default function AccountSettingsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [account, setAccount] = useState<AccountDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { account, setAccount, refetch } = useAccountContext();
   const [saving, setSaving] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/accounts/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.account) setAccount(data.account);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
+  if (!account) return null;
+
+  const cur = account.currencyCode || "USD";
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -80,9 +49,10 @@ export default function AccountSettingsPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      setAccount((prev) => prev ? { ...prev, ...data.account } : prev);
+      setAccount(() => data.account ? { ...account, ...data.account } : account);
       toast.success("Account updated");
       window.dispatchEvent(new CustomEvent("accounts-changed"));
+      refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update");
     } finally {
@@ -107,10 +77,9 @@ export default function AccountSettingsPage() {
           body: JSON.stringify({ isActive: !willDeactivate }),
         });
         if (res.ok) {
-          const data = await res.json();
-          setAccount((prev) => prev ? { ...prev, ...data.account } : prev);
           toast.success(willDeactivate ? "Account deactivated" : "Account reactivated");
           window.dispatchEvent(new CustomEvent("accounts-changed"));
+          refetch();
         } else {
           toast.error("Failed to update account");
         }
@@ -142,41 +111,8 @@ export default function AccountSettingsPage() {
     });
   }
 
-  if (loading) return <BrandLoader />;
-
-  if (!account) {
-    return <p className="text-muted-foreground">Account not found.</p>;
-  }
-
-  const cur = account.currencyCode || "USD";
-
   return (
-    <ContentReveal>
-      {/* Back link */}
-      <button
-        onClick={() => router.push(`/accounting/accounts/${id}`)}
-        className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to {account.name}
-      </button>
-
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="text-base sm:text-lg font-semibold tracking-tight">Settings</h1>
-          <Badge variant="outline" className={TYPE_STYLE[account.type] || ""}>
-            {account.type}
-          </Badge>
-          {account.isActive === false && (
-            <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
-          )}
-        </div>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          <span className="font-mono">{account.code}</span> · {account.name}
-        </p>
-      </div>
-
+    <>
       <form onSubmit={handleSave} className="space-y-10">
         {/* General */}
         <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
@@ -297,6 +233,6 @@ export default function AccountSettingsPage() {
       </form>
 
       {confirmDialog}
-    </ContentReveal>
+    </>
   );
 }
