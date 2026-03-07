@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
@@ -333,7 +333,7 @@ export default function ContactsPage() {
 
   if (contacts.length === 0 && !search && typeFilter === "all" && !refetching && !pendingSearch) {
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
           {/* Background skeleton table */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-6">
@@ -433,12 +433,12 @@ export default function ContactsPage() {
             ))}
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
+    <ContentReveal>
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <PageHeader
@@ -531,6 +531,6 @@ export default function ContactsPage() {
         )}
       </div>
       {confirmDialog}
-    </BlurReveal>
+    </ContentReveal>
   );
 }

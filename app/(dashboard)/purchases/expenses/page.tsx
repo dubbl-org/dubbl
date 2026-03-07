@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
 
 interface ExpenseClaim {
@@ -253,7 +253,7 @@ export default function ExpensesPage() {
 
   if (!loading && (countsData?.total || 0) === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div>
           {/* Full-width pipeline steps */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 rounded-lg border overflow-hidden mb-8">
@@ -324,12 +324,12 @@ export default function ExpensesPage() {
             </div>
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
+    <ContentReveal>
       <div className="space-y-3 sm:space-y-6">
         {/* Header */}
         <PageHeader
@@ -503,6 +503,6 @@ export default function ExpensesPage() {
           </div>
         )}
       </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

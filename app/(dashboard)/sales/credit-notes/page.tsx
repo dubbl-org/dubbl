@@ -12,7 +12,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 interface CreditNote {
   id: string;
@@ -119,7 +119,7 @@ export default function CreditNotesPage() {
 
   if (!loading && creditNotes.length === 0 && statusFilter === "all") {
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="pt-12 pb-12 space-y-10">
           {/* Top: title + CTA */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -212,12 +212,12 @@ export default function CreditNotesPage() {
             </div>
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <ContentReveal className="space-y-10">
       <Section
         title="Credit Notes"
         description="View, filter, and manage all your credit notes."
@@ -252,6 +252,6 @@ export default function CreditNotesPage() {
           />
         </div>
       </Section>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

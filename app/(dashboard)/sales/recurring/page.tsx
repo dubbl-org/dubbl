@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 interface RecurringTemplate {
   id: string;
@@ -135,7 +135,7 @@ export default function RecurringInvoicesPage() {
     const recurringDays = new Set([1, 15]);
 
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="pt-12 pb-12 space-y-10">
           {/* Top: title + CTA */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -244,12 +244,12 @@ export default function RecurringInvoicesPage() {
             </div>
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <ContentReveal className="space-y-10">
       <Section
         title="Recurring Invoices"
         description="Manage recurring templates that automatically generate invoices."
@@ -280,6 +280,6 @@ export default function RecurringInvoicesPage() {
           />
         </div>
       </Section>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

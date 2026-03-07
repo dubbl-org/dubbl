@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 
 
@@ -127,7 +127,7 @@ export default function TransactionsPage() {
 
   if (!loading && entries.length === 0) {
     return (
-      <BlurReveal className="space-y-6">
+      <ContentReveal className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight">Journal Entries</h2>
           <Button
@@ -179,12 +179,12 @@ export default function TransactionsPage() {
             </div>
           ))}
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
+    <ContentReveal>
     <div className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="Summary of transactions and journal entries across all statuses.">
         <div className="space-y-4">
@@ -235,6 +235,6 @@ export default function TransactionsPage() {
         </div>
       </div>
     </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

@@ -31,7 +31,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
 
 interface Bill {
@@ -379,7 +379,7 @@ export default function BillsPage() {
 
   if (!loading && (countsData?.total || 0) === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="relative">
           {/* Background skeleton table */}
           <div className="pointer-events-none w-full rounded-lg border overflow-hidden">
@@ -471,7 +471,7 @@ export default function BillsPage() {
             </div>
           ))}
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
@@ -482,7 +482,7 @@ export default function BillsPage() {
     aging["60+"].amount;
 
   return (
-    <BlurReveal className="space-y-10">
+    <ContentReveal className="space-y-10">
       {/* Overview */}
       <div className="rounded-xl border bg-card overflow-hidden">
         {/* Hero stats row */}
@@ -732,6 +732,6 @@ export default function BillsPage() {
           )}
         </div>
       </Section>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

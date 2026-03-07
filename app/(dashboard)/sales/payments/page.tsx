@@ -6,7 +6,7 @@ import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 
@@ -105,7 +105,7 @@ export default function PaymentsPage() {
 
   if (!loading && payments.length === 0) {
     return (
-      <BlurReveal className="space-y-10">
+      <ContentReveal className="space-y-10">
         <Section title="Payments" description="Track payments received against your invoices.">
           <EmptyState
             icon={Banknote}
@@ -113,12 +113,12 @@ export default function PaymentsPage() {
             description="Payments will appear here when you record them against invoices."
           />
         </Section>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <ContentReveal className="space-y-10">
       <Section title="Payments" description="Track payments received against your invoices.">
         <div className="overflow-x-auto">
           <DataTable
@@ -129,6 +129,6 @@ export default function PaymentsPage() {
           />
         </div>
       </Section>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

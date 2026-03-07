@@ -40,7 +40,7 @@ import {
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal, decimalToCents } from "@/lib/money";
@@ -579,7 +579,7 @@ export default function ExpenseDetailPage() {
   const sc = statusConfig[claim.status] || statusConfig.draft;
 
   return (
-    <BlurReveal>
+    <ContentReveal>
       <div className="space-y-6">
         {/* Top bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -760,6 +760,6 @@ export default function ExpenseDetailPage() {
       />
 
       {confirmDialog}
-    </BlurReveal>
+    </ContentReveal>
   );
 }

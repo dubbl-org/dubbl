@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 
 interface ProjectMember {
@@ -199,7 +199,7 @@ export default function ProjectsPage() {
 
   if (!loading && projects.length === 0 && statusFilter === "all") {
     return (
-      <BlurReveal className="space-y-10">
+      <ContentReveal className="space-y-10">
         <Section title="Projects" description="Create your first project to start tracking time, tasks, and billing.">
           <EmptyState
             icon={FolderKanban}
@@ -215,12 +215,12 @@ export default function ProjectsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
+    <ContentReveal>
     <div className="space-y-6 sm:space-y-8">
       <Section title="Overview" description="A summary of your projects and resource allocation.">
         <div className="space-y-4">
@@ -272,6 +272,6 @@ export default function ProjectsPage() {
         </div>
       </Section>
     </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

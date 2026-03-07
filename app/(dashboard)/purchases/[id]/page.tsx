@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal } from "@/lib/money";
@@ -104,7 +104,7 @@ export default function BillDetailPage() {
   const sc = statusConfig[b.status] || statusConfig.draft;
 
   return (
-    <BlurReveal>
+    <ContentReveal>
       <div className="space-y-6">
         {/* Top bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -296,6 +296,6 @@ export default function BillDetailPage() {
         </div>
       </div>
       {confirmDialog}
-    </BlurReveal>
+    </ContentReveal>
   );
 }

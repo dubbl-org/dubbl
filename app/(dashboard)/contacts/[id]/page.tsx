@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { centsToDecimal, decimalToCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
@@ -474,7 +474,7 @@ export default function ContactDetailPage() {
         })}
       </nav>
 
-      <BlurReveal key={tab}>
+      <ContentReveal key={tab}>
         {/* Details tab */}
         {tab === "details" && (
           <form onSubmit={handleSubmit} className="space-y-10">
@@ -1011,7 +1011,7 @@ export default function ContactDetailPage() {
             </Section>
           </div>
         )}
-      </BlurReveal>
+      </ContentReveal>
       {confirmDialog}
     </div>
   );

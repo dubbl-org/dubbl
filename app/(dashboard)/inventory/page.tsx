@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 
 interface InventoryItem {
@@ -143,7 +143,7 @@ export default function InventoryPage() {
 
   if (!loading && items.length === 0 && !search) {
     return (
-      <BlurReveal className="space-y-10">
+      <ContentReveal className="space-y-10">
         <Section title="Inventory" description="Manage products and stock levels.">
           <EmptyState
             icon={Package}
@@ -159,12 +159,12 @@ export default function InventoryPage() {
             </Button>
           </EmptyState>
         </Section>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
+    <ContentReveal>
     <div className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="A summary of your inventory levels and stock value.">
         <div className="space-y-4">
@@ -214,6 +214,6 @@ export default function InventoryPage() {
         </div>
       </Section>
     </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }
