@@ -152,7 +152,7 @@ export default function AccountSettingsPage() {
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">Control whether this account appears in dropdowns.</p>
           </div>
           <div className="min-w-0">
-            <Select name="isActive" defaultValue={account.isActive === false ? "false" : "true"}>
+            <Select name="isActive" defaultValue={account.isActive === false ? "false" : "true"} key={String(account.isActive)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="true">Active</SelectItem>
