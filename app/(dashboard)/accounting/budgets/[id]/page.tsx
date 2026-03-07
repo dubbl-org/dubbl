@@ -19,9 +19,12 @@ import {
 } from "recharts";
 
 export default function BudgetOverviewPage() {
-  const { budget, comparisons } = useBudgetContext();
+  const { budget, comparisons, totalBudgeted, totalActual } = useBudgetContext();
 
   const grandTotal = budget.lines.reduce((s, l) => s + l.total, 0);
+  const totalVariance = totalBudgeted - totalActual;
+  const overallPct = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
+  const over = totalActual > totalBudgeted;
 
   // Build chart data from period comparisons (aggregate across all accounts)
   const chartData = useMemo(() => {
@@ -152,9 +155,28 @@ export default function BudgetOverviewPage() {
 
       {/* Grand total */}
       {grandTotal > 0 && (
-        <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
-          <p className="text-sm font-medium">Grand Total</p>
-          <p className="font-mono text-lg font-semibold tabular-nums">{formatMoney(grandTotal)}</p>
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Grand Total</p>
+            <p className="font-mono text-lg font-semibold tabular-nums">{formatMoney(grandTotal)}</p>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-4 text-muted-foreground">
+              <span>Spent: <span className="font-mono tabular-nums text-foreground">{formatMoney(totalActual)}</span></span>
+              <span className={cn(
+                "font-mono tabular-nums",
+                over ? "text-red-600" : "text-emerald-600"
+              )}>
+                {over ? "Over by " + formatMoney(Math.abs(totalVariance)) : formatMoney(totalVariance) + " remaining"}
+              </span>
+            </div>
+            <span className={cn(
+              "text-xs font-mono tabular-nums font-medium",
+              over ? "text-red-600" : overallPct > 80 ? "text-amber-600" : "text-emerald-600"
+            )}>
+              {overallPct}%
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -310,6 +332,10 @@ function PeriodBreakdownTable({ comparisons }: { comparisons: { periods: PeriodC
   const periods = Array.from(periodMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
   if (periods.length === 0) return null;
 
+  const totBudgeted = periods.reduce((s, p) => s + p.budgeted, 0);
+  const totActual = periods.reduce((s, p) => s + p.actual, 0);
+  const totVariance = totBudgeted - totActual;
+
   return (
     <div>
       <p className="text-sm font-medium mb-3">Period Breakdown</p>
@@ -341,6 +367,19 @@ function PeriodBreakdownTable({ comparisons }: { comparisons: { periods: PeriodC
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="border-t bg-muted/30">
+              <td className="px-4 py-2 text-sm font-medium">Total</td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold">{formatMoney(totBudgeted)}</td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold text-blue-600">{formatMoney(totActual)}</td>
+              <td className={cn(
+                "px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold",
+                totVariance >= 0 ? "text-emerald-600" : "text-red-600"
+              )}>
+                {totVariance >= 0 ? "" : "-"}{formatMoney(Math.abs(totVariance))}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
