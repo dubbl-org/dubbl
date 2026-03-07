@@ -188,7 +188,7 @@ export default function EntryDetailPage() {
         )}
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-3 text-sm">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 text-sm">
         <div>
           <span className="text-muted-foreground">Date</span>
           <p className="font-medium">{entry.date}</p>
@@ -222,7 +222,7 @@ export default function EntryDetailPage() {
         </div>
       )}
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">

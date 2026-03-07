@@ -159,9 +159,9 @@ export default function MembersPage() {
         </div>
         <div className="min-w-0 space-y-4">
           {/* Stats + action */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             {members.length > 0 ? (
-              <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[12px] text-muted-foreground">
                 <span>{members.length} total</span>
                 <span className="text-border">|</span>
                 <span>{ownerCount} owner{ownerCount !== 1 ? "s" : ""}</span>
@@ -197,7 +197,7 @@ export default function MembersPage() {
                 return (
                   <div
                     key={m.id}
-                    className="flex items-center justify-between p-4"
+                    className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="size-9">
@@ -267,7 +267,7 @@ export default function MembersPage() {
             What each role can do within the organization.
           </p>
         </div>
-        <div className="min-w-0 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
+        <div className="min-w-0 grid gap-px overflow-hidden rounded-lg border border-border bg-border grid-cols-1 sm:grid-cols-3">
           <div className="bg-card p-4">
             <div className="flex items-center gap-2">
               <Shield className="size-3.5 text-purple-600" />

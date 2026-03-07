@@ -221,10 +221,10 @@ export default function ProjectsPage() {
 
   return (
     <BlurReveal>
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <Section title="Overview" description="A summary of your projects and resource allocation.">
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard title="Active" value={activeProjects.length.toString()} icon={FolderKanban} />
             <StatCard title="Total Budget" value={formatMoney(totalBudget)} icon={DollarSign} />
             <StatCard title="Total Billed" value={formatMoney(totalBilled)} icon={Target}
@@ -250,15 +250,17 @@ export default function ProjectsPage() {
 
       <Section title="Projects" description="View and manage all your projects.">
         <div className="space-y-4">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="on_hold">On Hold</TabsTrigger>
-              <TabsTrigger value="archived">Archived</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="overflow-x-auto -mx-1 px-1">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+                <TabsTrigger value="on_hold">On Hold</TabsTrigger>
+                <TabsTrigger value="archived">Archived</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
           <DataTable
               columns={columns}

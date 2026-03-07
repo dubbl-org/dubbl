@@ -137,7 +137,7 @@ export default function BillingPage() {
           </p>
         </div>
         <div className="min-w-0">
-          <div className="flex items-center justify-between rounded-lg border border-border p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border p-4">
             <div className="flex items-center gap-4">
               <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
                 <span className="text-lg font-bold text-emerald-600">
@@ -173,7 +173,7 @@ export default function BillingPage() {
             Compare features and choose the right plan for your team.
           </p>
         </div>
-        <div className="min-w-0 grid gap-4 lg:grid-cols-3">
+        <div className="min-w-0 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {plans.map((plan) => {
             const isCurrent = plan.id === currentPlan;
             return (

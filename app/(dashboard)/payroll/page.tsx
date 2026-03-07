@@ -218,10 +218,10 @@ export default function PayrollPage() {
 
   return (
     <BlurReveal>
-    <div className="space-y-10">
+    <div className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="A summary of your payroll, active employees, and recent pay runs.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <StatCard
                 title="Active Employees"
                 value={activeEmployees.length.toString()}
@@ -238,7 +238,7 @@ export default function PayrollPage() {
                 icon={FileText}
               />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button
               size="sm"
               variant="outline"

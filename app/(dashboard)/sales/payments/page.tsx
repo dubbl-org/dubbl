@@ -120,12 +120,14 @@ export default function PaymentsPage() {
   return (
     <BlurReveal className="space-y-10">
       <Section title="Payments" description="Track payments received against your invoices.">
-        <DataTable
-          columns={columns}
-          data={payments}
-          loading={loading}
-          emptyMessage="No payments found."
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            columns={columns}
+            data={payments}
+            loading={loading}
+            emptyMessage="No payments found."
+          />
+        </div>
       </Section>
     </BlurReveal>
   );

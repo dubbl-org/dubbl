@@ -111,13 +111,13 @@ export default function NewFixedAssetPage() {
   const expenseAccounts = accounts.filter((a) => a.type === "expense");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="New Fixed Asset"
         description="Add a capital asset to track depreciation."
       />
-      <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Asset Name *</Label>
             <Input
@@ -146,7 +146,7 @@ export default function NewFixedAssetPage() {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Purchase Date *</Label>
             <Input
@@ -167,7 +167,7 @@ export default function NewFixedAssetPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="space-y-2">
             <Label>Residual Value</Label>
             <Input
@@ -206,7 +206,7 @@ export default function NewFixedAssetPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="space-y-2">
             <Label>Asset Account</Label>
             <Select value={assetAccountId} onValueChange={setAssetAccountId}>
@@ -260,7 +260,7 @@ export default function NewFixedAssetPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/accounting/fixed-assets">Cancel</Link>
           </Button>

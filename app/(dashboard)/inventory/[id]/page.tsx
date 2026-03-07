@@ -217,7 +217,7 @@ export default function InventoryItemDetailPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {isLowStock && (
           <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
             Low Stock
@@ -235,7 +235,7 @@ export default function InventoryItemDetailPage() {
         </Badge>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">On Hand</p>
           <p className="text-xl font-bold font-mono">{item.quantityOnHand}</p>
@@ -254,7 +254,7 @@ export default function InventoryItemDetailPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
+      <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 sm:space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="code">Code</Label>

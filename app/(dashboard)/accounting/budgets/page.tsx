@@ -138,14 +138,14 @@ export default function BudgetsPage() {
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <BlurReveal className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="A summary of your budgets and their current status.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
             <StatCard title="Total Budgets" value={budgets.length.toString()} icon={Target} />
             <StatCard title="Active" value={activeBudgets.toString()} icon={Target} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end flex-wrap">
             <Button
               size="sm"
               onClick={() => openDrawer("budget")}
@@ -163,7 +163,7 @@ export default function BudgetsPage() {
           <div className="h-px bg-border" />
 
           <Section title="Budget Utilization" description="Spending progress against active budgets.">
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {utilization.map((u) => (
                 <div key={u.budgetId} className="rounded-lg border bg-card p-4">
                   <BudgetProgressBar

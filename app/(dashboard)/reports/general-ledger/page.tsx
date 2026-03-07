@@ -89,17 +89,17 @@ export default function GeneralLedgerPage() {
       ) : (
         accounts.map((acct) => (
           <div key={acct.accountId} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">
-                <span className="font-mono text-sm text-muted-foreground mr-2">{acct.accountCode}</span>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-sm sm:text-base font-semibold">
+                <span className="font-mono text-xs sm:text-sm text-muted-foreground mr-2">{acct.accountCode}</span>
                 {acct.accountName}
               </h2>
-              <span className="text-sm text-muted-foreground capitalize">{acct.accountType}</span>
+              <span className="text-xs sm:text-sm text-muted-foreground capitalize">{acct.accountType}</span>
             </div>
             <DataTable columns={entryColumns} data={acct.entries} emptyMessage="No entries." />
-            <div className="flex justify-between px-4 py-2 bg-muted/50 rounded-lg text-sm font-semibold">
+            <div className="flex flex-col gap-1 sm:flex-row sm:justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
               <span>Account Total</span>
-              <div className="flex gap-6 font-mono tabular-nums">
+              <div className="flex gap-3 sm:gap-6 font-mono tabular-nums text-xs sm:text-sm">
                 <span>Dr: {formatMoney(acct.totalDebit)}</span>
                 <span>Cr: {formatMoney(acct.totalCredit)}</span>
                 <span>Bal: {formatMoney(acct.balance)}</span>

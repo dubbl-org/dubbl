@@ -189,7 +189,7 @@ export default function NotesPage() {
       {/* Stats + Filter bar */}
       {notes.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Notes
@@ -338,8 +338,8 @@ function NoteCard({
       note.isPinned && "border-amber-300 bg-amber-50/50 dark:border-amber-200/30 dark:bg-amber-950/20",
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex items-start sm:items-center justify-between mb-2 gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           {note.isPinned && <Pin className="size-3 text-amber-500" />}
           <div className="flex items-center gap-1.5 rounded-full bg-muted/50 px-2 py-0.5">
             <User className="size-2.5 text-muted-foreground/60" />

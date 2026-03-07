@@ -456,8 +456,8 @@ export default function BankAccountDetailPage() {
             <CircleDot className="size-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-lg font-semibold tracking-tight">{account.accountName}</h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight">{account.accountName}</h1>
               <Badge variant="outline">{ACCOUNT_TYPE_LABELS[account.accountType]}</Badge>
               <Badge variant="outline" className="text-[10px]">{account.currencyCode}</Badge>
             </div>
@@ -468,7 +468,7 @@ export default function BankAccountDetailPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)}>
             <RefreshCcw className="mr-2 size-3.5" />
             Reconcile
@@ -481,7 +481,7 @@ export default function BankAccountDetailPage() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-8">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4 mb-8">
         <div>
           <p className="text-[11px] text-muted-foreground">Balance</p>
           <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">{formatMoney(account.balance, cur)}</p>
@@ -506,7 +506,7 @@ export default function BankAccountDetailPage() {
       </div>
 
       {/* Tabs */}
-      <nav className="-mt-2 mb-8 flex items-center gap-1 border-b border-border">
+      <nav className="-mt-2 mb-8 flex items-center gap-1 overflow-x-auto border-b border-border">
         {TABS.map((t) => {
           const Icon = t.icon;
           return (
@@ -514,7 +514,7 @@ export default function BankAccountDetailPage() {
               key={t.value}
               onClick={() => setTab(t.value)}
               className={cn(
-                "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
+                "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
                 tab === t.value
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -875,7 +875,7 @@ export default function BankAccountDetailPage() {
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">Irreversible actions.</p>
               </div>
               <div className="min-w-0">
-                <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
                   <div>
                     <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete account</p>
                     <p className="text-[12px] text-muted-foreground">Permanently delete this account and all imported transactions.</p>
@@ -1060,7 +1060,7 @@ function ImportSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
               <Upload className="size-5" />
@@ -1072,7 +1072,7 @@ function ImportSheet({
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+        <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
           {/* Dropzone */}
           <div className="space-y-4">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Upload File</p>
@@ -1082,7 +1082,7 @@ function ImportSheet({
               onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setSelectedFile(f); }}
               onClick={() => fileInputRef.current?.click()}
               className={cn(
-                "relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-all",
+                "relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 sm:px-6 sm:py-10 text-center transition-all",
                 dragging
                   ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
                   : "border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/30",
@@ -1177,8 +1177,8 @@ function ImportSheet({
                   </div>
                 )}
 
-                <div className="rounded-lg border overflow-hidden">
-                  <div className="grid grid-cols-[90px_1fr_100px] gap-2 border-b bg-muted/30 px-3 py-2">
+                <div className="rounded-lg border overflow-hidden overflow-x-auto">
+                  <div className="grid min-w-[320px] grid-cols-[90px_1fr_100px] gap-2 border-b bg-muted/30 px-3 py-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Date</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Amount</span>
@@ -1187,7 +1187,7 @@ function ImportSheet({
                     {preview.transactions.map((tx, i) => (
                       <div
                         key={`${tx.date}-${tx.description}-${i}`}
-                        className={cn("grid grid-cols-[90px_1fr_100px] gap-2 px-3 py-2.5", i < preview.transactions.length - 1 && "border-b")}
+                        className={cn("grid min-w-[320px] grid-cols-[90px_1fr_100px] gap-2 px-3 py-2.5", i < preview.transactions.length - 1 && "border-b")}
                       >
                         <span className="text-xs text-muted-foreground">{tx.date}</span>
                         <p className="text-xs font-medium truncate">{tx.description}</p>
@@ -1203,7 +1203,7 @@ function ImportSheet({
           )}
         </div>
 
-        <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+        <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 sm:gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button variant="outline" disabled={!canPreview || previewing} onClick={onPreview}>
             {previewing ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Previewing...</> : "Preview"}

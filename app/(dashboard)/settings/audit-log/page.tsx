@@ -154,15 +154,15 @@ export default function AuditLogPage() {
         </div>
         <div className="min-w-0 space-y-4">
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Input
               placeholder="Search by user, entity..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="max-w-[220px]"
+              className="w-full sm:max-w-[220px]"
             />
             <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Entity type" />
               </SelectTrigger>
               <SelectContent>
@@ -175,7 +175,7 @@ export default function AuditLogPage() {
               </SelectContent>
             </Select>
             <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-full sm:w-36">
                 <SelectValue placeholder="Action" />
               </SelectTrigger>
               <SelectContent>

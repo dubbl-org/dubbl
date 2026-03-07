@@ -96,7 +96,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-10">
+    <form onSubmit={handleSubmit} className="space-y-8 sm:space-y-10">
       <Section title="General" description="Basic project details and categorization.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
@@ -183,7 +183,7 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       <Section title="Timeline" description="Project schedule and time estimates.">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <div className="space-y-1.5"><Label className="text-xs">Start Date</Label><DatePicker value={projStartDate} onChange={setProjStartDate} placeholder="Select start date" /></div>
           <div className="space-y-1.5"><Label className="text-xs">End Date</Label><DatePicker value={projEndDate} onChange={setProjEndDate} placeholder="Select end date" /></div>
           <div className="space-y-1.5"><Label className="text-xs">Estimated Hours</Label><Input name="estimatedHours" type="number" step="0.5" min={0} defaultValue={proj.estimatedHours > 0 ? (proj.estimatedHours / 60).toFixed(1) : ""} /></div>
@@ -223,7 +223,7 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       <Section title="Danger zone" description="Irreversible actions for this project.">
-        <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
           <div>
             <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete project</p>
             <p className="text-[12px] text-muted-foreground">Permanently delete this project and all associated data.</p>

@@ -3,9 +3,10 @@
 import { useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Menu } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { useSidebar } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
@@ -81,6 +82,7 @@ export function Topbar() {
   const pathname = usePathname();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
+  const { toggleSidebar, isMobile } = useSidebar();
   const segments = pathname.split("/").filter(Boolean);
 
   // For group roots, show the default subtab in the breadcrumb
@@ -135,15 +137,20 @@ export function Topbar() {
 
   return (
     <header className="shrink-0">
-      <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-6">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-3 sm:px-6">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {isMobile && (
+            <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={toggleSidebar}>
+              <Menu className="size-4" />
+            </Button>
+          )}
           <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <Logo className="h-5 w-auto" />
-            <span className="text-[14px] font-semibold tracking-tight">dubbl</span>
+            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">dubbl</span>
           </Link>
-          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
           {parentLabel && effectiveSegments.length > 1 && (
-            <>
+            <div className="hidden sm:contents">
               {parentHref ? (
                 <Link href={parentHref} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
                   {parentLabel}
@@ -152,7 +159,7 @@ export function Topbar() {
                 <span className="text-[13px] text-muted-foreground shrink-0">{parentLabel}</span>
               )}
               <span className="text-muted-foreground/40 shrink-0">/</span>
-            </>
+            </div>
           )}
           <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
@@ -180,7 +187,7 @@ export function Topbar() {
                 onClick={() => openDrawer(cta.drawer)}
               >
                 <Plus className="size-3" />
-                {cta.label}
+                <span className="hidden sm:inline">{cta.label}</span>
               </Button>
             </>
           )}

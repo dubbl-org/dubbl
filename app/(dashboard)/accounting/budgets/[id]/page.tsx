@@ -213,7 +213,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
         title={editing ? "Edit Budget" : budget.name}
         description={editing ? "Modify budget allocations." : `${budget.startDate} to ${budget.endDate}`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!editing && (
             <>
               <Badge variant="outline" className={budget.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>
@@ -240,7 +240,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
 
       {editing ? (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Budget Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -322,7 +322,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {budget.lines.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {budget.lines.map((line) => (
                 <div key={line.id} className="rounded-lg border bg-card p-4">
                   <BudgetProgressBar

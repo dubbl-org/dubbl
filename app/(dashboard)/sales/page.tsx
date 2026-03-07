@@ -296,7 +296,7 @@ export default function InvoicesPage() {
           </div>
 
           {/* Preview stat cards (empty) */}
-          <div className="w-full max-w-lg grid grid-cols-3 gap-3 opacity-40">
+          <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-40">
             {[
               { label: "Outstanding", value: "$0.00" },
               { label: "Overdue", value: "$0.00" },
@@ -339,7 +339,7 @@ export default function InvoicesPage() {
                   );
                 })}
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {([
                   { key: "current" as const, color: "bg-emerald-500", label: "Current" },
                   { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
@@ -368,13 +368,13 @@ export default function InvoicesPage() {
         <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="sent">Sent</TabsTrigger>
-                <TabsTrigger value="partial">Partial</TabsTrigger>
-                <TabsTrigger value="paid">Paid</TabsTrigger>
-                <TabsTrigger value="overdue">Overdue</TabsTrigger>
+              <TabsList className="overflow-x-auto">
+                <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+                <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
+                <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
+                <TabsTrigger value="partial" className="whitespace-nowrap">Partial</TabsTrigger>
+                <TabsTrigger value="paid" className="whitespace-nowrap">Paid</TabsTrigger>
+                <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -466,10 +466,10 @@ export default function InvoicesPage() {
               {payments.map((p, i) => (
                 <div
                   key={p.id}
-                  className={`flex items-center justify-between px-4 py-3 ${i < payments.length - 1 ? "border-b" : ""}`}
+                  className={`flex items-center justify-between px-3 sm:px-4 py-3 ${i < payments.length - 1 ? "border-b" : ""}`}
                 >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="hidden sm:flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
                       <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div className="min-w-0">

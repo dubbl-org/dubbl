@@ -75,7 +75,7 @@ export default function IncomeStatementPage() {
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             {s.label}
           </h3>
-          <div className="rounded-lg border">
+          <div className="rounded-lg border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
@@ -106,12 +106,12 @@ export default function IncomeStatementPage() {
         </div>
       ))}
 
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6">
-        <div className="flex items-center justify-between">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
           <span className="text-sm font-semibold text-emerald-900">
             Net Income
           </span>
-          <span className="text-2xl font-bold font-mono tabular-nums text-emerald-700">
+          <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700">
             {parseFloat(data.netIncome).toFixed(2)}
           </span>
         </div>

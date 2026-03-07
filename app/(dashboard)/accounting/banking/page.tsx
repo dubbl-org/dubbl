@@ -153,7 +153,7 @@ export default function BankingPage() {
       <BlurReveal>
         <div className="flex flex-col items-center gap-10 pt-16 pb-12">
           <div className="w-full max-w-xl">
-            <div className="grid grid-cols-3 gap-0">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-0">
               {[
                 { step: "1", label: "Add account", sub: "Create a bank account with currency and type", color: "bg-blue-500", ring: "ring-blue-200 dark:ring-blue-900" },
                 { step: "2", label: "Import", sub: "Upload statements in CSV, OFX, CAMT, and more", color: "bg-amber-500", ring: "ring-amber-200 dark:ring-amber-900" },
@@ -161,7 +161,7 @@ export default function BankingPage() {
               ].map(({ step, label, sub, color, ring }, i) => (
                 <div key={step} className="flex flex-col items-center text-center relative">
                   {i < 2 && (
-                    <div className="absolute top-4 left-[calc(50%+16px)] w-[calc(100%-32px)] h-px bg-border" />
+                    <div className="hidden sm:block absolute top-4 left-[calc(50%+16px)] w-[calc(100%-32px)] h-px bg-border" />
                   )}
                   <div className={`relative z-10 flex size-8 items-center justify-center rounded-full ${color} ring-4 ${ring} text-white text-xs font-bold`}>
                     {step}
@@ -186,7 +186,7 @@ export default function BankingPage() {
             </Button>
           </div>
 
-          <div className="w-full max-w-lg grid grid-cols-3 gap-3 opacity-40">
+          <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-40">
             {[
               { label: "Total Balance", value: "$0.00" },
               { label: "Accounts", value: "0" },
@@ -217,11 +217,11 @@ export default function BankingPage() {
   const currencies = [...new Set(accounts.map((a) => a.currencyCode))];
 
   return (
-    <BlurReveal className="space-y-10">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <BlurReveal className="space-y-6 sm:space-y-10">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
         <div>
           <p className="text-[11px] text-muted-foreground">Total Balance</p>
-          <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">{formatMoney(totals.balance)}</p>
+          <p className="mt-0.5 font-mono text-lg sm:text-xl font-semibold tabular-nums">{formatMoney(totals.balance)}</p>
         </div>
         <div>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
@@ -246,8 +246,8 @@ export default function BankingPage() {
 
       <Section title="Bank Accounts" description="Manage accounts, balances, and statement imports.">
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
               <span className="font-medium text-foreground tabular-nums">{accounts.length}</span> accounts
               <span className="text-border">·</span>
               <span className="tabular-nums">{totals.active} active</span>

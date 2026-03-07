@@ -136,15 +136,15 @@ export default function ApiKeysPage() {
           ) : (
             <div className="divide-y rounded-lg border">
               {keys.map((k) => (
-                <div key={k.id} className="flex items-center justify-between p-4">
-                  <div>
+                <div key={k.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                  <div className="min-w-0">
                     <p className="text-sm font-medium">{k.name}</p>
-                    <p className="text-xs font-mono text-muted-foreground">
+                    <p className="text-xs font-mono text-muted-foreground truncate">
                       {k.keyPrefix}...
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {k.lastUsedAt ? `Last used ${k.lastUsedAt}` : "Never used"}
                     </span>
                     <Button

@@ -350,8 +350,8 @@ export default function DashboardPage() {
                 scale={3.5}
                 speed={0.2}
               />
-              <div className="relative p-8">
-                <h2 className="text-2xl font-bold text-emerald-950">
+              <div className="relative p-5 sm:p-8">
+                <h2 className="text-xl sm:text-2xl font-bold text-emerald-950">
                   {greeting}{firstName ? `, ${firstName}` : ""}
                 </h2>
                 <p className="mt-1 max-w-lg text-sm text-emerald-950/70">
@@ -526,7 +526,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Section D: Recent Activity */}
-            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+            <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[13px] font-semibold">Recent Entries</h2>

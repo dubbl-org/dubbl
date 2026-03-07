@@ -256,7 +256,7 @@ export default function ExpensesPage() {
       <BlurReveal>
         <div>
           {/* Full-width pipeline steps */}
-          <div className="grid grid-cols-4 gap-0 rounded-lg border overflow-hidden mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 rounded-lg border overflow-hidden mb-8">
             {[
               { label: "Draft", desc: "Create expense claim", color: "bg-gray-400", bg: "bg-gray-50 dark:bg-gray-900/30" },
               { label: "Submitted", desc: "Submit for review", color: "bg-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
@@ -330,7 +330,7 @@ export default function ExpensesPage() {
 
   return (
     <BlurReveal>
-      <div className="space-y-6">
+      <div className="space-y-3 sm:space-y-6">
         {/* Header */}
         <PageHeader
           title="Expenses"
@@ -347,10 +347,10 @@ export default function ExpensesPage() {
         </PageHeader>
 
         {/* Stats strip */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight">
+            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight">
               {formatMoney(totalAmount)}
             </p>
           </div>
@@ -359,7 +359,7 @@ export default function ExpensesPage() {
               <span className="size-1.5 rounded-full bg-blue-500" />
               Pending
             </p>
-            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight text-blue-600 dark:text-blue-400">
+            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-blue-600 dark:text-blue-400">
               {formatMoney(pendingAmount)}
             </p>
           </div>
@@ -368,13 +368,13 @@ export default function ExpensesPage() {
               <span className="size-1.5 rounded-full bg-emerald-500" />
               Approved
             </p>
-            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
+            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
               {formatMoney(approvedAmount)}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Claims</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight">
+            <p className="text-lg sm:text-2xl font-bold tabular-nums tracking-tight">
               {countsData?.total || 0}
             </p>
           </div>
@@ -384,16 +384,18 @@ export default function ExpensesPage() {
 
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All ({countsData?.total || 0})</TabsTrigger>
-              <TabsTrigger value="draft">Draft ({statusCounts.draft || 0})</TabsTrigger>
-              <TabsTrigger value="submitted">Submitted ({statusCounts.submitted || 0})</TabsTrigger>
-              <TabsTrigger value="approved">Approved ({statusCounts.approved || 0})</TabsTrigger>
-              <TabsTrigger value="rejected">Rejected ({statusCounts.rejected || 0})</TabsTrigger>
-              <TabsTrigger value="paid">Paid ({statusCounts.paid || 0})</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList>
+                <TabsTrigger value="all" className="whitespace-nowrap">All ({countsData?.total || 0})</TabsTrigger>
+                <TabsTrigger value="draft" className="whitespace-nowrap">Draft ({statusCounts.draft || 0})</TabsTrigger>
+                <TabsTrigger value="submitted" className="whitespace-nowrap">Submitted ({statusCounts.submitted || 0})</TabsTrigger>
+                <TabsTrigger value="approved" className="whitespace-nowrap">Approved ({statusCounts.approved || 0})</TabsTrigger>
+                <TabsTrigger value="rejected" className="whitespace-nowrap">Rejected ({statusCounts.rejected || 0})</TabsTrigger>
+                <TabsTrigger value="paid" className="whitespace-nowrap">Paid ({statusCounts.paid || 0})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input

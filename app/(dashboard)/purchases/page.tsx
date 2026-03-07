@@ -474,7 +474,7 @@ export default function BillsPage() {
 
   return (
     <BlurReveal>
-      <div className="space-y-6">
+      <div className="space-y-3 sm:space-y-6">
         {/* Header */}
         <PageHeader
           title="Bills"
@@ -491,10 +491,10 @@ export default function BillsPage() {
         </PageHeader>
 
         {/* Summary strip - outstanding + overdue + total + aging inline */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Outstanding</p>
-            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight">
+            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight">
               {formatMoney(outstanding)}
             </p>
           </div>
@@ -503,19 +503,19 @@ export default function BillsPage() {
               <span className="size-1.5 rounded-full bg-red-500" />
               Overdue
             </p>
-            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight text-red-600 dark:text-red-400">
+            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-red-600 dark:text-red-400">
               {formatMoney(overdue)}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Total Bills</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight">
+            <p className="text-lg sm:text-2xl font-bold tabular-nums tracking-tight">
               {countsData?.total || 0}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Paid</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
+            <p className="text-lg sm:text-2xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
               {statusCounts.paid || 0}
             </p>
           </div>
@@ -523,7 +523,7 @@ export default function BillsPage() {
 
         {/* Aging breakdown as colored cards */}
         {agingTotal > 0 && (
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(
               [
                 {
@@ -575,7 +575,7 @@ export default function BillsPage() {
 
         {/* Due soon strip */}
         {dueSoon.length > 0 && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-4">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-3 sm:p-4">
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
               <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -624,16 +624,18 @@ export default function BillsPage() {
 
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All ({countsData?.total || 0})</TabsTrigger>
-              <TabsTrigger value="draft">Draft ({statusCounts.draft || 0})</TabsTrigger>
-              <TabsTrigger value="received">Received ({statusCounts.received || 0})</TabsTrigger>
-              <TabsTrigger value="partial">Partial ({statusCounts.partial || 0})</TabsTrigger>
-              <TabsTrigger value="paid">Paid ({statusCounts.paid || 0})</TabsTrigger>
-              <TabsTrigger value="overdue">Overdue ({statusCounts.overdue || 0})</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList>
+                <TabsTrigger value="all" className="whitespace-nowrap">All ({countsData?.total || 0})</TabsTrigger>
+                <TabsTrigger value="draft" className="whitespace-nowrap">Draft ({statusCounts.draft || 0})</TabsTrigger>
+                <TabsTrigger value="received" className="whitespace-nowrap">Received ({statusCounts.received || 0})</TabsTrigger>
+                <TabsTrigger value="partial" className="whitespace-nowrap">Partial ({statusCounts.partial || 0})</TabsTrigger>
+                <TabsTrigger value="paid" className="whitespace-nowrap">Paid ({statusCounts.paid || 0})</TabsTrigger>
+                <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue ({statusCounts.overdue || 0})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input

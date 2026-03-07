@@ -138,14 +138,14 @@ export default function CreditNotesPage() {
             </Button>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] items-start">
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
             {/* Left: Ledger-style calculation */}
             <div className="rounded-xl border bg-card overflow-hidden">
-              <div className="bg-muted/30 px-5 py-3 border-b">
+              <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">How credit notes work</p>
               </div>
               <div className="divide-y">
-                <div className="flex items-center justify-between px-5 py-3.5">
+                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex size-7 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40">
                       <ReceiptText className="size-3.5 text-blue-500" />
@@ -157,7 +157,7 @@ export default function CreditNotesPage() {
                   </div>
                   <span className="font-mono text-sm font-medium">$1,200.00</span>
                 </div>
-                <div className="flex items-center justify-between px-5 py-3.5 bg-teal-50/30 dark:bg-teal-950/10">
+                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-teal-50/30 dark:bg-teal-950/10">
                   <div className="flex items-center gap-3">
                     <div className="flex size-7 items-center justify-center rounded-md bg-teal-50 dark:bg-teal-950/40">
                       <CreditCard className="size-3.5 text-teal-500" />
@@ -169,7 +169,7 @@ export default function CreditNotesPage() {
                   </div>
                   <span className="font-mono text-sm font-medium text-teal-600 dark:text-teal-400">-$200.00</span>
                 </div>
-                <div className="flex items-center justify-between px-5 py-3.5">
+                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="size-7" />
                     <p className="text-sm font-semibold">New balance</p>
@@ -223,13 +223,13 @@ export default function CreditNotesPage() {
         description="View, filter, and manage all your credit notes."
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="sent">Sent</TabsTrigger>
-                <TabsTrigger value="applied">Applied</TabsTrigger>
+              <TabsList className="overflow-x-auto">
+                <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+                <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
+                <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
+                <TabsTrigger value="applied" className="whitespace-nowrap">Applied</TabsTrigger>
               </TabsList>
             </Tabs>
 

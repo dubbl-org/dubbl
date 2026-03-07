@@ -30,7 +30,7 @@ export function TabLayout({
   return (
     <div>
       {!isDetailPage && (
-        <nav className="-mt-2 mb-8 flex items-center gap-1 border-b border-border">
+        <nav className="-mt-2 mb-6 sm:mb-8 flex items-center gap-1 overflow-x-auto border-b border-border scrollbar-none">
           {tabs.map((tab) => {
             const isActive = tab.exact
               ? pathname === tab.href
@@ -41,7 +41,7 @@ export function TabLayout({
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
+                  "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors whitespace-nowrap",
                   isActive
                     ? "border-foreground text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"

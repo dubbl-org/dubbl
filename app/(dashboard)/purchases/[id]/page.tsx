@@ -89,9 +89,9 @@ export default function BillDetailPage() {
         {b.status !== "void" && b.status !== "paid" && <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600"><Ban className="mr-2 size-4" />Void</Button>}
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge variant="outline" className={statusColors[b.status] || ""}>{b.status}</Badge>
-        <span className="text-sm text-muted-foreground">Issued {b.issueDate} · Due {b.dueDate}</span>
+        <span className="text-xs sm:text-sm text-muted-foreground">Issued {b.issueDate} · Due {b.dueDate}</span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -100,12 +100,12 @@ export default function BillDetailPage() {
         <div className="rounded-lg border p-4"><p className="text-xs text-muted-foreground">Due</p><p className="text-xl font-bold font-mono text-amber-600">{formatMoney(b.amountDue)}</p></div>
       </div>
 
-      <div className="rounded-lg border">
-        <div className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+      <div className="rounded-lg border overflow-x-auto">
+        <div className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
           <span>Description</span><span className="text-right">Qty</span><span className="text-right">Price</span><span className="text-right">Amount</span>
         </div>
         {b.lines.map((line) => (
-          <div key={line.id} className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
+          <div key={line.id} className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
             <div><p className="text-sm">{line.description}</p>{line.account && <p className="text-xs text-muted-foreground">{line.account.code} &middot; {line.account.name}</p>}</div>
             <span className="text-right text-sm font-mono">{(line.quantity / 100).toFixed(0)}</span>
             <span className="text-right text-sm font-mono">{formatMoney(line.unitPrice)}</span>

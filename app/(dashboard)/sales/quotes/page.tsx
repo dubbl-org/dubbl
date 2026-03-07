@@ -115,7 +115,7 @@ export default function QuotesPage() {
   if (!loading && quotes.length === 0 && statusFilter === "all") {
     return (
       <BlurReveal>
-        <div className="flex items-start pt-16 pb-12">
+        <div className="flex items-start px-3 sm:px-6 pt-16 pb-12">
           <div className="grid w-full gap-10 lg:grid-cols-2 lg:gap-16 items-center">
             {/* Left: text + CTA */}
             <div>
@@ -123,7 +123,7 @@ export default function QuotesPage() {
                 <ScrollText className="size-3.5 text-purple-500" />
                 Quotes &amp; Proposals
               </div>
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight">Send quotes, win deals</h2>
+              <h2 className="mt-4 text-lg sm:text-2xl font-semibold tracking-tight">Send quotes, win deals</h2>
               <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-md">
                 Create detailed proposals with line items and pricing. When your customer accepts, convert it to an invoice with one click.
               </p>
@@ -138,7 +138,7 @@ export default function QuotesPage() {
                 </Button>
               </div>
               {/* Mini stats */}
-              <div className="mt-8 flex gap-6 text-center">
+              <div className="mt-8 flex gap-4 sm:gap-6 text-center">
                 {[
                   { label: "Sent", value: "0" },
                   { label: "Accepted", value: "0" },
@@ -221,7 +221,7 @@ export default function QuotesPage() {
             <StatCard title="Accepted" value={formatMoney(accepted)} icon={FileText} changeType="positive" />
             <StatCard title="Total Quotes" value={quotes.length.toString()} icon={FileText} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end flex-wrap">
             <Button
               onClick={() => openDrawer("quote")}
               size="sm"
@@ -239,11 +239,11 @@ export default function QuotesPage() {
       <Section title="Quotes" description="View, filter, and manage all your quotes.">
         <div className="space-y-4">
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="draft">Draft</TabsTrigger>
-              <TabsTrigger value="sent">Sent</TabsTrigger>
-              <TabsTrigger value="accepted">Accepted</TabsTrigger>
+            <TabsList className="overflow-x-auto">
+              <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+              <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
+              <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
+              <TabsTrigger value="accepted" className="whitespace-nowrap">Accepted</TabsTrigger>
             </TabsList>
           </Tabs>
 

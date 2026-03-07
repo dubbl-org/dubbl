@@ -169,15 +169,15 @@ export default function TransactionsPage() {
 
   return (
     <BlurReveal>
-    <div className="space-y-10">
+    <div className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="Summary of transactions and journal entries across all statuses.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
             <StatCard title="Total Posted" value={formatMoney(totalPosted)} icon={ArrowLeftRight} />
             <StatCard title="Posted Entries" value={posted.length.toString()} icon={ArrowLeftRight} />
             <StatCard title="Drafts" value={drafts.length.toString()} icon={ArrowLeftRight} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end flex-wrap">
             <Button
               onClick={() => openDrawer("entry")}
               size="sm"
@@ -192,7 +192,7 @@ export default function TransactionsPage() {
 
       <div className="h-px bg-border" />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_380px]">
         <Section title="Journal Entries" description="View, filter, and manage all your journal entries.">
           <div className="space-y-4">
             <Tabs value={statusFilter} onValueChange={setStatusFilter}>

@@ -45,10 +45,10 @@ export default function NewQuotePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader title="New Quote" description="Create a sales quote." />
-      <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2"><Label>Customer *</Label><ContactPicker value={contactId} onChange={setContactId} type="customer" /></div>
           <div className="space-y-2"><Label>Reference</Label><Input value={reference} onChange={(e) => setReference(e.target.value)} /></div>
           <div className="space-y-2"><Label>Issue Date</Label><Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} /></div>
@@ -56,7 +56,7 @@ export default function NewQuotePage() {
         </div>
         <div className="space-y-2"><Label>Line Items</Label><LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} /></div>
         <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild><Link href="/sales/quotes">Cancel</Link></Button>
           <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">{saving ? "Creating..." : "Create Quote"}</Button>
         </div>

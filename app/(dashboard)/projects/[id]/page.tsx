@@ -100,20 +100,20 @@ export default function ProjectOverviewPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Row 1: Stat Cards - always full width */}
-      <div className={cn("grid gap-2.5", stats.length <= 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6")}>
+      <div className={cn("grid gap-2", stats.length <= 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6")}>
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
 
       {/* Row 2: Charts - ALWAYS 2 columns, fill full width */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <TimeAreaChart entries={proj.timeEntries} color={proj.color} />
         <TaskPieChart tasksByStatus={tasksByStatus} totalTasks={totalTasks} doneTasks={doneTasks} />
       </div>
 
       {/* Row 3: Calendar + Progress + Details - 3 columns full width */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <MiniCalendar proj={proj} />
         </div>
@@ -195,7 +195,7 @@ export default function ProjectOverviewPage() {
             <TrendingUp className="size-3.5 text-muted-foreground/60" />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Progress</span>
           </div>
-          <div className="grid gap-5 grid-cols-1 sm:grid-cols-3">
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-3">
             {proj.enableTasks && totalTasks > 0 ? (
               <ProgressBar label="Tasks" value={progressPct} color="#10b981" sub={`${doneTasks} of ${totalTasks} done`} />
             ) : (
@@ -241,7 +241,7 @@ export default function ProjectOverviewPage() {
       )}
 
       {/* Row 5: Activity Lists - ALWAYS 2 columns */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Left column: Tasks + Milestones */}
         <div className="space-y-4">
           <ListCard icon={Zap} label="Active Tasks" href={`/projects/${proj.id}/tasks`} count={activeTasks.length}>
@@ -463,7 +463,7 @@ function TimeAreaChart({ entries, color }: { entries: ProjectDetail["timeEntries
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-1">
         <div className="flex items-center gap-1.5">
           <Clock className="size-3.5 text-muted-foreground/60" />
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Time (14 days)</span>
@@ -521,7 +521,7 @@ function TaskPieChart({ tasksByStatus, totalTasks, doneTasks }: { tasksByStatus:
         <Zap className="size-3.5 text-muted-foreground/60" />
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task Distribution</span>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-center gap-4">
         <div className="shrink-0">
           <ResponsiveContainer width={140} height={140}>
             <PieChart>

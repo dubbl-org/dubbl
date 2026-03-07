@@ -82,7 +82,7 @@ export default function MilestonesPage() {
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid gap-3 grid-cols-3">
+      <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-3">
         <div className="rounded-lg border bg-card p-3">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Progress</p>
           <p className="text-lg font-bold font-mono tabular-nums mt-0.5">{completed}/{total}</p>
@@ -170,7 +170,7 @@ export default function MilestonesPage() {
           {milestones.map((ms) => {
             const overdue = ms.dueDate && new Date(ms.dueDate) < new Date() && ms.status !== "completed";
             return (
-              <div key={ms.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
+              <div key={ms.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 hover:bg-muted/20 transition-colors group">
                 <button onClick={() => toggleComplete(ms)} disabled={togglingId === ms.id} className="shrink-0">
                   {togglingId === ms.id ? (
                     <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />

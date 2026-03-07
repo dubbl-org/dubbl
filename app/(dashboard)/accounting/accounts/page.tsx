@@ -181,7 +181,7 @@ export default function AccountsPage() {
       <BlurReveal className="space-y-10">
         <Section title="Accounts" description="Set up and manage your chart of accounts for recording transactions.">
           <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
-            <div className="grid gap-3 sm:grid-cols-5">
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
               {ALL_TYPES.map((type) => (
                 <div
                   key={type}
@@ -225,10 +225,10 @@ export default function AccountsPage() {
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <BlurReveal className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="Chart of accounts summary across all account types and statuses.">
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
             {ALL_TYPES.map((type) => (
               <div
                 key={type}

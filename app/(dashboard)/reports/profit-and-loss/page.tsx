@@ -80,7 +80,7 @@ export default function ProfitAndLossPage() {
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Revenue</h2>
         <DataTable columns={columns} data={revenue} loading={loading} emptyMessage="No revenue entries." />
-        <div className="flex justify-between px-4 py-2 bg-muted/50 rounded-lg text-sm font-semibold">
+        <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
           <span>Total Revenue</span>
           <span className="font-mono tabular-nums">{formatMoney(totalRevenue)}</span>
         </div>
@@ -89,13 +89,13 @@ export default function ProfitAndLossPage() {
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Expenses</h2>
         <DataTable columns={columns} data={expenses} loading={loading} emptyMessage="No expense entries." />
-        <div className="flex justify-between px-4 py-2 bg-muted/50 rounded-lg text-sm font-semibold">
+        <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
           <span>Total Expenses</span>
           <span className="font-mono tabular-nums">{formatMoney(totalExpenses)}</span>
         </div>
       </div>
 
-      <div className="flex justify-between px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg font-semibold">
+      <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-emerald-50 border border-emerald-200 rounded-lg font-semibold text-sm sm:text-base">
         <span>Net Income</span>
         <span className="font-mono tabular-nums">{formatMoney(netIncome)}</span>
       </div>

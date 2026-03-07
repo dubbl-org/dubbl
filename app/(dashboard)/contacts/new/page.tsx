@@ -63,10 +63,10 @@ export default function NewContactPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader title="New Contact" description="Add a customer or supplier." />
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="name">Name *</Label>
             <Input id="name" name="name" required placeholder="Contact name" />
@@ -113,7 +113,7 @@ export default function NewContactPage() {
           <Textarea id="notes" name="notes" placeholder="Internal notes..." rows={3} />
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/contacts">Cancel</Link>
           </Button>

@@ -154,7 +154,7 @@ export default function RecurringInvoicesPage() {
             </Button>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] items-start">
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
             {/* Left: Calendar */}
             <div className="rounded-xl border bg-card overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
@@ -199,10 +199,10 @@ export default function RecurringInvoicesPage() {
             <div className="space-y-4">
               {/* Mock template card */}
               <div className="rounded-xl border bg-card overflow-hidden">
-                <div className="bg-muted/30 px-5 py-3 border-b">
+                <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Example template</p>
                 </div>
-                <div className="p-5 space-y-3">
+                <div className="p-3 sm:p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">Monthly hosting</p>
@@ -233,7 +233,7 @@ export default function RecurringInvoicesPage() {
               </div>
 
               {/* Supported frequencies */}
-              <div className="rounded-xl border bg-card px-5 py-4">
+              <div className="rounded-xl border bg-card px-3 sm:px-5 py-4">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Supported frequencies</p>
                 <div className="flex flex-wrap gap-2">
                   {["Weekly", "Fortnightly", "Monthly", "Quarterly", "Semi-annual", "Annual"].map((freq) => (
@@ -255,13 +255,13 @@ export default function RecurringInvoicesPage() {
         description="Manage recurring templates that automatically generate invoices."
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="paused">Paused</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsList className="overflow-x-auto">
+                <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+                <TabsTrigger value="active" className="whitespace-nowrap">Active</TabsTrigger>
+                <TabsTrigger value="paused" className="whitespace-nowrap">Paused</TabsTrigger>
+                <TabsTrigger value="completed" className="whitespace-nowrap">Completed</TabsTrigger>
               </TabsList>
             </Tabs>
 

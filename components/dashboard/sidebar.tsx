@@ -256,7 +256,7 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="none">
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader>
         <OrgSwitcher />
       </SidebarHeader>

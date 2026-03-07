@@ -57,10 +57,10 @@ export default function NewInventoryItemPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader title="New Inventory Item" description="Add a product or item to track." />
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="code">Code *</Label>
             <Input id="code" name="code" required placeholder="ITEM-001" />
@@ -124,7 +124,7 @@ export default function NewInventoryItemPage() {
           <Textarea id="description" name="description" placeholder="Item description..." rows={3} />
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/inventory">Cancel</Link>
           </Button>

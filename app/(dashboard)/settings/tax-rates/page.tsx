@@ -132,9 +132,9 @@ export default function TaxRatesPage() {
           </p>
         </div>
         <div className="min-w-0 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             {rates.length > 0 ? (
-              <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[12px] text-muted-foreground">
                 <span>{rates.length} rate{rates.length !== 1 ? "s" : ""}</span>
                 <span className="text-border">|</span>
                 <span>{salesCount} sales</span>

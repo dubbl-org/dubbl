@@ -169,10 +169,10 @@ export default function FixedAssetsPage() {
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <BlurReveal className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="A summary of your fixed assets, book values, and accumulated depreciation.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
             <StatCard title="Total Cost" value={formatMoney(totalCost)} icon={Building2} />
             <StatCard
               title="Net Book Value"
@@ -186,7 +186,7 @@ export default function FixedAssetsPage() {
               changeType="negative"
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end flex-wrap gap-2">
             <Button
               size="sm"
               variant="outline"

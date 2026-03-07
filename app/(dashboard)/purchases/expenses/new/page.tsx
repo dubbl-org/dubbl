@@ -114,14 +114,14 @@ export default function NewExpensePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="New Expense Claim"
         description="Create a new expense claim for reimbursement."
       />
 
-      <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Title *</Label>
             <Input
@@ -179,7 +179,7 @@ export default function NewExpensePage() {
                   )}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
                   <div className="space-y-2">
                     <Label>Date</Label>
                     <Input
@@ -225,7 +225,7 @@ export default function NewExpensePage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="space-y-2">
                     <Label>Account</Label>
                     <AccountPicker
@@ -261,7 +261,7 @@ export default function NewExpensePage() {
           </span>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/purchases/expenses">Cancel</Link>
           </Button>

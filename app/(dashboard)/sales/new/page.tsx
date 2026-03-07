@@ -77,10 +77,10 @@ export default function NewInvoicePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader title="New Invoice" description="Create a sales invoice." />
-      <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Customer *</Label>
             <ContactPicker value={contactId} onChange={setContactId} type="customer" />
@@ -113,7 +113,7 @@ export default function NewInvoicePage() {
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes to customer..." rows={3} />
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/sales">Cancel</Link>
           </Button>

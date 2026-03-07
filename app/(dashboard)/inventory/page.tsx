@@ -165,10 +165,10 @@ export default function InventoryPage() {
 
   return (
     <BlurReveal>
-    <div className="space-y-10">
+    <div className="space-y-6 sm:space-y-10">
       <Section title="Overview" description="A summary of your inventory levels and stock value.">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <StatCard title="Total Items" value={items.length.toString()} icon={Package} />
             <StatCard title="Total Value" value={formatMoney(totalValue)} icon={Package} />
             <StatCard
@@ -178,7 +178,7 @@ export default function InventoryPage() {
                 changeType={lowStockCount > 0 ? "negative" : "neutral"}
               />
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end">
             <Button
               size="sm"
               onClick={() => openDrawer("inventory")}
@@ -195,12 +195,12 @@ export default function InventoryPage() {
 
       <Section title="Items" description="View and manage all inventory items.">
         <div className="space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <Input
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
+              className="w-full sm:max-w-sm"
             />
           </div>
 

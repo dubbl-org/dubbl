@@ -175,7 +175,7 @@ export default function EmployeeDetailPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge
           variant="outline"
           className={
@@ -186,13 +186,13 @@ export default function EmployeeDetailPage() {
         >
           {emp.isActive ? "Active" : "Inactive"}
         </Badge>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs sm:text-sm text-muted-foreground">
           Started {emp.startDate} · Annual salary{" "}
           {formatMoney(emp.salary)}
         </span>
       </div>
 
-      <div className="max-w-4xl space-y-6">
+      <div className="max-w-4xl space-y-4 sm:space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Full Name</Label>
@@ -233,7 +233,7 @@ export default function EmployeeDetailPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label>Annual Salary</Label>
             <Input

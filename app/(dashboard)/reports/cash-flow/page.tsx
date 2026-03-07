@@ -75,7 +75,7 @@ export default function CashFlowPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
         {sections.map((s) => (
           <StatCard
             key={s.title}
@@ -97,14 +97,14 @@ export default function CashFlowPage() {
         <div key={s.title} className="space-y-2">
           <h2 className="text-lg font-semibold">{s.title}</h2>
           <DataTable columns={columns} data={s.data} loading={loading} emptyMessage={`No ${s.title.toLowerCase()}.`} />
-          <div className="flex justify-between px-4 py-2 bg-muted/50 rounded-lg text-sm font-semibold">
+          <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
             <span>Total {s.title}</span>
             <span className="font-mono tabular-nums">{formatMoney(s.total)}</span>
           </div>
         </div>
       ))}
 
-      <div className="flex justify-between px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg font-semibold">
+      <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-emerald-50 border border-emerald-200 rounded-lg font-semibold text-sm sm:text-base">
         <span>Net Cash Flow</span>
         <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
       </div>

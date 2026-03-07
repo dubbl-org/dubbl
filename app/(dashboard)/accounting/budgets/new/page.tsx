@@ -112,15 +112,15 @@ export default function NewBudgetPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader title="New Budget" description="Create a new budget with monthly allocations." />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="name">Budget Name</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. FY 2026 Operating Budget" required />
@@ -196,7 +196,7 @@ export default function NewBudgetPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => router.push("/accounting/budgets")}>Cancel</Button>
           <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
             <Save className="mr-2 size-4" />{saving ? "Saving..." : "Create Budget"}

@@ -229,10 +229,11 @@ export default function ReconcilePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-2 sm:items-center sm:gap-4">
         <Button
           variant="ghost"
           size="icon"
+          className="shrink-0 mt-0.5 sm:mt-0"
           onClick={() => router.push(`/accounting/banking/${id}`)}
         >
           <ArrowLeft className="size-4" />
@@ -251,29 +252,29 @@ export default function ReconcilePage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+        <div className="rounded-lg border bg-card p-3 sm:p-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Statement Balance
           </p>
-          <p className="mt-1 text-xl font-bold font-mono tabular-nums">
+          <p className="mt-1 text-lg sm:text-xl font-bold font-mono tabular-nums">
             {formatMoney(account?.balance || 0)}
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-lg border bg-card p-3 sm:p-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Unreconciled
           </p>
-          <p className="mt-1 text-xl font-bold font-mono tabular-nums">
+          <p className="mt-1 text-lg sm:text-xl font-bold font-mono tabular-nums">
             {transactions.length} transactions
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-lg border bg-card p-3 sm:p-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Selected Total
           </p>
           <p
-            className={`mt-1 text-xl font-bold font-mono tabular-nums ${
+            className={`mt-1 text-lg sm:text-xl font-bold font-mono tabular-nums ${
               selectedTotal < 0 ? "text-red-600" : selectedTotal > 0 ? "text-emerald-600" : ""
             }`}
           >
@@ -286,8 +287,8 @@ export default function ReconcilePage() {
       </div>
 
       {/* Search and actions */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             value={search}
@@ -296,7 +297,7 @@ export default function ReconcilePage() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={selectAll}>
             {selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0
               ? "Deselect All"
@@ -342,7 +343,7 @@ export default function ReconcilePage() {
             <div
               key={tx.id}
               onClick={() => toggleSelect(tx.id)}
-              className={`flex items-center gap-4 px-4 py-3 cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 sm:gap-4 px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer transition-colors ${
                 selectedIds.has(tx.id)
                   ? "bg-emerald-50 border-l-2 border-l-emerald-500"
                   : "hover:bg-muted/50"
@@ -363,7 +364,7 @@ export default function ReconcilePage() {
 
               {/* Icon */}
               <div
-                className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
+                className={`hidden sm:flex size-8 shrink-0 items-center justify-center rounded-full ${
                   tx.amount >= 0
                     ? "bg-emerald-100 text-emerald-700"
                     : "bg-red-100 text-red-700"
@@ -423,7 +424,7 @@ export default function ReconcilePage() {
           <h3 className="text-sm font-semibold">Past Reconciliations</h3>
           <div className="rounded-lg border divide-y">
             {reconciliations.map((rec) => (
-              <div key={rec.id} className="flex items-center justify-between px-4 py-3">
+              <div key={rec.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 py-2.5 sm:px-4 sm:py-3">
                 <div>
                   <p className="text-sm font-medium">
                     {rec.startDate} to {rec.endDate}

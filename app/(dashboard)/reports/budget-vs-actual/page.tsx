@@ -116,10 +116,10 @@ export default function BudgetVsActualPage() {
         description="Compare budgeted amounts to actual GL balances."
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="text-sm font-medium">Budget:</label>
         <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
+          className="h-9 w-full sm:w-auto rounded-md border bg-background px-3 text-sm"
           value={selectedBudgetId}
           onChange={(e) => setSelectedBudgetId(e.target.value)}
         >
@@ -141,7 +141,7 @@ export default function BudgetVsActualPage() {
       </div>
 
       {comparisons.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {comparisons.slice(0, 6).map((c) => (
             <div key={c.accountId} className="rounded-lg border bg-card p-4">
               <BudgetProgressBar
@@ -161,7 +161,7 @@ export default function BudgetVsActualPage() {
         emptyMessage="No budget lines to compare."
       />
 
-      <div className="flex justify-between px-4 py-3 bg-muted/50 rounded-lg text-sm font-semibold">
+      <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-muted/50 rounded-lg text-sm font-semibold">
         <span>Total Variance</span>
         <span className={`font-mono tabular-nums ${totalVariance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
           {formatMoney(totalVariance)}

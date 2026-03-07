@@ -375,12 +375,12 @@ export default function ContactsPage() {
           </div>
 
           {/* Top section */}
-          <div className="relative flex flex-1 flex-col items-center justify-center py-12 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-              <Users className="size-7 text-emerald-600 dark:text-emerald-400" />
+          <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
+            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
+              <Users className="size-6 sm:size-7 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h2 className="mt-5 text-xl font-semibold tracking-tight">Manage your contacts</h2>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+            <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Manage your contacts</h2>
+            <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
               Keep track of everyone you do business with. Add customers, suppliers, or contacts that are both.
             </p>
             <Button
@@ -394,7 +394,7 @@ export default function ContactsPage() {
           </div>
 
           {/* Feature cards */}
-          <div className="grid gap-4 sm:grid-cols-3 pb-8">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
             {[
               {
                 icon: Building2,
@@ -420,7 +420,7 @@ export default function ContactsPage() {
             ].map(({ icon: Icon, title, description, color, bg }) => (
               <div
                 key={title}
-                className="group rounded-xl p-5"
+                className="group rounded-xl p-4 sm:p-5"
               >
                 <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
                   <Icon className={`size-4.5 ${color}`} />
@@ -439,7 +439,7 @@ export default function ContactsPage() {
 
   return (
     <BlurReveal>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <PageHeader
           title="Contacts"
@@ -456,7 +456,7 @@ export default function ContactsPage() {
 
         {/* Summary + search */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-[13px] text-muted-foreground">
             <span className="font-medium text-foreground tabular-nums">{total}</span> contacts
             <span className="text-border">·</span>
             <span className="inline-flex items-center gap-1.5">
@@ -505,6 +505,7 @@ export default function ContactsPage() {
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
               style={{ willChange: "opacity, transform, filter" }}
+              className="overflow-x-auto"
             >
               <DataTable
                 columns={columns}

@@ -115,7 +115,7 @@ function DrawerFooter({
   label: string;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
       <Button type="button" variant="outline" onClick={onClose}>
         Cancel
       </Button>
@@ -176,7 +176,7 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Users className="size-5" /></DrawerIcon>
             <div>
@@ -186,7 +186,7 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Basic Info</SectionLabel>
               <div className="space-y-2">
@@ -321,7 +321,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><FolderKanban className="size-5" /></DrawerIcon>
             <div>
@@ -331,7 +331,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Project Info</SectionLabel>
               <div className="space-y-2">
@@ -528,7 +528,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><FileText className="size-5" /></DrawerIcon>
             <div>
@@ -538,7 +538,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Invoice Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -653,7 +653,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><ShoppingCart className="size-5" /></DrawerIcon>
             <div>
@@ -663,7 +663,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Bill Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -779,7 +779,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><BookOpen className="size-5" /></DrawerIcon>
             <div>
@@ -788,7 +788,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
             </div>
           </div>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <EntryForm
             accounts={accounts}
             onSubmit={handleSubmit}
@@ -849,7 +849,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Package className="size-5" /></DrawerIcon>
             <div>
@@ -859,7 +859,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Item Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -993,7 +993,7 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><FileText className="size-5" /></DrawerIcon>
             <div>
@@ -1003,7 +1003,7 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Quote Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1115,7 +1115,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
             <div>
@@ -1125,7 +1125,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Order Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1260,7 +1260,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
             <div>
@@ -1270,7 +1270,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Claim Info</SectionLabel>
               <div className="space-y-2">
@@ -1436,7 +1436,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Building2 className="size-5" /></DrawerIcon>
             <div>
@@ -1446,7 +1446,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Asset Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1650,7 +1650,7 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Target className="size-5" /></DrawerIcon>
             <div>
@@ -1660,7 +1660,7 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Budget Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-3">
@@ -1813,7 +1813,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Users className="size-5" /></DrawerIcon>
             <div>
@@ -1823,7 +1823,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Personal Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1962,7 +1962,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><CreditCard className="size-5" /></DrawerIcon>
             <div>
@@ -1972,7 +1972,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Credit Note Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -2082,7 +2082,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><RefreshCw className="size-5" /></DrawerIcon>
             <div>
@@ -2092,7 +2092,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Template Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">

@@ -80,13 +80,13 @@ export default function NewEmployeePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="New Employee"
         description="Add an employee to the payroll."
       />
-      <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Full Name *</Label>
             <Input
@@ -105,7 +105,7 @@ export default function NewEmployeePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Email</Label>
             <Input
@@ -125,7 +125,7 @@ export default function NewEmployeePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="space-y-2">
             <Label>Annual Salary *</Label>
             <Input
@@ -161,7 +161,7 @@ export default function NewEmployeePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label>Bank Account Number</Label>
             <Input
@@ -180,7 +180,7 @@ export default function NewEmployeePage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/payroll">Cancel</Link>
           </Button>
