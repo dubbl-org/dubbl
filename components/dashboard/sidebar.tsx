@@ -146,7 +146,6 @@ interface ProjectListItem {
 function ProjectsCollapsible({ pathname }: { pathname: string }) {
   const [open, setOpen] = useState(() => pathname.startsWith("/projects"));
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
-  const [fetched, setFetched] = useState(false);
   const [hovered, setHovered] = useState(false);
   const iconRef = useRef<IconHandle>(null);
   const { open: openDrawer } = useCreateDrawer();
@@ -166,13 +165,13 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
       .then((data) => {
         if (data.data) setProjects(data.data);
       })
-      .finally(() => setFetched(true));
+      .catch(() => {});
   };
 
+  // Prefetch on mount so data is ready when expanded
   useEffect(() => {
-    if (!open || fetched) return;
     fetchProjects();
-  }, [open, fetched]);
+  }, []);
 
   // Listen for project changes (create/delete/update)
   useEffect(() => {
