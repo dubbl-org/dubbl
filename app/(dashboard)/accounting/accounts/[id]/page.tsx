@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowDownRight, ArrowUpRight, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowDownRight, ArrowUpRight, Search, Settings2, X } from "lucide-react";
+import { motion, MotionConfig } from "motion/react";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,7 @@ const TYPE_STYLE: Record<string, string> = {
   expense: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
-const columns: Column<LedgerEntry>[] = [
+const ledgerColumns: Column<LedgerEntry>[] = [
   {
     key: "number",
     header: "#",
@@ -112,70 +113,114 @@ export default function AccountLedgerPage() {
   const [account, setAccount] = useState<AccountDetail | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState("date:desc");
   const [entryType, setEntryType] = useState("all");
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+  const [refetching, setRefetching] = useState(false);
+  const [fetchKey, setFetchKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-    fetch(`/api/v1/accounts/${id}`, {
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const pendingSearch = search !== debouncedSearch;
+
+  const buildParams = useCallback((pageNum: number) => {
+    const [sortBy, sortOrder] = sort.split(":");
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
+    if (entryType !== "all") params.set("entryType", entryType);
+    if (sortBy !== "date") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    params.set("page", String(pageNum));
+    params.set("limit", "50");
+    return params;
+  }, [debouncedSearch, dateFrom, dateTo, entryType, sort]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    const isRefetch = !loading;
+    setPage(1);
+    setHasMore(true);
+    if (isRefetch) setRefetching(true);
+
+    fetch(`/api/v1/accounts/${id}?${buildParams(1)}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.account) setAccount(data.account);
-        if (data.ledger) setLedger(data.ledger);
+        if (data.data) setLedger(data.data);
+        if (data.pagination) {
+          setTotal(data.pagination.total);
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
       })
-      .finally(() => setLoading(false));
-  }, [id]);
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setRefetching(false);
+          setFetchKey((k) => k + 1);
+        }
+      });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, debouncedSearch, dateFrom, dateTo, entryType, sort]);
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || !orgId) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+
+    fetch(`/api/v1/accounts/${id}?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setLedger((prev) => [...prev, ...data.data]);
+        if (data.pagination) {
+          setPage(data.pagination.page);
+          setTotal(data.pagination.total);
+          setHasMore(data.pagination.page < data.pagination.totalPages);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [loadingMore, hasMore, page, id, orgId, buildParams]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const summary = useMemo(() => {
     const totalDebits = ledger.reduce((s, e) => s + parseFloat(e.debitAmount), 0);
     const totalCredits = ledger.reduce((s, e) => s + parseFloat(e.creditAmount), 0);
     return { totalDebits, totalCredits };
   }, [ledger]);
-
-  const filtered = useMemo(() => {
-    let result = ledger;
-
-    if (entryType === "debits") {
-      result = result.filter((e) => parseFloat(e.debitAmount) > 0);
-    } else if (entryType === "credits") {
-      result = result.filter((e) => parseFloat(e.creditAmount) > 0);
-    }
-
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (e) =>
-          e.description.toLowerCase().includes(q) ||
-          String(e.entryNumber).includes(q)
-      );
-    }
-
-    if (dateFrom) result = result.filter((e) => e.date >= dateFrom);
-    if (dateTo) result = result.filter((e) => e.date <= dateTo);
-
-    const [sortKey, sortDir] = sort.split(":");
-    const mul = sortDir === "asc" ? 1 : -1;
-    result = [...result].sort((a, b) => {
-      if (sortKey === "date") return mul * a.date.localeCompare(b.date);
-      if (sortKey === "number") return mul * (a.entryNumber - b.entryNumber);
-      if (sortKey === "amount") {
-        const aAmt = parseFloat(a.debitAmount) || parseFloat(a.creditAmount);
-        const bAmt = parseFloat(b.debitAmount) || parseFloat(b.creditAmount);
-        return mul * (aAmt - bAmt);
-      }
-      return 0;
-    });
-
-    return result;
-  }, [ledger, search, dateFrom, dateTo, sort, entryType]);
 
   if (loading) return <BrandLoader />;
 
@@ -216,6 +261,14 @@ export default function AccountLedgerPage() {
             {account.description && <> · {account.description}</>}
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/accounting/accounts/${id}/settings`)}
+        >
+          <Settings2 className="mr-2 size-3.5" />
+          Settings
+        </Button>
       </div>
 
       {/* Stats */}
@@ -250,14 +303,9 @@ export default function AccountLedgerPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Ledger</h3>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {filtered.length === ledger.length
-              ? `${ledger.length} entries`
-              : `${filtered.length} of ${ledger.length} entries`}
-          </span>
+          <span className="text-xs text-muted-foreground tabular-nums">{total} entries</span>
         </div>
 
-        {/* Entry type tabs */}
         <Tabs value={entryType} onValueChange={setEntryType}>
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
@@ -266,7 +314,6 @@ export default function AccountLedgerPage() {
           </TabsList>
         </Tabs>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -326,11 +373,41 @@ export default function AccountLedgerPage() {
           )}
         </div>
 
-        <DataTable
-          columns={columns}
-          data={filtered}
-          emptyMessage={hasFilters ? "No entries match your filters." : "No transactions in this account yet."}
-        />
+        {refetching || pendingSearch ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="brand-loader" aria-label="Loading">
+              <div className="brand-loader-circle brand-loader-circle-1" />
+              <div className="brand-loader-circle brand-loader-circle-2" />
+            </div>
+          </div>
+        ) : (
+          <MotionConfig reducedMotion="never">
+            <motion.div
+              key={fetchKey}
+              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+              style={{ willChange: "opacity, transform, filter" }}
+              className="overflow-x-auto"
+            >
+              <DataTable
+                columns={ledgerColumns}
+                data={ledger}
+                emptyMessage={hasFilters ? "No entries match your filters." : "No transactions in this account yet."}
+              />
+            </motion.div>
+          </MotionConfig>
+        )}
+
+        {hasMore && !refetching && <div ref={sentinelRef} className="h-1" />}
+        {loadingMore && (
+          <div className="flex items-center justify-center py-4">
+            <div className="brand-loader" aria-label="Loading more">
+              <div className="brand-loader-circle brand-loader-circle-1" />
+              <div className="brand-loader-circle brand-loader-circle-2" />
+            </div>
+          </div>
+        )}
       </div>
     </ContentReveal>
   );
