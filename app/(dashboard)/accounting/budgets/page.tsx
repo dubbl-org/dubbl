@@ -89,8 +89,7 @@ export default function BudgetsPage() {
 
   if (!loading && budgets.length === 0) {
     return (
-      <BlurReveal>
-        <div className="min-h-[60vh] flex flex-col justify-center gap-8">
+      <BlurReveal className="space-y-6">
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div className="flex items-center gap-3">
@@ -136,7 +135,6 @@ export default function BudgetsPage() {
               ))}
             </div>
           </div>
-        </div>
       </BlurReveal>
     );
   }

@@ -3,30 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 
 interface Account {
@@ -111,18 +92,9 @@ const columns: Column<Account>[] = [
 
 export default function AccountsPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({
-    code: "",
-    name: "",
-    type: "asset",
-    subType: "",
-    description: "",
-    currencyCode: "USD",
-  });
-  const [saving, setSaving] = useState(false);
 
   function fetchAccounts() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -142,34 +114,11 @@ export default function AccountsPage() {
     fetchAccounts();
   }, []);
 
-  async function createAccount() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/v1/accounts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": orgId,
-        },
-        body: JSON.stringify({
-          ...form,
-          subType: form.subType || null,
-          description: form.description || null,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
-      toast.success("Account created");
-      setDialogOpen(false);
-      setForm({ code: "", name: "", type: "asset", subType: "", description: "", currencyCode: "USD" });
-      fetchAccounts();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create account");
-    } finally {
-      setSaving(false);
-    }
-  }
+  useEffect(() => {
+    const handler = () => fetchAccounts();
+    window.addEventListener("accounts-changed", handler);
+    return () => window.removeEventListener("accounts-changed", handler);
+  }, []);
 
   const typeBreakdown = accounts.reduce<Record<string, number>>((acc, a) => {
     acc[a.type] = (acc[a.type] || 0) + 1;
@@ -177,12 +126,34 @@ export default function AccountsPage() {
   }, {});
 
   if (!loading && accounts.length === 0) {
+    const TYPE_BG: Record<string, string> = {
+      asset: "bg-blue-500/10 dark:bg-blue-500/15",
+      liability: "bg-orange-500/10 dark:bg-orange-500/15",
+      equity: "bg-purple-500/10 dark:bg-purple-500/15",
+      revenue: "bg-emerald-500/10 dark:bg-emerald-500/15",
+      expense: "bg-red-500/10 dark:bg-red-500/15",
+    };
+    const TYPE_DOT: Record<string, string> = {
+      asset: "bg-blue-500",
+      liability: "bg-orange-500",
+      equity: "bg-purple-500",
+      revenue: "bg-emerald-500",
+      expense: "bg-red-500",
+    };
+    const TYPE_EXAMPLES: Record<string, string[]> = {
+      asset: ["1000 · Cash", "1100 · Accounts Receivable", "1200 · Equipment", "1300 · Inventory"],
+      liability: ["2000 · Accounts Payable", "2100 · Loans", "2200 · Credit Cards"],
+      equity: ["3000 · Owner Capital", "3100 · Retained Earnings", "3200 · Drawings"],
+      revenue: ["4000 · Sales Revenue", "4100 · Service Income", "4200 · Interest"],
+      expense: ["5000 · Rent", "5100 · Payroll", "5200 · Utilities", "5300 · Supplies"],
+    };
+
     return (
       <BlurReveal className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
           <Button
-            onClick={() => setDialogOpen(true)}
+            onClick={() => openDrawer("account")}
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700"
           >
@@ -191,37 +162,24 @@ export default function AccountsPage() {
           </Button>
         </div>
 
-        <div className="rounded-lg border divide-y">
-          {ALL_TYPES.map((type) => {
-            const examples = type === "asset" ? ["Cash", "Accounts Receivable", "Equipment", "Inventory"]
-              : type === "liability" ? ["Accounts Payable", "Loans", "Credit Cards", "Accrued Expenses"]
-              : type === "equity" ? ["Owner Capital", "Retained Earnings", "Drawings"]
-              : type === "revenue" ? ["Sales Revenue", "Service Income", "Interest Income"]
-              : ["Rent", "Payroll", "Utilities", "Office Supplies"];
-            return (
-              <div key={type} className="flex items-center gap-4 px-4 py-3.5">
-                <div className={`w-1 self-stretch rounded-full ${TYPE_BORDER_COLORS[type].replace("border-l-", "bg-")}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium capitalize">{type}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {examples.map((ex) => (
-                      <span key={ex} className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{ex}</span>
-                    ))}
-                  </div>
-                </div>
-                <span className="text-lg font-mono font-semibold tabular-nums text-muted-foreground/25 shrink-0">0</span>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {ALL_TYPES.map((type) => (
+            <div
+              key={type}
+              className={`rounded-xl ${TYPE_BG[type]} p-4 space-y-3`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`size-2 rounded-full ${TYPE_DOT[type]}`} />
+                <p className="text-sm font-semibold capitalize">{type}</p>
               </div>
-            );
-          })}
+              <div className="space-y-1">
+                {TYPE_EXAMPLES[type].map((ex) => (
+                  <p key={ex} className="text-[12px] text-muted-foreground font-mono">{ex}</p>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-        <AccountDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          form={form}
-          setForm={setForm}
-          onSubmit={createAccount}
-          loading={saving}
-        />
       </BlurReveal>
     );
   }
@@ -243,7 +201,7 @@ export default function AccountsPage() {
           </div>
           <div className="flex justify-end">
             <Button
-              onClick={() => setDialogOpen(true)}
+              onClick={() => openDrawer("account")}
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
             >
@@ -265,109 +223,7 @@ export default function AccountsPage() {
         />
       </Section>
 
-      <AccountDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        form={form}
-        setForm={setForm}
-        onSubmit={createAccount}
-        loading={saving}
-      />
     </BlurReveal>
   );
 }
 
-function AccountDialog({
-  open,
-  onOpenChange,
-  form,
-  setForm,
-  onSubmit,
-  loading,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  form: { code: string; name: string; type: string; subType: string; description: string; currencyCode: string };
-  setForm: (f: typeof form) => void;
-  onSubmit: () => void;
-  loading: boolean;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-xl">
-        <DialogHeader>
-          <DialogTitle>New Account</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Code</Label>
-              <Input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="1000"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Cash"
-              />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select
-                value={form.type}
-                onValueChange={(v) => setForm({ ...form, type: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asset">Asset</SelectItem>
-                  <SelectItem value="liability">Liability</SelectItem>
-                  <SelectItem value="equity">Equity</SelectItem>
-                  <SelectItem value="revenue">Revenue</SelectItem>
-                  <SelectItem value="expense">Expense</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <Input
-                value={form.currencyCode}
-                onChange={(e) => setForm({ ...form, currencyCode: e.target.value })}
-                placeholder="USD"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Description (optional)</Label>
-            <Textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Account description..."
-              rows={2}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={onSubmit}
-            disabled={!form.code || !form.name || loading}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            {loading ? "Creating..." : "Create Account"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}

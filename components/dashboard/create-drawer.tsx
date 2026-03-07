@@ -44,7 +44,7 @@ import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -82,6 +82,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <EmployeeDrawer open={activeType === "employee"} onClose={close} />
       <CreditNoteDrawer open={activeType === "creditNote"} onClose={close} />
       <RecurringDrawer open={activeType === "recurring"} onClose={close} />
+      <AccountDrawer open={activeType === "account"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -2152,6 +2153,112 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Template" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Account Drawer
+// ---------------------------------------------------------------------------
+function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          code: form.get("code"),
+          name: form.get("name"),
+          type: form.get("type") || "asset",
+          subType: form.get("subType") || null,
+          description: form.get("description") || null,
+          currencyCode: form.get("currencyCode") || "USD",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create account");
+      }
+      toast.success("Account created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("accounts-changed"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><BookOpen className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Account</SheetTitle>
+              <SheetDescription>Add an account to your chart of accounts.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Account Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-account-code">Code *</Label>
+                  <Input id="drawer-account-code" name="code" required placeholder="1000" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-account-name">Name *</Label>
+                  <Input id="drawer-account-name" name="name" required placeholder="Cash" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select name="type" defaultValue="asset">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asset">Asset</SelectItem>
+                      <SelectItem value="liability">Liability</SelectItem>
+                      <SelectItem value="equity">Equity</SelectItem>
+                      <SelectItem value="revenue">Revenue</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-account-currency">Currency</Label>
+                  <Input id="drawer-account-currency" name="currencyCode" defaultValue="USD" placeholder="USD" maxLength={3} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Optional</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-account-description">Description</Label>
+                <Textarea id="drawer-account-description" name="description" placeholder="Account description..." rows={2} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Account" />
         </form>
       </SheetContent>
     </Sheet>
