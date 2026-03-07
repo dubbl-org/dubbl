@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, BookOpen } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
@@ -181,24 +181,30 @@ export default function AccountsPage() {
       <BlurReveal className="space-y-10">
         <Section title="Accounts" description="Set up and manage your chart of accounts for recording transactions.">
           <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
-            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="space-y-2">
               {ALL_TYPES.map((type) => (
                 <div
                   key={type}
-                  className={`rounded-lg border border-dashed border-l-4 ${TYPE_BORDER_COLORS[type]} p-4 opacity-50`}
+                  className={`flex items-center justify-between rounded-lg border border-dashed border-l-4 ${TYPE_BORDER_COLORS[type]} px-4 py-3 opacity-50`}
                 >
-                  <p className="text-xs font-medium text-muted-foreground capitalize">{type}</p>
-                  <p className="text-2xl font-semibold mt-1 tabular-nums text-muted-foreground/40">0</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-muted-foreground capitalize">{type}</span>
+                    <span className="text-[10px] text-muted-foreground/60">
+                      {type === "asset" ? "Cash, receivables, equipment" :
+                       type === "liability" ? "Payables, loans, credit cards" :
+                       type === "equity" ? "Owner capital, retained earnings" :
+                       type === "revenue" ? "Sales, service income, interest" :
+                       "Rent, payroll, supplies"}
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground/40 tabular-nums">0 accounts</span>
                 </div>
               ))}
             </div>
-            <div className="flex flex-col items-center py-8 text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-                <BookOpen className="size-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h3 className="mt-4 text-sm font-medium">Set up your chart of accounts</h3>
+            <div className="flex flex-col items-center py-4 text-center">
+              <h3 className="text-sm font-medium">Build your chart of accounts</h3>
               <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                Create accounts for each type to organize your financial records.
+                Accounts organize where money comes from and where it goes. Start by adding a few for each type.
               </p>
               <div className="mt-4">
                 <Button

@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -150,19 +149,37 @@ export default function FixedAssetsPage() {
     return (
       <BlurReveal className="space-y-10">
         <Section title="Fixed Assets" description="Manage capital assets and depreciation.">
-          <EmptyState
-            icon={Building2}
-            title="No fixed assets"
-            description="Add your first fixed asset to track depreciation and book value."
-          >
-            <Button
-              onClick={() => openDrawer("fixedAsset")}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              Add Asset
-            </Button>
-          </EmptyState>
+          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
+            <div className="rounded-lg border border-dashed bg-card p-5 opacity-50">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                {[
+                  { label: "Original Cost", value: "$0.00" },
+                  { label: "Book Value", value: "$0.00" },
+                  { label: "Depreciation", value: "$0.00" },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-lg font-mono font-semibold text-muted-foreground/40 tabular-nums">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col items-center py-4 text-center">
+              <h3 className="text-sm font-medium">Track your capital assets</h3>
+              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                Add equipment, vehicles, and property to track their value and depreciation over time.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => openDrawer("fixedAsset")}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Plus className="mr-2 size-4" />
+                  Add Asset
+                </Button>
+              </div>
+            </div>
+          </div>
         </Section>
       </BlurReveal>
     );

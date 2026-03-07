@@ -71,7 +71,7 @@ const LABELS: Record<string, string> = {
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring";
 
-const CTA_MAP: Record<string, { label: string; drawer: DrawerType }> = {
+const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
   "sales/quotes": { label: "New Quote", drawer: "quote" },
   "sales/credit-notes": { label: "New Credit Note", drawer: "creditNote" },
@@ -80,6 +80,8 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType }> = {
   "purchases/expenses": { label: "New Expense", drawer: "expense" },
   "purchases/orders": { label: "New PO", drawer: "purchaseOrder" },
   accounting: { label: "New Entry", drawer: "entry" },
+  "accounting/accounts": null,
+  "accounting/banking": null,
   "accounting/fixed-assets": { label: "New Asset", drawer: "fixedAsset" },
   "accounting/budgets": { label: "New Budget", drawer: "budget" },
   contacts: { label: "New Contact", drawer: "contact" },
@@ -139,7 +141,8 @@ export function Topbar() {
     parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
   }
 
-  const cta = CTA_MAP[`${segments[0]}/${segments[1]}`] || CTA_MAP[segments[0]];
+  const subtabKey = `${segments[0]}/${segments[1]}`;
+  const cta = subtabKey in CTA_MAP ? CTA_MAP[subtabKey] : CTA_MAP[segments[0]];
 
   const openCommandPalette = useCallback(() => {
     document.dispatchEvent(new CustomEvent("open-command-palette"));
