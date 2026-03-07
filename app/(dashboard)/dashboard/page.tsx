@@ -638,7 +638,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Financial KPIs */}
-            {ratios && (
+            {ratios && Object.values(ratios).some((v) => v !== null) && (
               <div className="rounded-lg border bg-card p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
