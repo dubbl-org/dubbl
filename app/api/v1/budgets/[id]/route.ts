@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { budget, budgetLine } from "@/lib/db/schema";
+import { budget, budgetLine, budgetPeriod } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
+import type { PeriodType } from "@/lib/budget-periods";
 import { z } from "zod";
 
 export async function GET(
@@ -25,7 +27,10 @@ export async function GET(
       with: {
         fiscalYear: true,
         lines: {
-          with: { account: true },
+          with: {
+            account: true,
+            periods: true,
+          },
         },
       },
     });
@@ -37,29 +42,28 @@ export async function GET(
   }
 }
 
+const periodSchema = z.object({
+  label: z.string().min(1),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+  amount: z.number().int().default(0),
+  sortOrder: z.number().int().default(0),
+});
+
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   fiscalYearId: z.string().nullable().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  periodType: z.enum(["monthly", "weekly", "daily", "quarterly", "yearly", "custom"]).optional(),
   isActive: z.boolean().optional(),
   lines: z
     .array(
       z.object({
         id: z.string().optional(),
         accountId: z.string().min(1),
-        jan: z.number().int().default(0),
-        feb: z.number().int().default(0),
-        mar: z.number().int().default(0),
-        apr: z.number().int().default(0),
-        may: z.number().int().default(0),
-        jun: z.number().int().default(0),
-        jul: z.number().int().default(0),
-        aug: z.number().int().default(0),
-        sep: z.number().int().default(0),
-        oct: z.number().int().default(0),
-        nov: z.number().int().default(0),
-        dec: z.number().int().default(0),
+        total: z.number().int().optional(),
+        periods: z.array(periodSchema).optional(),
       })
     )
     .optional(),
@@ -95,32 +99,46 @@ export async function PATCH(
       .where(eq(budget.id, id))
       .returning();
 
-    // If lines are provided, replace them
     if (lines) {
+      // Delete old lines (periods cascade)
       await db.delete(budgetLine).where(eq(budgetLine.budgetId, id));
-      const processedLines = lines.map((l) => {
-        const total = l.jan + l.feb + l.mar + l.apr + l.may + l.jun +
-          l.jul + l.aug + l.sep + l.oct + l.nov + l.dec;
-        return {
-          budgetId: id,
-          accountId: l.accountId,
-          jan: l.jan,
-          feb: l.feb,
-          mar: l.mar,
-          apr: l.apr,
-          may: l.may,
-          jun: l.jun,
-          jul: l.jul,
-          aug: l.aug,
-          sep: l.sep,
-          oct: l.oct,
-          nov: l.nov,
-          dec: l.dec,
-          total,
-        };
-      });
-      if (processedLines.length > 0) {
-        await db.insert(budgetLine).values(processedLines);
+
+      const periodType = (parsed.periodType || existing.periodType) as PeriodType;
+      const startDate = parsed.startDate || existing.startDate;
+      const endDate = parsed.endDate || existing.endDate;
+
+      for (const line of lines) {
+        let periods = line.periods;
+        if (!periods || periods.length === 0) {
+          const generated = generatePeriods(periodType, startDate, endDate);
+          const total = line.total || 0;
+          const amounts = distributeAmount(total, generated.length);
+          periods = generated.map((p, i) => ({ ...p, amount: amounts[i] }));
+        }
+
+        const total = line.total ?? periods.reduce((s, p) => s + p.amount, 0);
+
+        const [createdLine] = await db
+          .insert(budgetLine)
+          .values({
+            budgetId: id,
+            accountId: line.accountId,
+            total,
+          })
+          .returning();
+
+        if (periods.length > 0) {
+          await db.insert(budgetPeriod).values(
+            periods.map((p) => ({
+              budgetLineId: createdLine.id,
+              label: p.label,
+              startDate: p.startDate,
+              endDate: p.endDate,
+              amount: p.amount,
+              sortOrder: p.sortOrder,
+            }))
+          );
+        }
       }
     }
 

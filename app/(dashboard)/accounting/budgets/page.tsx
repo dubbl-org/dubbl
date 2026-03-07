@@ -16,6 +16,7 @@ interface Budget {
   name: string;
   startDate: string;
   endDate: string;
+  periodType: string;
   isActive: boolean;
   createdAt: string;
   lines?: { total: number }[];
@@ -207,6 +208,11 @@ export default function BudgetsPage() {
                     )}>
                       {b.isActive ? "Active" : "Inactive"}
                     </Badge>
+                    {b.periodType && b.periodType !== "monthly" && (
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {b.periodType.charAt(0).toUpperCase() + b.periodType.slice(1)}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {b.startDate} · {b.endDate}

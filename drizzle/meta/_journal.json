@@ -43,6 +43,13 @@
       "when": 1772873525748,
       "tag": "0005_unusual_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772902649255,
+      "tag": "0006_faulty_darkhawk",
+      "breakpoints": true
     }
   ]
 }

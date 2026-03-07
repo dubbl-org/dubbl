@@ -1560,33 +1560,35 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 // ---------------------------------------------------------------------------
 // Budget Drawer
 // ---------------------------------------------------------------------------
+import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
+import type { PeriodType } from "@/lib/budget-periods";
+
+interface BudgetPeriodInput {
+  label: string;
+  startDate: string;
+  endDate: string;
+  amount: number;
+  sortOrder: number;
+}
+
 interface BudgetLineInput {
   accountId: string;
-  jan: number; feb: number; mar: number; apr: number;
-  may: number; jun: number; jul: number; aug: number;
-  sep: number; oct: number; nov: number; dec: number;
+  total: number;
+  periods: BudgetPeriodInput[];
 }
 
-const BUDGET_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
-const BUDGET_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-type BudgetMonthKey = typeof BUDGET_MONTHS[number];
+const PERIOD_TYPE_OPTIONS: { value: PeriodType; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+  { value: "custom", label: "Custom" },
+];
 
-function emptyBudgetLine(): BudgetLineInput {
-  return { accountId: "", jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 };
-}
-
-function budgetLineTotal(line: BudgetLineInput): number {
-  return BUDGET_MONTHS.reduce((s, m) => s + line[m], 0);
-}
-
-function distributeEvenly(annualCents: number): Record<BudgetMonthKey, number> {
-  const perMonth = Math.floor(annualCents / 12);
-  const remainder = annualCents - perMonth * 12;
-  const result = {} as Record<BudgetMonthKey, number>;
-  BUDGET_MONTHS.forEach((m, i) => {
-    result[m] = perMonth + (i < remainder ? 1 : 0);
-  });
-  return result;
+function emptyBudgetLine(periodType: PeriodType, startDate: string, endDate: string): BudgetLineInput {
+  const periods = generatePeriods(periodType, startDate, endDate).map((p) => ({ ...p, amount: 0 }));
+  return { accountId: "", total: 0, periods };
 }
 
 interface BudgetAccount {
@@ -1602,17 +1604,20 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
   const [budgetName, setBudgetName] = useState("");
   const [startDate, setStartDate] = useState(`${new Date().getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(`${new Date().getFullYear()}-12-31`);
-  const [budgetLines, setBudgetLines] = useState<BudgetLineInput[]>([emptyBudgetLine()]);
+  const [periodType, setPeriodType] = useState<PeriodType>("monthly");
+  const [budgetLines, setBudgetLines] = useState<BudgetLineInput[]>([emptyBudgetLine("monthly", `${new Date().getFullYear()}-01-01`, `${new Date().getFullYear()}-12-31`)]);
   const [annualAmounts, setAnnualAmounts] = useState<Record<number, string>>({});
   const [budgetAccounts, setBudgetAccounts] = useState<BudgetAccount[]>([]);
   const [expandedLine, setExpandedLine] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) {
-      setBudgetName(""); setBudgetLines([emptyBudgetLine()]);
+      const yr = new Date().getFullYear();
+      setBudgetName(""); setPeriodType("monthly");
+      setBudgetLines([emptyBudgetLine("monthly", `${yr}-01-01`, `${yr}-12-31`)]);
       setAnnualAmounts({}); setExpandedLine(null);
-      setStartDate(`${new Date().getFullYear()}-01-01`);
-      setEndDate(`${new Date().getFullYear()}-12-31`);
+      setStartDate(`${yr}-01-01`);
+      setEndDate(`${yr}-12-31`);
       return;
     }
     const orgId = localStorage.getItem("activeOrgId");
@@ -1622,29 +1627,67 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       .then((data) => { if (data.accounts) setBudgetAccounts(data.accounts); else if (data.data) setBudgetAccounts(data.data); });
   }, [open]);
 
+  function regenerateAllPeriods(newType: PeriodType, newStart: string, newEnd: string) {
+    setBudgetLines((prev) =>
+      prev.map((line) => {
+        const newPeriods = generatePeriods(newType, newStart, newEnd).map((p) => ({ ...p, amount: 0 }));
+        const amounts = distributeAmount(line.total, newPeriods.length);
+        return {
+          ...line,
+          periods: newPeriods.map((p, i) => ({ ...p, amount: amounts[i] })),
+        };
+      })
+    );
+  }
+
+  function handlePeriodTypeChange(newType: PeriodType) {
+    setPeriodType(newType);
+    regenerateAllPeriods(newType, startDate, endDate);
+  }
+
+  function handleStartDateChange(v: string) {
+    setStartDate(v);
+    regenerateAllPeriods(periodType, v, endDate);
+  }
+
+  function handleEndDateChange(v: string) {
+    setEndDate(v);
+    regenerateAllPeriods(periodType, startDate, v);
+  }
+
   function handleAnnualChange(index: number, value: string) {
     setAnnualAmounts((prev) => ({ ...prev, [index]: value }));
     const cents = Math.round(parseFloat(value || "0") * 100);
     if (cents >= 0) {
-      const distributed = distributeEvenly(cents);
       setBudgetLines((prev) => {
         const copy = [...prev];
-        copy[index] = { ...copy[index], ...distributed };
+        const line = copy[index];
+        const amounts = distributeAmount(cents, line.periods.length);
+        copy[index] = {
+          ...line,
+          total: cents,
+          periods: line.periods.map((p, i) => ({ ...p, amount: amounts[i] })),
+        };
         return copy;
       });
     }
   }
 
-  function updateMonth(index: number, month: BudgetMonthKey, value: string) {
+  function updatePeriodAmount(lineIndex: number, periodIndex: number, value: string) {
     const cents = Math.round(parseFloat(value || "0") * 100);
     setBudgetLines((prev) => {
       const copy = [...prev];
-      copy[index] = { ...copy[index], [month]: cents };
+      const line = { ...copy[lineIndex] };
+      const periods = [...line.periods];
+      periods[periodIndex] = { ...periods[periodIndex], amount: cents };
+      line.periods = periods;
+      line.total = periods.reduce((s, p) => s + p.amount, 0);
+      copy[lineIndex] = line;
       return copy;
     });
     setAnnualAmounts((prev) => {
       const copy = { ...prev };
-      delete copy[index];
+      delete copy[lineIndex];
       return copy;
     });
   }
@@ -1671,7 +1714,17 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       const res = await fetch("/api/v1/budgets", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ name: budgetName, startDate, endDate, lines: validLines }),
+        body: JSON.stringify({
+          name: budgetName,
+          startDate,
+          endDate,
+          periodType,
+          lines: validLines.map((l) => ({
+            accountId: l.accountId,
+            total: l.total,
+            periods: l.periods,
+          })),
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1688,7 +1741,7 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
     }
   }
 
-  const grandTotal = budgetLines.reduce((s, l) => s + budgetLineTotal(l), 0);
+  const grandTotal = budgetLines.reduce((s, l) => s + l.total, 0);
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -1698,7 +1751,7 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
             <DrawerIcon><Target className="size-5" /></DrawerIcon>
             <div>
               <SheetTitle className="text-lg">New Budget</SheetTitle>
-              <SheetDescription>Plan spending by account with annual or monthly amounts.</SheetDescription>
+              <SheetDescription>Plan spending by account with flexible period types.</SheetDescription>
             </div>
           </div>
         </SheetHeader>
@@ -1713,12 +1766,23 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                  <DatePicker value={startDate} onChange={handleStartDateChange} placeholder="Start date" />
                 </div>
                 <div className="space-y-2">
                   <Label>End Date</Label>
-                  <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" />
+                  <DatePicker value={endDate} onChange={handleEndDateChange} placeholder="End date" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Period Type</Label>
+                <Select value={periodType} onValueChange={(v) => handlePeriodTypeChange(v as PeriodType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PERIOD_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -1727,13 +1791,12 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <SectionLabel>Budget Lines</SectionLabel>
-                <Button type="button" variant="outline" size="sm" onClick={() => setBudgetLines((prev) => [...prev, emptyBudgetLine()])}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setBudgetLines((prev) => [...prev, emptyBudgetLine(periodType, startDate, endDate)])}>
                   <Plus className="mr-2 size-3.5" />Add Line
                 </Button>
               </div>
 
               {budgetLines.map((line, i) => {
-                const total = budgetLineTotal(line);
                 const isExpanded = expandedLine === i;
                 return (
                   <div key={i} className="space-y-2.5">
@@ -1763,44 +1826,44 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
                       </button>
                     </div>
 
-                    {/* Annual amount + per-month info */}
+                    {/* Annual amount + per-period info */}
                     <div className="flex items-center gap-3">
                       <Label className="text-xs text-muted-foreground shrink-0 w-16">Annual</Label>
                       <CurrencyInput
                         prefix="$"
-                        value={annualAmounts[i] ?? (total > 0 ? (total / 100).toFixed(2) : "")}
+                        value={annualAmounts[i] ?? (line.total > 0 ? (line.total / 100).toFixed(2) : "")}
                         onChange={(v) => handleAnnualChange(i, v)}
                         placeholder="0.00"
                         className="flex-1"
                       />
-                      {total > 0 && (
+                      {line.total > 0 && line.periods.length > 0 && (
                         <span className="text-xs text-muted-foreground font-mono tabular-nums shrink-0">
-                          {formatMoney(Math.floor(total / 12))}/mo
+                          {formatMoney(Math.floor(line.total / line.periods.length))}/period
                         </span>
                       )}
                     </div>
 
-                    {/* Customize months toggle */}
-                    {total > 0 && (
+                    {/* Customize periods toggle */}
+                    {line.total > 0 && line.periods.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setExpandedLine(isExpanded ? null : i)}
                         className="text-[11px] text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
                       >
-                        {isExpanded ? "Hide monthly breakdown" : "Customize monthly amounts"}
+                        {isExpanded ? "Hide period breakdown" : `Customize period amounts (${line.periods.length} periods)`}
                       </button>
                     )}
 
-                    {/* Monthly grid */}
+                    {/* Period grid */}
                     {isExpanded && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                        {BUDGET_MONTHS.map((m, mi) => (
-                          <div key={m} className="space-y-1">
-                            <label className="text-[10px] text-muted-foreground pl-0.5">{BUDGET_MONTH_LABELS[mi]}</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {line.periods.map((p, pi) => (
+                          <div key={pi} className="space-y-1">
+                            <label className="text-[10px] text-muted-foreground pl-0.5">{p.label}</label>
                             <CurrencyInput
                               size="sm"
-                              value={(line[m] / 100).toFixed(2)}
-                              onChange={(v) => updateMonth(i, m, v)}
+                              value={(p.amount / 100).toFixed(2)}
+                              onChange={(v) => updatePeriodAmount(i, pi, v)}
                             />
                           </div>
                         ))}

@@ -19,6 +19,7 @@ import {
   bankTransaction,
   budget,
   budgetLine,
+  budgetPeriod,
   project,
   timeEntry,
   fixedAsset,
@@ -578,24 +579,24 @@ async function seed() {
     { code: "5600", monthly: 50000 },   // $500/mo marketing
   ];
 
+  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   for (const ba of budgetAccounts) {
-    await db.insert(budgetLine).values({
+    const [bl] = await db.insert(budgetLine).values({
       budgetId: bud.id,
       accountId: accountMap.get(ba.code)!,
-      jan: ba.monthly,
-      feb: ba.monthly,
-      mar: ba.monthly,
-      apr: ba.monthly,
-      may: ba.monthly,
-      jun: ba.monthly,
-      jul: ba.monthly,
-      aug: ba.monthly,
-      sep: ba.monthly,
-      oct: ba.monthly,
-      nov: ba.monthly,
-      dec: ba.monthly,
       total: ba.monthly * 12,
-    });
+    }).returning();
+
+    await db.insert(budgetPeriod).values(
+      monthLabels.map((label, i) => ({
+        budgetLineId: bl.id,
+        label: `${label} 2026`,
+        startDate: `2026-${String(i + 1).padStart(2, "0")}-01`,
+        endDate: `2026-${String(i + 1).padStart(2, "0")}-${new Date(2026, i + 1, 0).getDate()}`,
+        amount: ba.monthly,
+        sortOrder: i,
+      }))
+    );
   }
   console.log(`  1 budget with ${budgetAccounts.length} line items`);
 
