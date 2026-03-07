@@ -89,20 +89,42 @@ export default function BudgetsPage() {
 
   if (!loading && budgets.length === 0) {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Budgets" description="Plan and track your financial budgets.">
-          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
-            <div className="rounded-lg border border-dashed bg-card p-6 space-y-4 opacity-60">
-              <p className="text-xs font-medium text-muted-foreground">Preview: Budget Utilization</p>
+      <BlurReveal>
+        <div className="min-h-[60vh] flex flex-col justify-center gap-8">
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div className="flex items-center gap-3">
+                <Target className="size-4 text-muted-foreground" />
+                <div>
+                  <h2 className="text-sm font-semibold">Budget Tracking</h2>
+                  <p className="text-xs text-muted-foreground">Monitor spending against your targets</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => openDrawer("budget")}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Plus className="mr-2 size-4" />
+                New Budget
+              </Button>
+            </div>
+            <div className="p-5 space-y-5 opacity-40">
               {[
-                { label: "Marketing", pct: 65 },
-                { label: "Operations", pct: 82 },
-                { label: "Engineering", pct: 40 },
-              ].map(({ label, pct }) => (
-                <div key={label} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-muted-foreground">{label}</span>
-                    <span className="tabular-nums font-mono text-xs text-muted-foreground">{pct}%</span>
+                { label: "Marketing", budgeted: "$12,000", actual: "$7,800", pct: 65 },
+                { label: "Operations", budgeted: "$25,000", actual: "$20,500", pct: 82 },
+                { label: "Engineering", budgeted: "$40,000", actual: "$16,000", pct: 40 },
+                { label: "Sales", budgeted: "$18,000", actual: "$9,900", pct: 55 },
+              ].map(({ label, budgeted, actual, pct }) => (
+                <div key={label} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">{label}</span>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono tabular-nums">
+                      <span>{actual}</span>
+                      <span className="text-muted-foreground/40">/</span>
+                      <span>{budgeted}</span>
+                      <span className={`font-sans font-medium ${pct > 80 ? "text-amber-500/70" : "text-emerald-500/70"}`}>{pct}%</span>
+                    </div>
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                     <div
@@ -113,26 +135,8 @@ export default function BudgetsPage() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-col items-center py-4 text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-                <Target className="size-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h3 className="mt-4 text-sm font-medium">Track spending against targets</h3>
-              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                Create your first budget to monitor how actuals compare to your plan.
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={() => openDrawer("budget")}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="mr-2 size-4" />
-                  New Budget
-                </Button>
-              </div>
-            </div>
           </div>
-        </Section>
+        </div>
       </BlurReveal>
     );
   }

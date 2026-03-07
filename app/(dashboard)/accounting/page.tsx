@@ -127,42 +127,42 @@ export default function TransactionsPage() {
 
   if (!loading && entries.length === 0) {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Transactions" description="Create and manage journal entries to track your financial activity.">
-          <div className="space-y-8 min-h-[50vh] flex flex-col justify-center">
-            <div className="grid gap-4 sm:grid-cols-3">
+      <BlurReveal>
+        <div className="min-h-[60vh] flex flex-col justify-center gap-10">
+          <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
+            <div className="flex-1 space-y-3">
+              <h2 className="text-lg font-semibold tracking-tight">Journal Entries</h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Record debits and credits across your chart of accounts. Every transaction stays balanced and audit-ready.
+              </p>
+              <Button
+                onClick={() => openDrawer("entry")}
+                className="mt-2 bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Plus className="mr-2 size-4" />
+                New Entry
+              </Button>
+            </div>
+            <div className="w-full sm:w-auto sm:min-w-[320px] flex flex-col gap-2">
               {[
-                { step: 1, icon: BookOpen, label: "Set up accounts", desc: "Create your chart of accounts to categorize transactions" },
-                { step: 2, icon: ArrowLeftRight, label: "Record entries", desc: "Create journal entries with balanced debits and credits" },
-                { step: 3, icon: BarChart3, label: "View reports", desc: "Generate financial statements from your recorded data" },
-              ].map(({ step, icon: StepIcon, label, desc }) => (
-                <div key={step} className="relative rounded-lg border bg-card p-5">
-                  <span className="absolute -top-3 left-4 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
-                    {step}
+                { icon: BookOpen, label: "Set up accounts", desc: "Categorize where money flows" },
+                { icon: ArrowLeftRight, label: "Record entries", desc: "Balanced debits and credits" },
+                { icon: BarChart3, label: "View reports", desc: "Financial statements from your data" },
+              ].map(({ icon: StepIcon, label, desc }, i) => (
+                <div key={label} className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-xs font-bold">
+                    {i + 1}
                   </span>
-                  <StepIcon className="size-5 text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+                  <StepIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex flex-col items-center py-4 text-center">
-              <h3 className="text-sm font-medium">Ready to get started?</h3>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Create your first journal entry to start tracking your finances.
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={() => openDrawer("entry")}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="mr-2 size-4" />
-                  New Entry
-                </Button>
-              </div>
-            </div>
           </div>
-        </Section>
+        </div>
       </BlurReveal>
     );
   }

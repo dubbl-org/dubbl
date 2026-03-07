@@ -147,40 +147,46 @@ export default function FixedAssetsPage() {
 
   if (!loading && assets.length === 0 && statusFilter === "all") {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Fixed Assets" description="Manage capital assets and depreciation.">
-          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
-            <div className="rounded-lg border border-dashed bg-card p-5 opacity-50">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                {[
-                  { label: "Original Cost", value: "$0.00" },
-                  { label: "Book Value", value: "$0.00" },
-                  { label: "Depreciation", value: "$0.00" },
-                ].map(({ label, value }) => (
-                  <div key={label}>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                    <p className="mt-1 text-lg font-mono font-semibold text-muted-foreground/40 tabular-nums">{value}</p>
-                  </div>
+      <BlurReveal>
+        <div className="min-h-[60vh] flex flex-col justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold tracking-tight">Fixed Assets</h2>
+              <p className="text-sm text-muted-foreground">
+                Track equipment, vehicles, and property. Monitor depreciation and net book value over time.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {["Equipment", "Vehicles", "Property", "Furniture", "IT Hardware"].map((tag) => (
+                  <span key={tag} className="rounded-full border border-dashed px-2.5 py-0.5 text-[11px] text-muted-foreground/60">{tag}</span>
                 ))}
               </div>
+              <Button
+                onClick={() => openDrawer("fixedAsset")}
+                className="mt-2 bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Plus className="mr-2 size-4" />
+                Add Asset
+              </Button>
             </div>
-            <div className="flex flex-col items-center py-4 text-center">
-              <h3 className="text-sm font-medium">Track your capital assets</h3>
-              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                Add equipment, vehicles, and property to track their value and depreciation over time.
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={() => openDrawer("fixedAsset")}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="mr-2 size-4" />
-                  Add Asset
-                </Button>
-              </div>
+            <div className="rounded-lg border border-dashed bg-card p-5 opacity-40 space-y-4">
+              {[
+                { label: "Original Cost", value: "$0.00", bar: "w-full" },
+                { label: "Net Book Value", value: "$0.00", bar: "w-3/4" },
+                { label: "Depreciation", value: "$0.00", bar: "w-1/4" },
+              ].map(({ label, value, bar }) => (
+                <div key={label} className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground">{value}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted">
+                    <div className={`h-full rounded-full bg-muted-foreground/20 ${bar}`} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        </Section>
+        </div>
       </BlurReveal>
     );
   }

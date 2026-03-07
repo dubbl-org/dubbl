@@ -178,46 +178,40 @@ export default function AccountsPage() {
 
   if (!loading && accounts.length === 0) {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Accounts" description="Set up and manage your chart of accounts for recording transactions.">
-          <div className="space-y-6 min-h-[50vh] flex flex-col justify-center">
-            <div className="space-y-2">
-              {ALL_TYPES.map((type) => (
-                <div
-                  key={type}
-                  className={`flex items-center justify-between rounded-lg border border-dashed border-l-4 ${TYPE_BORDER_COLORS[type]} px-4 py-3 opacity-50`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground capitalize">{type}</span>
-                    <span className="text-[10px] text-muted-foreground/60">
-                      {type === "asset" ? "Cash, receivables, equipment" :
-                       type === "liability" ? "Payables, loans, credit cards" :
-                       type === "equity" ? "Owner capital, retained earnings" :
-                       type === "revenue" ? "Sales, service income, interest" :
-                       "Rent, payroll, supplies"}
-                    </span>
-                  </div>
-                  <span className="text-xs font-mono text-muted-foreground/40 tabular-nums">0 accounts</span>
-                </div>
-              ))}
+      <BlurReveal>
+        <div className="min-h-[60vh] flex flex-col justify-center gap-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
+              <p className="text-sm text-muted-foreground mt-1">Organize where money comes from and where it goes.</p>
             </div>
-            <div className="flex flex-col items-center py-4 text-center">
-              <h3 className="text-sm font-medium">Build your chart of accounts</h3>
-              <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                Accounts organize where money comes from and where it goes. Start by adding a few for each type.
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={() => setDialogOpen(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="mr-2 size-4" />
-                  New Account
-                </Button>
-              </div>
-            </div>
+            <Button
+              onClick={() => setDialogOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="mr-2 size-4" />
+              New Account
+            </Button>
           </div>
-        </Section>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {ALL_TYPES.map((type) => (
+              <div
+                key={type}
+                className={`rounded-lg border border-dashed border-t-4 ${TYPE_BORDER_COLORS[type].replace("border-l-", "border-t-")} p-4 space-y-3 opacity-50`}
+              >
+                <p className="text-sm font-medium capitalize">{type}</p>
+                <p className="text-2xl font-mono font-semibold tabular-nums text-muted-foreground/30">0</p>
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                  {type === "asset" ? "Cash, receivables, equipment" :
+                   type === "liability" ? "Payables, loans, credit cards" :
+                   type === "equity" ? "Owner capital, retained earnings" :
+                   type === "revenue" ? "Sales, service income, interest" :
+                   "Rent, payroll, supplies"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
         <AccountDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
