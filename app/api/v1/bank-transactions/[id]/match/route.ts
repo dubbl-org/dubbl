@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bankTransaction, bankAccount, bill, payment, paymentAllocation } from "@/lib/db/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { findMatches, type MatchCandidate } from "@/lib/banking/reconciliation-matcher";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
+import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
 
 // GET: Find potential matches for a bank transaction
@@ -167,13 +168,8 @@ export async function POST(
       return NextResponse.json({ error: "Cannot record payment for this bill status" }, { status: 400 });
     }
 
-    // Create payment record
-    const [maxResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(payment)
-      .where(eq(payment.organizationId, ctx.organizationId));
-    const next = (Number(maxResult?.count) || 0) + 1;
-    const paymentNumber = `PAY-${next.toString().padStart(5, "0")}`;
+    // Generate payment number
+    const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
     const [created] = await db
       .insert(payment)

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { invoice, payment, paymentAllocation } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
+import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
 
 const paySchema = z.object({
@@ -47,12 +48,7 @@ export async function POST(
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
     // Generate payment number
-    const [maxResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(payment)
-      .where(eq(payment.organizationId, ctx.organizationId));
-    const next = (Number(maxResult?.count) || 0) + 1;
-    const paymentNumber = `PAY-${next.toString().padStart(5, "0")}`;
+    const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
     // Create payment record
     const [created] = await db
