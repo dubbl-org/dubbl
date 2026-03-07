@@ -6,6 +6,7 @@ import {
   Scale,
   PieChart,
   TrendingUp,
+  TrendingDown,
   DollarSign,
   BookOpen,
   Target,
@@ -15,6 +16,8 @@ import {
   ArrowLeftRight,
   Gauge,
   Layers,
+  Compass,
+  Users,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 
@@ -58,6 +61,18 @@ const reportCategories = [
         description: "Side-by-side period comparison with change amounts and percentages.",
         href: "/reports/pnl-comparison",
         icon: ArrowLeftRight,
+      },
+      {
+        title: "Cash Flow Forecast",
+        description: "Forward-looking projection from invoices, bills, and recurring templates.",
+        href: "/reports/cash-flow-forecast",
+        icon: Compass,
+      },
+      {
+        title: "Contact Profitability",
+        description: "Revenue minus costs per customer for the period.",
+        href: "/reports/profitability",
+        icon: Users,
       },
     ],
   },
