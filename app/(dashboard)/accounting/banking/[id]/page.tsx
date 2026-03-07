@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 
 type BankAccountType =
@@ -493,7 +494,7 @@ export default function BankAccountDetailPage() {
   const reconciledPct = summary.total > 0 ? Math.round((summary.reconciled / summary.total) * 100) : 0;
 
   return (
-    <div>
+    <ContentReveal>
       {/* Back link */}
       <button
         onClick={() => router.push("/accounting/banking")}
@@ -990,7 +991,7 @@ export default function BankAccountDetailPage() {
         orgId={orgId}
         onCreated={() => { setExpenseTx(null); fetchData(); }}
       />
-    </div>
+    </ContentReveal>
   );
 }
 
