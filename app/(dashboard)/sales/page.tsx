@@ -21,7 +21,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 interface Invoice {
   id: string;
@@ -257,7 +257,7 @@ export default function InvoicesPage() {
 
   if (!loading && invoices.length === 0 && statusFilter === "all" && !hasFilters) {
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="flex flex-col items-center gap-10 pt-16 pb-12">
           {/* Invoice lifecycle stepper */}
           <div className="w-full max-w-xl">
@@ -309,12 +309,12 @@ export default function InvoicesPage() {
             ))}
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <ContentReveal className="space-y-10">
       <Section title="Overview" description="Revenue summary and outstanding amounts across all invoices.">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -497,6 +497,6 @@ export default function InvoicesPage() {
           </Section>
         </>
       )}
-    </BlurReveal>
+    </ContentReveal>
   );
 }
