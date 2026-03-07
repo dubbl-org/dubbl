@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useEffect, useMemo, use } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Save, Trash2, Target, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Plus, Save, Trash2, Target, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -52,6 +60,7 @@ interface Comparison {
 }
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 type MonthKey = typeof MONTHS[number];
 
 interface LineInput {
@@ -97,6 +106,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -137,14 +147,6 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
       .finally(() => setLoading(false));
   }, [id, orgId]);
 
-  function updateLine(index: number, field: string, value: string | number) {
-    setLines((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
-  }
-
   function handleAnnualChange(index: number, value: string) {
     setAnnualAmounts((prev) => ({ ...prev, [index]: value }));
     const cents = Math.round(parseFloat(value || "0") * 100);
@@ -158,12 +160,36 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
     }
   }
 
+  function updateMonthValue(index: number, month: MonthKey, value: string) {
+    const cents = Math.round(parseFloat(value || "0") * 100);
+    setLines((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [month]: cents };
+      return copy;
+    });
+    // Clear annual amount so it recalculates from months
+    setAnnualAmounts((prev) => {
+      const copy = { ...prev };
+      delete copy[index];
+      return copy;
+    });
+  }
+
   function removeLine(index: number) {
     setLines((prev) => prev.filter((_, i) => i !== index));
     setAnnualAmounts((prev) => {
       const copy = { ...prev };
       delete copy[index];
       return copy;
+    });
+  }
+
+  function toggleExpand(index: number) {
+    setExpandedLines((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
     });
   }
 
@@ -186,12 +212,22 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
 
       toast.success("Budget updated");
       setEditing(false);
-      // Reload
+      setExpandedLines(new Set());
       const [budgetRes, reportRes] = await Promise.all([
         fetch(`/api/v1/budgets/${id}`, { headers: { "x-organization-id": orgId } }).then((r) => r.json()),
         fetch(`/api/v1/reports/budget-vs-actual?budgetId=${id}`, { headers: { "x-organization-id": orgId } }).then((r) => r.json()).catch(() => null),
       ]);
-      if (budgetRes.budget) setBudget(budgetRes.budget);
+      if (budgetRes.budget) {
+        setBudget(budgetRes.budget);
+        setLines(
+          budgetRes.budget.lines.map((l: BudgetLineData) => ({
+            id: l.id, accountId: l.accountId,
+            jan: l.jan, feb: l.feb, mar: l.mar, apr: l.apr,
+            may: l.may, jun: l.jun, jul: l.jul, aug: l.aug,
+            sep: l.sep, oct: l.oct, nov: l.nov, dec: l.dec,
+          }))
+        );
+      }
       if (reportRes) {
         setComparisons(reportRes.comparisons || []);
         setTotalBudgeted(reportRes.totalBudgeted || 0);
@@ -252,7 +288,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 dark:bg-purple-500/15">
-            <Target className={cn("size-5 text-purple-700 dark:text-purple-300")} />
+            <Target className="size-5 text-purple-700 dark:text-purple-300" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
@@ -265,7 +301,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {budget.startDate} · {budget.endDate}
+              {budget.startDate} · {budget.endDate} · {budget.lines.length} line{budget.lines.length !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -277,7 +313,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => { setEditing(false); setExpandedLines(new Set()); }}>Cancel</Button>
               <Button size="sm" onClick={handleSave} loading={saving} className="bg-emerald-600 hover:bg-emerald-700">
                 <Save className="mr-2 size-3.5" />Save
               </Button>
@@ -360,42 +396,75 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {lines.map((line, i) => {
               const total = lineTotal(line);
+              const expanded = expandedLines.has(i);
               return (
-                <div key={i} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <select
-                        className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                        value={line.accountId}
-                        onChange={(e) => updateLine(i, "accountId", e.target.value)}
+                <div key={i} className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Select
+                        value={line.accountId || undefined}
+                        onValueChange={(val) => {
+                          setLines((prev) => {
+                            const copy = [...prev];
+                            copy[i] = { ...copy[i], accountId: val };
+                            return copy;
+                          });
+                        }}
                       >
-                        <option value="">Select account...</option>
-                        {accounts.map((a) => (
-                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="w-40">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Annual amount"
-                        value={annualAmounts[i] ?? (total / 100).toFixed(2)}
-                        onChange={(e) => handleAnnualChange(i, e.target.value)}
-                        className="font-mono text-right"
-                      />
-                    </div>
-                    <button type="button" onClick={() => removeLine(i)} className="text-muted-foreground hover:text-red-600 shrink-0">
+                    <button type="button" onClick={() => removeLine(i)} className="text-muted-foreground hover:text-red-600 shrink-0 p-1">
                       <Trash2 className="size-4" />
                     </button>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Distributed evenly: {formatMoney(Math.floor(total / 12))}/mo</span>
-                    <span className="font-mono font-medium text-foreground">Total: {formatMoney(total)}</span>
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs text-muted-foreground shrink-0 w-16">Annual</Label>
+                    <CurrencyInput
+                      prefix="$"
+                      value={annualAmounts[i] ?? (total / 100).toFixed(2)}
+                      onChange={(v) => handleAnnualChange(i, v)}
+                      placeholder="0.00"
+                      className="flex-1"
+                    />
+                    {total > 0 && (
+                      <span className="text-xs text-muted-foreground font-mono tabular-nums shrink-0">
+                        {formatMoney(Math.floor(total / 12))}/mo
+                      </span>
+                    )}
                   </div>
+                  {total > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(i)}
+                      className="text-[11px] text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                    >
+                      {expanded ? "Hide monthly breakdown" : "Customize monthly amounts"}
+                    </button>
+                  )}
+                  {expanded && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                      {MONTHS.map((m, mi) => (
+                        <div key={m} className="space-y-1">
+                          <label className="text-[10px] text-muted-foreground pl-0.5">{MONTH_LABELS[mi]}</label>
+                          <CurrencyInput
+                            size="sm"
+                            value={(line[m] / 100).toFixed(2)}
+                            onChange={(v) => updateMonthValue(i, m, v)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {i < lines.length - 1 && <div className="h-px bg-border" />}
                 </div>
               );
             })}
@@ -409,64 +478,41 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
       ) : (
         /* View mode */
         <div className="space-y-6">
-          {/* Per-account breakdown */}
           {comparisons.length > 0 ? (
             <div className="space-y-3">
               {comparisons.map((c) => {
                 const pct = c.budgeted === 0 ? 0 : Math.round((c.actual / c.budgeted) * 100);
                 const over = c.actual > c.budgeted;
+                const budgetLine = budget.lines.find((l) => l.accountId === c.accountId);
                 return (
-                  <div key={c.accountId} className="rounded-lg border p-4 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{c.accountName}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{c.accountCode}</p>
-                      </div>
-                      <div className="text-right shrink-0 ml-4">
-                        <p className="text-sm font-mono font-semibold tabular-nums">
-                          {formatMoney(c.actual)} <span className="text-muted-foreground font-normal">/ {formatMoney(c.budgeted)}</span>
-                        </p>
-                        <p className={cn(
-                          "text-xs font-mono tabular-nums",
-                          over ? "text-red-600" : "text-emerald-600"
-                        )}>
-                          {over ? "Over by " : "Under by "}{formatMoney(Math.abs(c.variance))}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full rounded-full transition-all",
-                          over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
-                        )}
-                        style={{ width: `${Math.min(pct, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{pct}% utilized</span>
-                      <span className="font-mono tabular-nums">{formatMoney(c.budgeted - c.actual)} remaining</span>
-                    </div>
-                  </div>
+                  <ViewLineCard
+                    key={c.accountId}
+                    accountName={c.accountName}
+                    accountCode={c.accountCode}
+                    budgeted={c.budgeted}
+                    actual={c.actual}
+                    variance={c.variance}
+                    pct={pct}
+                    over={over}
+                    budgetLine={budgetLine}
+                  />
                 );
               })}
             </div>
           ) : budget.lines.length > 0 ? (
             <div className="space-y-3">
               {budget.lines.map((line) => (
-                <div key={line.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {line.account ? line.account.name : line.accountId}
-                    </p>
-                    {line.account && (
-                      <p className="text-xs text-muted-foreground font-mono">{line.account.code}</p>
-                    )}
-                  </div>
-                  <p className="font-mono text-sm font-semibold tabular-nums shrink-0 ml-4">
-                    {formatMoney(line.total)}
-                  </p>
-                </div>
+                <ViewLineCard
+                  key={line.id}
+                  accountName={line.account?.name || line.accountId}
+                  accountCode={line.account?.code || ""}
+                  budgeted={line.total}
+                  actual={0}
+                  variance={line.total}
+                  pct={0}
+                  over={false}
+                  budgetLine={line}
+                />
               ))}
             </div>
           ) : (
@@ -475,9 +521,127 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
               <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditing(true)}>Add lines</Button>
             </div>
           )}
+
+          {/* Monthly totals summary */}
+          {budget.lines.length > 0 && (
+            <>
+              <div className="h-px bg-border" />
+              <div>
+                <p className="text-sm font-medium mb-3">Monthly Plan</p>
+                <div className="grid grid-cols-6 sm:grid-cols-12 gap-x-4 gap-y-1 text-xs">
+                  {MONTHS.map((m, mi) => {
+                    const monthTotal = budget.lines.reduce((s, l) => s + l[m], 0);
+                    return (
+                      <div key={m} className="text-center py-1.5">
+                        <p className="text-[10px] text-muted-foreground">{MONTH_LABELS[mi]}</p>
+                        <p className="font-mono text-xs font-semibold tabular-nums mt-0.5">{formatMoney(monthTotal)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Grand total */}
+          {grandTotal > 0 && (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
+              <p className="text-sm font-medium">Grand Total</p>
+              <p className="font-mono text-lg font-semibold tabular-nums">{formatMoney(grandTotal)}</p>
+            </div>
+          )}
         </div>
       )}
       {confirmDialog}
     </ContentReveal>
+  );
+}
+
+function ViewLineCard({
+  accountName,
+  accountCode,
+  budgeted,
+  actual,
+  variance,
+  pct,
+  over,
+  budgetLine,
+}: {
+  accountName: string;
+  accountCode: string;
+  budgeted: number;
+  actual: number;
+  variance: number;
+  pct: number;
+  over: boolean;
+  budgetLine?: BudgetLineData;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg border px-4 py-3 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{accountName}</p>
+            {accountCode && <span className="text-xs text-muted-foreground font-mono">{accountCode}</span>}
+          </div>
+        </div>
+        <div className="text-right shrink-0 ml-4">
+          <p className="text-sm font-mono font-semibold tabular-nums">
+            {actual > 0 ? (
+              <>{formatMoney(actual)} <span className="text-muted-foreground font-normal">/ {formatMoney(budgeted)}</span></>
+            ) : (
+              formatMoney(budgeted)
+            )}
+          </p>
+          {actual > 0 && (
+            <p className={cn(
+              "text-xs font-mono tabular-nums",
+              over ? "text-red-600" : "text-emerald-600"
+            )}>
+              {over ? "Over by " : "Under by "}{formatMoney(Math.abs(variance))}
+            </p>
+          )}
+        </div>
+      </div>
+      {actual > 0 && (
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+            )}
+            style={{ width: `${Math.min(pct, 100)}%` }}
+          />
+        </div>
+      )}
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-3">
+          {actual > 0 && <span>{pct}% utilized</span>}
+          {actual > 0 && <span className="font-mono tabular-nums">{formatMoney(budgeted - actual)} remaining</span>}
+          {actual === 0 && <span>No spending recorded yet</span>}
+        </div>
+        {budgetLine && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            Months
+          </button>
+        )}
+      </div>
+      {expanded && budgetLine && (
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-x-4 gap-y-1 pt-1 text-[11px]">
+          {MONTHS.map((m, mi) => (
+            <div key={m} className="flex items-center justify-between sm:flex-col sm:items-center">
+              <span className="text-muted-foreground">{MONTH_LABELS[mi]}</span>
+              <span className="font-mono tabular-nums">{formatMoney(budgetLine[m])}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

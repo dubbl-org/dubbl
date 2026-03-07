@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Plus, Target } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -35,9 +35,10 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true);
   const [utilization, setUtilization] = useState<BudgetUtilization[]>([]);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
+    setLoading(true);
     fetch("/api/v1/budgets?limit=100", {
       headers: { "x-organization-id": orgId },
     })
@@ -66,6 +67,12 @@ export default function BudgetsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchData();
+    window.addEventListener("budgets-changed", fetchData);
+    return () => window.removeEventListener("budgets-changed", fetchData);
+  }, [fetchData]);
 
   if (loading) return <BrandLoader />;
 

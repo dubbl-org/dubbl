@@ -42,6 +42,7 @@ import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-item
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account";
@@ -1568,6 +1569,7 @@ interface BudgetLineInput {
 
 const BUDGET_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
 const BUDGET_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+type BudgetMonthKey = typeof BUDGET_MONTHS[number];
 
 function emptyBudgetLine(): BudgetLineInput {
   return { accountId: "", jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 };
@@ -1575,6 +1577,16 @@ function emptyBudgetLine(): BudgetLineInput {
 
 function budgetLineTotal(line: BudgetLineInput): number {
   return BUDGET_MONTHS.reduce((s, m) => s + line[m], 0);
+}
+
+function distributeEvenly(annualCents: number): Record<BudgetMonthKey, number> {
+  const perMonth = Math.floor(annualCents / 12);
+  const remainder = annualCents - perMonth * 12;
+  const result = {} as Record<BudgetMonthKey, number>;
+  BUDGET_MONTHS.forEach((m, i) => {
+    result[m] = perMonth + (i < remainder ? 1 : 0);
+  });
+  return result;
 }
 
 interface BudgetAccount {
@@ -1591,11 +1603,14 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
   const [startDate, setStartDate] = useState(`${new Date().getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(`${new Date().getFullYear()}-12-31`);
   const [budgetLines, setBudgetLines] = useState<BudgetLineInput[]>([emptyBudgetLine()]);
+  const [annualAmounts, setAnnualAmounts] = useState<Record<number, string>>({});
   const [budgetAccounts, setBudgetAccounts] = useState<BudgetAccount[]>([]);
+  const [expandedLine, setExpandedLine] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) {
       setBudgetName(""); setBudgetLines([emptyBudgetLine()]);
+      setAnnualAmounts({}); setExpandedLine(null);
       setStartDate(`${new Date().getFullYear()}-01-01`);
       setEndDate(`${new Date().getFullYear()}-12-31`);
       return;
@@ -1604,20 +1619,44 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
     if (!orgId) return;
     fetch("/api/v1/accounts?limit=500", { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
-      .then((data) => { if (data.data) setBudgetAccounts(data.data); });
+      .then((data) => { if (data.accounts) setBudgetAccounts(data.accounts); else if (data.data) setBudgetAccounts(data.data); });
   }, [open]);
 
-  function updateBudgetLine(index: number, field: string, value: string | number) {
+  function handleAnnualChange(index: number, value: string) {
+    setAnnualAmounts((prev) => ({ ...prev, [index]: value }));
+    const cents = Math.round(parseFloat(value || "0") * 100);
+    if (cents >= 0) {
+      const distributed = distributeEvenly(cents);
+      setBudgetLines((prev) => {
+        const copy = [...prev];
+        copy[index] = { ...copy[index], ...distributed };
+        return copy;
+      });
+    }
+  }
+
+  function updateMonth(index: number, month: BudgetMonthKey, value: string) {
+    const cents = Math.round(parseFloat(value || "0") * 100);
     setBudgetLines((prev) => {
       const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
+      copy[index] = { ...copy[index], [month]: cents };
+      return copy;
+    });
+    setAnnualAmounts((prev) => {
+      const copy = { ...prev };
+      delete copy[index];
       return copy;
     });
   }
 
-  function updateMonthCents(index: number, month: string, value: string) {
-    const cents = Math.round(parseFloat(value || "0") * 100);
-    updateBudgetLine(index, month, cents);
+  function removeLine(index: number) {
+    setBudgetLines((prev) => prev.filter((_, i) => i !== index));
+    setAnnualAmounts((prev) => {
+      const copy = { ...prev };
+      delete copy[index];
+      return copy;
+    });
+    if (expandedLine === index) setExpandedLine(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1640,6 +1679,7 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       }
       toast.success("Budget created");
       onClose();
+      window.dispatchEvent(new Event("budgets-changed"));
       router.push("/accounting/budgets");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create budget");
@@ -1648,15 +1688,17 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
     }
   }
 
+  const grandTotal = budgetLines.reduce((s, l) => s + budgetLineTotal(l), 0);
+
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col">
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Target className="size-5" /></DrawerIcon>
             <div>
               <SheetTitle className="text-lg">New Budget</SheetTitle>
-              <SheetDescription>Create a budget with monthly allocations.</SheetDescription>
+              <SheetDescription>Plan spending by account with annual or monthly amounts.</SheetDescription>
             </div>
           </div>
         </SheetHeader>
@@ -1664,11 +1706,11 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
           <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Budget Info</SectionLabel>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Budget Name *</Label>
-                  <Input value={budgetName} onChange={(e) => setBudgetName(e.target.value)} placeholder="FY 2026 Operating Budget" required />
-                </div>
+              <div className="space-y-2">
+                <Label>Budget Name *</Label>
+                <Input value={budgetName} onChange={(e) => setBudgetName(e.target.value)} placeholder="FY 2026 Operating Budget" required />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
                   <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
@@ -1689,59 +1731,99 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
                   <Plus className="mr-2 size-3.5" />Add Line
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/50 border-b">
-                      <th className="px-3 py-2 text-left font-medium w-48">Account</th>
-                      {BUDGET_MONTH_LABELS.map((m) => (
-                        <th key={m} className="px-2 py-2 text-right font-medium w-20">{m}</th>
-                      ))}
-                      <th className="px-3 py-2 text-right font-medium w-24">Total</th>
-                      <th className="px-2 py-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {budgetLines.map((line, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="px-3 py-2">
-                          <select
-                            className="h-8 w-full rounded border bg-background px-2 text-sm"
-                            value={line.accountId}
-                            onChange={(e) => updateBudgetLine(i, "accountId", e.target.value)}
-                          >
-                            <option value="">Select account...</option>
+
+              {budgetLines.map((line, i) => {
+                const total = budgetLineTotal(line);
+                const isExpanded = expandedLine === i;
+                return (
+                  <div key={i} className="space-y-2.5">
+                    {/* Account + remove */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <Select
+                          value={line.accountId || undefined}
+                          onValueChange={(val) => {
+                            setBudgetLines((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], accountId: val };
+                              return copy;
+                            });
+                          }}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                          <SelectContent>
                             {budgetAccounts.map((a) => (
-                              <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                              <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
                             ))}
-                          </select>
-                        </td>
-                        {BUDGET_MONTHS.map((m) => (
-                          <td key={m} className="px-1 py-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="h-8 w-full rounded border bg-background px-2 text-right text-sm font-mono tabular-nums"
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <button type="button" onClick={() => removeLine(i)} className="text-muted-foreground hover:text-red-600 shrink-0 p-1">
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+
+                    {/* Annual amount + per-month info */}
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs text-muted-foreground shrink-0 w-16">Annual</Label>
+                      <CurrencyInput
+                        prefix="$"
+                        value={annualAmounts[i] ?? (total > 0 ? (total / 100).toFixed(2) : "")}
+                        onChange={(v) => handleAnnualChange(i, v)}
+                        placeholder="0.00"
+                        className="flex-1"
+                      />
+                      {total > 0 && (
+                        <span className="text-xs text-muted-foreground font-mono tabular-nums shrink-0">
+                          {formatMoney(Math.floor(total / 12))}/mo
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Customize months toggle */}
+                    {total > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLine(isExpanded ? null : i)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                      >
+                        {isExpanded ? "Hide monthly breakdown" : "Customize monthly amounts"}
+                      </button>
+                    )}
+
+                    {/* Monthly grid */}
+                    {isExpanded && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                        {BUDGET_MONTHS.map((m, mi) => (
+                          <div key={m} className="space-y-1">
+                            <label className="text-[10px] text-muted-foreground pl-0.5">{BUDGET_MONTH_LABELS[mi]}</label>
+                            <CurrencyInput
+                              size="sm"
                               value={(line[m] / 100).toFixed(2)}
-                              onChange={(e) => updateMonthCents(i, m, e.target.value)}
+                              onChange={(v) => updateMonth(i, m, v)}
                             />
-                          </td>
+                          </div>
                         ))}
-                        <td className="px-3 py-2 text-right font-mono text-sm tabular-nums font-medium">
-                          ${(budgetLineTotal(line) / 100).toFixed(2)}
-                        </td>
-                        <td className="px-2 py-2">
-                          <button type="button" onClick={() => setBudgetLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-red-600">
-                            <Trash2 className="size-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      </div>
+                    )}
+
+                    {i < budgetLines.length - 1 && <div className="h-px bg-border" />}
+                  </div>
+                );
+              })}
+
+              {budgetLines.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No lines yet. Add one to start planning.</p>
+              )}
             </div>
           </div>
+
+          {grandTotal > 0 && (
+            <div className="flex items-center justify-between border-t px-4 py-2.5 sm:px-6 text-sm">
+              <span className="text-muted-foreground">Total budget</span>
+              <span className="font-mono font-semibold tabular-nums">{formatMoney(grandTotal)}</span>
+            </div>
+          )}
           <DrawerFooter onClose={onClose} saving={saving} label="Create Budget" />
         </form>
       </SheetContent>
