@@ -178,39 +178,41 @@ export default function AccountsPage() {
 
   if (!loading && accounts.length === 0) {
     return (
-      <BlurReveal>
-        <div className="min-h-[60vh] flex flex-col justify-center gap-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
-              <p className="text-sm text-muted-foreground mt-1">Organize where money comes from and where it goes.</p>
-            </div>
-            <Button
-              onClick={() => setDialogOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Account
-            </Button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {ALL_TYPES.map((type) => (
-              <div
-                key={type}
-                className={`rounded-lg border border-dashed border-t-4 ${TYPE_BORDER_COLORS[type].replace("border-l-", "border-t-")} p-4 space-y-3 opacity-50`}
-              >
-                <p className="text-sm font-medium capitalize">{type}</p>
-                <p className="text-2xl font-mono font-semibold tabular-nums text-muted-foreground/30">0</p>
-                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                  {type === "asset" ? "Cash, receivables, equipment" :
-                   type === "liability" ? "Payables, loans, credit cards" :
-                   type === "equity" ? "Owner capital, retained earnings" :
-                   type === "revenue" ? "Sales, service income, interest" :
-                   "Rent, payroll, supplies"}
-                </p>
+      <BlurReveal className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
+          <Button
+            onClick={() => setDialogOpen(true)}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            New Account
+          </Button>
+        </div>
+
+        <div className="rounded-lg border divide-y">
+          {ALL_TYPES.map((type) => {
+            const examples = type === "asset" ? ["Cash", "Accounts Receivable", "Equipment", "Inventory"]
+              : type === "liability" ? ["Accounts Payable", "Loans", "Credit Cards", "Accrued Expenses"]
+              : type === "equity" ? ["Owner Capital", "Retained Earnings", "Drawings"]
+              : type === "revenue" ? ["Sales Revenue", "Service Income", "Interest Income"]
+              : ["Rent", "Payroll", "Utilities", "Office Supplies"];
+            return (
+              <div key={type} className="flex items-center gap-4 px-4 py-3.5">
+                <div className={`w-1 self-stretch rounded-full ${TYPE_BORDER_COLORS[type].replace("border-l-", "bg-")}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium capitalize">{type}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {examples.map((ex) => (
+                      <span key={ex} className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{ex}</span>
+                    ))}
+                  </div>
+                </div>
+                <span className="text-lg font-mono font-semibold tabular-nums text-muted-foreground/25 shrink-0">0</span>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
         <AccountDialog
           open={dialogOpen}

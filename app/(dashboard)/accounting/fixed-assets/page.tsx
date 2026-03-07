@@ -147,45 +147,53 @@ export default function FixedAssetsPage() {
 
   if (!loading && assets.length === 0 && statusFilter === "all") {
     return (
-      <BlurReveal>
-        <div className="min-h-[60vh] flex flex-col justify-center">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold tracking-tight">Fixed Assets</h2>
-              <p className="text-sm text-muted-foreground">
-                Track equipment, vehicles, and property. Monitor depreciation and net book value over time.
-              </p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {["Equipment", "Vehicles", "Property", "Furniture", "IT Hardware"].map((tag) => (
-                  <span key={tag} className="rounded-full border border-dashed px-2.5 py-0.5 text-[11px] text-muted-foreground/60">{tag}</span>
-                ))}
-              </div>
-              <Button
-                onClick={() => openDrawer("fixedAsset")}
-                className="mt-2 bg-emerald-600 hover:bg-emerald-700"
-              >
-                <Plus className="mr-2 size-4" />
-                Add Asset
-              </Button>
+      <BlurReveal className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">Fixed Assets</h2>
+          <Button
+            onClick={() => openDrawer("fixedAsset")}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            Add Asset
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Total Cost", value: "$0.00" },
+            { label: "Net Book Value", value: "$0.00" },
+            { label: "Accumulated Depreciation", value: "$0.00" },
+          ].map(({ label, value }) => (
+            <div key={label} className="rounded-lg border bg-card p-4">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
+              <p className="mt-1.5 text-xl font-mono font-semibold tabular-nums text-muted-foreground/30">{value}</p>
             </div>
-            <div className="rounded-lg border border-dashed bg-card p-5 opacity-40 space-y-4">
-              {[
-                { label: "Original Cost", value: "$0.00", bar: "w-full" },
-                { label: "Net Book Value", value: "$0.00", bar: "w-3/4" },
-                { label: "Depreciation", value: "$0.00", bar: "w-1/4" },
-              ].map(({ label, value, bar }) => (
-                <div key={label} className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{label}</span>
-                    <span className="font-mono tabular-nums text-muted-foreground">{value}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div className={`h-full rounded-full bg-muted-foreground/20 ${bar}`} />
-                  </div>
-                </div>
-              ))}
-            </div>
+          ))}
+        </div>
+
+        <div className="rounded-lg border overflow-hidden opacity-50">
+          <div className="grid grid-cols-[1fr_120px_120px_120px_100px] gap-px bg-muted text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="bg-card px-4 py-2.5">Asset</div>
+            <div className="bg-card px-4 py-2.5">Purchase Date</div>
+            <div className="bg-card px-4 py-2.5 text-right">Cost</div>
+            <div className="bg-card px-4 py-2.5 text-right">Book Value</div>
+            <div className="bg-card px-4 py-2.5">Status</div>
           </div>
+          {[
+            { name: "Office Laptop", date: "Jan 2025", cost: "$1,200", nbv: "$900", status: "Active" },
+            { name: "Delivery Van", date: "Mar 2024", cost: "$28,000", nbv: "$21,000", status: "Active" },
+            { name: "Office Furniture", date: "Jun 2023", cost: "$4,500", nbv: "$2,250", status: "Active" },
+          ].map((row) => (
+            <div key={row.name} className="grid grid-cols-[1fr_120px_120px_120px_100px] gap-px bg-muted">
+              <div className="bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground">{row.name}</div>
+              <div className="bg-card px-4 py-2.5 text-sm text-muted-foreground">{row.date}</div>
+              <div className="bg-card px-4 py-2.5 text-sm font-mono tabular-nums text-right text-muted-foreground">{row.cost}</div>
+              <div className="bg-card px-4 py-2.5 text-sm font-mono tabular-nums text-right text-muted-foreground">{row.nbv}</div>
+              <div className="bg-card px-4 py-2.5 text-xs text-emerald-600">{row.status}</div>
+            </div>
+          ))}
         </div>
       </BlurReveal>
     );
