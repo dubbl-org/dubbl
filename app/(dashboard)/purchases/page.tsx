@@ -14,7 +14,6 @@ import {
   FileText,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -164,6 +163,7 @@ export default function BillsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const [bills, setBills] = useState<Bill[]>([]);
+  const [allBills, setAllBills] = useState<Bill[]>([]);
   const [countsData, setCountsData] = useState<{ counts: Record<string, { count: number; amount: number }>; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refetching, setRefetching] = useState(false);
@@ -202,7 +202,7 @@ export default function BillsPage() {
     return params;
   }, [statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
 
-  // Fetch status counts via lightweight COUNT(*) endpoint
+  // Fetch status counts + all bills for overview (once, not affected by filters)
   useEffect(() => {
     if (!orgId) return;
     let cancelled = false;
@@ -212,6 +212,13 @@ export default function BillsPage() {
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled && data.counts) setCountsData(data);
+      });
+    fetch(`/api/v1/bills?limit=200`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.data) setAllBills(data.data);
       });
     return () => { cancelled = true; };
   }, [orgId]);
@@ -312,7 +319,7 @@ export default function BillsPage() {
       "31-60": { count: 0, amount: 0 },
       "60+": { count: 0, amount: 0 },
     };
-    bills
+    allBills
       .filter(
         (b) =>
           ["received", "partial", "overdue"].includes(b.status) &&
@@ -338,12 +345,12 @@ export default function BillsPage() {
         }
       });
     return buckets;
-  }, [bills]);
+  }, [allBills]);
 
   // Bills due within 7 days (not paid/void/draft)
   const dueSoon = useMemo(() => {
     const now = new Date();
-    return bills
+    return allBills
       .filter((b) => {
         if (["paid", "void", "draft"].includes(b.status)) return false;
         const due = new Date(b.dueDate);
@@ -355,7 +362,7 @@ export default function BillsPage() {
           new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
       )
       .slice(0, 5);
-  }, [bills]);
+  }, [allBills]);
 
   const pendingSearch = search !== debouncedSearch;
   const hasFilters = dateFrom || dateTo;
@@ -476,95 +483,121 @@ export default function BillsPage() {
 
   return (
     <BlurReveal className="space-y-10">
-      <Section title="Overview" description="Payables summary and outstanding amounts across all bills.">
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Outstanding" value={formatMoney(outstanding)} icon={FileText} />
-            <StatCard title="Overdue" value={formatMoney(overdue)} icon={FileText} changeType="negative" />
-            <StatCard title="Total Bills" value={(countsData?.total || 0).toString()} icon={FileText} />
+      {/* Overview */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        {/* Hero stats row */}
+        <div className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Total Outstanding</p>
+              <p className="mt-1 text-3xl sm:text-4xl font-bold font-mono tabular-nums tracking-tighter">
+                {formatMoney(outstanding)}
+              </p>
+            </div>
+            <div className="flex gap-6 sm:gap-8">
+              <div>
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-red-500" />Overdue
+                </p>
+                <p className="mt-0.5 text-lg font-semibold font-mono tabular-nums text-red-600 dark:text-red-400">
+                  {formatMoney(overdue)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Bills</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums">{countsData?.total || 0}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-emerald-500" />Paid
+                </p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {statusCounts.paid || 0}
+                </p>
+              </div>
+            </div>
           </div>
-          {agingTotal > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Aging Breakdown</p>
-              <div className="h-3 w-full rounded-full overflow-hidden flex">
-                {([
-                  { key: "current" as const, color: "bg-emerald-500" },
-                  { key: "1-30" as const, color: "bg-amber-400" },
-                  { key: "31-60" as const, color: "bg-orange-500" },
-                  { key: "60+" as const, color: "bg-red-500" },
-                ] as const).map(({ key, color }) => {
-                  const pct = (aging[key].amount / agingTotal) * 100;
-                  if (pct === 0) return null;
-                  return (
-                    <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />
-                  );
-                })}
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {([
-                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
-                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
-                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
-                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
-                ] as const).map(({ key, color, label }) => (
-                  <div key={key} className="text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`inline-block size-2 rounded-full ${color}`} />
-                      <span className="text-muted-foreground">{label}</span>
-                    </div>
-                    <p className="font-mono tabular-nums mt-0.5 pl-3.5">
-                      {aging[key].count} · {formatMoney(aging[key].amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Due soon */}
-          {dueSoon.length > 0 && (
-            <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-3 sm:p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  Due within 7 days
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {dueSoon.map((b) => {
-                  const due = new Date(b.dueDate);
-                  const now = new Date();
-                  const days = Math.ceil(
-                    (due.getTime() - now.getTime()) / 86400000
-                  );
-                  return (
-                    <button
-                      key={b.id}
-                      onClick={() => router.push(`/purchases/${b.id}`)}
-                      className="flex items-center gap-3 rounded-md border bg-card px-3 py-2 text-left hover:bg-accent transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-mono">{b.billNumber}</p>
-                        <p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
-                          {b.contact?.name || "No supplier"}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-mono font-medium tabular-nums">
-                          {formatMoney(b.amountDue)}
-                        </p>
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                          {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
-      </Section>
+
+        {/* Aging bar + legend */}
+        {agingTotal > 0 && (
+          <div className="border-t px-5 py-4 sm:px-6">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-3">Aging</p>
+            <div className="h-2.5 w-full rounded-full overflow-hidden flex mb-3">
+              {([
+                { key: "current" as const, color: "bg-emerald-500" },
+                { key: "1-30" as const, color: "bg-amber-400" },
+                { key: "31-60" as const, color: "bg-orange-500" },
+                { key: "60+" as const, color: "bg-red-500" },
+              ] as const).map(({ key, color }) => {
+                const pct = (aging[key].amount / agingTotal) * 100;
+                if (pct === 0) return null;
+                return <div key={key} className={`${color} h-full first:rounded-l-full last:rounded-r-full`} style={{ width: `${pct}%` }} />;
+              })}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2">
+              {([
+                { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
+                { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
+                { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
+              ] as const).map(({ key, color, label }) => (
+                <div key={key} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={`size-2 rounded-full ${color}`} />
+                    {label}
+                  </div>
+                  <p className="text-xs font-mono font-medium tabular-nums">
+                    {formatMoney(aging[key].amount)}
+                    <span className="text-muted-foreground font-normal ml-1.5">({aging[key].count})</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Due soon */}
+        {dueSoon.length > 0 && (
+          <div className="border-t px-5 py-4 sm:px-6">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="text-[11px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                Due within 7 days
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {dueSoon.map((b) => {
+                const due = new Date(b.dueDate);
+                const now = new Date();
+                const days = Math.ceil((due.getTime() - now.getTime()) / 86400000);
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => router.push(`/purchases/${b.id}`)}
+                    className="flex items-center gap-3 rounded-lg border bg-background/50 px-3 py-2 text-left hover:bg-accent transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-mono font-medium">{b.billNumber}</p>
+                      <p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
+                        {b.contact?.name || "No supplier"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-mono font-semibold tabular-nums">
+                        {formatMoney(b.amountDue)}
+                      </p>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                        {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="h-px bg-border" />
 

@@ -11,7 +11,7 @@ import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
 import { contact } from "./contacts";
 import { journalEntry } from "./bookkeeping";
-import { bankAccount } from "./banking";
+import { bankAccount, bankTransaction } from "./banking";
 
 export const paymentTypeEnum = pgEnum("payment_type", [
   "received", // customer payment (reduces AR)
@@ -45,6 +45,7 @@ export const payment = pgTable("payment", {
   reference: text("reference"), // check number, transfer ref, etc.
   notes: text("notes"),
   bankAccountId: uuid("bank_account_id").references(() => bankAccount.id),
+  bankTransactionId: uuid("bank_transaction_id").references(() => bankTransaction.id),
   currencyCode: text("currency_code").notNull().default("USD"),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   createdBy: uuid("created_by").references(() => users.id),
@@ -79,6 +80,10 @@ export const paymentRelations = relations(payment, ({ one, many }) => ({
   bankAccount: one(bankAccount, {
     fields: [payment.bankAccountId],
     references: [bankAccount.id],
+  }),
+  bankTransaction: one(bankTransaction, {
+    fields: [payment.bankTransactionId],
+    references: [bankTransaction.id],
   }),
   journalEntry: one(journalEntry, {
     fields: [payment.journalEntryId],

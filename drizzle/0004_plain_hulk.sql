@@ -1,0 +1,2 @@
+ALTER TABLE "payment" ADD COLUMN "bank_transaction_id" uuid;--> statement-breakpoint
+ALTER TABLE "payment" ADD CONSTRAINT "payment_bank_transaction_id_bank_transaction_id_fk" FOREIGN KEY ("bank_transaction_id") REFERENCES "public"."bank_transaction"("id") ON DELETE no action ON UPDATE no action;

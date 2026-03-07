@@ -11,7 +11,10 @@ import {
   Clock3,
   FileStack,
   FileText,
+  Link2,
   Loader2,
+  MoreHorizontal,
+  Receipt,
   RefreshCcw,
   Settings2,
   Upload,
@@ -47,7 +50,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMoney } from "@/lib/money";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { formatMoney, centsToDecimal } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 
@@ -138,6 +148,23 @@ interface Transaction {
   import?: { id: string; format: string; fileName: string | null } | null;
 }
 
+interface OpenBill {
+  id: string;
+  billNumber: string;
+  contactName: string;
+  dueDate: string;
+  total: number;
+  amountDue: number;
+  status: string;
+}
+
+interface SuggestedMatch {
+  transactionId: string;
+  candidate: { type: string; id: string; description: string; amount: number; date: string };
+  confidence: number;
+  reasons: string[];
+}
+
 const ACCOUNT_TYPE_LABELS: Record<BankAccountType, string> = {
   checking: "Checking",
   savings: "Savings",
@@ -213,6 +240,12 @@ export default function BankAccountDetailPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Match to bill / Create expense state
+  const [matchTx, setMatchTx] = useState<Transaction | null>(null);
+  const [matchBills, setMatchBills] = useState<OpenBill[]>([]);
+  const [matchSuggestions, setMatchSuggestions] = useState<SuggestedMatch[]>([]);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [expenseTx, setExpenseTx] = useState<Transaction | null>(null);
 
   useEntityTitle(account?.accountName ?? undefined);
 
@@ -368,6 +401,30 @@ export default function BankAccountDetailPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update status");
     }
+  }
+
+  async function handleOpenMatch(tx: Transaction) {
+    if (!orgId) return;
+    setMatchTx(tx);
+    setMatchLoading(true);
+    setMatchBills([]);
+    setMatchSuggestions([]);
+    try {
+      const res = await fetch(`/api/v1/bank-transactions/${tx.id}/match`, {
+        headers: { "x-organization-id": orgId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMatchBills(data.openBills || []);
+        setMatchSuggestions(data.suggestedMatches || []);
+      }
+    } finally {
+      setMatchLoading(false);
+    }
+  }
+
+  function handleOpenExpense(tx: Transaction) {
+    setExpenseTx(tx);
   }
 
   async function handleSaveSettings(e: React.FormEvent<HTMLFormElement>) {
@@ -607,6 +664,8 @@ export default function BankAccountDetailPage() {
                       isLast={i === Math.min(7, transactions.length - 1)}
                       onReconcile={handleReconcile}
                       onExclude={handleExclude}
+                      onMatchBill={handleOpenMatch}
+                      onCreateExpense={handleOpenExpense}
                     />
                   ))}
                 </div>
@@ -742,6 +801,8 @@ export default function BankAccountDetailPage() {
                     isLast={i === filteredTx.length - 1}
                     onReconcile={handleReconcile}
                     onExclude={handleExclude}
+                    onMatchBill={handleOpenMatch}
+                    onCreateExpense={handleOpenExpense}
                   />
                 ))}
               </motion.div>
@@ -908,6 +969,27 @@ export default function BankAccountDetailPage() {
         onImport={handleImport}
         currencyCode={cur}
       />
+
+      {/* Match to Bill Sheet */}
+      <MatchToBillSheet
+        transaction={matchTx}
+        onClose={() => setMatchTx(null)}
+        bills={matchBills}
+        suggestions={matchSuggestions}
+        loading={matchLoading}
+        currencyCode={cur}
+        orgId={orgId}
+        onMatched={() => { setMatchTx(null); fetchData(); }}
+      />
+
+      {/* Create Expense from Transaction Sheet */}
+      <CreateExpenseSheet
+        transaction={expenseTx}
+        onClose={() => setExpenseTx(null)}
+        currencyCode={cur}
+        orgId={orgId}
+        onCreated={() => { setExpenseTx(null); fetchData(); }}
+      />
     </div>
   );
 }
@@ -921,14 +1003,19 @@ function TransactionRow({
   isLast,
   onReconcile,
   onExclude,
+  onMatchBill,
+  onCreateExpense,
 }: {
   tx: Transaction;
   cur: string;
   isLast: boolean;
   onReconcile: (id: string) => void;
   onExclude: (id: string) => void;
+  onMatchBill: (tx: Transaction) => void;
+  onCreateExpense: (tx: Transaction) => void;
 }) {
   const isCredit = tx.amount > 0;
+  const isOutgoing = tx.amount < 0;
   return (
     <div
       className={cn(
@@ -966,14 +1053,32 @@ function TransactionRow({
       <div className="flex items-center gap-3 shrink-0">
         <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           {tx.status === "unreconciled" && (
-            <>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-emerald-600" onClick={() => onReconcile(tx.id)}>
-                <CheckCircle className="mr-1 size-3" />Match
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => onExclude(tx.id)}>
-                <XCircle className="mr-1 size-3" />Exclude
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                  <MoreHorizontal className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {isOutgoing && (
+                  <>
+                    <DropdownMenuItem onClick={() => onMatchBill(tx)}>
+                      <Link2 className="mr-2 size-3.5" />Match to Bill
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onCreateExpense(tx)}>
+                      <Receipt className="mr-2 size-3.5" />Create Expense
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={() => onReconcile(tx.id)}>
+                  <CheckCircle className="mr-2 size-3.5" />Reconcile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onExclude(tx.id)} className="text-muted-foreground">
+                  <XCircle className="mr-2 size-3.5" />Exclude
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {tx.status === "excluded" && (
             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onExclude(tx.id)}>Restore</Button>
@@ -1210,6 +1315,369 @@ function ImportSheet({
           </Button>
           <Button onClick={onImport} disabled={!canPreview || importing} className="bg-emerald-600 hover:bg-emerald-700">
             {importing ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Importing...</> : "Import"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Match to Bill Sheet
+// ---------------------------------------------------------------------------
+function MatchToBillSheet({
+  transaction,
+  onClose,
+  bills,
+  suggestions,
+  loading,
+  currencyCode,
+  orgId,
+  onMatched,
+}: {
+  transaction: Transaction | null;
+  onClose: () => void;
+  bills: OpenBill[];
+  suggestions: SuggestedMatch[];
+  loading: boolean;
+  currencyCode: string;
+  orgId: string | null;
+  onMatched: () => void;
+}) {
+  const [selectedBill, setSelectedBill] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [billSearch, setBillSearch] = useState("");
+
+  // Reset state when transaction changes
+  useEffect(() => {
+    if (transaction) {
+      setSelectedBill(null);
+      setPayAmount(centsToDecimal(Math.abs(transaction.amount)));
+      setBillSearch("");
+    }
+  }, [transaction]);
+
+  // Get suggested bill IDs for highlighting
+  const suggestedBillIds = useMemo(
+    () => new Set(suggestions.map((s) => s.candidate.id)),
+    [suggestions]
+  );
+
+  const filteredBills = useMemo(() => {
+    if (!billSearch) return bills;
+    const q = billSearch.toLowerCase();
+    return bills.filter(
+      (b) =>
+        b.billNumber.toLowerCase().includes(q) ||
+        b.contactName.toLowerCase().includes(q)
+    );
+  }, [bills, billSearch]);
+
+  async function handleMatch() {
+    if (!orgId || !transaction || !selectedBill) return;
+    setSaving(true);
+    try {
+      const amount = Math.round(parseFloat(payAmount) * 100);
+      if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
+      const res = await fetch(`/api/v1/bank-transactions/${transaction.id}/match`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          billId: selectedBill,
+          amount,
+          date: transaction.date,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast.success("Transaction matched to bill");
+      onMatched();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to match");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const selected = bills.find((b) => b.id === selectedBill);
+
+  return (
+    <Sheet open={!!transaction} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
+        <SheetHeader className="px-4 pt-5 pb-4 sm:px-6 border-b shrink-0">
+          <SheetTitle className="text-lg">Match to Bill</SheetTitle>
+          <SheetDescription>
+            Link this bank transaction to an open bill to record payment.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
+          {/* Transaction summary */}
+          {transaction && (
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Bank Transaction</p>
+              <p className="text-sm font-medium">{transaction.description}</p>
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                <span>{transaction.date}</span>
+                <span className="font-mono font-semibold text-red-600 dark:text-red-400">
+                  {formatMoney(transaction.amount, currencyCode)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Suggested matches */}
+          {suggestions.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Suggested Matches</p>
+              <div className="space-y-1.5">
+                {suggestions.map((s) => {
+                  const b = bills.find((bill) => bill.id === s.candidate.id);
+                  if (!b) return null;
+                  return (
+                    <button
+                      key={s.candidate.id}
+                      type="button"
+                      onClick={() => { setSelectedBill(b.id); setPayAmount(centsToDecimal(Math.min(Math.abs(transaction?.amount || 0), b.amountDue))); }}
+                      className={cn(
+                        "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
+                        selectedBill === b.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{b.billNumber}</span>
+                          <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            {s.confidence}% match
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{b.contactName} · Due {b.dueDate}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{s.reasons.join(", ")}</p>
+                      </div>
+                      <span className="font-mono text-sm font-medium tabular-nums shrink-0 ml-3">
+                        {formatMoney(b.amountDue, currencyCode)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* All open bills */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              {suggestions.length > 0 ? "All Open Bills" : "Open Bills"}
+            </p>
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search bills..."
+                value={billSearch}
+                onChange={(e) => setBillSearch(e.target.value)}
+                className="pl-9 h-8 text-xs"
+              />
+            </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredBills.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No open bills found.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {filteredBills.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => { setSelectedBill(b.id); setPayAmount(centsToDecimal(Math.min(Math.abs(transaction?.amount || 0), b.amountDue))); }}
+                    className={cn(
+                      "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
+                      selectedBill === b.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20",
+                      suggestedBillIds.has(b.id) && selectedBill !== b.id && "border-emerald-200 dark:border-emerald-900"
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium">{b.billNumber}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{b.contactName} · Due {b.dueDate}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className="font-mono text-sm font-medium tabular-nums">{formatMoney(b.amountDue, currencyCode)}</span>
+                      <p className="text-[10px] text-muted-foreground">of {formatMoney(b.total, currencyCode)}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Payment amount */}
+          {selected && (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Payment Amount</Label>
+                <span className="text-[10px] text-muted-foreground">
+                  Bill due: {formatMoney(selected.amountDue, currencyCode)}
+                </span>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={handleMatch}
+            disabled={!selectedBill || saving}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Matching...</> : "Match & Reconcile"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Create Expense from Transaction Sheet
+// ---------------------------------------------------------------------------
+function CreateExpenseSheet({
+  transaction,
+  onClose,
+  currencyCode,
+  orgId,
+  onCreated,
+}: {
+  transaction: Transaction | null;
+  onClose: () => void;
+  currencyCode: string;
+  orgId: string | null;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [itemDesc, setItemDesc] = useState("");
+  const [itemAmount, setItemAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (transaction) {
+      setTitle(transaction.payee || transaction.description || "");
+      setDescription("");
+      setItemDesc(transaction.description || "");
+      setItemAmount(centsToDecimal(Math.abs(transaction.amount)));
+      setCategory("");
+    }
+  }, [transaction]);
+
+  async function handleCreate() {
+    if (!orgId || !transaction) return;
+    if (!title.trim()) { toast.error("Enter a title"); return; }
+    setSaving(true);
+    try {
+      const amount = parseFloat(itemAmount);
+      if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
+      const res = await fetch(`/api/v1/bank-transactions/${transaction.id}/create-expense`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+          currencyCode,
+          items: [{
+            date: transaction.date,
+            description: itemDesc.trim() || title.trim(),
+            amount,
+            category: category.trim() || null,
+          }],
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast.success("Expense created and transaction reconciled");
+      onCreated();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create expense");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={!!transaction} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
+        <SheetHeader className="px-4 pt-5 pb-4 sm:px-6 border-b shrink-0">
+          <SheetTitle className="text-lg">Create Expense</SheetTitle>
+          <SheetDescription>
+            Create an expense claim from this bank transaction.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
+          {/* Transaction summary */}
+          {transaction && (
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Bank Transaction</p>
+              <p className="text-sm font-medium">{transaction.description}</p>
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                <span>{transaction.date}</span>
+                <span className="font-mono font-semibold text-red-600 dark:text-red-400">
+                  {formatMoney(transaction.amount, currencyCode)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Expense form */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Title</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Office Supplies" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Description (optional)</Label>
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Notes about this expense" />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Expense Item</p>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Item Description</Label>
+              <Input value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} placeholder="What was purchased" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Amount</Label>
+                <Input type="number" step="0.01" value={itemAmount} onChange={(e) => setItemAmount(e.target.value)} className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Category (optional)</Label>
+                <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Travel" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={handleCreate}
+            disabled={saving || !title.trim()}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Creating...</> : "Create Expense"}
           </Button>
         </div>
       </SheetContent>
