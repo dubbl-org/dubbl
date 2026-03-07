@@ -472,7 +472,7 @@ export default function ContactsPage() {
         {/* Summary + search */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-[13px] text-muted-foreground">
-            <span className="font-medium text-foreground tabular-nums">{total}</span> contacts
+            <span className="font-medium text-foreground tabular-nums">{contacts.length}</span> contacts
             <span className="text-border">·</span>
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-blue-500" />
