@@ -1,20 +1,36 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ShoppingCart } from "lucide-react";
-import { Section } from "@/components/dashboard/section";
+import {
+  Plus,
+  ShoppingCart,
+  Search,
+  X,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
-
+import { motion, MotionConfig } from "motion/react";
 
 interface Bill {
   id: string;
@@ -29,64 +45,117 @@ interface Bill {
 
 const statusColors: Record<string, string> = {
   draft: "",
-  received: "border-blue-200 bg-blue-50 text-blue-700",
-  partial: "border-amber-200 bg-amber-50 text-amber-700",
-  paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  overdue: "border-red-200 bg-red-50 text-red-700",
-  void: "border-gray-200 bg-gray-50 text-gray-700",
+  received:
+    "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  partial:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  overdue:
+    "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+  void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
-const columns: Column<Bill>[] = [
-  {
-    key: "number",
-    header: "Number",
-    className: "w-32",
-    render: (r) => <span className="font-mono text-sm">{r.billNumber}</span>,
-  },
-  {
-    key: "contact",
-    header: "Supplier",
-    render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span>,
-  },
-  {
-    key: "date",
-    header: "Date",
-    className: "w-28",
-    render: (r) => <span className="text-sm">{r.issueDate}</span>,
-  },
-  {
-    key: "due",
-    header: "Due",
-    className: "w-28",
-    render: (r) => <span className="text-sm">{r.dueDate}</span>,
-  },
-  {
-    key: "status",
-    header: "Status",
-    className: "w-24",
-    render: (r) => (
-      <Badge variant="outline" className={statusColors[r.status] || ""}>
-        {r.status}
-      </Badge>
-    ),
-  },
-  {
-    key: "total",
-    header: "Total",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">{formatMoney(r.total)}</span>
-    ),
-  },
-  {
-    key: "due-amount",
-    header: "Due",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">{formatMoney(r.amountDue)}</span>
-    ),
-  },
-];
+function getDueInfo(dueDate: string, status: string) {
+  if (status === "paid" || status === "void" || status === "draft") return null;
+  const now = new Date();
+  const due = new Date(dueDate);
+  const days = Math.floor((now.getTime() - due.getTime()) / 86400000);
+  if (days <= 0) {
+    const left = Math.abs(days);
+    if (left === 0) return { label: "Due today", color: "text-amber-600" };
+    if (left <= 7)
+      return { label: `Due in ${left}d`, color: "text-muted-foreground" };
+    return null;
+  }
+  if (days <= 30) return { label: `${days}d overdue`, color: "text-red-500" };
+  if (days <= 90)
+    return { label: `${days}d overdue`, color: "text-red-600 font-medium" };
+  return {
+    label: `${days}d overdue`,
+    color: "text-red-700 font-semibold",
+  };
+}
+
+function buildColumns(): Column<Bill>[] {
+  return [
+    {
+      key: "number",
+      header: "Number",
+      sortKey: "number",
+      className: "w-32",
+      render: (r) => (
+        <span className="font-mono text-sm">{r.billNumber}</span>
+      ),
+    },
+    {
+      key: "contact",
+      header: "Supplier",
+      render: (r) => (
+        <span className="text-sm font-medium">{r.contact?.name || "-"}</span>
+      ),
+    },
+    {
+      key: "date",
+      header: "Date",
+      sortKey: "date",
+      className: "w-28",
+      render: (r) => <span className="text-sm">{r.issueDate}</span>,
+    },
+    {
+      key: "due",
+      header: "Due",
+      sortKey: "due",
+      className: "w-36",
+      render: (r) => {
+        const info = getDueInfo(r.dueDate, r.status);
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{r.dueDate}</span>
+            {info && (
+              <span className={`text-[11px] ${info.color}`}>{info.label}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      className: "w-24",
+      render: (r) => (
+        <Badge variant="outline" className={statusColors[r.status] || ""}>
+          {r.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      sortKey: "total",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="font-mono text-sm tabular-nums">
+          {formatMoney(r.total)}
+        </span>
+      ),
+    },
+    {
+      key: "due-amount",
+      header: "Balance",
+      sortKey: "amountDue",
+      className: "w-28 text-right",
+      render: (r) => {
+        const color =
+          r.amountDue > 0 && r.status !== "draft" ? "text-amber-600" : "";
+        return (
+          <span className={`font-mono text-sm tabular-nums ${color}`}>
+            {formatMoney(r.amountDue)}
+          </span>
+        );
+      },
+    },
+  ];
+}
 
 export default function BillsPage() {
   const router = useRouter();
@@ -94,165 +163,501 @@ export default function BillsPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortBy, setSortBy] = useState("created");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [fetchKey, setFetchKey] = useState(0);
+
+  const columns = useMemo(() => buildColumns(), []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
+    let cancelled = false;
 
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
 
     fetch(`/api/v1/bills?${params}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) setBills(data.data);
+        if (!cancelled && data.data) setBills(data.data);
       })
       .then(() => devDelay())
-      .finally(() => setLoading(false));
-  }, [statusFilter]);
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setFetchKey((k) => k + 1);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [statusFilter, debouncedSearch, sortBy, sortOrder, dateFrom, dateTo]);
+
+  const handleSort = useCallback((key: string) => {
+    setSortBy((prev) => {
+      if (prev === key) {
+        setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
+        return key;
+      }
+      setSortOrder("desc");
+      return key;
+    });
+  }, []);
 
   const outstanding = bills
     .filter((b) => ["received", "partial", "overdue"].includes(b.status))
     .reduce((s, b) => s + b.amountDue, 0);
 
+  const overdue = bills
+    .filter((b) => b.status === "overdue")
+    .reduce((s, b) => s + b.amountDue, 0);
+
   const aging = useMemo(() => {
     const now = new Date();
-    const buckets = { current: { count: 0, amount: 0 }, "1-30": { count: 0, amount: 0 }, "31-60": { count: 0, amount: 0 }, "60+": { count: 0, amount: 0 } };
+    const buckets = {
+      current: { count: 0, amount: 0 },
+      "1-30": { count: 0, amount: 0 },
+      "31-60": { count: 0, amount: 0 },
+      "60+": { count: 0, amount: 0 },
+    };
     bills
-      .filter((b) => ["received", "partial", "overdue"].includes(b.status) && b.amountDue > 0)
+      .filter(
+        (b) =>
+          ["received", "partial", "overdue"].includes(b.status) &&
+          b.amountDue > 0
+      )
       .forEach((bill) => {
         const due = new Date(bill.dueDate);
-        const days = Math.floor((now.getTime() - due.getTime()) / 86400000);
-        if (days <= 0) { buckets.current.count++; buckets.current.amount += bill.amountDue; }
-        else if (days <= 30) { buckets["1-30"].count++; buckets["1-30"].amount += bill.amountDue; }
-        else if (days <= 60) { buckets["31-60"].count++; buckets["31-60"].amount += bill.amountDue; }
-        else { buckets["60+"].count++; buckets["60+"].amount += bill.amountDue; }
+        const days = Math.floor(
+          (now.getTime() - due.getTime()) / 86400000
+        );
+        if (days <= 0) {
+          buckets.current.count++;
+          buckets.current.amount += bill.amountDue;
+        } else if (days <= 30) {
+          buckets["1-30"].count++;
+          buckets["1-30"].amount += bill.amountDue;
+        } else if (days <= 60) {
+          buckets["31-60"].count++;
+          buckets["31-60"].amount += bill.amountDue;
+        } else {
+          buckets["60+"].count++;
+          buckets["60+"].amount += bill.amountDue;
+        }
       });
     return buckets;
   }, [bills]);
 
-  const agingTotal = aging.current.amount + aging["1-30"].amount + aging["31-60"].amount + aging["60+"].amount;
+  // Bills due within 7 days (not paid/void/draft)
+  const dueSoon = useMemo(() => {
+    const now = new Date();
+    return bills
+      .filter((b) => {
+        if (["paid", "void", "draft"].includes(b.status)) return false;
+        const due = new Date(b.dueDate);
+        const days = Math.ceil((due.getTime() - now.getTime()) / 86400000);
+        return days >= 0 && days <= 7;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      )
+      .slice(0, 5);
+  }, [bills]);
+
+  const pendingSearch = search !== debouncedSearch;
+  const hasFilters = dateFrom || dateTo;
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const b of bills) c[b.status] = (c[b.status] || 0) + 1;
+    return c;
+  }, [bills]);
 
   if (loading) return <BrandLoader />;
 
-  if (!loading && bills.length === 0 && statusFilter === "all") {
+  if (!loading && bills.length === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Bills" description="Track purchase bills from your suppliers and manage payables.">
-          <div className="min-h-[50vh] flex flex-col items-center justify-center text-center py-12">
-            <div className="grid grid-cols-4 gap-3 mb-8 w-full max-w-lg opacity-40">
-              {["Current", "1-30 days", "31-60 days", "60+ days"].map((label) => (
-                <div key={label} className="rounded-lg border border-dashed p-3">
-                  <p className="text-[11px] text-muted-foreground">{label}</p>
-                  <p className="text-lg font-semibold tabular-nums text-muted-foreground/40 mt-0.5">$0</p>
+      <BlurReveal>
+        <div className="relative">
+          {/* Background skeleton table */}
+          <div className="pointer-events-none w-full rounded-lg border overflow-hidden">
+            <div className="flex items-center gap-4 border-b bg-muted/50 px-4 h-10">
+              <div className="h-2 w-16 rounded bg-muted-foreground/20" />
+              <div className="h-2 w-24 rounded bg-muted-foreground/20" />
+              <div className="h-2 w-14 rounded bg-muted-foreground/20 hidden sm:block" />
+              <div className="h-2 w-14 rounded bg-muted-foreground/20 hidden sm:block" />
+              <div className="ml-auto h-2 w-16 rounded bg-muted-foreground/20" />
+              <div className="h-2 w-16 rounded bg-muted-foreground/20" />
+            </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b last:border-0 px-4 h-12">
+                <div className={`h-2.5 rounded bg-muted ${i % 3 === 0 ? "w-20" : i % 3 === 1 ? "w-16" : "w-24"}`} />
+                <div className={`h-2.5 rounded bg-muted/70 flex-1 max-w-[140px] ${i % 2 === 0 ? "max-w-[160px]" : "max-w-[120px]"}`} />
+                <div className="h-2.5 w-20 rounded bg-muted/50 hidden sm:block" />
+                <div className="h-2.5 w-20 rounded bg-muted/50 hidden sm:block" />
+                <div className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium hidden sm:block ${
+                  i % 4 === 0 ? "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500" :
+                  i % 4 === 1 ? "bg-amber-100 text-amber-400 dark:bg-amber-900/40 dark:text-amber-500" :
+                  i % 4 === 2 ? "bg-emerald-100 text-emerald-400 dark:bg-emerald-900/40 dark:text-emerald-500" :
+                  "bg-red-100 text-red-400 dark:bg-red-900/40 dark:text-red-500"
+                }`}>
+                  {i % 4 === 0 ? "received" : i % 4 === 1 ? "partial" : i % 4 === 2 ? "paid" : "overdue"}
                 </div>
-              ))}
+                <div className={`h-2.5 rounded bg-muted/40 ${i % 2 === 0 ? "w-16" : "w-14"}`} />
+                <div className={`h-2.5 rounded bg-muted/40 ${i % 2 === 0 ? "w-14" : "w-16"}`} />
+              </div>
+            ))}
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
+
+          {/* CTA overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-950/50">
+              <ShoppingCart className="size-7 text-amber-600 dark:text-amber-400" />
             </div>
-            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-              <ShoppingCart className="size-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h3 className="mt-4 text-sm font-medium">No bills yet</h3>
-            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-              Add your first bill from a supplier to track payables.
+            <h2 className="mt-5 text-xl font-semibold tracking-tight">
+              Track your payables
+            </h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+              Add bills from your suppliers to keep track of what you owe, when
+              it&apos;s due, and how your payables age over time.
             </p>
-            <div className="mt-4">
-              <Button
-                onClick={() => openDrawer("bill")}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                <Plus className="mr-2 size-4" />
-                New Bill
-              </Button>
-            </div>
-          </div>
-        </Section>
-      </BlurReveal>
-    );
-  }
-
-  return (
-    <BlurReveal>
-    <div className="space-y-10">
-      <Section title="Overview" description="Bills and payables summary across all suppliers.">
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard title="Outstanding" value={formatMoney(outstanding)} icon={ShoppingCart} />
-            <StatCard title="Total Bills" value={bills.length.toString()} icon={ShoppingCart} />
-          </div>
-          {agingTotal > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Payables Aging</p>
-              <div className="h-3 w-full rounded-full overflow-hidden flex">
-                {([
-                  { key: "current" as const, color: "bg-emerald-500" },
-                  { key: "1-30" as const, color: "bg-amber-400" },
-                  { key: "31-60" as const, color: "bg-orange-500" },
-                  { key: "60+" as const, color: "bg-red-500" },
-                ] as const).map(({ key, color }) => {
-                  const pct = (aging[key].amount / agingTotal) * 100;
-                  if (pct === 0) return null;
-                  return <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />;
-                })}
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {([
-                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
-                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
-                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
-                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
-                ] as const).map(({ key, color, label }) => (
-                  <div key={key} className="text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`inline-block size-2 rounded-full ${color}`} />
-                      <span className="text-muted-foreground">{label}</span>
-                    </div>
-                    <p className="font-mono tabular-nums mt-0.5 pl-3.5">
-                      {aging[key].count} · {formatMoney(aging[key].amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end">
             <Button
               onClick={() => openDrawer("bill")}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              size="lg"
+              className="mt-6 bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
               New Bill
             </Button>
           </div>
         </div>
-      </Section>
 
-      <div className="h-px bg-border" />
+        {/* Feature cards - full width */}
+        <div className="grid gap-4 sm:grid-cols-3 mt-8">
+          {[
+            {
+              icon: Clock,
+              title: "Aging tracking",
+              desc: "See how long bills have been outstanding with automatic aging buckets.",
+              color: "text-amber-600 dark:text-amber-400",
+              bg: "bg-amber-50 dark:bg-amber-950/40",
+            },
+            {
+              icon: AlertTriangle,
+              title: "Overdue alerts",
+              desc: "Bills approaching or past their due date are highlighted so you never miss a payment.",
+              color: "text-red-600 dark:text-red-400",
+              bg: "bg-red-50 dark:bg-red-950/40",
+            },
+            {
+              icon: CheckCircle2,
+              title: "Payment matching",
+              desc: "Record payments against bills and track outstanding balances automatically.",
+              color: "text-emerald-600 dark:text-emerald-400",
+              bg: "bg-emerald-50 dark:bg-emerald-950/40",
+            },
+          ].map(({ icon: Icon, title, desc, color, bg }) => (
+            <div key={title} className="rounded-xl p-5">
+              <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
+                <Icon className={`size-4.5 ${color}`} />
+              </div>
+              <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                {desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </BlurReveal>
+    );
+  }
 
-      <Section title="Bills" description="View, filter, and manage all your bills.">
-        <div className="space-y-4">
+  const agingTotal =
+    aging.current.amount +
+    aging["1-30"].amount +
+    aging["31-60"].amount +
+    aging["60+"].amount;
+
+  return (
+    <BlurReveal>
+      <div className="space-y-6">
+        {/* Header */}
+        <PageHeader
+          title="Bills"
+          description="Track purchase bills from your suppliers and manage payables."
+        >
+          <Button
+            onClick={() => openDrawer("bill")}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            New Bill
+          </Button>
+        </PageHeader>
+
+        {/* Summary strip - outstanding + overdue + total + aging inline */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Outstanding</p>
+            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight">
+              {formatMoney(outstanding)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-red-500" />
+              Overdue
+            </p>
+            <p className="text-2xl font-bold font-mono tabular-nums tracking-tight text-red-600 dark:text-red-400">
+              {formatMoney(overdue)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Total Bills</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight">
+              {bills.length}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Paid</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
+              {statusCounts.paid || 0}
+            </p>
+          </div>
+        </div>
+
+        {/* Aging breakdown as colored cards */}
+        {agingTotal > 0 && (
+          <div className="grid grid-cols-4 gap-3">
+            {(
+              [
+                {
+                  key: "current" as const,
+                  label: "Current",
+                  border: "border-t-emerald-500",
+                  dot: "bg-emerald-500",
+                },
+                {
+                  key: "1-30" as const,
+                  label: "1-30 days",
+                  border: "border-t-amber-400",
+                  dot: "bg-amber-400",
+                },
+                {
+                  key: "31-60" as const,
+                  label: "31-60 days",
+                  border: "border-t-orange-500",
+                  dot: "bg-orange-500",
+                },
+                {
+                  key: "60+" as const,
+                  label: "60+ days",
+                  border: "border-t-red-500",
+                  dot: "bg-red-500",
+                },
+              ] as const
+            ).map(({ key, label, border, dot }) => (
+              <div
+                key={key}
+                className={`rounded-lg border border-t-2 ${border} bg-card p-3`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={`size-1.5 rounded-full ${dot}`} />
+                  <span className="text-[11px] text-muted-foreground">
+                    {label}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm font-semibold tabular-nums">
+                  {formatMoney(aging[key].amount)}
+                </p>
+                <p className="text-[11px] text-muted-foreground tabular-nums">
+                  {aging[key].count} bill{aging[key].count !== 1 ? "s" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Due soon strip */}
+        {dueSoon.length > 0 && (
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                Due within 7 days
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {dueSoon.map((b) => {
+                const due = new Date(b.dueDate);
+                const now = new Date();
+                const days = Math.ceil(
+                  (due.getTime() - now.getTime()) / 86400000
+                );
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => router.push(`/purchases/${b.id}`)}
+                    className="flex items-center gap-3 rounded-md border bg-card px-3 py-2 text-left hover:bg-accent transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-mono">{b.billNumber}</p>
+                      <p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
+                        {b.contact?.name || "No supplier"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-mono font-medium tabular-nums">
+                        {formatMoney(b.amountDue)}
+                      </p>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                        {days === 0
+                          ? "Today"
+                          : days === 1
+                            ? "Tomorrow"
+                            : `${days} days`}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="h-px bg-border" />
+
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList>
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="draft">Draft</TabsTrigger>
               <TabsTrigger value="received">Received</TabsTrigger>
+              <TabsTrigger value="partial">Partial</TabsTrigger>
               <TabsTrigger value="paid">Paid</TabsTrigger>
+              <TabsTrigger value="overdue">Overdue</TabsTrigger>
             </TabsList>
           </Tabs>
-
-          <DataTable
-              columns={columns}
-              data={bills}
-              loading={loading}
-              emptyMessage="No bills found."
-              onRowClick={(r) => router.push(`/purchases/${r.id}`)}
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Search bills..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
             />
+          </div>
         </div>
-      </Section>
-    </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">From</span>
+            <DatePicker
+              value={dateFrom}
+              onChange={(v) => setDateFrom(v)}
+              placeholder="Start date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">To</span>
+            <DatePicker
+              value={dateTo}
+              onChange={(v) => setDateTo(v)}
+              placeholder="End date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <Select
+            value={`${sortBy}:${sortOrder}`}
+            onValueChange={(v) => {
+              const [key, order] = v.split(":");
+              setSortBy(key);
+              setSortOrder(order as "asc" | "desc");
+            }}
+          >
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created:desc">Newest first</SelectItem>
+              <SelectItem value="created:asc">Oldest first</SelectItem>
+              <SelectItem value="due:asc">Due soonest</SelectItem>
+              <SelectItem value="due:desc">Due latest</SelectItem>
+              <SelectItem value="total:desc">Highest amount</SelectItem>
+              <SelectItem value="total:asc">Lowest amount</SelectItem>
+              <SelectItem value="amountDue:desc">Highest balance</SelectItem>
+              <SelectItem value="number:desc">Number (desc)</SelectItem>
+              <SelectItem value="number:asc">Number (asc)</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+            >
+              <X className="mr-1 size-3" />
+              Clear dates
+            </Button>
+          )}
+        </div>
+
+        {/* Table */}
+        {pendingSearch ? (
+          <BrandLoader className="h-40" />
+        ) : (
+          <MotionConfig reducedMotion="never">
+            <motion.div
+              key={fetchKey}
+              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{
+                duration: 0.8,
+                delay: 0.12,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              style={{ willChange: "opacity, transform, filter" }}
+            >
+              <DataTable
+                columns={columns}
+                data={bills}
+                loading={loading}
+                emptyMessage="No bills match your filters."
+                onRowClick={(r) => router.push(`/purchases/${r.id}`)}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+              />
+            </motion.div>
+          </MotionConfig>
+        )}
+      </div>
     </BlurReveal>
   );
 }
