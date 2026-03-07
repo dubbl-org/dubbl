@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 interface Account {
   id: string;
@@ -73,6 +74,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -174,7 +176,13 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
   }
 
   async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this budget?")) return;
+    const confirmed = await confirm({
+      title: "Delete this budget?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -383,6 +391,7 @@ export default function BudgetDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

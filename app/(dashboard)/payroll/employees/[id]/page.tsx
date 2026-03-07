@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import Link from "next/link";
 
 interface EmployeeDetail {
@@ -40,6 +41,7 @@ export default function EmployeeDetailPage() {
   const [emp, setEmp] = useState<EmployeeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Edit form state
   const [name, setName] = useState("");
@@ -117,7 +119,14 @@ export default function EmployeeDetailPage() {
   }
 
   async function handleDelete() {
-    if (!orgId || !confirm("Delete this employee?")) return;
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete this employee?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/v1/payroll/employees/${id}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -275,6 +284,7 @@ export default function EmployeeDetailPage() {
           />
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatMoney, centsToDecimal } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import Link from "next/link";
 
 interface InventoryItemDetail {
@@ -42,6 +43,7 @@ export default function InventoryItemDetailPage() {
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustment, setAdjustment] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -130,7 +132,13 @@ export default function InventoryItemDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this inventory item?")) return;
+    const confirmed = await confirm({
+      title: "Delete this inventory item?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -315,6 +323,7 @@ export default function InventoryItemDetailPage() {
           </Button>
         </div>
       </form>
+      {confirmDialog}
     </div>
   );
 }

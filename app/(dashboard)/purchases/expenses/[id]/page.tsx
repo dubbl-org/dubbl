@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Download,
   Loader2,
+  Receipt,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -36,7 +44,6 @@ import { BlurReveal } from "@/components/ui/blur-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal, decimalToCents } from "@/lib/money";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 interface ExpenseDetail {
@@ -175,57 +182,89 @@ function ReceiptViewer({ fileKey, fileName }: { fileKey: string; fileName: strin
   );
 }
 
-export default function ExpenseDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const { confirm, dialog: confirmDialog } = useConfirm();
-  const [claim, setClaim] = useState<ExpenseDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [payOpen, setPayOpen] = useState(false);
-  const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
+// ---------------------------------------------------------------------------
+// Drawer helper components (matching create-drawer.tsx pattern)
+// ---------------------------------------------------------------------------
 
-  // Edit state
+function DrawerIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function DrawerFooter({
+  onClose,
+  saving,
+  label,
+}: {
+  onClose: () => void;
+  saving: boolean;
+  label: string;
+}) {
+  return (
+    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
+      <Button type="button" variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        disabled={saving}
+        className="bg-emerald-600 hover:bg-emerald-700"
+      >
+        {saving ? "Saving..." : label}
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit Expense Drawer
+// ---------------------------------------------------------------------------
+
+function EditExpenseDrawer({
+  open,
+  onClose,
+  claim,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  claim: ExpenseDetail;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editItems, setEditItems] = useState<EditItem[]>([]);
 
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEntityTitle(claim?.title);
-
+  // Initialize form state when drawer opens
   useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/expenses/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.expenseClaim) setClaim(data.expenseClaim);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  function startEditing() {
-    if (!claim) return;
-    setEditTitle(claim.title);
-    setEditDescription(claim.description || "");
-    setEditItems(
-      claim.items.map((item) => ({
-        date: item.date,
-        description: item.description,
-        amount: centsToDecimal(item.amount),
-        category: item.category || "",
-        accountId: "",
-        receiptFileKey: item.receiptFileKey || "",
-        receiptFileName: item.receiptFileName || "",
-      }))
-    );
-    setEditing(true);
-  }
+    if (open) {
+      setEditTitle(claim.title);
+      setEditDescription(claim.description || "");
+      setEditItems(
+        claim.items.map((item) => ({
+          date: item.date,
+          description: item.description,
+          amount: centsToDecimal(item.amount),
+          category: item.category || "",
+          accountId: "",
+          receiptFileKey: item.receiptFileKey || "",
+          receiptFileName: item.receiptFileName || "",
+        }))
+      );
+    }
+  }, [open, claim]);
 
   function updateEditItem(index: number, updates: Partial<EditItem>) {
     setEditItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -243,7 +282,12 @@ export default function ExpenseDetailPage() {
     setEditItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleSaveEdit() {
+  const editTotal = editItems.reduce((sum, item) => sum + decimalToCents(parseFloat(item.amount) || 0), 0);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId || !editTitle.trim()) {
       toast.error("Title is required");
       return;
@@ -255,7 +299,7 @@ export default function ExpenseDetailPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/expenses/${id}`, {
+      const res = await fetch(`/api/v1/expenses/${claim.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
@@ -278,20 +322,152 @@ export default function ExpenseDetailPage() {
         throw new Error(data.error || "Failed to update");
       }
 
-      // Reload the claim
-      const reloadRes = await fetch(`/api/v1/expenses/${id}`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const reloadData = await reloadRes.json();
-      if (reloadData.expenseClaim) setClaim(reloadData.expenseClaim);
-      setEditing(false);
       toast.success("Expense claim updated");
+      onClose();
+      onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update");
     } finally {
       setSaving(false);
     }
   }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">Edit Expense Claim</SheetTitle>
+              <SheetDescription>Update expense claim details.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Claim Info</SectionLabel>
+              <div className="space-y-2">
+                <Label>Title *</Label>
+                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionLabel>Expense Items</SectionLabel>
+                <Button type="button" variant="outline" size="sm" onClick={addEditItem}>
+                  <Plus className="mr-2 size-3.5" />Add Item
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {editItems.map((item, index) => (
+                  <div key={index} className="rounded-lg border p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                      {editItems.length > 1 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeEditItem(index)} className="text-red-600 hover:text-red-700">
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Date</Label>
+                        <Input type="date" value={item.date} onChange={(e) => updateEditItem(index, { date: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Description *</Label>
+                        <Input value={item.description} onChange={(e) => updateEditItem(index, { description: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Amount *</Label>
+                        <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateEditItem(index, { amount: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Category</Label>
+                        <Input value={item.category} onChange={(e) => updateEditItem(index, { category: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Account</Label>
+                        <AccountPicker value={item.accountId} onChange={(val) => updateEditItem(index, { accountId: val })} typeFilter={["expense"]} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Receipt</Label>
+                        {item.receiptFileName ? (
+                          <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                            <FileText className="size-4 text-emerald-600 shrink-0" />
+                            <span className="text-xs truncate flex-1">{item.receiptFileName}</span>
+                            <button type="button" onClick={() => updateEditItem(index, { receiptFileKey: "", receiptFileName: "" })} className="text-muted-foreground hover:text-foreground">
+                              <X className="size-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <FileUploader accept="image/*,.pdf" onUpload={(fileKey, fileName) => updateEditItem(index, { receiptFileKey: fileKey, receiptFileName: fileName })} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+              <span className="text-sm font-medium">Total</span>
+              <span className="text-lg font-bold font-mono tabular-nums">{formatMoney(editTotal)}</span>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Save Changes" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
+export default function ExpenseDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [claim, setClaim] = useState<ExpenseDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [payOpen, setPayOpen] = useState(false);
+  const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useEntityTitle(claim?.title);
+
+  const loadClaim = useCallback(() => {
+    if (!orgId) return;
+    fetch(`/api/v1/expenses/${id}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.expenseClaim) setClaim(data.expenseClaim);
+      })
+      .finally(() => setLoading(false));
+  }, [id, orgId]);
+
+  useEffect(() => {
+    loadClaim();
+  }, [loadClaim]);
 
   async function handleSubmit() {
     if (!orgId) return;
@@ -401,12 +577,11 @@ export default function ExpenseDetailPage() {
   }
 
   const sc = statusConfig[claim.status] || statusConfig.draft;
-  const editTotal = editItems.reduce((sum, item) => sum + decimalToCents(parseFloat(item.amount) || 0), 0);
 
   return (
     <BlurReveal>
       <div className="space-y-6">
-        {/* Top bar - same pattern as sales */}
+        {/* Top bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild className="size-8 p-0">
@@ -424,9 +599,9 @@ export default function ExpenseDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {claim.status === "draft" && !editing && (
+            {claim.status === "draft" && (
               <>
-                <Button variant="outline" size="sm" onClick={startEditing}>
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="mr-2 size-3.5" />Edit
                 </Button>
                 <Button size="sm" onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700">
@@ -507,7 +682,7 @@ export default function ExpenseDetailPage() {
           </div>
         )}
 
-        {claim.description && !editing && (
+        {claim.description && (
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground mb-1">Description</p>
             <p className="text-sm">{claim.description}</p>
@@ -515,154 +690,75 @@ export default function ExpenseDetailPage() {
         )}
 
         {/* Summary cards */}
-        {!editing && (
-          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Total Amount</p>
-              <p className="mt-1 text-xl font-bold font-mono tabular-nums">{formatMoney(claim.totalAmount, claim.currencyCode)}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Items</p>
-              <p className="mt-1 text-xl font-bold font-mono tabular-nums">{claim.items.length}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Currency</p>
-              <p className="mt-1 text-xl font-bold">{claim.currencyCode}</p>
-            </div>
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Total Amount</p>
+            <p className="mt-1 text-xl font-bold font-mono tabular-nums">{formatMoney(claim.totalAmount, claim.currencyCode)}</p>
           </div>
-        )}
-
-        {/* Edit mode */}
-        {editing ? (
-          <div className="space-y-4 rounded-lg border p-4 sm:p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Title *</Label>
-                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Expense Items</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addEditItem}>
-                  <Plus className="mr-1.5 size-3.5" />Add Item
-                </Button>
-              </div>
-
-              {editItems.map((item, index) => (
-                <div key={index} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
-                    {editItems.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeEditItem(index)} className="text-red-600 hover:text-red-700 size-7 p-0">
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Date</Label>
-                      <Input type="date" value={item.date} onChange={(e) => updateEditItem(index, { date: e.target.value })} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Description *</Label>
-                      <Input value={item.description} onChange={(e) => updateEditItem(index, { description: e.target.value })} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Amount *</Label>
-                      <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateEditItem(index, { amount: e.target.value })} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Category</Label>
-                      <Input value={item.category} onChange={(e) => updateEditItem(index, { category: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Account</Label>
-                      <AccountPicker value={item.accountId} onChange={(val) => updateEditItem(index, { accountId: val })} typeFilter={["expense"]} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Receipt</Label>
-                      {item.receiptFileName ? (
-                        <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                          <FileText className="size-4 text-emerald-600 shrink-0" />
-                          <span className="text-xs truncate flex-1">{item.receiptFileName}</span>
-                          <button onClick={() => updateEditItem(index, { receiptFileKey: "", receiptFileName: "" })} className="text-muted-foreground hover:text-foreground">
-                            <X className="size-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <FileUploader accept="image/*,.pdf" onUpload={(fileKey, fileName) => updateEditItem(index, { receiptFileKey: fileKey, receiptFileName: fileName })} />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
-              <span className="text-sm font-medium">Total</span>
-              <span className="text-lg font-bold font-mono tabular-nums">{formatMoney(editTotal)}</span>
-            </div>
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-              <Button variant="outline" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
-              <Button onClick={handleSaveEdit} loading={saving} className="bg-emerald-600 hover:bg-emerald-700">Save Changes</Button>
-            </div>
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Items</p>
+            <p className="mt-1 text-xl font-bold font-mono tabular-nums">{claim.items.length}</p>
           </div>
-        ) : (
-          /* View mode - expense items table */
-          <div className="rounded-lg border overflow-hidden">
-            <div className="overflow-x-auto">
-              <div className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 border-b bg-muted/50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>Date</span>
-                <span>Description</span>
-                <span>Category</span>
-                <span>Receipt</span>
-                <span className="text-right">Amount</span>
-              </div>
-              {claim.items.map((item) => (
-                <div key={item.id} className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 border-b px-4 py-3 last:border-b-0 hover:bg-muted/30 transition-colors">
-                  <span className="text-sm tabular-nums">{item.date}</span>
-                  <div>
-                    <p className="text-sm font-medium">{item.description}</p>
-                    {item.account && (
-                      <p className="text-xs text-muted-foreground">{item.account.code} · {item.account.name}</p>
-                    )}
-                  </div>
-                  <span className="text-sm text-muted-foreground">{item.category || "-"}</span>
-                  <span>
-                    {item.receiptFileKey && item.receiptFileName ? (
-                      <ReceiptViewer fileKey={item.receiptFileKey} fileName={item.receiptFileName} />
-                    ) : (
-                      <span className="text-sm text-muted-foreground">-</span>
-                    )}
-                  </span>
-                  <span className="text-right text-sm font-mono font-medium tabular-nums">
-                    {formatMoney(item.amount, claim.currencyCode)}
-                  </span>
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Currency</p>
+            <p className="mt-1 text-xl font-bold">{claim.currencyCode}</p>
+          </div>
+        </div>
+
+        {/* View mode - expense items table */}
+        <div className="rounded-lg border overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 border-b bg-muted/50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>Date</span>
+              <span>Description</span>
+              <span>Category</span>
+              <span>Receipt</span>
+              <span className="text-right">Amount</span>
+            </div>
+            {claim.items.map((item) => (
+              <div key={item.id} className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 border-b px-4 py-3 last:border-b-0 hover:bg-muted/30 transition-colors">
+                <span className="text-sm tabular-nums">{item.date}</span>
+                <div>
+                  <p className="text-sm font-medium">{item.description}</p>
+                  {item.account && (
+                    <p className="text-xs text-muted-foreground">{item.account.code} · {item.account.name}</p>
+                  )}
                 </div>
-              ))}
-              {/* Total row */}
-              <div className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 bg-muted/50 px-4 py-3">
-                <span />
-                <span />
-                <span />
-                <span className="text-sm font-semibold">Total</span>
-                <span className="text-right text-sm font-mono font-bold tabular-nums">
-                  {formatMoney(claim.totalAmount, claim.currencyCode)}
+                <span className="text-sm text-muted-foreground">{item.category || "-"}</span>
+                <span>
+                  {item.receiptFileKey && item.receiptFileName ? (
+                    <ReceiptViewer fileKey={item.receiptFileKey} fileName={item.receiptFileName} />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">-</span>
+                  )}
+                </span>
+                <span className="text-right text-sm font-mono font-medium tabular-nums">
+                  {formatMoney(item.amount, claim.currencyCode)}
                 </span>
               </div>
+            ))}
+            {/* Total row */}
+            <div className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 bg-muted/50 px-4 py-3">
+              <span />
+              <span />
+              <span />
+              <span className="text-sm font-semibold">Total</span>
+              <span className="text-right text-sm font-mono font-bold tabular-nums">
+                {formatMoney(claim.totalAmount, claim.currencyCode)}
+              </span>
             </div>
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Edit Expense Drawer */}
+      <EditExpenseDrawer
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        claim={claim}
+        onSaved={loadClaim}
+      />
+
       {confirmDialog}
     </BlurReveal>
   );

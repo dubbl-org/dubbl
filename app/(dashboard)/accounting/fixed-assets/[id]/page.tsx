@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import Link from "next/link";
 
 interface DepEntry {
@@ -74,6 +75,7 @@ export default function FixedAssetDetailPage() {
   const [disposeDate, setDisposeDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const orgId =
     typeof window !== "undefined"
@@ -136,7 +138,14 @@ export default function FixedAssetDetailPage() {
   }
 
   async function handleDelete() {
-    if (!orgId || !confirm("Delete this asset?")) return;
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete this asset?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/v1/fixed-assets/${id}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -378,6 +387,7 @@ export default function FixedAssetDetailPage() {
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

@@ -11,8 +11,10 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
+  FileText,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Section } from "@/components/dashboard/section";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -473,277 +475,230 @@ export default function BillsPage() {
     aging["60+"].amount;
 
   return (
-    <BlurReveal>
-      <div className="space-y-3 sm:space-y-6">
-        {/* Header */}
-        <PageHeader
-          title="Bills"
-          description="Track purchase bills from your suppliers and manage payables."
-        >
-          <Button
-            onClick={() => openDrawer("bill")}
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Plus className="mr-2 size-4" />
-            New Bill
-          </Button>
-        </PageHeader>
-
-        {/* Summary strip - outstanding + overdue + total + aging inline */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Outstanding</p>
-            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight">
-              {formatMoney(outstanding)}
-            </p>
+    <BlurReveal className="space-y-10">
+      <Section title="Overview" description="Payables summary and outstanding amounts across all bills.">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title="Outstanding" value={formatMoney(outstanding)} icon={FileText} />
+            <StatCard title="Overdue" value={formatMoney(overdue)} icon={FileText} changeType="negative" />
+            <StatCard title="Total Bills" value={(countsData?.total || 0).toString()} icon={FileText} />
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-red-500" />
-              Overdue
-            </p>
-            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-red-600 dark:text-red-400">
-              {formatMoney(overdue)}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Total Bills</p>
-            <p className="text-lg sm:text-2xl font-bold tabular-nums tracking-tight">
-              {countsData?.total || 0}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Paid</p>
-            <p className="text-lg sm:text-2xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
-              {statusCounts.paid || 0}
-            </p>
-          </div>
-        </div>
-
-        {/* Aging breakdown as colored cards */}
-        {agingTotal > 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {(
-              [
-                {
-                  key: "current" as const,
-                  label: "Current",
-                  border: "border-t-emerald-500",
-                  dot: "bg-emerald-500",
-                },
-                {
-                  key: "1-30" as const,
-                  label: "1-30 days",
-                  border: "border-t-amber-400",
-                  dot: "bg-amber-400",
-                },
-                {
-                  key: "31-60" as const,
-                  label: "31-60 days",
-                  border: "border-t-orange-500",
-                  dot: "bg-orange-500",
-                },
-                {
-                  key: "60+" as const,
-                  label: "60+ days",
-                  border: "border-t-red-500",
-                  dot: "bg-red-500",
-                },
-              ] as const
-            ).map(({ key, label, border, dot }) => (
-              <div
-                key={key}
-                className={`rounded-lg border border-t-2 ${border} bg-card p-3`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className={`size-1.5 rounded-full ${dot}`} />
-                  <span className="text-[11px] text-muted-foreground">
-                    {label}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-sm font-semibold tabular-nums">
-                  {formatMoney(aging[key].amount)}
-                </p>
-                <p className="text-[11px] text-muted-foreground tabular-nums">
-                  {aging[key].count} bill{aging[key].count !== 1 ? "s" : ""}
-                </p>
+          {agingTotal > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Aging Breakdown</p>
+              <div className="h-3 w-full rounded-full overflow-hidden flex">
+                {([
+                  { key: "current" as const, color: "bg-emerald-500" },
+                  { key: "1-30" as const, color: "bg-amber-400" },
+                  { key: "31-60" as const, color: "bg-orange-500" },
+                  { key: "60+" as const, color: "bg-red-500" },
+                ] as const).map(({ key, color }) => {
+                  const pct = (aging[key].amount / agingTotal) * 100;
+                  if (pct === 0) return null;
+                  return (
+                    <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Due soon strip */}
-        {dueSoon.length > 0 && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                Due within 7 days
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {dueSoon.map((b) => {
-                const due = new Date(b.dueDate);
-                const now = new Date();
-                const days = Math.ceil(
-                  (due.getTime() - now.getTime()) / 86400000
-                );
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => router.push(`/purchases/${b.id}`)}
-                    className="flex items-center gap-3 rounded-md border bg-card px-3 py-2 text-left hover:bg-accent transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-mono">{b.billNumber}</p>
-                      <p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
-                        {b.contact?.name || "No supplier"}
-                      </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {([
+                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
+                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
+                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
+                ] as const).map(({ key, color, label }) => (
+                  <div key={key} className="text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-block size-2 rounded-full ${color}`} />
+                      <span className="text-muted-foreground">{label}</span>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-mono font-medium tabular-nums">
-                        {formatMoney(b.amountDue)}
-                      </p>
-                      <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                        {days === 0
-                          ? "Today"
-                          : days === 1
-                            ? "Tomorrow"
-                            : `${days} days`}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
+                    <p className="font-mono tabular-nums mt-0.5 pl-3.5">
+                      {aging[key].count} · {formatMoney(aging[key].amount)}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="h-px bg-border" />
-
-        {/* Filters */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all" className="whitespace-nowrap">All ({countsData?.total || 0})</TabsTrigger>
-                <TabsTrigger value="draft" className="whitespace-nowrap">Draft ({statusCounts.draft || 0})</TabsTrigger>
-                <TabsTrigger value="received" className="whitespace-nowrap">Received ({statusCounts.received || 0})</TabsTrigger>
-                <TabsTrigger value="partial" className="whitespace-nowrap">Partial ({statusCounts.partial || 0})</TabsTrigger>
-                <TabsTrigger value="paid" className="whitespace-nowrap">Paid ({statusCounts.paid || 0})</TabsTrigger>
-                <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue ({statusCounts.overdue || 0})</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search bills..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">From</span>
-            <DatePicker
-              value={dateFrom}
-              onChange={(v) => setDateFrom(v)}
-              placeholder="Start date"
-              className="h-8 w-40 text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">To</span>
-            <DatePicker
-              value={dateTo}
-              onChange={(v) => setDateTo(v)}
-              placeholder="End date"
-              className="h-8 w-40 text-xs"
-            />
-          </div>
-          <Select
-            value={`${sortBy}:${sortOrder}`}
-            onValueChange={(v) => {
-              const [key, order] = v.split(":");
-              setSortBy(key);
-              setSortOrder(order as "asc" | "desc");
-            }}
-          >
-            <SelectTrigger className="h-8 w-44 text-xs">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created:desc">Newest first</SelectItem>
-              <SelectItem value="created:asc">Oldest first</SelectItem>
-              <SelectItem value="due:asc">Due soonest</SelectItem>
-              <SelectItem value="due:desc">Due latest</SelectItem>
-              <SelectItem value="total:desc">Highest amount</SelectItem>
-              <SelectItem value="total:asc">Lowest amount</SelectItem>
-              <SelectItem value="amountDue:desc">Highest balance</SelectItem>
-              <SelectItem value="number:desc">Number (desc)</SelectItem>
-              <SelectItem value="number:asc">Number (asc)</SelectItem>
-            </SelectContent>
-          </Select>
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-muted-foreground"
-              onClick={() => {
-                setDateFrom("");
-                setDateTo("");
-              }}
-            >
-              <X className="mr-1 size-3" />
-              Clear dates
-            </Button>
+          {/* Due soon */}
+          {dueSoon.length > 0 && (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-3 sm:p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                  Due within 7 days
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {dueSoon.map((b) => {
+                  const due = new Date(b.dueDate);
+                  const now = new Date();
+                  const days = Math.ceil(
+                    (due.getTime() - now.getTime()) / 86400000
+                  );
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => router.push(`/purchases/${b.id}`)}
+                      className="flex items-center gap-3 rounded-md border bg-card px-3 py-2 text-left hover:bg-accent transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-mono">{b.billNumber}</p>
+                        <p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
+                          {b.contact?.name || "No supplier"}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-mono font-medium tabular-nums">
+                          {formatMoney(b.amountDue)}
+                        </p>
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                          {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
+      </Section>
 
-        {/* Table */}
-        {refetching || pendingSearch ? (
-          <BrandLoader className="h-40" />
-        ) : (
-          <MotionConfig reducedMotion="never">
-            <motion.div
-              key={fetchKey}
-              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{
-                duration: 0.8,
-                delay: 0.12,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              style={{ willChange: "opacity, transform, filter" }}
+      <div className="h-px bg-border" />
+
+      <Section title="Bills" description="View, filter, and manage all your bills.">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+              <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+                <TabsList>
+                  <TabsTrigger value="all" className="whitespace-nowrap">All ({countsData?.total || 0})</TabsTrigger>
+                  <TabsTrigger value="draft" className="whitespace-nowrap">Draft ({statusCounts.draft || 0})</TabsTrigger>
+                  <TabsTrigger value="received" className="whitespace-nowrap">Received ({statusCounts.received || 0})</TabsTrigger>
+                  <TabsTrigger value="partial" className="whitespace-nowrap">Partial ({statusCounts.partial || 0})</TabsTrigger>
+                  <TabsTrigger value="paid" className="whitespace-nowrap">Paid ({statusCounts.paid || 0})</TabsTrigger>
+                  <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue ({statusCounts.overdue || 0})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <Button
+              onClick={() => openDrawer("bill")}
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
-              <DataTable
-                columns={columns}
-                data={bills}
-                loading={loading}
-                emptyMessage="No bills match your filters."
-                onRowClick={(r) => router.push(`/purchases/${r.id}`)}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                onSort={handleSort}
-              />
-            </motion.div>
-          </MotionConfig>
-        )}
+              <Plus className="mr-2 size-4" />
+              New Bill
+            </Button>
+          </div>
 
-        {/* Infinite scroll sentinel */}
-        {hasMore && !refetching && (
-          <div ref={sentinelRef} className="flex items-center justify-center py-6">
-            {loadingMore && (
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Search bills..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">From</span>
+              <DatePicker
+                value={dateFrom}
+                onChange={(v) => setDateFrom(v)}
+                placeholder="Start date"
+                className="h-8 w-40 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">To</span>
+              <DatePicker
+                value={dateTo}
+                onChange={(v) => setDateTo(v)}
+                placeholder="End date"
+                className="h-8 w-40 text-xs"
+              />
+            </div>
+            <Select
+              value={`${sortBy}:${sortOrder}`}
+              onValueChange={(v) => {
+                const [key, order] = v.split(":");
+                setSortBy(key);
+                setSortOrder(order as "asc" | "desc");
+              }}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created:desc">Newest first</SelectItem>
+                <SelectItem value="created:asc">Oldest first</SelectItem>
+                <SelectItem value="due:asc">Due soonest</SelectItem>
+                <SelectItem value="due:desc">Due latest</SelectItem>
+                <SelectItem value="total:desc">Highest amount</SelectItem>
+                <SelectItem value="total:asc">Lowest amount</SelectItem>
+                <SelectItem value="amountDue:desc">Highest balance</SelectItem>
+                <SelectItem value="number:desc">Number (desc)</SelectItem>
+                <SelectItem value="number:asc">Number (asc)</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+              >
+                <X className="mr-1 size-3" />
+                Clear dates
+              </Button>
             )}
           </div>
-        )}
-      </div>
+
+          {refetching || pendingSearch ? (
+            <BrandLoader className="h-40" />
+          ) : (
+            <MotionConfig reducedMotion="never">
+              <motion.div
+                key={fetchKey}
+                initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{
+                  duration: 0.8,
+                  delay: 0.12,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                style={{ willChange: "opacity, transform, filter" }}
+              >
+                <DataTable
+                  columns={columns}
+                  data={bills}
+                  loading={loading}
+                  emptyMessage="No bills match your filters."
+                  onRowClick={(r) => router.push(`/purchases/${r.id}`)}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
+                />
+              </motion.div>
+            </MotionConfig>
+          )}
+
+          {hasMore && !refetching && (
+            <div ref={sentinelRef} className="flex items-center justify-center py-6">
+              {loadingMore && (
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              )}
+            </div>
+          )}
+        </div>
+      </Section>
     </BlurReveal>
   );
 }

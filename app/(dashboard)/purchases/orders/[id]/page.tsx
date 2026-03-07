@@ -1,26 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Send, ShoppingCart, Pencil, Trash2, Plus, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { DatePicker } from "@/components/ui/date-picker";
+import { ContactPicker } from "@/components/dashboard/contact-picker";
+import { AccountPicker } from "@/components/dashboard/account-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { BlurReveal } from "@/components/ui/blur-reveal";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, centsToDecimal } from "@/lib/money";
 import Link from "next/link";
 
 interface PODetail {
   id: string;
   poNumber: string;
+  contactId: string;
   issueDate: string;
   deliveryDate: string | null;
   status: string;
+  reference: string | null;
+  notes: string | null;
   subtotal: number;
   total: number;
-  notes: string | null;
   contact: { name: string } | null;
   lines: {
     id: string;
@@ -28,8 +44,17 @@ interface PODetail {
     quantity: number;
     unitPrice: number;
     amount: number;
-    account: { code: string; name: string } | null;
+    account: { id: string; code: string; name: string } | null;
+    taxRate: { id: string } | null;
   }[];
+}
+
+interface EditLine {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  accountId: string;
+  taxRateId: string;
 }
 
 const statusConfig: Record<string, { class: string }> = {
@@ -41,22 +66,266 @@ const statusConfig: Record<string, { class: string }> = {
   void: { class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300" },
 };
 
+// ---------------------------------------------------------------------------
+// Drawer helper components
+// ---------------------------------------------------------------------------
+
+function DrawerIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function DrawerFooter({
+  onClose,
+  saving,
+  label,
+}: {
+  onClose: () => void;
+  saving: boolean;
+  label: string;
+}) {
+  return (
+    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
+      <Button type="button" variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        disabled={saving}
+        className="bg-emerald-600 hover:bg-emerald-700"
+      >
+        {saving ? "Saving..." : label}
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit PO Drawer
+// ---------------------------------------------------------------------------
+
+function EditPODrawer({
+  open,
+  onClose,
+  po,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  po: PODetail;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<EditLine[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setContactId(po.contactId);
+      setIssueDate(po.issueDate);
+      setDeliveryDate(po.deliveryDate || "");
+      setNotes(po.notes || "");
+      setLines(
+        po.lines.map((l) => ({
+          description: l.description,
+          quantity: String(l.quantity / 100),
+          unitPrice: centsToDecimal(l.unitPrice),
+          accountId: l.account?.id || "",
+          taxRateId: l.taxRate?.id || "",
+        }))
+      );
+    }
+  }, [open, po]);
+
+  function updateLine(index: number, updates: Partial<EditLine>) {
+    setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...updates } : l)));
+  }
+
+  function addLine() {
+    setLines((prev) => [...prev, { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+  }
+
+  function removeLine(index: number) {
+    if (lines.length <= 1) return;
+    setLines((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId || !contactId) {
+      toast.error("Supplier is required");
+      return;
+    }
+    if (lines.some((l) => !l.description.trim() || !l.unitPrice)) {
+      toast.error("All lines need a description and price");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/v1/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId,
+          issueDate,
+          deliveryDate: deliveryDate || null,
+          notes: notes || null,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update");
+      }
+
+      toast.success("Purchase order updated");
+      onClose();
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Package className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">Edit Purchase Order</SheetTitle>
+              <SheetDescription>Update purchase order details.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Order Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Supplier *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="supplier" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Delivery Date</Label>
+                <DatePicker value={deliveryDate} onChange={setDeliveryDate} placeholder="Expected delivery" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionLabel>Line Items</SectionLabel>
+                <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                  <Plus className="mr-2 size-3.5" />Add Line
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {lines.map((line, index) => (
+                  <div key={index} className="rounded-lg border p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Line {index + 1}</span>
+                      {lines.length > 1 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(index)} className="text-red-600 hover:text-red-700">
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="space-y-2 sm:col-span-3">
+                        <Label className="text-xs">Description *</Label>
+                        <Input value={line.description} onChange={(e) => updateLine(index, { description: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Quantity</Label>
+                        <Input type="number" step="1" min="1" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Unit Price *</Label>
+                        <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Account</Label>
+                        <AccountPicker value={line.accountId} onChange={(val) => updateLine(index, { accountId: val })} typeFilter={["expense"]} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Save Changes" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [po, setPo] = useState<PODetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(po?.poNumber);
 
-  useEffect(() => {
+  const loadPO = useCallback(() => {
     if (!orgId) return;
     fetch(`/api/v1/purchase-orders/${id}`, { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
       .then((data) => { if (data.purchaseOrder) setPo(data.purchaseOrder); })
       .finally(() => setLoading(false));
   }, [id, orgId]);
+
+  useEffect(() => {
+    loadPO();
+  }, [loadPO]);
 
   async function handleSend() {
     if (!orgId) return;
@@ -77,6 +346,28 @@ export default function PODetailPage() {
       router.push(`/purchases/${data.bill.id}`);
     } else {
       toast.error("Failed to convert");
+    }
+  }
+
+  async function handleDelete() {
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete this purchase order?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const res = await fetch(`/api/v1/purchase-orders/${id}`, {
+      method: "DELETE",
+      headers: { "x-organization-id": orgId },
+    });
+    if (res.ok) {
+      toast.success("Purchase order deleted");
+      router.push("/purchases/orders");
+    } else {
+      const data = await res.json();
+      toast.error(data.error || "Failed to delete");
     }
   }
 
@@ -117,9 +408,17 @@ export default function PODetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {po.status === "draft" && (
-              <Button size="sm" onClick={handleSend} className="bg-emerald-600 hover:bg-emerald-700">
-                <Send className="mr-2 size-3.5" />Send
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="mr-2 size-3.5" />Edit
+                </Button>
+                <Button size="sm" onClick={handleSend} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Send className="mr-2 size-3.5" />Send
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600 hover:text-red-700">
+                  <Trash2 className="mr-2 size-3.5" />Delete
+                </Button>
+              </>
             )}
             {["sent", "received"].includes(po.status) && (
               <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700">
@@ -138,6 +437,13 @@ export default function PODetailPage() {
           {po.deliveryDate && <span>Delivery {po.deliveryDate}</span>}
         </div>
 
+        {po.notes && (
+          <div className="rounded-lg border p-4">
+            <p className="text-xs text-muted-foreground mb-1">Notes</p>
+            <p className="text-sm">{po.notes}</p>
+          </div>
+        )}
+
         {/* Summary cards */}
         <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
           <div className="rounded-lg border bg-card p-4">
@@ -153,13 +459,6 @@ export default function PODetailPage() {
             <p className="mt-1 text-xl font-bold truncate">{po.contact?.name || "-"}</p>
           </div>
         </div>
-
-        {po.notes && (
-          <div className="rounded-lg border p-4">
-            <p className="text-xs text-muted-foreground mb-1">Notes</p>
-            <p className="text-sm">{po.notes}</p>
-          </div>
-        )}
 
         {/* Line items */}
         <div className="rounded-lg border overflow-hidden">
@@ -193,6 +492,16 @@ export default function PODetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit PO Drawer */}
+      <EditPODrawer
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        po={po}
+        onSaved={loadPO}
+      />
+
+      {confirmDialog}
     </BlurReveal>
   );
 }

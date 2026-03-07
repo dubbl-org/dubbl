@@ -69,13 +69,23 @@ const LABELS: Record<string, string> = {
   team: "Team",
 };
 
-const CTA_MAP: Record<string, { label: string; drawer: "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" }> = {
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring";
+
+const CTA_MAP: Record<string, { label: string; drawer: DrawerType }> = {
   sales: { label: "New Invoice", drawer: "invoice" },
+  "sales/quotes": { label: "New Quote", drawer: "quote" },
+  "sales/credit-notes": { label: "New Credit Note", drawer: "creditNote" },
+  "sales/recurring": { label: "New Recurring", drawer: "recurring" },
   purchases: { label: "New Bill", drawer: "bill" },
+  "purchases/expenses": { label: "New Expense", drawer: "expense" },
+  "purchases/orders": { label: "New PO", drawer: "purchaseOrder" },
   accounting: { label: "New Entry", drawer: "entry" },
+  "accounting/fixed-assets": { label: "New Asset", drawer: "fixedAsset" },
+  "accounting/budgets": { label: "New Budget", drawer: "budget" },
   contacts: { label: "New Contact", drawer: "contact" },
   projects: { label: "New Project", drawer: "project" },
   inventory: { label: "New Item", drawer: "inventory" },
+  "payroll/employees": { label: "New Employee", drawer: "employee" },
 };
 
 export function Topbar() {
@@ -129,7 +139,7 @@ export function Topbar() {
     parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
   }
 
-  const cta = CTA_MAP[segments[0]];
+  const cta = CTA_MAP[`${segments[0]}/${segments[1]}`] || CTA_MAP[segments[0]];
 
   const openCommandPalette = useCallback(() => {
     document.dispatchEvent(new CustomEvent("open-command-palette"));

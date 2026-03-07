@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2, Loader2 } from "lucide-react";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [contactId, setContactId] = useState(proj?.contactId || "");
   const [projStartDate, setProjStartDate] = useState(proj?.startDate || "");
   const [projEndDate, setProjEndDate] = useState(proj?.endDate || "");
@@ -81,7 +83,13 @@ export default function SettingsPage() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this project? This action cannot be undone.")) return;
+    const confirmed = await confirm({
+      title: "Delete this project?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     if (!orgId) return;
     setDeleting(true);
     try {
@@ -233,6 +241,7 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Section>
+      {confirmDialog}
     </form>
   );
 }
