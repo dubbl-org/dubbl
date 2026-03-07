@@ -6,7 +6,6 @@ import { Building2, CircleDot, Plus, ArrowUpRight, Waves } from "lucide-react";
 import { toast } from "sonner";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { Section } from "@/components/dashboard/section";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -219,25 +218,29 @@ export default function BankingPage() {
 
   return (
     <BlurReveal className="space-y-10">
-      <Section title="Overview" description="Total balances and account summary.">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard title="Total Balance" value={formatMoney(totals.balance)} icon={Building2} />
-          <StatCard
-            title="Money In"
-            value={formatMoney(positiveBalance)}
-            icon={Building2}
-            changeType="positive"
-            change={`${accounts.filter((a) => a.balance > 0).length} accounts`}
-          />
-          <StatCard
-            title="Money Out"
-            value={formatMoney(negativeBalance)}
-            icon={Building2}
-            changeType="negative"
-            change={`${accounts.filter((a) => a.balance < 0).length} accounts`}
-          />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div>
+          <p className="text-[11px] text-muted-foreground">Total Balance</p>
+          <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">{formatMoney(totals.balance)}</p>
         </div>
-      </Section>
+        <div>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <span className="size-2 rounded-full bg-emerald-500" />Money In
+          </p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(positiveBalance)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <span className="size-2 rounded-full bg-red-500" />Money Out
+          </p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">{formatMoney(negativeBalance)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground">Accounts</p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums">{accounts.length}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{totals.active} active{currencies.length > 1 ? ` · ${currencies.length} currencies` : ""}</p>
+        </div>
+      </div>
 
       <div className="h-px bg-border" />
 

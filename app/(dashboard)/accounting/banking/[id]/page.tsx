@@ -497,7 +497,7 @@ export default function BankAccountDetailPage() {
         <div>
           <p className="text-[11px] text-muted-foreground">Reconciled</p>
           <div className="flex items-center gap-2 mt-1">
-            <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+            <div className="h-2 flex-1 rounded-full bg-gray-200 dark:bg-muted overflow-hidden">
               <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${reconciledPct}%` }} />
             </div>
             <span className="text-xs font-mono tabular-nums text-muted-foreground">{reconciledPct}%</span>
@@ -546,23 +546,33 @@ export default function BankAccountDetailPage() {
         {tab === "overview" && (
           <div className="space-y-8">
             {/* Reconciliation breakdown */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                { label: "Unreconciled", count: summary.unreconciled, color: "bg-amber-500", textColor: "text-amber-600" },
-                { label: "Reconciled", count: summary.reconciled, color: "bg-emerald-500", textColor: "text-emerald-600" },
-                { label: "Excluded", count: summary.excluded, color: "bg-gray-400", textColor: "text-muted-foreground" },
-              ].map(({ label, count, color, textColor }) => (
-                <div key={label} className="rounded-xl border bg-card p-5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-                    <div className={cn("size-2.5 rounded-full", color)} />
+            <div>
+              <div className="flex items-center gap-6 text-[13px]">
+                {[
+                  { label: "Unreconciled", count: summary.unreconciled, dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+                  { label: "Reconciled", count: summary.reconciled, dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+                  { label: "Excluded", count: summary.excluded, dot: "bg-gray-400", text: "text-muted-foreground" },
+                ].map(({ label, count, dot, text }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className={cn("size-2 rounded-full", dot)} />
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className={cn("font-mono font-semibold tabular-nums", text)}>{count}</span>
                   </div>
-                  <p className={cn("mt-2 text-2xl font-bold tracking-tight font-mono tabular-nums", textColor)}>{count}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {summary.total > 0 ? `${Math.round((count / summary.total) * 100)}% of total` : "No transactions"}
-                  </p>
+                ))}
+              </div>
+              {summary.total > 0 && (
+                <div className="mt-3 h-2.5 w-full rounded-full overflow-hidden flex bg-gray-200 dark:bg-muted">
+                  {summary.reconciled > 0 && (
+                    <div className="h-full bg-emerald-500" style={{ width: `${(summary.reconciled / summary.total) * 100}%` }} />
+                  )}
+                  {summary.unreconciled > 0 && (
+                    <div className="h-full bg-amber-500" style={{ width: `${(summary.unreconciled / summary.total) * 100}%` }} />
+                  )}
+                  {summary.excluded > 0 && (
+                    <div className="h-full bg-gray-400" style={{ width: `${(summary.excluded / summary.total) * 100}%` }} />
+                  )}
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Recent transactions */}
