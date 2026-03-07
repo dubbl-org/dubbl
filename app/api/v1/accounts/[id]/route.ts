@@ -62,11 +62,15 @@ export async function GET(
       )
       .orderBy(asc(journalEntry.date));
 
-    // Compute running balance on full set
+    // Compute running balance and totals on full set
     let balance = 0;
+    let totalDebits = 0;
+    let totalCredits = 0;
     const fullLedger = allLedger.map((row) => {
       const debit = row.debitAmount || 0;
       const credit = row.creditAmount || 0;
+      totalDebits += debit;
+      totalCredits += credit;
       if (["asset", "expense"].includes(account.type)) {
         balance += debit - credit;
       } else {
@@ -113,7 +117,7 @@ export async function GET(
     const paged = filtered.slice(offset, offset + limit);
 
     return NextResponse.json({
-      account: { ...account, balance },
+      account: { ...account, balance, totalDebits, totalCredits, entryCount: allLedger.length },
       ...paginatedResponse(paged, total, page, limit),
     });
   } catch (err) {

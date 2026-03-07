@@ -27,6 +27,19 @@ export function TabLayout({
     tab.exact ? pathname === tab.href : pathname === tab.href
   ) && tabs.some((tab) => pathname.startsWith(tab.href + "/"));
 
+  // On detail pages, keep the blur key stable so sub-tab navigation
+  // doesn't re-animate the entire layout. Use the tab href + first
+  // extra segment (the ID) as a stable key.
+  let blurKey = pathname;
+  if (isDetailPage) {
+    const matchedTab = tabs.find((tab) => pathname.startsWith(tab.href + "/"));
+    if (matchedTab) {
+      const rest = pathname.slice(matchedTab.href.length + 1);
+      const idSegment = rest.split("/")[0];
+      blurKey = `${matchedTab.href}/${idSegment}`;
+    }
+  }
+
   return (
     <div>
       {!isDetailPage && (
@@ -54,7 +67,7 @@ export function TabLayout({
           })}
         </nav>
       )}
-      <BlurReveal key={pathname}>{children}</BlurReveal>
+      <BlurReveal key={blurKey}>{children}</BlurReveal>
     </div>
   );
 }
