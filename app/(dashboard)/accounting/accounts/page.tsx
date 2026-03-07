@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronRight, Plus, Search, X } from "lucide-react";
+import { ChevronRight, Plus, Search, X } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,17 +139,7 @@ export default function AccountsPage() {
     return (
       <ContentReveal className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="size-8 p-0"
-              onClick={() => router.push("/accounting")}
-            >
-              <ArrowLeft className="size-4" />
-            </Button>
-            <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
-          </div>
+          <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
           <Button
             onClick={() => openDrawer("account")}
             size="sm"
@@ -188,21 +178,11 @@ export default function AccountsPage() {
     <ContentReveal className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="size-8 p-0"
-            onClick={() => router.push("/accounting")}
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {accounts.length} accounts · {activeCount} active
-            </p>
-          </div>
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {accounts.length} accounts · {activeCount} active
+          </p>
         </div>
         <Button
           onClick={() => openDrawer("account")}
