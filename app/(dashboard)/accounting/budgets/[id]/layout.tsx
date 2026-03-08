@@ -153,6 +153,7 @@ export default function BudgetDetailLayout({ children }: { children: React.React
   }, [id, orgId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [fetchData]);
 

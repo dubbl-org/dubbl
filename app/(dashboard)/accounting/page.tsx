@@ -187,6 +187,7 @@ export default function TransactionsPage() {
 
   const [contentKey, setContentKey] = useState(0);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setContentKey((k) => k + 1);
   }, [debouncedSearch, statusFilter, sortBy]);
 

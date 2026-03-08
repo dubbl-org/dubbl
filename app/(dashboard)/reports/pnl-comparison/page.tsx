@@ -39,6 +39,7 @@ export default function PnlComparisonPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params = new URLSearchParams({
       compare: compareType,

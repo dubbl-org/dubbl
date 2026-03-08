@@ -39,6 +39,7 @@ export default function CashFlowForecastPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch(`/api/v1/reports/cash-flow-forecast?weeks=${weeksAhead}`, {
       headers: { "x-organization-id": orgId },

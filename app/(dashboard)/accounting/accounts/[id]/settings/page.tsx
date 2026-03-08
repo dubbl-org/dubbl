@@ -125,7 +125,7 @@ export default function AccountSettingsPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs">Account Code</Label>
                 <Input name="code" required defaultValue={account.code} className="font-mono" />
-                <p className="text-[11px] text-muted-foreground">Changing the code won't affect existing journal entries.</p>
+                <p className="text-[11px] text-muted-foreground">Changing the code won&apos;t affect existing journal entries.</p>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Account Name</Label>

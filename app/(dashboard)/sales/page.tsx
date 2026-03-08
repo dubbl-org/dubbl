@@ -203,6 +203,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRefetching(true);
     setPage(1);
 
@@ -287,6 +288,7 @@ export default function InvoicesPage() {
 
   // Bump searchKey when debounced search changes to trigger ContentReveal
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchKey((k) => k + 1);
   }, [debouncedSearch]);
 

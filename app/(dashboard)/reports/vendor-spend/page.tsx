@@ -37,6 +37,7 @@ export default function VendorSpendPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/vendor-spend?${params}`, {

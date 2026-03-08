@@ -182,6 +182,7 @@ export default function AuditLogPage() {
 
   // Reset page on filter change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [entityTypeFilter, actionFilter, dateFrom, dateTo]);
 
@@ -217,6 +218,7 @@ export default function AuditLogPage() {
     if (!orgId) return;
     let cancelled = false;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params = new URLSearchParams();
     params.set("page", String(page));

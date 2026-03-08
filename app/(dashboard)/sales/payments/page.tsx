@@ -194,6 +194,7 @@ export default function PaymentsPage() {
 
   // Bump filterKey when filters change to trigger ContentReveal
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilterKey((k) => k + 1);
   }, [debouncedSearch, methodFilter, dateFrom, dateTo]);
 

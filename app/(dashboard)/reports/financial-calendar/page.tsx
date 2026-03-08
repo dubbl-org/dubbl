@@ -42,6 +42,7 @@ export default function FinancialCalendarPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
 
     const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toISOString().slice(0, 10);

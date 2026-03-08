@@ -22,7 +22,7 @@ export async function getNextNumber(
     );
 
     // drizzle execute() returns QueryResult with .rows
-    const rows = Array.isArray(result) ? result : (result as any).rows ?? [];
+    const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? [];
     const existing = rows[0] as { id: string; last_number: number } | undefined;
 
     if (existing) {
@@ -46,7 +46,7 @@ export async function getNextNumber(
           `SELECT MAX(CAST(NULLIF(regexp_replace(${columnName}, '^[A-Z]+-', ''), '') AS integer)) as max_num FROM ${tableName} WHERE organization_id = '${organizationId}'`
         )
       );
-      const maxRows = Array.isArray(maxResult) ? maxResult : (maxResult as any).rows ?? [];
+      const maxRows = Array.isArray(maxResult) ? maxResult : (maxResult as { rows?: unknown[] }).rows ?? [];
       maxNum = Number(maxRows[0]?.max_num || 0);
     }
 

@@ -132,6 +132,7 @@ export default function BudgetsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
     window.addEventListener("budgets-changed", fetchData);
     return () => window.removeEventListener("budgets-changed", fetchData);

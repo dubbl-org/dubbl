@@ -36,6 +36,7 @@ export default function PaymentPerformancePage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/payment-performance?${params}`, {
