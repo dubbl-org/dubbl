@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { motion } from "motion/react";
 import { Trash2, Package, ArrowUpDown, Save, Loader2, ArrowLeft } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
@@ -240,7 +241,12 @@ export default function InventoryItemDetailPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div className="rounded-xl border bg-card p-4">
+          <motion.div
+            className="rounded-xl border bg-card p-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+          >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">On Hand</p>
             <p className={cn(
               "mt-1.5 text-2xl font-bold font-mono tabular-nums",
@@ -250,20 +256,27 @@ export default function InventoryItemDetailPage() {
             </p>
             <div className="mt-2 flex items-center gap-2">
               <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
-                <div
+                <motion.div
                   className={cn(
                     "h-full rounded-full",
                     isLowStock ? "bg-amber-500" : "bg-emerald-500"
                   )}
-                  style={{ width: `${stockPercent}%` }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stockPercent}%` }}
+                  transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
                 />
               </div>
               <span className="text-[10px] text-muted-foreground tabular-nums">
                 Reorder at {item.reorderPoint}
               </span>
             </div>
-          </div>
-          <div className="rounded-xl border bg-card p-4">
+          </motion.div>
+          <motion.div
+            className="rounded-xl border bg-card p-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+          >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Stock Value</p>
             <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums">
               {formatMoney(stockValue)}
@@ -271,8 +284,13 @@ export default function InventoryItemDetailPage() {
             <p className="mt-1 text-[11px] text-muted-foreground">
               {item.quantityOnHand} x {formatMoney(item.purchasePrice)}
             </p>
-          </div>
-          <div className="rounded-xl border bg-card p-4">
+          </motion.div>
+          <motion.div
+            className="rounded-xl border bg-card p-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+          >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sale Price</p>
             <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
               {formatMoney(item.salePrice)}
@@ -280,8 +298,13 @@ export default function InventoryItemDetailPage() {
             <p className="mt-1 text-[11px] text-muted-foreground">
               Cost {formatMoney(item.purchasePrice)}
             </p>
-          </div>
-          <div className="rounded-xl border bg-card p-4">
+          </motion.div>
+          <motion.div
+            className="rounded-xl border bg-card p-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+          >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Margin</p>
             <p className={cn(
               "mt-1.5 text-2xl font-bold font-mono tabular-nums",
@@ -292,7 +315,7 @@ export default function InventoryItemDetailPage() {
             <p className="mt-1 text-[11px] text-muted-foreground">
               {item.purchasePrice > 0 ? `${formatMoney(item.salePrice - item.purchasePrice)} per unit` : "No cost set"}
             </p>
-          </div>
+          </motion.div>
         </div>
 
         {/* Edit form - Section-based layout like contacts */}
