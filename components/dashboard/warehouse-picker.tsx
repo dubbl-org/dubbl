@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { Check, ChevronsUpDown, Loader2, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,30 +36,30 @@ interface WarehousePickerProps {
 export function WarehousePicker({ value, onChange, placeholder = "Select warehouse..." }: WarehousePickerProps) {
   const [open, setOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
+  const fetchIdRef = useRef(0);
+  const [fetchCount, setFetchCount] = useState(0);
+  const loading = fetchCount > 0;
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const fetchWarehouses = useCallback(() => {
-    if (!orgId) return;
-    setLoading(true);
-    fetch("/api/v1/warehouses", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setWarehouses(data.data);
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (nextOpen && orgId) {
+      const id = ++fetchIdRef.current;
+      setFetchCount((c) => c + 1);
+      fetch("/api/v1/warehouses", {
+        headers: { "x-organization-id": orgId },
       })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  // Load on open
-  useEffect(() => {
-    if (!open) return;
-    fetchWarehouses();
-  }, [open, fetchWarehouses]);
+        .then((r) => r.json())
+        .then((data) => {
+          if (id === fetchIdRef.current && data.data) setWarehouses(data.data);
+        })
+        .catch(() => {})
+        .finally(() => setFetchCount((c) => c - 1));
+    }
+  }
 
   const selected = warehouses.find((w) => w.id === value);
 
@@ -72,7 +72,7 @@ export function WarehousePicker({ value, onChange, placeholder = "Select warehou
     : warehouses;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

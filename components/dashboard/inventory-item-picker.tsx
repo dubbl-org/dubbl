@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check, ChevronsUpDown, Loader2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,49 +40,65 @@ export function InventoryItemPicker({ value, onChange, placeholder = "Select ite
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
+  const fetchIdRef = useRef(0);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  // Fetch items when popover opens or search changes
-  const fetchItems = useCallback((query: string) => {
-    if (!orgId) return;
-    setLoading(true);
+  // Fetch items when debounced search changes (while open)
+  useEffect(() => {
+    if (!open || !orgId) return;
+    const id = ++fetchIdRef.current;
     const params = new URLSearchParams({ limit: "50" });
-    if (query) params.set("search", query);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    // Only show loading for search changes, not the initial open (handled by onOpenChange)
     fetch(`/api/v1/inventory?${params}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) setItems(data.data);
+        if (id === fetchIdRef.current && data.data) {
+          setItems(data.data);
+          setLoading(false);
+        }
       })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  // Load on open + when debounced search changes
-  useEffect(() => {
-    if (!open) return;
-    fetchItems(debouncedSearch);
-  }, [open, debouncedSearch, fetchItems]);
+      .catch(() => {
+        if (id === fetchIdRef.current) setLoading(false);
+      });
+  }, [open, debouncedSearch, orgId]);
 
   // Resolve the selected item label if we have a value but no match yet
+  const resolvedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!value || !orgId) { setSelected(null); return; }
-    const match = items.find((i) => i.id === value);
-    if (match) { setSelected(match); return; }
-    // Fetch single item to display its name
+    if (!value || !orgId) return;
+    if (items.find((i) => i.id === value)) return;
+    if (resolvedRef.current === value) return;
+    let cancelled = false;
+    resolvedRef.current = value;
     fetch(`/api/v1/inventory/${value}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.inventoryItem) setSelected(data.inventoryItem);
+        if (!cancelled && data.inventoryItem) setSelected(data.inventoryItem);
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [value, items, orgId]);
 
+  // Derive selected from items list or keep the fetched resolution
+  const selectedItem = !value ? null : items.find((i) => i.id === value) || selected;
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setLoading(true);
+    } else {
+      setSearch("");
+    }
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -90,9 +106,9 @@ export function InventoryItemPicker({ value, onChange, placeholder = "Select ite
           aria-expanded={open}
           className="w-full justify-between font-normal h-9"
         >
-          {selected ? (
+          {selectedItem ? (
             <span className="truncate">
-              {selected.name} <span className="text-muted-foreground">({selected.code})</span>
+              {selectedItem.name} <span className="text-muted-foreground">({selectedItem.code})</span>
             </span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -105,7 +121,7 @@ export function InventoryItemPicker({ value, onChange, placeholder = "Select ite
           <CommandInput
             placeholder="Search items..."
             value={search}
-            onValueChange={setSearch}
+            onValueChange={(v) => { setSearch(v); setLoading(true); }}
           />
           <CommandList>
             {loading ? (
