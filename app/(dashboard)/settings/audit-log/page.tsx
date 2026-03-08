@@ -266,15 +266,7 @@ export default function AuditLogPage() {
   if (loading && entries.length === 0) return <BrandLoader />;
 
   return (
-    <div className="space-y-10">
-      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
-        <div className="shrink-0">
-          <p className="text-sm font-medium">Audit log</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Track all changes made within your organization.
-          </p>
-        </div>
-        <ContentReveal className="min-w-0 space-y-5">
+    <ContentReveal className="space-y-5">
           {/* Quick stats */}
           <div className="flex flex-wrap items-center gap-3">
             {Object.entries(actionCounts).slice(0, 5).map(([action, count]) => {
@@ -520,14 +512,12 @@ export default function AuditLogPage() {
             </>
           )}
 
-          {/* Result count */}
-          {filtered.length > 0 && (
-            <p className="text-[11px] text-muted-foreground">
-              Showing {filtered.length} of {totalCount} entries
-            </p>
-          )}
-        </ContentReveal>
-      </section>
-    </div>
+      {/* Result count */}
+      {filtered.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          Showing {filtered.length} of {totalCount} entries
+        </p>
+      )}
+    </ContentReveal>
   );
 }
