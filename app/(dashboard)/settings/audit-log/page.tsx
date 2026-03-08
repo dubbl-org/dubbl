@@ -387,74 +387,96 @@ export default function AuditLogPage() {
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border bg-card overflow-hidden">
-              {grouped.map((group) => (
+            <>
+            <div className="space-y-0">
+              {grouped.map((group, gi) => (
                 <div key={group.label}>
-                  {/* Day header */}
-                  <div className="px-4 py-2 bg-muted/30 border-b">
+                  {/* Day header with dot on timeline */}
+                  <div className="relative flex items-center gap-3 pl-[18px] py-3">
+                    {/* Timeline line above day label */}
+                    {gi > 0 && (
+                      <div className="absolute left-[22px] -top-0 h-3 w-px bg-border" />
+                    )}
+                    <div className="relative z-10 flex size-2 shrink-0 rounded-full bg-border ring-4 ring-background" />
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                       {group.label}
                     </p>
+                    <div className="flex-1 h-px bg-border" />
                   </div>
 
-                  {/* Entries */}
-                  <div className="divide-y divide-border">
-                    {group.items.map((entry) => {
+                  {/* Timeline entries */}
+                  <div className="relative">
+                    {/* Continuous vertical line */}
+                    <div className="absolute left-[22px] top-0 bottom-0 w-px bg-border" />
+
+                    {group.items.map((entry, i) => {
                       const EntityIcon = ENTITY_ICONS[entry.entityType] || ArrowLeftRight;
                       const actionConfig = getActionConfig(entry.action);
                       const ActionIcon = actionConfig.icon;
+                      const isLastEntry = i === group.items.length - 1 && gi === grouped.length - 1;
 
                       return (
                         <div
                           key={entry.id}
-                          className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/20"
+                          className={cn(
+                            "relative flex items-start gap-3 pl-2 pr-3 py-2.5 ml-1 transition-colors hover:bg-muted/30 rounded-lg group",
+                            isLastEntry && "pb-4"
+                          )}
                         >
-                          {/* Action icon */}
-                          <div className={cn(
-                            "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                            entry.action.includes("delete") || entry.action.includes("void")
-                              ? "bg-red-50 dark:bg-red-950/40"
-                              : entry.action.includes("create") || entry.action.includes("approve")
-                                ? "bg-emerald-50 dark:bg-emerald-950/40"
-                                : "bg-blue-50 dark:bg-blue-950/40"
-                          )}>
-                            <ActionIcon className={cn("size-3.5", actionConfig.color)} />
-                          </div>
-
-                          {/* Main content */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] leading-snug">
-                              <span className="font-medium">{entry.userName}</span>{" "}
-                              <span className="text-muted-foreground">{entry.action}</span>{" "}
-                              <span className="inline-flex items-center gap-1">
-                                <EntityIcon className="inline size-3 text-muted-foreground/50" />
-                                <span className="text-muted-foreground">{formatEntityType(entry.entityType)}</span>
-                              </span>
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="font-mono text-[10px] text-muted-foreground/50">{entry.entityId.slice(0, 8)}</span>
-                              {entry.ipAddress && (
-                                <>
-                                  <span className="text-muted-foreground/30">·</span>
-                                  <span className="text-[10px] text-muted-foreground/50">{entry.ipAddress}</span>
-                                </>
-                              )}
+                          {/* Timeline node */}
+                          <div className="relative z-10 mt-1 shrink-0">
+                            <div className={cn(
+                              "flex size-[26px] items-center justify-center rounded-md ring-2 ring-background",
+                              actionConfig.badgeClass.includes("emerald")
+                                ? "bg-emerald-100 dark:bg-emerald-950/60"
+                                : actionConfig.badgeClass.includes("blue")
+                                  ? "bg-blue-100 dark:bg-blue-950/60"
+                                  : actionConfig.badgeClass.includes("red")
+                                    ? "bg-red-100 dark:bg-red-950/60"
+                                    : actionConfig.badgeClass.includes("violet")
+                                      ? "bg-violet-100 dark:bg-violet-950/60"
+                                      : actionConfig.badgeClass.includes("orange")
+                                        ? "bg-orange-100 dark:bg-orange-950/60"
+                                        : "bg-muted"
+                            )}>
+                              <ActionIcon className={cn("size-3", actionConfig.color)} />
                             </div>
                           </div>
 
-                          {/* Action badge */}
-                          <Badge variant="outline" className={cn("text-[10px] shrink-0 capitalize", actionConfig.badgeClass)}>
-                            {entry.action}
-                          </Badge>
+                          {/* Content card */}
+                          <div className="flex-1 min-w-0 flex items-start justify-between gap-3 rounded-lg border bg-card px-3.5 py-2.5 shadow-xs transition-shadow group-hover:shadow-sm">
+                            <div className="min-w-0">
+                              <p className="text-[13px] leading-snug">
+                                <span className="font-medium">{entry.userName}</span>{" "}
+                                <span className="text-muted-foreground">{entry.action}</span>{" "}
+                                <span className="inline-flex items-center gap-1">
+                                  <EntityIcon className="inline size-3 text-muted-foreground/50" />
+                                  <span className="text-muted-foreground">{formatEntityType(entry.entityType)}</span>
+                                </span>
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className={cn("text-[10px] capitalize h-[18px] px-1.5", actionConfig.badgeClass)}>
+                                  {entry.action}
+                                </Badge>
+                                <span className="font-mono text-[10px] text-muted-foreground/40">{entry.entityId.slice(0, 8)}</span>
+                                {entry.ipAddress && (
+                                  <>
+                                    <span className="text-muted-foreground/20">·</span>
+                                    <span className="text-[10px] text-muted-foreground/40">{entry.ipAddress}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
 
-                          {/* Timestamp */}
-                          <div className="text-right shrink-0 hidden sm:block">
-                            <p className="text-[11px] text-muted-foreground tabular-nums">
-                              {new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground/50">
-                              {getRelativeTime(entry.createdAt)}
-                            </p>
+                            {/* Timestamp */}
+                            <div className="text-right shrink-0">
+                              <p className="text-[11px] text-muted-foreground tabular-nums">
+                                {new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground/40 hidden sm:block">
+                                {getRelativeTime(entry.createdAt)}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       );
@@ -463,37 +485,39 @@ export default function AuditLogPage() {
                 </div>
               ))}
 
-              {/* Pagination footer */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t px-4 py-3">
-                  <p className="text-[11px] text-muted-foreground tabular-nums">
-                    Page {page} of {totalPages}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
-                      <ChevronLeft className="size-3 mr-1" />
-                      Previous
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      Next
-                      <ChevronRight className="size-3 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4">
+                <p className="text-[11px] text-muted-foreground tabular-nums">
+                  Page {page} of {totalPages}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="size-3 mr-1" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                    <ChevronRight className="size-3 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           )}
 
           {/* Result count */}
