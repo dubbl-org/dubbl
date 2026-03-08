@@ -18,6 +18,11 @@ import {
   Layers,
   Compass,
   Users,
+  CalendarDays,
+  GitCompareArrows,
+  ShoppingBag,
+  Timer,
+  Copy,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 
@@ -74,6 +79,18 @@ const reportCategories = [
         href: "/reports/profitability",
         icon: Users,
       },
+      {
+        title: "Comparative Balance Sheet",
+        description: "Period-over-period balance sheet comparison.",
+        href: "/reports/comparative-balance-sheet",
+        icon: GitCompareArrows,
+      },
+      {
+        title: "Financial Calendar",
+        description: "Upcoming invoice due dates, bill payments, and recurring events.",
+        href: "/reports/financial-calendar",
+        icon: CalendarDays,
+      },
     ],
   },
   {
@@ -97,6 +114,24 @@ const reportCategories = [
         description: "Current ratio, margins, DSO, DPO, and more KPIs.",
         href: "/reports/financial-ratios",
         icon: Gauge,
+      },
+      {
+        title: "Vendor Spend Analysis",
+        description: "Top suppliers by total spend for the period.",
+        href: "/reports/vendor-spend",
+        icon: ShoppingBag,
+      },
+      {
+        title: "Payment Performance",
+        description: "Average collection and payment times by contact.",
+        href: "/reports/payment-performance",
+        icon: Timer,
+      },
+      {
+        title: "Duplicate Detection",
+        description: "Find potential duplicate invoices and bills.",
+        href: "/reports/duplicate-detection",
+        icon: Copy,
       },
     ],
   },

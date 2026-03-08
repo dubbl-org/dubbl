@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
+import { ExportButton } from "@/components/dashboard/export-button";
 
 interface AccountRow {
   accountId: string;
@@ -58,7 +59,13 @@ export default function ProfitAndLossPage() {
       <PageHeader
         title="Profit & Loss"
         description="Revenue minus expenses for the selected period."
-      />
+      >
+        <ExportButton
+          data={[...revenue.map((r) => ({ ...r, section: "Revenue" })), ...expenses.map((e) => ({ ...e, section: "Expense" }))]}
+          columns={["section", "accountCode", "accountName", "balance"]}
+          filename="profit-and-loss"
+        />
+      </PageHeader>
 
       <DateRangeFilter
         startDate={startDate}

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { formatMoney } from "@/lib/money";
+import { ExportButton } from "@/components/dashboard/export-button";
 
 interface InvoiceRow {
   id: string;
@@ -59,7 +60,13 @@ export default function AgedReceivablesPage() {
       <PageHeader
         title="Aged Receivables"
         description="Outstanding invoices grouped by aging buckets."
-      />
+      >
+        <ExportButton
+          data={allInvoices}
+          columns={["invoiceNumber", "contactName", "dueDate", "daysOverdue", "amountDue", "bucket"]}
+          filename="aged-receivables"
+        />
+      </PageHeader>
 
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {buckets.map((b) => (

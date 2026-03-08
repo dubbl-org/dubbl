@@ -279,6 +279,12 @@ export default function DashboardPage() {
     dso: number | null;
     dpo: number | null;
   } | null>(null);
+  const [actionAlerts, setActionAlerts] = useState<{
+    overdueInvoices: { count: number; total: number };
+    overdueBills: { count: number; total: number };
+    uncategorizedTransactions: number;
+    accountsNeedingReconciliation: { bankAccountName: string; lastReconDate: string | null }[];
+  } | null>(null);
 
   useEffect(() => {
     const id = localStorage.getItem("activeOrgId");
@@ -361,6 +367,12 @@ export default function DashboardPage() {
       .then((data) => {
         if (data.ratios) setRatios(data.ratios);
       })
+      .catch(() => {});
+
+    // Load action alerts in background
+    fetch("/api/v1/dashboard/alerts", { headers })
+      .then((r) => r.json())
+      .then((data) => setActionAlerts(data))
       .catch(() => {});
   }, []);
 
@@ -666,6 +678,52 @@ export default function DashboardPage() {
                     <KpiItem label="DPO" value={`${ratios.dpo}d`} good={ratios.dpo <= 60} />
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            {actionAlerts && (actionAlerts.overdueInvoices.count > 0 || actionAlerts.overdueBills.count > 0 || actionAlerts.uncategorizedTransactions > 0 || actionAlerts.accountsNeedingReconciliation.length > 0) && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {actionAlerts.overdueInvoices.count > 0 && (
+                  <button
+                    onClick={() => router.push("/sales")}
+                    className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-left transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
+                  >
+                    <p className="text-xs font-medium text-red-800 dark:text-red-300">Overdue Invoices</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-red-600 mt-0.5">{actionAlerts.overdueInvoices.count}</p>
+                    <p className="text-[11px] text-red-600/70 font-mono tabular-nums">{formatMoney(actionAlerts.overdueInvoices.total)} outstanding</p>
+                  </button>
+                )}
+                {actionAlerts.overdueBills.count > 0 && (
+                  <button
+                    onClick={() => router.push("/purchases")}
+                    className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-3 text-left transition-colors hover:bg-orange-100 dark:hover:bg-orange-950/50"
+                  >
+                    <p className="text-xs font-medium text-orange-800 dark:text-orange-300">Overdue Bills</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-orange-600 mt-0.5">{actionAlerts.overdueBills.count}</p>
+                    <p className="text-[11px] text-orange-600/70 font-mono tabular-nums">{formatMoney(actionAlerts.overdueBills.total)} to pay</p>
+                  </button>
+                )}
+                {actionAlerts.uncategorizedTransactions > 0 && (
+                  <button
+                    onClick={() => router.push("/accounting/banking")}
+                    className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3 text-left transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/50"
+                  >
+                    <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Uncategorized Transactions</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-blue-600 mt-0.5">{actionAlerts.uncategorizedTransactions}</p>
+                    <p className="text-[11px] text-blue-600/70">Need categorization</p>
+                  </button>
+                )}
+                {actionAlerts.accountsNeedingReconciliation.length > 0 && (
+                  <button
+                    onClick={() => router.push("/accounting/banking")}
+                    className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-3 text-left transition-colors hover:bg-violet-100 dark:hover:bg-violet-950/50"
+                  >
+                    <p className="text-xs font-medium text-violet-800 dark:text-violet-300">Needs Reconciliation</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-violet-600 mt-0.5">{actionAlerts.accountsNeedingReconciliation.length}</p>
+                    <p className="text-[11px] text-violet-600/70">bank account{actionAlerts.accountsNeedingReconciliation.length !== 1 ? "s" : ""}</p>
+                  </button>
+                )}
               </div>
             )}
 

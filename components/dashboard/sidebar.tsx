@@ -101,7 +101,7 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function NavItemLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavItemLink({ item, active, badge }: { item: NavItem; active: boolean; badge?: number }) {
   const [hovered, setHovered] = useState(false);
   const iconRef = useRef<IconHandle>(null);
   const IconComp = item.icon;
@@ -129,7 +129,12 @@ function NavItemLink({ item, active }: { item: NavItem; active: boolean }) {
         )}
       >
         <IconComp ref={iconRef} size={16} className="shrink-0" />
-        <span>{item.label}</span>
+        <span className="flex-1">{item.label}</span>
+        {badge !== undefined && badge > 0 && (
+          <span className="size-4 rounded-full bg-red-100 text-red-600 text-[9px] font-medium flex items-center justify-center shrink-0 dark:bg-red-950 dark:text-red-400">
+            {badge}
+          </span>
+        )}
       </Link>
     </SidebarMenuItem>
   );
@@ -253,6 +258,28 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [overdueCounts, setOverdueCounts] = useState<{ sales: number; purchases: number }>({ sales: 0, purchases: 0 });
+
+  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/dashboard/alerts", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setOverdueCounts({
+          sales: data.overdueInvoices?.count || 0,
+          purchases: data.overdueBills?.count || 0,
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  const badgeMap: Record<string, number> = {
+    "/sales": overdueCounts.sales,
+    "/purchases": overdueCounts.purchases,
+  };
 
   return (
     <Sidebar collapsible="offcanvas">
@@ -278,6 +305,7 @@ export function AppSidebar() {
                     key={item.href}
                     item={item}
                     active={isActive(pathname, item.href)}
+                    badge={badgeMap[item.href]}
                   />
                 ))}
               </SidebarMenu>

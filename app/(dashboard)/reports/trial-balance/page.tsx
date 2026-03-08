@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButton } from "@/components/dashboard/export-button";
 
 interface AccountBalance {
   accountId: string;
@@ -47,7 +48,13 @@ export default function TrialBalancePage() {
       <PageHeader
         title="Trial Balance"
         description="Summary of all account balances."
-      />
+      >
+        <ExportButton
+          data={accounts}
+          columns={["code", "name", "type", "debitBalance", "creditBalance"]}
+          filename="trial-balance"
+        />
+      </PageHeader>
       {loading ? (
         <Skeleton className="h-64 w-full" />
       ) : (
