@@ -14,9 +14,6 @@ import {
   ArrowUpDown,
   Download,
   Trash2,
-  CheckSquare,
-  Square,
-  MinusSquare,
   Power,
   PowerOff,
   Tag,
@@ -37,13 +34,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -55,6 +45,7 @@ import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
 
@@ -100,6 +91,7 @@ export default function InventoryPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [categories, setCategories] = useState<string[]>([]);
+  const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
   const [bulkCategory, setBulkCategory] = useState("");
@@ -349,115 +341,128 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Filters row */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="low_stock">Low Stock</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="inactive">Inactive</TabsTrigger>
-            </TabsList>
-          </Tabs>
+      {/* Toolbar - transforms when in select mode */}
+      {selectMode ? (
+        <div className="space-y-3">
+          {/* Selection action bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 mr-auto">
+              <Checkbox
+                checked={isAllSelected ? true : isPartialSelected ? "indeterminate" : false}
+                onCheckedChange={toggleSelectAll}
+              />
+              <span className="text-sm font-medium">
+                {selectionCount > 0 ? `${selectionCount} selected` : "Select items"}
+              </span>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
-              <Download className="size-3" />
-              <span className="hidden sm:inline">Export</span>
+            {selectionCount > 0 && (
+              <>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_active")} disabled={bulkLoading}>
+                  <Power className="size-3 mr-1.5" />Active
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_inactive")} disabled={bulkLoading}>
+                  <PowerOff className="size-3 mr-1.5" />Inactive
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkCategoryOpen(true)} disabled={bulkLoading}>
+                  <Tag className="size-3 mr-1.5" />Category
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkAdjustOpen(true)} disabled={bulkLoading}>
+                  <ArrowUpDown className="size-3 mr-1.5" />Adjust
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={handleBulkDelete} disabled={bulkLoading}>
+                  <Trash2 className="size-3 mr-1.5" />Delete
+                </Button>
+                {bulkLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+              </>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => { setSelectMode(false); setSelected(new Set()); }}
+            >
+              Done
             </Button>
           </div>
         </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="low_stock">Low Stock</TabsTrigger>
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="inactive">Inactive</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          {/* Search */}
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, code, or SKU..."
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-9 pr-8 h-8 text-sm"
-            />
-            {search && (
-              <button
-                onClick={() => handleSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
+                Select
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
+                <Download className="size-3" />
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+            </div>
           </div>
 
-          {/* Category filter */}
-          {categories.length > 0 && (
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
-                <Tag className="size-3 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Category" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {/* Search */}
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, code, or SKU..."
+                value={search}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-9 pr-8 h-8 text-sm"
+              />
+              {search && (
+                <button
+                  onClick={() => handleSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Category filter */}
+            {categories.length > 0 && (
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
+                  <Tag className="size-3 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Sort */}
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+              <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+                <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
 
-          {/* Sort */}
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
-              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
-            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
-          </Button>
-        </div>
-      </div>
-
-      {/* Bulk action bar */}
-      {selectionCount > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
-          <span className="text-xs font-medium">{selectionCount} selected</span>
-          <div className="h-4 w-px bg-border" />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={bulkLoading}>
-                {bulkLoading ? <Loader2 className="size-3 animate-spin mr-1.5" /> : null}
-                Actions
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => bulkAction("set_active")}>
-                <Power className="size-3.5 mr-2" />Set Active
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => bulkAction("set_inactive")}>
-                <PowerOff className="size-3.5 mr-2" />Set Inactive
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setBulkCategoryOpen(true)}>
-                <Tag className="size-3.5 mr-2" />Set Category
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setBulkAdjustOpen(true)}>
-                <ArrowUpDown className="size-3.5 mr-2" />Adjust Stock
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600">
-                <Trash2 className="size-3.5 mr-2" />Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto" onClick={() => setSelected(new Set())}>
-            Clear
-          </Button>
+            <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
+              <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -472,122 +477,107 @@ export default function InventoryPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border bg-card">
-          {/* Select all header */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/30">
-            <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground transition-colors">
-              {isAllSelected ? (
-                <CheckSquare className="size-4" />
-              ) : isPartialSelected ? (
-                <MinusSquare className="size-4" />
-              ) : (
-                <Square className="size-4" />
-              )}
-            </button>
-            <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Item</span>
-            <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide hidden sm:block w-24 text-right">Stock</span>
-            <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide hidden md:block w-24 text-right">Price</span>
-            <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide hidden lg:block w-24 text-right">Value</span>
-            <div className="w-4" />
-          </div>
+        <div className="rounded-xl border bg-card divide-y">
+          {items.map((item) => {
+            const isLow = item.quantityOnHand <= item.reorderPoint && item.isActive;
+            const isSelected = selected.has(item.id);
+            const stockPercent = item.reorderPoint > 0
+              ? Math.min((item.quantityOnHand / (item.reorderPoint * 3)) * 100, 100)
+              : 100;
 
-          {/* Items */}
-          <div className="divide-y">
-            {items.map((item) => {
-              const isLow = item.quantityOnHand <= item.reorderPoint && item.isActive;
-              const isSelected = selected.has(item.id);
-              const stockPercent = item.reorderPoint > 0
-                ? Math.min((item.quantityOnHand / (item.reorderPoint * 3)) * 100, 100)
-                : 100;
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  "group flex items-center gap-3 px-4 py-3 transition-colors",
+                  selectMode ? "cursor-pointer hover:bg-muted/40" : "cursor-pointer hover:bg-muted/40",
+                  isSelected && "bg-primary/5"
+                )}
+                onClick={() => {
+                  if (selectMode) toggleSelect(item.id);
+                  else router.push(`/inventory/${item.id}`);
+                }}
+              >
+                {/* Checkbox - only in select mode */}
+                {selectMode && (
+                  <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelect(item.id)}
+                    />
+                  </div>
+                )}
 
-              return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-muted/40",
-                    isSelected && "bg-muted/30"
-                  )}
-                >
-                  {/* Checkbox */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
-                    className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  >
-                    {isSelected ? <CheckSquare className="size-4 text-emerald-600" /> : <Square className="size-4" />}
-                  </button>
-
-                  {/* Icon + info */}
-                  <div
-                    className="flex items-center gap-3 flex-1 min-w-0"
-                    onClick={() => router.push(`/inventory/${item.id}`)}
-                  >
-                    <div className={cn(
-                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                      isLow ? "bg-amber-50 dark:bg-amber-950/40" : item.isActive ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-muted"
-                    )}>
-                      <Package className={cn(
-                        "size-4",
-                        isLow ? "text-amber-600 dark:text-amber-400" : item.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-                      )} />
+                {/* Icon + info */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                    isLow ? "bg-amber-50 dark:bg-amber-950/40" : item.isActive ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-muted"
+                  )}>
+                    <Package className={cn(
+                      "size-4",
+                      isLow ? "text-amber-600 dark:text-amber-400" : item.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                    )} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      {isLow && (
+                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-1.5 py-0">Low</Badge>
+                      )}
+                      {!item.isActive && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                      )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{item.name}</p>
-                        {isLow && (
-                          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-1.5 py-0">Low</Badge>
-                        )}
-                        {!item.isActive && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Inactive</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {item.code}
-                        {item.sku ? ` · ${item.sku}` : ""}
-                        {item.category ? ` · ${item.category}` : ""}
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.code}
+                      {item.sku ? ` · ${item.sku}` : ""}
+                      {item.category ? ` · ${item.category}` : ""}
+                    </p>
                   </div>
-
-                  {/* Stock bar */}
-                  <div className="hidden sm:flex flex-col items-end gap-1 w-24" onClick={() => router.push(`/inventory/${item.id}`)}>
-                    <span className={cn("text-xs font-mono tabular-nums font-medium", isLow ? "text-amber-600 dark:text-amber-400" : "")}>
-                      {item.quantityOnHand}
-                    </span>
-                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div className={cn("h-full rounded-full transition-all", isLow ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${stockPercent}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Prices */}
-                  <div className="hidden md:flex flex-col items-end gap-0.5 w-24" onClick={() => router.push(`/inventory/${item.id}`)}>
-                    <span className="text-xs font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(item.salePrice)}</span>
-                    <span className="text-[11px] font-mono tabular-nums text-muted-foreground">Cost {formatMoney(item.purchasePrice)}</span>
-                  </div>
-
-                  {/* Value */}
-                  <div className="hidden lg:block text-right w-24" onClick={() => router.push(`/inventory/${item.id}`)}>
-                    <p className="text-xs font-mono tabular-nums font-medium">{formatMoney(item.quantityOnHand * item.purchasePrice)}</p>
-                    <p className="text-[11px] text-muted-foreground">value</p>
-                  </div>
-
-                  <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" onClick={() => router.push(`/inventory/${item.id}`)} />
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Stock bar */}
+                <div className="hidden sm:flex flex-col items-end gap-1 w-24">
+                  <span className={cn("text-xs font-mono tabular-nums font-medium", isLow ? "text-amber-600 dark:text-amber-400" : "")}>
+                    {item.quantityOnHand}
+                  </span>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all", isLow ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${stockPercent}%` }} />
+                  </div>
+                </div>
+
+                {/* Prices */}
+                <div className="hidden md:flex flex-col items-end gap-0.5 w-24">
+                  <span className="text-xs font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(item.salePrice)}</span>
+                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">Cost {formatMoney(item.purchasePrice)}</span>
+                </div>
+
+                {/* Value */}
+                <div className="hidden lg:block text-right w-24">
+                  <p className="text-xs font-mono tabular-nums font-medium">{formatMoney(item.quantityOnHand * item.purchasePrice)}</p>
+                  <p className="text-[11px] text-muted-foreground">value</p>
+                </div>
+
+                {!selectMode && (
+                  <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+                )}
+              </div>
+            );
+          })}
 
           {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-1" />
+          <div ref={sentinelRef} className="h-1 border-none" />
 
           {loadingMore && (
-            <div className="flex items-center justify-center py-4 border-t">
+            <div className="flex items-center justify-center py-4">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
               <span className="ml-2 text-xs text-muted-foreground">Loading more...</span>
             </div>
           )}
 
           {!hasMore && items.length > 0 && (
-            <div className="py-3 text-center border-t">
+            <div className="py-3 text-center">
               <span className="text-[11px] text-muted-foreground">
                 Showing all {items.length} item{items.length !== 1 ? "s" : ""}
               </span>
