@@ -1,0 +1,26 @@
+Date,Description,Amount,Balance,Reference
+2026-03-01,Opening Balance,0.00,15420.50,
+2026-03-02,Invoice Payment - Acme Corp,2500.00,17920.50,INV-2026-001
+2026-03-03,Stripe Payout - February Sales,4830.75,22751.25,po_3N8xK2
+2026-03-04,Office Supplies - Staples,-187.32,22563.93,TXN-44821
+2026-03-05,AWS Monthly - Cloud Hosting,-349.99,22213.94,aws-inv-8812
+2026-03-06,Payroll - March 1st,-8750.00,13463.94,PAY-2026-03A
+2026-03-07,Invoice Payment - Widget Co,1200.00,14663.94,INV-2026-003
+2026-03-08,Google Workspace,-72.00,14591.94,GWS-20260308
+2026-03-10,Client Deposit - Johnson LLC,5000.00,19591.94,DEP-0042
+2026-03-11,Rent Payment - 123 Main St,-3200.00,16391.94,RENT-MAR26
+2026-03-12,Insurance Premium - Quarterly,-1450.00,14941.94,INS-Q1-2026
+2026-03-13,Invoice Payment - DataFlow Inc,3750.00,18691.94,INV-2026-005
+2026-03-14,Uber Eats - Team Lunch,-89.47,18602.47,UE-88431
+2026-03-15,Adobe Creative Cloud,-54.99,18547.48,ADOBE-MAR26
+2026-03-17,Transfer from Savings,2000.00,20547.48,INT-TRF-0019
+2026-03-18,Payroll - March 15th,-8750.00,11797.48,PAY-2026-03B
+2026-03-19,Invoice Payment - TechStart,1850.00,13647.48,INV-2026-007
+2026-03-20,Zoom Pro Monthly,-14.99,13632.49,ZM-20260320
+2026-03-21,Client Refund - Widget Co,-300.00,13332.49,REF-2026-001
+2026-03-22,Consulting Fee - Parker & Assoc,6200.00,19532.49,INV-2026-009
+2026-03-24,Utility Payment - Electric,-234.18,19298.31,UTIL-E-MAR
+2026-03-25,Stripe Payout - March Sales,3920.50,23218.81,po_4M9yL3
+2026-03-26,Equipment Lease Payment,-850.00,22368.81,LEASE-MAR26
+2026-03-27,Invoice Payment - GreenTech,4100.00,26468.81,INV-2026-011
+2026-03-28,Bank Service Fee,-35.00,26433.81,FEE-MAR26

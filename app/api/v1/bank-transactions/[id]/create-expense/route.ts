@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, expenseClaim, expenseItem } from "@/lib/db/schema";
+import { bankTransaction, bankAccount, expenseClaim, expenseItem, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -100,6 +100,15 @@ export async function POST(
       .update(bankTransaction)
       .set({ status: "reconciled" })
       .where(eq(bankTransaction.id, id));
+
+    await db.insert(auditLog).values({
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      action: "created_expense",
+      entityType: "bank_transaction",
+      entityId: id,
+      changes: { expenseClaimId: created.id, amount: totalAmount },
+    });
 
     return NextResponse.json({ expenseClaim: created }, { status: 201 });
   } catch (err) {

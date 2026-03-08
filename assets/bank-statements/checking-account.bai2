@@ -1,0 +1,30 @@
+01,TESTBANK,DUBBL,260328,1200,001,80,1,2/
+02,TESTBANK,074000010,1,260301,1200,,2/
+03,1234567890,USD,010,1542050,,,015,2643381,,,/
+16,195,250000,0,0,INV-2026-001,,Invoice Payment - Acme Corp/
+16,195,483075,0,0,po_3N8xK2,,Stripe Payout - February Sales/
+16,495,18732,0,0,TXN-44821,,Office Supplies - Staples/
+16,495,34999,0,0,aws-inv-8812,,AWS Monthly - Cloud Hosting/
+16,495,875000,0,0,PAY-2026-03A,,Payroll - March 1st/
+16,195,120000,0,0,INV-2026-003,,Invoice Payment - Widget Co/
+16,495,7200,0,0,GWS-20260308,,Google Workspace/
+16,195,500000,0,0,DEP-0042,,Client Deposit - Johnson LLC/
+16,495,320000,0,0,RENT-MAR26,,Rent Payment - 123 Main St/
+16,495,145000,0,0,INS-Q1-2026,,Insurance Premium - Quarterly/
+16,195,375000,0,0,INV-2026-005,,Invoice Payment - DataFlow Inc/
+16,495,8947,0,0,UE-88431,,Uber Eats - Team Lunch/
+16,495,5499,0,0,ADOBE-MAR26,,Adobe Creative Cloud/
+16,195,200000,0,0,INT-TRF-0019,,Transfer from Savings/
+16,495,875000,0,0,PAY-2026-03B,,Payroll - March 15th/
+16,195,185000,0,0,INV-2026-007,,Invoice Payment - TechStart/
+16,495,1499,0,0,ZM-20260320,,Zoom Pro Monthly/
+16,495,30000,0,0,REF-2026-001,,Client Refund - Widget Co/
+16,195,620000,0,0,INV-2026-009,,Consulting Fee - Parker & Assoc/
+16,495,23418,0,0,UTIL-E-MAR,,Utility Payment - Electric/
+16,195,392050,0,0,po_4M9yL3,,Stripe Payout - March Sales/
+16,495,85000,0,0,LEASE-MAR26,,Equipment Lease Payment/
+16,195,410000,0,0,INV-2026-011,,Invoice Payment - GreenTech/
+16,495,3500,0,0,FEE-MAR26,,Bank Service Fee/
+49,2643381,24/
+98,2643381,1,26/
+99,2643381,1,28/

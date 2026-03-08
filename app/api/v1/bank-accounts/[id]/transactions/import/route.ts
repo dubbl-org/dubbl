@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankAccount } from "@/lib/db/schema";
+import { bankAccount, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -91,6 +91,21 @@ export async function POST(
       content,
       format: body.format,
       mapping: body.mapping,
+    });
+
+    await db.insert(auditLog).values({
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      action: "imported_statement",
+      entityType: "bank_account",
+      entityId: id,
+      changes: {
+        importId: result.importId,
+        format: result.format,
+        fileName: body.fileName,
+        imported: result.imported,
+        duplicates: result.duplicateCount,
+      },
     });
 
     return NextResponse.json({ import: result }, { status: 201 });

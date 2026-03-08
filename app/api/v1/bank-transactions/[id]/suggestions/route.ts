@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, auditLog } from "@/lib/db/schema";
+import { bankTransaction, bankAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { suggestAccounts } from "@/lib/banking/account-suggestions";
 
-export async function POST(
+export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -16,15 +17,11 @@ export async function POST(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:banking");
 
-    // Find the transaction and verify ownership through bank account
     const transaction = await db.query.bankTransaction.findFirst({
       where: eq(bankTransaction.id, id),
-      with: { bankAccount: true },
     });
-
     if (!transaction) return notFound("Bank transaction");
 
-    // Verify the bank account belongs to this organization
     const account = await db.query.bankAccount.findFirst({
       where: and(
         eq(bankAccount.id, transaction.bankAccountId),
@@ -32,34 +29,14 @@ export async function POST(
         notDeleted(bankAccount.deletedAt)
       ),
     });
-
     if (!account) return notFound("Bank transaction");
 
-    if (transaction.status === "reconciled") {
-      return NextResponse.json(
-        { error: "Cannot exclude a reconciled transaction" },
-        { status: 400 }
-      );
-    }
+    const suggestions = await suggestAccounts(
+      transaction.bankAccountId,
+      transaction.description
+    );
 
-    const newStatus = transaction.status === "excluded" ? "unreconciled" : "excluded";
-
-    const [updated] = await db
-      .update(bankTransaction)
-      .set({ status: newStatus })
-      .where(eq(bankTransaction.id, id))
-      .returning();
-
-    await db.insert(auditLog).values({
-      organizationId: ctx.organizationId,
-      userId: ctx.userId,
-      action: newStatus === "excluded" ? "excluded" : "restored",
-      entityType: "bank_transaction",
-      entityId: id,
-      changes: { previousStatus: transaction.status },
-    });
-
-    return NextResponse.json({ transaction: updated });
+    return NextResponse.json({ suggestions });
   } catch (err) {
     return handleError(err);
   }

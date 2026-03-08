@@ -27,6 +27,10 @@ import {
   inventoryItem,
   expenseClaim,
   expenseItem,
+  payment,
+  paymentAllocation,
+  recurringTemplate,
+  recurringTemplateLine,
 } from "./schema";
 import bcrypt from "bcryptjs";
 
@@ -403,6 +407,7 @@ async function seed() {
     { contact: 8, number: "INV-00010", date: "2026-02-25", due: "2026-03-27", status: "draft" as const, desc: "Cloud Architecture", qty: 100, price: 450000, paid: 0 },
   ];
 
+  const invoiceIds: { id: string; contactIdx: number; status: string; paid: number; total: number }[] = [];
   for (const inv of invoiceData) {
     const lineAmount = (inv.qty / 100) * inv.price;
     const [row] = await db
@@ -432,6 +437,7 @@ async function seed() {
       accountId: accountMap.get("4010")!,
       sortOrder: 0,
     });
+    invoiceIds.push({ id: row.id, contactIdx: inv.contact, status: inv.status, paid: inv.paid, total: lineAmount });
   }
   console.log(`  ${invoiceData.length} invoices`);
 
@@ -450,6 +456,7 @@ async function seed() {
     { contact: 12, number: "BILL-00010", date: "2026-02-01", due: "2026-02-02", status: "paid" as const, desc: "Rent February", amount: 350000, paid: 350000 },
   ];
 
+  const billIds: { id: string; contactIdx: number; status: string; paid: number }[] = [];
   for (const b of billData) {
     const [row] = await db
       .insert(bill)
@@ -478,6 +485,7 @@ async function seed() {
       accountId: accountMap.get("5000")!,
       sortOrder: 0,
     });
+    billIds.push({ id: row.id, contactIdx: b.contact, status: b.status, paid: b.paid });
   }
   console.log(`  ${billData.length} bills`);
 
@@ -555,6 +563,104 @@ async function seed() {
     });
   }
   console.log(`  3 bank accounts, ${bankTxns.length} transactions`);
+
+  // 11b. Payments (received for paid invoices, made for paid bills)
+  console.log("Creating payments...");
+  let payNum = 1;
+
+  // Received payments for paid/partial invoices
+  for (const inv of invoiceIds.filter((i) => i.paid > 0)) {
+    const [p] = await db
+      .insert(payment)
+      .values({
+        organizationId: org.id,
+        contactId: contactIds[inv.contactIdx],
+        paymentNumber: `PAY-R${String(payNum++).padStart(4, "0")}`,
+        type: "received",
+        date: "2026-01-25",
+        amount: inv.paid,
+        method: payNum % 2 === 0 ? "bank_transfer" : "card",
+        reference: `REF-${payNum}`,
+        bankAccountId: checkingBank.id,
+        currencyCode: "USD",
+        createdBy: demoUser.id,
+      })
+      .returning();
+
+    await db.insert(paymentAllocation).values({
+      paymentId: p.id,
+      documentType: "invoice",
+      documentId: inv.id,
+      amount: inv.paid,
+    });
+  }
+
+  // Made payments for paid bills
+  for (const b of billIds.filter((b) => b.paid > 0)) {
+    const [p] = await db
+      .insert(payment)
+      .values({
+        organizationId: org.id,
+        contactId: contactIds[b.contactIdx],
+        paymentNumber: `PAY-M${String(payNum++).padStart(4, "0")}`,
+        type: "made",
+        date: "2026-02-01",
+        amount: b.paid,
+        method: "bank_transfer",
+        reference: `CHK-${payNum}`,
+        bankAccountId: checkingBank.id,
+        currencyCode: "USD",
+        createdBy: demoUser.id,
+      })
+      .returning();
+
+    await db.insert(paymentAllocation).values({
+      paymentId: p.id,
+      documentType: "bill",
+      documentId: b.id,
+      amount: b.paid,
+    });
+  }
+  console.log(`  ${payNum - 1} payments`);
+
+  // 11c. Recurring Templates
+  console.log("Creating recurring templates...");
+  const recurringData = [
+    { name: "Monthly Retainer - Metro Services", type: "invoice", contactIdx: 4, freq: "monthly" as const, desc: "Monthly Retainer", price: 300000 },
+    { name: "Quarterly Consulting - Pinnacle", type: "invoice", contactIdx: 5, freq: "quarterly" as const, desc: "Quarterly Consulting", price: 600000 },
+    { name: "Monthly Rent", type: "bill", contactIdx: 12, freq: "monthly" as const, desc: "Office Rent", price: 350000 },
+    { name: "Monthly AWS", type: "bill", contactIdx: 11, freq: "monthly" as const, desc: "Cloud Hosting", price: 48000 },
+  ];
+
+  for (const rt of recurringData) {
+    const [tmpl] = await db
+      .insert(recurringTemplate)
+      .values({
+        organizationId: org.id,
+        name: rt.name,
+        type: rt.type,
+        contactId: contactIds[rt.contactIdx],
+        frequency: rt.freq,
+        startDate: "2026-01-01",
+        nextRunDate: "2026-03-01",
+        lastRunDate: "2026-02-01",
+        occurrencesGenerated: 2,
+        status: "active",
+        currencyCode: "USD",
+        createdBy: demoUser.id,
+      })
+      .returning();
+
+    await db.insert(recurringTemplateLine).values({
+      templateId: tmpl.id,
+      description: rt.desc,
+      quantity: 100,
+      unitPrice: rt.price,
+      accountId: accountMap.get(rt.type === "invoice" ? "4010" : "5200")!,
+      sortOrder: 0,
+    });
+  }
+  console.log(`  ${recurringData.length} recurring templates`);
 
   // 12. Budget
   console.log("Creating budget...");

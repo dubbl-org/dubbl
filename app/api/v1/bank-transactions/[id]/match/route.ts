@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, bill, payment, paymentAllocation } from "@/lib/db/schema";
+import { bankTransaction, bankAccount, bill, invoice, payment, paymentAllocation, auditLog } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -99,7 +99,39 @@ export async function GET(
       });
     }
 
-    // For incoming transactions, we could match against invoices but that's for sales
+    // For incoming transactions, match against open invoices
+    const openInvoices = await db.query.invoice.findMany({
+      where: and(
+        eq(invoice.organizationId, ctx.organizationId),
+        notDeleted(invoice.deletedAt),
+        inArray(invoice.status, ["sent", "partial", "overdue"])
+      ),
+      with: { contact: true },
+      limit: 50,
+    });
+
+    const invoiceCandidates: MatchCandidate[] = openInvoices.map((inv) => ({
+      type: "invoice" as const,
+      id: inv.id,
+      date: inv.dueDate,
+      description: `${inv.invoiceNumber} - ${inv.contact?.name || "Unknown"}`,
+      amount: inv.amountDue,
+      reference: inv.reference || inv.invoiceNumber,
+    }));
+
+    const invoiceMatches = findMatches(
+      {
+        id: transaction.id,
+        date: transaction.date,
+        description: transaction.description,
+        amount: transaction.amount,
+        reference: transaction.reference,
+      },
+      invoiceCandidates,
+      [],
+      []
+    );
+
     return NextResponse.json({
       transaction: {
         id: transaction.id,
@@ -108,7 +140,16 @@ export async function GET(
         amount: transaction.amount,
         reference: transaction.reference,
       },
-      suggestedMatches: [],
+      suggestedMatches: invoiceMatches,
+      openInvoices: openInvoices.map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        contactName: inv.contact?.name || "Unknown",
+        dueDate: inv.dueDate,
+        total: inv.total,
+        amountDue: inv.amountDue,
+        status: inv.status,
+      })),
       openBills: [],
     });
   } catch (err) {
@@ -116,12 +157,15 @@ export async function GET(
   }
 }
 
-// POST: Match a bank transaction to a bill (record payment + reconcile)
+// POST: Match a bank transaction to a bill or invoice (record payment + reconcile)
 const matchSchema = z.object({
-  billId: z.string().min(1),
+  billId: z.string().min(1).optional(),
+  invoiceId: z.string().min(1).optional(),
   amount: z.number().int().min(1), // cents
   date: z.string().min(1),
   method: z.enum(["bank_transfer", "cash", "check", "card", "other"]).default("bank_transfer"),
+}).refine((data) => data.billId || data.invoiceId, {
+  message: "Either billId or invoiceId must be provided",
 });
 
 export async function POST(
@@ -155,10 +199,95 @@ export async function POST(
       return NextResponse.json({ error: "Transaction already reconciled" }, { status: 400 });
     }
 
-    // Verify bill
+    const isInvoiceMatch = !!parsed.invoiceId;
+    const documentId = (isInvoiceMatch ? parsed.invoiceId : parsed.billId)!;
+
+    if (isInvoiceMatch) {
+      // Match to invoice (incoming payment)
+      const found = await db.query.invoice.findFirst({
+        where: and(
+          eq(invoice.id, documentId),
+          eq(invoice.organizationId, ctx.organizationId),
+          notDeleted(invoice.deletedAt)
+        ),
+      });
+      if (!found) return notFound("Invoice");
+      if (found.status === "draft" || found.status === "void") {
+        return NextResponse.json({ error: "Cannot record payment for this invoice status" }, { status: 400 });
+      }
+
+      const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
+
+      const [created] = await db
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: found.contactId,
+          paymentNumber,
+          type: "received",
+          date: parsed.date,
+          amount: parsed.amount,
+          method: parsed.method,
+          bankAccountId: account.id,
+          bankTransactionId: id,
+          createdBy: ctx.userId,
+        })
+        .returning();
+
+      await db.insert(paymentAllocation).values({
+        paymentId: created.id,
+        documentType: "invoice",
+        documentId,
+        amount: parsed.amount,
+      });
+
+      const je = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        { type: "invoice", reference: paymentNumber, amount: parsed.amount, date: parsed.date }
+      );
+      if (je) {
+        await db.update(payment).set({ journalEntryId: je.id }).where(eq(payment.id, created.id));
+      }
+
+      const newAmountPaid = found.amountPaid + parsed.amount;
+      const newAmountDue = found.total - newAmountPaid;
+      const newStatus = newAmountDue <= 0 ? "paid" : "partial";
+
+      await db
+        .update(invoice)
+        .set({
+          amountPaid: newAmountPaid,
+          amountDue: Math.max(0, newAmountDue),
+          status: newStatus,
+          paidAt: newStatus === "paid" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(invoice.id, documentId));
+
+      await db
+        .update(bankTransaction)
+        .set({ status: "reconciled", journalEntryId: je?.id || null })
+        .where(eq(bankTransaction.id, id));
+
+      await db.insert(auditLog).values({
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        action: "matched_invoice",
+        entityType: "bank_transaction",
+        entityId: id,
+        changes: { invoiceId: documentId, paymentId: created.id, amount: parsed.amount },
+      });
+
+      return NextResponse.json({
+        payment: { id: created.id, paymentNumber },
+        invoiceStatus: newStatus,
+      });
+    }
+
+    // Match to bill (outgoing payment)
     const found = await db.query.bill.findFirst({
       where: and(
-        eq(bill.id, parsed.billId),
+        eq(bill.id, documentId),
         eq(bill.organizationId, ctx.organizationId),
         notDeleted(bill.deletedAt)
       ),
@@ -168,7 +297,6 @@ export async function POST(
       return NextResponse.json({ error: "Cannot record payment for this bill status" }, { status: 400 });
     }
 
-    // Generate payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
     const [created] = await db
@@ -187,15 +315,13 @@ export async function POST(
       })
       .returning();
 
-    // Create allocation
     await db.insert(paymentAllocation).values({
       paymentId: created.id,
       documentType: "bill",
-      documentId: parsed.billId,
+      documentId,
       amount: parsed.amount,
     });
 
-    // Create journal entry
     const journalEntry = await createPaymentJournalEntry(
       { organizationId: ctx.organizationId, userId: ctx.userId },
       { type: "bill", reference: paymentNumber, amount: parsed.amount, date: parsed.date }
@@ -204,7 +330,6 @@ export async function POST(
       await db.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
     }
 
-    // Update bill amounts
     const newAmountPaid = found.amountPaid + parsed.amount;
     const newAmountDue = found.total - newAmountPaid;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
@@ -218,16 +343,21 @@ export async function POST(
         paidAt: newStatus === "paid" ? new Date() : null,
         updatedAt: new Date(),
       })
-      .where(eq(bill.id, parsed.billId));
+      .where(eq(bill.id, documentId));
 
-    // Mark bank transaction as reconciled
     await db
       .update(bankTransaction)
-      .set({
-        status: "reconciled",
-        journalEntryId: journalEntry?.id || null,
-      })
+      .set({ status: "reconciled", journalEntryId: journalEntry?.id || null })
       .where(eq(bankTransaction.id, id));
+
+    await db.insert(auditLog).values({
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      action: "matched_bill",
+      entityType: "bank_transaction",
+      entityId: id,
+      changes: { billId: documentId, paymentId: created.id, amount: parsed.amount },
+    });
 
     return NextResponse.json({
       payment: { id: created.id, paymentNumber },

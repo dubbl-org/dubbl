@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bankTransaction, bankAccount, auditLog } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { z } from "zod";
 
-const reconcileSchema = z.object({
-  reconciliationId: z.string().nullable().optional(),
-  journalEntryId: z.string().nullable().optional(),
-});
-
-export async function POST(
+export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -41,39 +35,31 @@ export async function POST(
 
     if (!account) return notFound("Bank transaction");
 
-    if (transaction.status === "reconciled") {
-      return NextResponse.json(
-        { error: "Transaction is already reconciled" },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const parsed = reconcileSchema.parse(body);
-
-    const [updated] = await db
-      .update(bankTransaction)
-      .set({
-        status: "reconciled",
-        reconciliationId: parsed.reconciliationId || null,
-        journalEntryId: parsed.journalEntryId || null,
-      })
-      .where(eq(bankTransaction.id, id))
-      .returning();
-
-    await db.insert(auditLog).values({
-      organizationId: ctx.organizationId,
-      userId: ctx.userId,
-      action: "reconciled",
-      entityType: "bank_transaction",
-      entityId: id,
-      changes: {
-        previousStatus: transaction.status,
-        reconciliationId: parsed.reconciliationId || null,
+    // Query audit log for this transaction
+    const entries = await db.query.auditLog.findMany({
+      where: and(
+        eq(auditLog.entityType, "bank_transaction"),
+        eq(auditLog.entityId, id)
+      ),
+      orderBy: desc(auditLog.createdAt),
+      with: {
+        user: true,
       },
     });
 
-    return NextResponse.json({ transaction: updated });
+    const activity = entries.map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      changes: entry.changes,
+      user: {
+        id: entry.user.id,
+        name: entry.user.name,
+        email: entry.user.email,
+      },
+      createdAt: entry.createdAt,
+    }));
+
+    return NextResponse.json({ activity });
   } catch (err) {
     return handleError(err);
   }

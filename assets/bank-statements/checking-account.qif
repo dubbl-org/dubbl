@@ -1,0 +1,133 @@
+!Type:Bank
+D03/02/2026
+T2500.00
+PInvoice Payment - Acme Corp
+MINV-2026-001
+NINV-2026-001
+^
+D03/03/2026
+T4830.75
+PStripe Payout - February Sales
+Mpo_3N8xK2
+Npo_3N8xK2
+^
+D03/04/2026
+T-187.32
+POffice Supplies - Staples
+MTXN-44821
+NTXN-44821
+^
+D03/05/2026
+T-349.99
+PAWS Monthly - Cloud Hosting
+Maws-inv-8812
+Naws-inv-8812
+^
+D03/06/2026
+T-8750.00
+PPayroll - March 1st
+MPAY-2026-03A
+NPAY-2026-03A
+^
+D03/07/2026
+T1200.00
+PInvoice Payment - Widget Co
+MINV-2026-003
+NINV-2026-003
+^
+D03/08/2026
+T-72.00
+PGoogle Workspace
+MGWS-20260308
+NGWS-20260308
+^
+D03/10/2026
+T5000.00
+PClient Deposit - Johnson LLC
+MDEP-0042
+NDEP-0042
+^
+D03/11/2026
+T-3200.00
+PRent Payment - 123 Main St
+MRENT-MAR26
+NRENT-MAR26
+^
+D03/12/2026
+T-1450.00
+PInsurance Premium - Quarterly
+MINS-Q1-2026
+NINS-Q1-2026
+^
+D03/13/2026
+T3750.00
+PInvoice Payment - DataFlow Inc
+MINV-2026-005
+NINV-2026-005
+^
+D03/14/2026
+T-89.47
+PUber Eats - Team Lunch
+MUE-88431
+NUE-88431
+^
+D03/15/2026
+T-54.99
+PAdobe Creative Cloud
+MADOBE-MAR26
+NADOBE-MAR26
+^
+D03/17/2026
+T2000.00
+PTransfer from Savings
+MINT-TRF-0019
+NINT-TRF-0019
+^
+D03/18/2026
+T-8750.00
+PPayroll - March 15th
+MPAY-2026-03B
+NPAY-2026-03B
+^
+D03/19/2026
+T1850.00
+PInvoice Payment - TechStart
+MINV-2026-007
+NINV-2026-007
+^
+D03/20/2026
+T-14.99
+PZoom Pro Monthly
+MZM-20260320
+NZM-20260320
+^
+D03/21/2026
+T-300.00
+PClient Refund - Widget Co
+MREF-2026-001
+NREF-2026-001
+^
+D03/22/2026
+T6200.00
+PConsulting Fee - Parker & Assoc
+MINV-2026-009
+NINV-2026-009
+^
+D03/25/2026
+T3920.50
+PStripe Payout - March Sales
+Mpo_4M9yL3
+Npo_4M9yL3
+^
+D03/27/2026
+T4100.00
+PInvoice Payment - GreenTech
+MINV-2026-011
+NINV-2026-011
+^
+D03/28/2026
+T-35.00
+PBank Service Fee
+MFEE-MAR26
+NFEE-MAR26
+^
