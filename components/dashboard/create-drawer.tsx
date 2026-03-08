@@ -18,6 +18,8 @@ import {
   CreditCard,
   RefreshCw,
   Landmark,
+  Warehouse,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sheet,
@@ -46,7 +48,7 @@ import { FileUploader } from "@/components/dashboard/file-uploader";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -86,6 +88,8 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <RecurringDrawer open={activeType === "recurring"} onClose={close} />
       <AccountDrawer open={activeType === "account"} onClose={close} />
       <BankAccountDrawer open={activeType === "bankAccount"} onClose={close} />
+      <WarehouseDrawer open={activeType === "warehouse"} onClose={close} />
+      <StockTakeDrawer open={activeType === "stockTake"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -2564,6 +2568,160 @@ function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Account" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse Drawer
+// ---------------------------------------------------------------------------
+function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/warehouses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          code: form.get("code"),
+          address: form.get("address") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create warehouse");
+      }
+      toast.success("Warehouse created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("refetch-warehouses"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create warehouse");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Warehouse className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Warehouse</SheetTitle>
+              <SheetDescription>Add a warehouse location for inventory tracking.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Warehouse Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-wh-name">Name *</Label>
+                  <Input id="drawer-wh-name" name="name" required placeholder="Main Warehouse" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-wh-code">Code *</Label>
+                  <Input id="drawer-wh-code" name="code" required placeholder="WH-001" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Location</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-wh-address">Address</Label>
+                <Textarea id="drawer-wh-address" name="address" placeholder="Street address, city, country..." rows={3} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Warehouse" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stock Take Drawer
+// ---------------------------------------------------------------------------
+function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/stock-takes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          notes: form.get("notes") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create stock take");
+      }
+      toast.success("Stock take created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("refetch-stock-takes"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create stock take");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><ClipboardList className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Stock Take</SheetTitle>
+              <SheetDescription>Create a physical inventory count to reconcile stock levels.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-st-name">Name *</Label>
+                <Input id="drawer-st-name" name="name" required placeholder="e.g. Q1 2026 Full Count" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea name="notes" placeholder="Optional notes about this stock take..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Stock Take" />
         </form>
       </SheetContent>
     </Sheet>

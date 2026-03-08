@@ -76,7 +76,7 @@ const LABELS: Record<string, string> = {
   team: "Team",
 };
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake";
 
 const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
@@ -94,6 +94,9 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   contacts: { label: "New Contact", drawer: "contact" },
   projects: { label: "New Project", drawer: "project" },
   inventory: { label: "New Item", drawer: "inventory" },
+  "inventory/stock-takes": { label: "New Stock Take", drawer: "stockTake" },
+  "inventory/warehouses": { label: "New Warehouse", drawer: "warehouse" },
+  "inventory/valuation": null,
   "payroll/employees": { label: "New Employee", drawer: "employee" },
 };
 
