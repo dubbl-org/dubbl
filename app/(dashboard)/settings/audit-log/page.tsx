@@ -130,15 +130,6 @@ const ENTITY_TYPES = [
   { value: "credit_note", label: "Credit Note" },
 ];
 
-const ACTIONS = [
-  { value: "create", label: "Create" },
-  { value: "update", label: "Update" },
-  { value: "delete", label: "Delete" },
-  { value: "post", label: "Post" },
-  { value: "void", label: "Void" },
-  { value: "approve", label: "Approve" },
-  { value: "send", label: "Send" },
-];
 
 function formatEntityType(type: string): string {
   return type.replace(/_/g, " ");
@@ -267,9 +258,22 @@ export default function AuditLogPage() {
 
   return (
     <ContentReveal className="space-y-5">
-          {/* Quick stats */}
-          <div className="flex flex-wrap items-center gap-3">
-            {Object.entries(actionCounts).slice(0, 5).map(([action, count]) => {
+          {/* Action toggle pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActionFilter("all")}
+              className={cn(
+                "rounded-md px-2.5 py-1.5 text-xs transition-colors",
+                actionFilter === "all"
+                  ? "bg-foreground text-background font-medium"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              All
+              <span className="ml-1.5 font-mono tabular-nums text-[10px] opacity-60">{totalCount}</span>
+            </button>
+            {Object.entries(actionCounts).map(([action, count]) => {
               const config = getActionConfig(action);
               const Icon = config.icon;
               return (
@@ -278,23 +282,18 @@ export default function AuditLogPage() {
                   type="button"
                   onClick={() => setActionFilter(actionFilter === action ? "all" : action)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
+                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors",
                     actionFilter === action
-                      ? "border-foreground/20 bg-muted font-medium"
-                      : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "bg-foreground text-background font-medium"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
-                  <Icon className={cn("size-3", config.color)} />
+                  <Icon className={cn("size-3", actionFilter === action ? "text-background" : config.color)} />
                   <span className="capitalize">{action}</span>
-                  <span className="font-mono tabular-nums text-muted-foreground/70">{count}</span>
+                  <span className="font-mono tabular-nums text-[10px] opacity-60">{count}</span>
                 </button>
               );
             })}
-            {totalCount > 0 && (
-              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
-                {totalCount} total
-              </span>
-            )}
           </div>
 
           {/* Filter bar */}
@@ -316,17 +315,6 @@ export default function AuditLogPage() {
                 <SelectItem value="all">All entities</SelectItem>
                 {ENTITY_TYPES.map((t) => (
                   <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="h-8 w-36 text-xs">
-                <SelectValue placeholder="Action" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All actions</SelectItem>
-                {ACTIONS.map((a) => (
-                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
