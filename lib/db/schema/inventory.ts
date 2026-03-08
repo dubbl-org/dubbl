@@ -23,6 +23,7 @@ export const inventoryItem = pgTable(
     code: text("code").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    category: text("category"),
     sku: text("sku"),
     purchasePrice: integer("purchase_price").notNull().default(0), // cents
     salePrice: integer("sale_price").notNull().default(0), // cents

@@ -828,6 +828,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
+          category: form.get("category") || null,
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
@@ -876,9 +877,15 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
                   <Input id="drawer-inv-name" name="name" required placeholder="Item name" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="drawer-inv-sku">SKU</Label>
-                <Input id="drawer-inv-sku" name="sku" placeholder="Stock keeping unit" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-category">Category</Label>
+                  <Input id="drawer-inv-category" name="category" placeholder="e.g. Electronics" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-sku">SKU</Label>
+                  <Input id="drawer-inv-sku" name="sku" placeholder="Stock keeping unit" />
+                </div>
               </div>
             </div>
 
