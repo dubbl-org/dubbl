@@ -33,6 +33,10 @@ import {
   fixedAsset,
   payrollEmployee,
   inventoryItem,
+  warehouse,
+  inventoryMovement,
+  inventoryItemSupplier,
+  inventoryVariant,
   expenseClaim,
   expenseItem,
   payment,
@@ -1175,30 +1179,6 @@ async function seed() {
   }
   console.log(`  ${employees.length} employees`);
 
-  // 16. Inventory Items
-  console.log("Creating inventory items...");
-  const items = [
-    { code: "PROD-001", name: "Widget A", sku: "WA-100", purchase: 1500, sale: 2999, qty: 150, reorder: 25 },
-    { code: "PROD-002", name: "Widget B", sku: "WB-200", purchase: 2500, sale: 4999, qty: 75, reorder: 10 },
-    { code: "PROD-003", name: "Gadget X", sku: "GX-300", purchase: 5000, sale: 9999, qty: 30, reorder: 5 },
-    { code: "PROD-004", name: "Accessory Pack", sku: "AP-400", purchase: 500, sale: 1499, qty: 200, reorder: 50 },
-    { code: "PROD-005", name: "Premium Kit", sku: "PK-500", purchase: 8000, sale: 14999, qty: 8, reorder: 10 },
-  ];
-
-  for (const item of items) {
-    await db.insert(inventoryItem).values({
-      organizationId: org.id,
-      code: item.code,
-      name: item.name,
-      sku: item.sku,
-      purchasePrice: item.purchase,
-      salePrice: item.sale,
-      quantityOnHand: item.qty,
-      reorderPoint: item.reorder,
-    });
-  }
-  console.log(`  ${items.length} inventory items`);
-
   // 17. Expense Claims
   console.log("Creating expense claims...");
   const [claim1] = await db
@@ -1292,6 +1272,159 @@ async function seed() {
   ]);
   console.log("  2 expense claims");
   } // end if (!hasTransactionalData) - bills through expense claims
+
+  // 18. Inventory Items + Warehouses + Movements + Suppliers + Variants
+  const existingInventory = await db.query.inventoryItem.findFirst({
+    where: eq(inventoryItem.organizationId, org.id),
+  });
+
+  if (!existingInventory) {
+  console.log("Creating inventory...");
+
+  // Warehouses
+  const [mainWarehouse] = await db.insert(warehouse).values({
+    organizationId: org.id,
+    name: "Main Warehouse",
+    code: "WH-MAIN",
+    address: "123 Industrial Blvd, Suite 100",
+    isDefault: true,
+    isActive: true,
+  }).returning();
+
+  await db.insert(warehouse).values({
+    organizationId: org.id,
+    name: "East Distribution Center",
+    code: "WH-EAST",
+    address: "456 Logistics Way, Building B",
+    isDefault: false,
+    isActive: true,
+  });
+
+  console.log("  2 warehouses");
+
+  // Inventory items with categories
+  const items = [
+    { code: "ELEC-001", name: "Wireless Mouse", sku: "WM-100", category: "Electronics", purchase: 1200, sale: 2499, qty: 150, reorder: 25 },
+    { code: "ELEC-002", name: "USB-C Hub 7-Port", sku: "UH-200", category: "Electronics", purchase: 2800, sale: 5499, qty: 75, reorder: 15 },
+    { code: "ELEC-003", name: "Bluetooth Keyboard", sku: "BK-300", category: "Electronics", purchase: 3500, sale: 6999, qty: 42, reorder: 10 },
+    { code: "ELEC-004", name: "Webcam HD 1080p", sku: "WC-400", category: "Electronics", purchase: 4500, sale: 8999, qty: 28, reorder: 10 },
+    { code: "FURN-001", name: "Desk Organizer Set", sku: "DO-100", category: "Furniture", purchase: 1800, sale: 3499, qty: 60, reorder: 15 },
+    { code: "FURN-002", name: "Monitor Stand", sku: "MS-200", category: "Furniture", purchase: 2200, sale: 4499, qty: 35, reorder: 10 },
+    { code: "FURN-003", name: "Ergonomic Footrest", sku: "EF-300", category: "Furniture", purchase: 3200, sale: 5999, qty: 18, reorder: 8 },
+    { code: "SUPP-001", name: "Printer Paper A4 (500 sheets)", sku: "PP-100", category: "Supplies", purchase: 450, sale: 899, qty: 300, reorder: 50 },
+    { code: "SUPP-002", name: "Ink Cartridge Black", sku: "IC-200", category: "Supplies", purchase: 2000, sale: 3999, qty: 45, reorder: 20 },
+    { code: "SUPP-003", name: "Sticky Notes (12-Pack)", sku: "SN-300", category: "Supplies", purchase: 350, sale: 799, qty: 120, reorder: 30 },
+    { code: "TOOL-001", name: "Precision Screwdriver Kit", sku: "SK-100", category: "Tools", purchase: 1500, sale: 2999, qty: 55, reorder: 10 },
+    { code: "TOOL-002", name: "Cable Tester Pro", sku: "CT-200", category: "Tools", purchase: 6500, sale: 12999, qty: 12, reorder: 5 },
+    { code: "PKG-001", name: "Shipping Box (Medium)", sku: "SB-100", category: "Packaging", purchase: 150, sale: 349, qty: 500, reorder: 100 },
+    { code: "PKG-002", name: "Bubble Wrap Roll (50m)", sku: "BW-200", category: "Packaging", purchase: 800, sale: 1599, qty: 25, reorder: 10 },
+    { code: "ELEC-005", name: "Noise Cancelling Headphones", sku: "NH-500", category: "Electronics", purchase: 12000, sale: 24999, qty: 5, reorder: 8, inactive: true },
+  ];
+
+  const createdItems: { id: string; code: string; name: string; qty: number }[] = [];
+  for (const item of items) {
+    const [created] = await db.insert(inventoryItem).values({
+      organizationId: org.id,
+      code: item.code,
+      name: item.name,
+      sku: item.sku,
+      category: item.category,
+      purchasePrice: item.purchase,
+      salePrice: item.sale,
+      quantityOnHand: item.qty,
+      reorderPoint: item.reorder,
+      isActive: !("inactive" in item && item.inactive),
+    }).returning();
+    createdItems.push({ id: created.id, code: item.code, name: item.name, qty: item.qty });
+  }
+  console.log(`  ${items.length} inventory items`);
+
+  // Inventory movements (history for first few items)
+  const movementData = [
+    { itemIdx: 0, type: "initial" as const, qty: 100, prev: 0, reason: "Opening stock" },
+    { itemIdx: 0, type: "purchase" as const, qty: 50, prev: 100, reason: "PO-2026-001" },
+    { itemIdx: 0, type: "sale" as const, qty: -10, prev: 150, reason: "INV-2026-012" },
+    { itemIdx: 0, type: "adjustment" as const, qty: 10, prev: 140, reason: "Found miscounted in warehouse audit" },
+    { itemIdx: 1, type: "initial" as const, qty: 50, prev: 0, reason: "Opening stock" },
+    { itemIdx: 1, type: "purchase" as const, qty: 30, prev: 50, reason: "PO-2026-003" },
+    { itemIdx: 1, type: "sale" as const, qty: -5, prev: 80, reason: "INV-2026-018" },
+    { itemIdx: 2, type: "initial" as const, qty: 30, prev: 0, reason: "Opening stock" },
+    { itemIdx: 2, type: "purchase" as const, qty: 20, prev: 30, reason: "PO-2026-005" },
+    { itemIdx: 2, type: "sale" as const, qty: -8, prev: 50, reason: "INV-2026-022" },
+    { itemIdx: 3, type: "initial" as const, qty: 20, prev: 0, reason: "Opening stock" },
+    { itemIdx: 3, type: "purchase" as const, qty: 15, prev: 20, reason: "PO-2026-007" },
+    { itemIdx: 3, type: "sale" as const, qty: -7, prev: 35, reason: "INV-2026-025" },
+  ];
+
+  for (const m of movementData) {
+    const ci = createdItems[m.itemIdx];
+    await db.insert(inventoryMovement).values({
+      organizationId: org.id,
+      inventoryItemId: ci.id,
+      warehouseId: mainWarehouse.id,
+      type: m.type,
+      quantity: m.qty,
+      previousQuantity: m.prev,
+      newQuantity: m.prev + m.qty,
+      reason: m.reason,
+      createdBy: "seed",
+    });
+  }
+  console.log(`  ${movementData.length} inventory movements`);
+
+  // Link some suppliers (use existing contacts that are suppliers)
+  const supplierContacts = await db.query.contact.findMany({
+    where: eq(contact.organizationId, org.id),
+    limit: 3,
+  });
+
+  if (supplierContacts.length > 0) {
+    const supplierLinks = [
+      { itemIdx: 0, contactIdx: 0, code: "SUP-WM100", lead: 7, price: 1100, preferred: true },
+      { itemIdx: 1, contactIdx: 0, code: "SUP-UH200", lead: 10, price: 2600, preferred: true },
+      { itemIdx: 2, contactIdx: 1 % supplierContacts.length, code: "SUP-BK300", lead: 14, price: 3200, preferred: true },
+      { itemIdx: 0, contactIdx: 1 % supplierContacts.length, code: "ALT-WM100", lead: 21, price: 1250, preferred: false },
+    ];
+
+    for (const sl of supplierLinks) {
+      await db.insert(inventoryItemSupplier).values({
+        organizationId: org.id,
+        inventoryItemId: createdItems[sl.itemIdx].id,
+        contactId: supplierContacts[sl.contactIdx].id,
+        supplierCode: sl.code,
+        leadTimeDays: sl.lead,
+        purchasePrice: sl.price,
+        isPreferred: sl.preferred,
+      });
+    }
+    console.log(`  ${supplierLinks.length} supplier links`);
+  }
+
+  // Variants for a couple of items
+  const variantData = [
+    { itemIdx: 0, name: "Black", sku: "WM-100-BLK", purchase: 1200, sale: 2499, qty: 80, options: { Color: "Black" } as Record<string, string> },
+    { itemIdx: 0, name: "White", sku: "WM-100-WHT", purchase: 1200, sale: 2499, qty: 50, options: { Color: "White" } as Record<string, string> },
+    { itemIdx: 0, name: "Silver", sku: "WM-100-SLV", purchase: 1300, sale: 2699, qty: 20, options: { Color: "Silver" } as Record<string, string> },
+    { itemIdx: 2, name: "Compact", sku: "BK-300-CMP", purchase: 3000, sale: 5999, qty: 22, options: { Size: "Compact" } as Record<string, string> },
+    { itemIdx: 2, name: "Full Size", sku: "BK-300-FUL", purchase: 3500, sale: 6999, qty: 20, options: { Size: "Full" } as Record<string, string> },
+  ];
+
+  for (const v of variantData) {
+    await db.insert(inventoryVariant).values({
+      organizationId: org.id,
+      inventoryItemId: createdItems[v.itemIdx].id,
+      name: v.name,
+      sku: v.sku,
+      purchasePrice: v.purchase,
+      salePrice: v.sale,
+      quantityOnHand: v.qty,
+      options: v.options,
+    });
+  }
+  console.log(`  ${variantData.length} variants`);
+  } else {
+    console.log("\nInventory data already exists, skipping...");
+  }
 
   console.log(`\nSeed complete! Organization: ${org.name}`);
   process.exit(0);

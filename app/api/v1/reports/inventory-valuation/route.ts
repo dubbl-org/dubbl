@@ -41,6 +41,10 @@ export async function GET(request: Request) {
       const totalValue = item.quantityOnHand * item.salePrice;
       const margin = totalValue - totalCost;
 
+      const marginPercent = totalCost > 0
+        ? ((totalValue - totalCost) / totalCost) * 100
+        : 0;
+
       return {
         id: item.id,
         code: item.code,
@@ -52,23 +56,27 @@ export async function GET(request: Request) {
         salePrice: item.salePrice,
         totalValue,
         margin,
+        marginPercent,
       };
     });
 
     // Handle sorting by computed fields
-    if (sortBy === "totalCost" || sortBy === "totalValue") {
+    if (sortBy === "totalCost" || sortBy === "totalValue" || sortBy === "marginPercent") {
       const mul = sortOrder === "desc" ? -1 : 1;
       valuedItems.sort((a, b) => {
-        const key = sortBy as "totalCost" | "totalValue";
+        const key = sortBy as "totalCost" | "totalValue" | "marginPercent";
         return mul * (a[key] - b[key]);
       });
     }
 
+    const sumCost = valuedItems.reduce((sum, i) => sum + i.totalCost, 0);
+    const sumValue = valuedItems.reduce((sum, i) => sum + i.totalValue, 0);
+
     const summary = {
       totalItems: valuedItems.length,
-      totalCost: valuedItems.reduce((sum, i) => sum + i.totalCost, 0),
-      totalValue: valuedItems.reduce((sum, i) => sum + i.totalValue, 0),
-      totalMargin: valuedItems.reduce((sum, i) => sum + i.margin, 0),
+      totalCost: sumCost,
+      totalValue: sumValue,
+      totalMargin: sumCost > 0 ? ((sumValue - sumCost) / sumCost) * 100 : 0,
     };
 
     return NextResponse.json({ items: valuedItems, summary });

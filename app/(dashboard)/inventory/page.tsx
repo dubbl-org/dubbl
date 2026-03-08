@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import {
   Package,
@@ -20,9 +19,6 @@ import {
   PowerOff,
   Tag,
   Loader2,
-  ClipboardList,
-  Warehouse,
-  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -449,25 +445,6 @@ export default function InventoryPage() {
               </Tabs>
 
               <div className="flex items-center gap-2">
-                <Link href="/inventory/stock-takes">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
-                    <ClipboardList className="size-3" />
-                    <span className="hidden sm:inline">Stock Takes</span>
-                  </Button>
-                </Link>
-                <Link href="/inventory/warehouses">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
-                    <Warehouse className="size-3" />
-                    <span className="hidden sm:inline">Warehouses</span>
-                  </Button>
-                </Link>
-                <Link href="/inventory/valuation">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
-                    <BarChart3 className="size-3" />
-                    <span className="hidden sm:inline">Valuation</span>
-                  </Button>
-                </Link>
-                <div className="w-px h-5 bg-border" />
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
                   Select
                 </Button>
