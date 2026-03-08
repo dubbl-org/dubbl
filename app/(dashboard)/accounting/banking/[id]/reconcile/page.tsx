@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Sheet,
   SheetContent,
@@ -436,22 +437,22 @@ export default function ReconcilePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={recForm.startDate}
-                    onChange={(e) =>
-                      setRecForm({ ...recForm, startDate: e.target.value })
+                    onChange={(v) =>
+                      setRecForm({ ...recForm, startDate: v })
                     }
+                    placeholder="Select date"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>End Date</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={recForm.endDate}
-                    onChange={(e) =>
-                      setRecForm({ ...recForm, endDate: e.target.value })
+                    onChange={(v) =>
+                      setRecForm({ ...recForm, endDate: v })
                     }
+                    placeholder="Select date"
                   />
                 </div>
               </div>
