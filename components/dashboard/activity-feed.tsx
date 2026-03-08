@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 import {
   FileText,
   ArrowLeftRight,
@@ -18,6 +19,7 @@ import {
   Send,
   Check,
   XCircle,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -119,7 +121,7 @@ export function ActivityFeed() {
     const id = localStorage.getItem("activeOrgId");
     if (!id) return;
 
-    fetch("/api/v1/audit-log?limit=15", {
+    fetch("/api/v1/audit-log?limit=5", {
       headers: { "x-organization-id": id },
     })
       .then((r) => r.json())
@@ -145,17 +147,11 @@ export function ActivityFeed() {
   }, []);
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden flex flex-col max-h-[inherit]">
-      <div className="px-4 py-3 border-b shrink-0">
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="px-4 py-3 border-b">
         <h3 className="text-[13px] font-semibold">Recent Activity</h3>
-        {!loading && entries.length > 0 && (
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {entries.length} recent actions
-          </p>
-        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0">
       {loading ? (
         <ActivitySkeleton />
       ) : entries.length === 0 ? (
@@ -168,66 +164,76 @@ export function ActivityFeed() {
           </p>
         </div>
       ) : (
-        <div className="py-1">
-          {grouped.map((group, gi) => (
-            <div key={group.label}>
-              {/* Day label */}
-              <div className="px-4 pt-3 pb-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                  {group.label}
-                </p>
-              </div>
+        <>
+          <div className="py-1">
+            {grouped.map((group, gi) => (
+              <div key={group.label}>
+                {/* Day label */}
+                <div className="px-4 pt-3 pb-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {group.label}
+                  </p>
+                </div>
 
-              {/* Timeline entries */}
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-[29px] top-0 bottom-0 w-px bg-border" />
+                {/* Timeline entries */}
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-[29px] top-0 bottom-0 w-px bg-border" />
 
-                {group.items.map((entry, i) => {
-                  const EntityIcon = ENTITY_ICONS[entry.entityType] || ArrowLeftRight;
-                  const actionConfig = getActionConfig(entry.action);
-                  const ActionIcon = actionConfig.icon;
-                  const isLast = i === group.items.length - 1 && gi === grouped.length - 1;
+                  {group.items.map((entry, i) => {
+                    const EntityIcon = ENTITY_ICONS[entry.entityType] || ArrowLeftRight;
+                    const actionConfig = getActionConfig(entry.action);
+                    const ActionIcon = actionConfig.icon;
+                    const isLast = i === group.items.length - 1 && gi === grouped.length - 1;
 
-                  return (
-                    <div
-                      key={entry.id}
-                      className={cn(
-                        "relative flex items-start gap-3 px-4 py-2 transition-colors hover:bg-muted/30",
-                        isLast && "pb-3"
-                      )}
-                    >
-                      {/* Timeline dot */}
-                      <div className={cn(
-                        "relative z-10 flex size-6 shrink-0 items-center justify-center rounded-md ring-1",
-                        actionConfig.bg, actionConfig.color
-                      )}>
-                        <ActionIcon className="size-3" />
+                    return (
+                      <div
+                        key={entry.id}
+                        className={cn(
+                          "relative flex items-start gap-3 px-4 py-2 transition-colors hover:bg-muted/30",
+                          isLast && "pb-3"
+                        )}
+                      >
+                        {/* Timeline dot */}
+                        <div className={cn(
+                          "relative z-10 flex size-6 shrink-0 items-center justify-center rounded-md ring-1",
+                          actionConfig.bg, actionConfig.color
+                        )}>
+                          <ActionIcon className="size-3" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="text-[12px] leading-snug">
+                            <span className="font-medium">{entry.userName}</span>{" "}
+                            <span className="text-muted-foreground">{entry.action}</span>{" "}
+                            <span className="inline-flex items-center gap-1">
+                              <EntityIcon className="inline size-3 text-muted-foreground/60" />
+                              <span className="text-muted-foreground">{formatEntityType(entry.entityType)}</span>
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/50 mt-0.5 tabular-nums">
+                            {getRelativeTime(entry.createdAt)}
+                          </p>
+                        </div>
                       </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 pt-0.5">
-                        <p className="text-[12px] leading-snug">
-                          <span className="font-medium">{entry.userName}</span>{" "}
-                          <span className="text-muted-foreground">{entry.action}</span>{" "}
-                          <span className="inline-flex items-center gap-1">
-                            <EntityIcon className="inline size-3 text-muted-foreground/60" />
-                            <span className="text-muted-foreground">{formatEntityType(entry.entityType)}</span>
-                          </span>
-                        </p>
-                        <p className="text-[10px] text-muted-foreground/50 mt-0.5 tabular-nums">
-                          {getRelativeTime(entry.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {/* View all footer */}
+          <Link
+            href="/settings/audit-log"
+            className="flex items-center justify-center gap-1.5 border-t px-4 py-2.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/30"
+          >
+            View all activity
+            <ChevronRight className="size-3" />
+          </Link>
+        </>
       )}
-      </div>
     </div>
   );
 }
