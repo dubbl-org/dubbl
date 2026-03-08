@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import { Plus, FileText, X, Banknote, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -177,7 +178,7 @@ export default function InvoicesPage() {
   const [sortBy, setSortBy] = useState("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -185,12 +186,6 @@ export default function InvoicesPage() {
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   const columns = useMemo(() => buildColumns(), []);
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   const buildParams = useCallback((p: number) => {
     const params = new URLSearchParams();
@@ -529,7 +524,7 @@ export default function InvoicesPage() {
               variant="ghost"
               size="sm"
               className="h-8 text-xs text-muted-foreground"
-              onClick={() => { setSearch(""); setDebouncedSearch(""); setDateFrom(""); setDateTo(""); }}
+              onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); }}
             >
               <X className="mr-1 size-3" />
               Clear filters

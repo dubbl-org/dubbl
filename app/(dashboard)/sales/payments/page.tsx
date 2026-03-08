@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import Link from "next/link";
 import { ArrowLeft, Banknote, Search, X } from "lucide-react";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
@@ -117,7 +118,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [methodFilter, setMethodFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -125,12 +126,6 @@ export default function PaymentsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const columns = useMemo(() => buildColumns(), []);
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -321,7 +316,7 @@ export default function PaymentsPage() {
             variant="ghost"
             size="sm"
             className="h-8 text-xs text-muted-foreground"
-            onClick={() => { setSearch(""); setDebouncedSearch(""); setMethodFilter("all"); setDateFrom(""); setDateTo(""); }}
+            onClick={() => { setSearch(""); setMethodFilter("all"); setDateFrom(""); setDateTo(""); }}
           >
             <X className="mr-1 size-3" />
             Clear filters

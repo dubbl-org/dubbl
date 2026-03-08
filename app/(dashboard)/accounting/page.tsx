@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -109,16 +110,10 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("date:desc");
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -458,7 +453,6 @@ export default function TransactionsPage() {
                 className="h-8 text-xs text-muted-foreground"
                 onClick={() => {
                   setSearch("");
-                  setDebouncedSearch("");
                   setDateFrom("");
                   setDateTo("");
                 }}

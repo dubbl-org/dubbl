@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Plus, Search, Target, X } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -79,14 +80,9 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<Record<string, BudgetReport>>({});
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [loadingReports, setLoadingReports] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   const fetchData = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");

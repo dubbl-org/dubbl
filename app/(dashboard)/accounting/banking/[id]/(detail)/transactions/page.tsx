@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { Clock3, Search, X } from "lucide-react";
 import { motion } from "motion/react";
 import { Input } from "@/components/ui/input";
@@ -33,15 +34,10 @@ export default function BankTransactionsPage() {
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [txSearch, setTxSearch] = useState("");
-  const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
+  const debouncedTxSearch = useDebounce(txSearch);
   const [txDateFrom, setTxDateFrom] = useState("");
   const [txDateTo, setTxDateTo] = useState("");
   const [txSort, setTxSort] = useState("date:desc");
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedTxSearch(txSearch), 300);
-    return () => clearTimeout(t);
-  }, [txSearch]);
 
   const txSearchPending = txSearch !== debouncedTxSearch;
 

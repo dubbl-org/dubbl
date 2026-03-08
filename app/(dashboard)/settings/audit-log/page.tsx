@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import {
   Search,
   X,
@@ -169,7 +170,7 @@ export default function AuditLogPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [entityTypeFilter, setEntityTypeFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -178,12 +179,6 @@ export default function AuditLogPage() {
   const limit = 30;
   const [allEntries, setAllEntries] = useState<AuditEntry[]>([]);
   const [allTotal, setAllTotal] = useState(0);
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   // Reset page on filter change
   useEffect(() => {
@@ -348,7 +343,7 @@ export default function AuditLogPage() {
                 size="sm"
                 className="h-8 text-xs text-muted-foreground"
                 onClick={() => {
-                  setSearch(""); setDebouncedSearch("");
+                  setSearch("");
                   setEntityTypeFilter("all"); setActionFilter("all");
                   setDateFrom(""); setDateTo("");
                 }}

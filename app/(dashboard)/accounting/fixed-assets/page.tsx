@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import { Plus, Play, Search, X, Building2, TrendingDown, Package } from "lucide-react";
 import { toast } from "sonner";
@@ -194,17 +195,11 @@ export default function FixedAssetsPage() {
   const [refetching, setRefetching] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [runningDepreciation, setRunningDepreciation] = useState(false);
   const [fetchKey, setFetchKey] = useState(0);
 
   const columns = useMemo(() => buildColumns(), []);
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   // Fetch all assets (for counts) on mount
   useEffect(() => {
@@ -592,7 +587,6 @@ export default function FixedAssetsPage() {
               className="h-8 text-xs text-muted-foreground"
               onClick={() => {
                 setSearch("");
-                setDebouncedSearch("");
               }}
             >
               <X className="mr-1 size-3" />

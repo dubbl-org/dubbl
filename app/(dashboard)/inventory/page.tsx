@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
+import Link from "next/link";
+import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import {
   Package,
   AlertTriangle,
@@ -19,6 +20,9 @@ import {
   PowerOff,
   Tag,
   Loader2,
+  ClipboardList,
+  Warehouse,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -42,12 +46,13 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
-import { devDelay } from "@/lib/dev-delay";
+
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
 interface InventoryItem {
@@ -82,8 +87,9 @@ export default function InventoryPage() {
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
+  const [fetchKey, setFetchKey] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -102,18 +108,36 @@ export default function InventoryPage() {
   const [bulkAdjustment, setBulkAdjustment] = useState("");
   const [bulkAdjustReason, setBulkAdjustReason] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef(1);
 
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
 
-  const handleSearch = useCallback((value: string) => {
-    setSearch(value);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setDebouncedSearch(value), 300);
-  }, []);
+      if (e.key === "/" && !isInput) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        if (selectMode) {
+          setSelectMode(false);
+          setSelected(new Set());
+        } else if (document.activeElement === searchRef.current) {
+          searchRef.current?.blur();
+          if (search) setSearch("");
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectMode, search]);
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   const buildUrl = useCallback((page: number) => {
     const params = new URLSearchParams();
@@ -132,13 +156,15 @@ export default function InventoryPage() {
   // Initial + filter change fetch
   useEffect(() => {
     if (!orgId) return;
-    setLoading(true);
+    let cancelled = false;
+    const isRefetch = !loading;
+    if (isRefetch) setRefetching(true);
     pageRef.current = 1;
 
     fetch(buildUrl(1), { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
-      .then(async (data) => {
-        if (initialLoading) await devDelay();
+      .then((data) => {
+        if (cancelled) return;
         if (data.data) {
           setItems(data.data);
           setTotalCount(data.pagination?.total || 0);
@@ -147,8 +173,11 @@ export default function InventoryPage() {
         if (data.categories) setCategories(data.categories);
         if (data.summary) setSummary(data.summary);
       })
-      .finally(() => { setLoading(false); setInitialLoading(false); });
-  }, [orgId, debouncedSearch, tab, categoryFilter, sortBy, sortOrder, buildUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => { if (!cancelled) { setLoading(false); setRefetching(false); setFetchKey((k) => k + 1); } });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, debouncedSearch, tab, categoryFilter, sortBy, sortOrder, buildUrl]);
 
   // Load more (infinite scroll)
   const loadMore = useCallback(() => {
@@ -174,13 +203,13 @@ export default function InventoryPage() {
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loading) loadMore();
+        if (entries[0].isIntersecting && !refetching) loadMore();
       },
       { rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loadMore, loading]);
+  }, [loadMore, refetching]);
 
   // Stats from API summary (real DB aggregates, not just loaded items)
 
@@ -279,9 +308,11 @@ export default function InventoryPage() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
-  if (initialLoading) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
-  if (!loading && items.length === 0 && !debouncedSearch && tab === "all" && categoryFilter === "all") {
+  const pendingSearch = search !== debouncedSearch;
+
+  if (!refetching && !pendingSearch && items.length === 0 && !debouncedSearch && tab === "all" && categoryFilter === "all") {
     return (
       <ContentReveal>
         <EmptyState
@@ -298,7 +329,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border bg-card p-4">
@@ -418,6 +449,25 @@ export default function InventoryPage() {
               </Tabs>
 
               <div className="flex items-center gap-2">
+                <Link href="/inventory/stock-takes">
+                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
+                    <ClipboardList className="size-3" />
+                    <span className="hidden sm:inline">Stock Takes</span>
+                  </Button>
+                </Link>
+                <Link href="/inventory/warehouses">
+                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
+                    <Warehouse className="size-3" />
+                    <span className="hidden sm:inline">Warehouses</span>
+                  </Button>
+                </Link>
+                <Link href="/inventory/valuation">
+                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
+                    <BarChart3 className="size-3" />
+                    <span className="hidden sm:inline">Valuation</span>
+                  </Button>
+                </Link>
+                <div className="w-px h-5 bg-border" />
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
                   Select
                 </Button>
@@ -435,14 +485,15 @@ export default function InventoryPage() {
           <div className="relative flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
+              ref={searchRef}
               placeholder="Search by name, code, or SKU..."
               value={search}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-8 h-8 text-sm"
             />
             {search && (
               <button
-                onClick={() => handleSearch("")}
+                onClick={() => setSearch("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="size-3.5" />
@@ -484,7 +535,14 @@ export default function InventoryPage() {
       </div>
 
       {/* Item list */}
-      {!loading && items.length === 0 ? (
+      {refetching || pendingSearch ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="brand-loader" aria-label="Loading">
+            <div className="brand-loader-circle brand-loader-circle-1" />
+            <div className="brand-loader-circle brand-loader-circle-2" />
+          </div>
+        </div>
+      ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
             {tab === "low_stock" ? <AlertTriangle className="size-5 text-muted-foreground" /> : <Archive className="size-5 text-muted-foreground" />}
@@ -494,6 +552,14 @@ export default function InventoryPage() {
           </p>
         </div>
       ) : (
+        <MotionConfig reducedMotion="never">
+        <motion.div
+          key={fetchKey}
+          initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+          style={{ willChange: "opacity, transform, filter" }}
+        >
         <div className="rounded-xl border bg-card divide-y">
           {items.map((item) => {
             const isLow = item.quantityOnHand <= item.reorderPoint && item.isActive;
@@ -595,22 +661,23 @@ export default function InventoryPage() {
             );
           })}
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-1 border-none" />
-
-          {loadingMore && (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-xs text-muted-foreground">Loading more...</span>
-            </div>
-          )}
-
           {!hasMore && items.length > 0 && (
             <div className="py-3 text-center">
               <span className="text-[11px] text-muted-foreground">
                 Showing all {items.length} item{items.length !== 1 ? "s" : ""}
               </span>
             </div>
+          )}
+        </div>
+        </motion.div>
+        </MotionConfig>
+      )}
+
+      {/* Infinite scroll sentinel */}
+      {hasMore && !refetching && (
+        <div ref={sentinelRef} className="flex items-center justify-center py-6">
+          {loadingMore && (
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
           )}
         </div>
       )}
@@ -708,6 +775,6 @@ export default function InventoryPage() {
       </Sheet>
 
       {confirmDialog}
-    </div>
+    </ContentReveal>
   );
 }

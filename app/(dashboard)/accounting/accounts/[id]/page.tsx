@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
@@ -91,7 +92,7 @@ export default function AccountLedgerPage() {
   const [total, setTotal] = useState(0);
 
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState("date:desc");
@@ -105,11 +106,6 @@ export default function AccountLedgerPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   const pendingSearch = search !== debouncedSearch;
 
