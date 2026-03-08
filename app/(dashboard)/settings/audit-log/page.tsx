@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
@@ -258,43 +259,19 @@ export default function AuditLogPage() {
 
   return (
     <ContentReveal className="space-y-5">
-          {/* Action toggle pills */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setActionFilter("all")}
-              className={cn(
-                "rounded-md px-2.5 py-1.5 text-xs transition-colors",
-                actionFilter === "all"
-                  ? "bg-foreground text-background font-medium"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              All
-              <span className="ml-1.5 font-mono tabular-nums text-[10px] opacity-60">{totalCount}</span>
-            </button>
-            {Object.entries(actionCounts).map(([action, count]) => {
-              const config = getActionConfig(action);
-              const Icon = config.icon;
-              return (
-                <button
-                  key={action}
-                  type="button"
-                  onClick={() => setActionFilter(actionFilter === action ? "all" : action)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors",
-                    actionFilter === action
-                      ? "bg-foreground text-background font-medium"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("size-3", actionFilter === action ? "text-background" : config.color)} />
-                  <span className="capitalize">{action}</span>
-                  <span className="font-mono tabular-nums text-[10px] opacity-60">{count}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Action filter tabs */}
+          <Tabs value={actionFilter} onValueChange={setActionFilter}>
+            <TabsList className="overflow-x-auto">
+              <TabsTrigger value="all" className="whitespace-nowrap">
+                All <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">{totalCount}</span>
+              </TabsTrigger>
+              {Object.entries(actionCounts).map(([action, count]) => (
+                <TabsTrigger key={action} value={action} className="whitespace-nowrap capitalize">
+                  {action} <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">{count}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
           {/* Filter bar */}
           <div className="flex flex-wrap items-center gap-2">
