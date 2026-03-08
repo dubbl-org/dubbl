@@ -12,7 +12,7 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
-  PNPM_VERSION: "9"
+  PNPM_VERSION: "10"
 
 jobs:
   lint:
