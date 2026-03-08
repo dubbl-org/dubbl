@@ -161,11 +161,18 @@ export default function InvoicesPage() {
   const { open: openDrawer } = useCreateDrawer();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [refetching, setRefetching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [fetchKey, setFetchKey] = useState(0);
+  const [summary, setSummary] = useState<{
+    totalCount: number;
+    outstanding: number;
+    overdue: number;
+    aging: Record<string, { count: number; amount: number }>;
+  } | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -201,7 +208,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (!orgId) return;
     let cancelled = false;
-    setLoading(true);
+    setRefetching(true);
     setPage(1);
 
     fetch(`/api/v1/invoices?${buildParams(1)}`, {
@@ -214,7 +221,7 @@ export default function InvoicesPage() {
         setTotalCount(data.pagination?.total || 0);
       })
       .then(() => devDelay())
-      .finally(() => { if (!cancelled) { setLoading(false); setFetchKey((k) => k + 1); } });
+      .finally(() => { if (!cancelled) { setInitialLoad(false); setRefetching(false); setFetchKey((k) => k + 1); } });
 
     return () => { cancelled = true; };
   }, [orgId, buildParams]);
@@ -240,9 +247,15 @@ export default function InvoicesPage() {
 
   const hasMore = invoices.length < totalCount;
 
-  // Fetch recent payments separately
+  // Fetch summary stats and recent payments (independent of filters)
   useEffect(() => {
     if (!orgId) return;
+    fetch(`/api/v1/invoices/summary`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => setSummary(data));
+
     fetch(`/api/v1/payments?type=received&limit=5`, {
       headers: { "x-organization-id": orgId },
     })
@@ -282,40 +295,21 @@ export default function InvoicesPage() {
     setSearchKey((k) => k + 1);
   }, [debouncedSearch]);
 
-  const outstanding = invoices
-    .filter((i) => ["sent", "partial", "overdue"].includes(i.status))
-    .reduce((sum, i) => sum + i.amountDue, 0);
+  const outstanding = summary?.outstanding || 0;
+  const overdue = summary?.overdue || 0;
+  const invoiceCount = summary?.totalCount || 0;
 
-  const overdue = invoices
-    .filter((i) => i.status === "overdue")
-    .reduce((sum, i) => sum + i.amountDue, 0);
+  const aging = summary?.aging || {
+    current: { count: 0, amount: 0 },
+    "1-30": { count: 0, amount: 0 },
+    "31-60": { count: 0, amount: 0 },
+    "60+": { count: 0, amount: 0 },
+  };
+  const agingTotal = (aging.current?.amount || 0) + (aging["1-30"]?.amount || 0) + (aging["31-60"]?.amount || 0) + (aging["60+"]?.amount || 0);
 
-  const aging = useMemo(() => {
-    const now = new Date();
-    const buckets = {
-      current: { count: 0, amount: 0 },
-      "1-30": { count: 0, amount: 0 },
-      "31-60": { count: 0, amount: 0 },
-      "60+": { count: 0, amount: 0 },
-    };
-    invoices
-      .filter((i) => ["sent", "partial", "overdue"].includes(i.status) && i.amountDue > 0)
-      .forEach((inv) => {
-        const due = new Date(inv.dueDate);
-        const days = Math.floor((now.getTime() - due.getTime()) / 86400000);
-        if (days <= 0) { buckets.current.count++; buckets.current.amount += inv.amountDue; }
-        else if (days <= 30) { buckets["1-30"].count++; buckets["1-30"].amount += inv.amountDue; }
-        else if (days <= 60) { buckets["31-60"].count++; buckets["31-60"].amount += inv.amountDue; }
-        else { buckets["60+"].count++; buckets["60+"].amount += inv.amountDue; }
-      });
-    return buckets;
-  }, [invoices]);
+  if (initialLoad) return <BrandLoader />;
 
-  const agingTotal = aging.current.amount + aging["1-30"].amount + aging["31-60"].amount + aging["60+"].amount;
-
-  if (loading && invoices.length === 0) return <BrandLoader />;
-
-  if (!loading && invoices.length === 0 && statusFilter === "all" && !hasFilters) {
+  if (!initialLoad && !refetching && invoices.length === 0 && statusFilter === "all" && !hasFilters) {
     return (
       <ContentReveal>
         <div className="flex flex-col items-center gap-10 pt-16 pb-12">
@@ -379,7 +373,7 @@ export default function InvoicesPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard title="Outstanding" value={formatMoney(outstanding)} icon={FileText} />
         <StatCard title="Overdue" value={formatMoney(overdue)} icon={FileText} changeType="negative" />
-        <StatCard title="Total Invoices" value={invoices.length.toString()} icon={FileText} />
+        <StatCard title="Total Invoices" value={invoiceCount.toString()} icon={FileText} />
       </div>
 
       {/* Aging + Recent Payments side by side */}
@@ -395,7 +389,8 @@ export default function InvoicesPage() {
                 { key: "31-60" as const, color: "bg-orange-500" },
                 { key: "60+" as const, color: "bg-red-500" },
               ] as const).map(({ key, color }) => {
-                const pct = (aging[key].amount / agingTotal) * 100;
+                const bucket = aging[key];
+                const pct = bucket ? (bucket.amount / agingTotal) * 100 : 0;
                 if (pct === 0) return null;
                 return <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />;
               })}
@@ -413,7 +408,7 @@ export default function InvoicesPage() {
                     <span className="text-muted-foreground">{label}</span>
                   </div>
                   <span className="font-mono tabular-nums">
-                    {aging[key].count} · {formatMoney(aging[key].amount)}
+                    {aging[key]?.count || 0} · {formatMoney(aging[key]?.amount || 0)}
                   </span>
                 </div>
               ))}
@@ -542,7 +537,7 @@ export default function InvoicesPage() {
           )}
         </div>
 
-        {loading || pendingSearch ? (
+        {refetching || pendingSearch ? (
           <BrandLoader className="h-48" />
         ) : (
           <ContentReveal key={`${fetchKey}-${searchKey}`}>
@@ -560,7 +555,7 @@ export default function InvoicesPage() {
         )}
 
         {/* Load more / count */}
-        {!loading && !pendingSearch && filteredInvoices.length > 0 && (
+        {!refetching && !pendingSearch && filteredInvoices.length > 0 && (
           <div className="flex items-center justify-between pt-1">
             <p className="text-xs text-muted-foreground">
               Showing {invoices.length} of {totalCount} invoice{totalCount !== 1 ? "s" : ""}
