@@ -20,6 +20,8 @@ import {
   Landmark,
   Warehouse,
   ClipboardList,
+  Tag,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   Sheet,
@@ -45,10 +47,12 @@ import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-item
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
+import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
+import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -90,6 +94,8 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <BankAccountDrawer open={activeType === "bankAccount"} onClose={close} />
       <WarehouseDrawer open={activeType === "warehouse"} onClose={close} />
       <StockTakeDrawer open={activeType === "stockTake"} onClose={close} />
+      <CategoryDrawer open={activeType === "category"} onClose={close} />
+      <TransferDrawer open={activeType === "transfer"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -2722,6 +2728,237 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Stock Take" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Category Drawer
+// ---------------------------------------------------------------------------
+function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/inventory/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          color: form.get("color") || null,
+          description: form.get("description") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create category");
+      }
+      toast.success("Category created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("refetch-categories"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create category");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Tag className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Category</SheetTitle>
+              <SheetDescription>Organize inventory items with categories.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Category Info</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-cat-name">Name *</Label>
+                <Input id="drawer-cat-name" name="name" required placeholder="e.g. Electronics" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-cat-color">Color</Label>
+                <Input id="drawer-cat-color" name="color" placeholder="#10b981" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-cat-desc">Description</Label>
+                <Textarea id="drawer-cat-desc" name="description" placeholder="Optional description..." rows={2} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Category" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Transfer Drawer
+// ---------------------------------------------------------------------------
+function TransferDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [lines, setLines] = useState<{ inventoryItemId: string; quantity: number }[]>([{ inventoryItemId: "", quantity: 1 }]);
+  const [fromWarehouseId, setFromWarehouseId] = useState("");
+  const [toWarehouseId, setToWarehouseId] = useState("");
+
+  function resetState() {
+    setLines([{ inventoryItemId: "", quantity: 1 }]);
+    setFromWarehouseId("");
+    setToWarehouseId("");
+  }
+
+  function addLine() {
+    setLines((prev) => [...prev, { inventoryItemId: "", quantity: 1 }]);
+  }
+
+  function removeLine(idx: number) {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateLine(idx: number, field: "inventoryItemId" | "quantity", value: string | number) {
+    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    if (!fromWarehouseId || !toWarehouseId) {
+      toast.error("Select both warehouses");
+      setSaving(false);
+      return;
+    }
+
+    const validLines = lines.filter((l) => l.inventoryItemId && l.quantity > 0);
+    if (validLines.length === 0) {
+      toast.error("Add at least one item");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/v1/inventory/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          fromWarehouseId,
+          toWarehouseId,
+          notes: (e.currentTarget.elements.namedItem("notes") as HTMLTextAreaElement)?.value || null,
+          lines: validLines,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create transfer");
+      }
+      toast.success("Transfer created");
+      onClose();
+      resetState();
+      window.dispatchEvent(new CustomEvent("refetch-transfers"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create transfer");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) { onClose(); resetState(); } }}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><ArrowLeftRight className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Transfer</SheetTitle>
+              <SheetDescription>Move inventory between warehouses.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            {/* Warehouses */}
+            <div className="space-y-3">
+              <SectionLabel>Warehouses</SectionLabel>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">From *</Label>
+                  <WarehousePicker value={fromWarehouseId} onChange={setFromWarehouseId} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">To *</Label>
+                  <WarehousePicker value={toWarehouseId} onChange={setToWarehouseId} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Line items */}
+            <div className="space-y-3">
+              <SectionLabel>Items</SectionLabel>
+              <div className="space-y-2">
+                {lines.map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <InventoryItemPicker
+                        value={line.inventoryItemId}
+                        onChange={(v) => updateLine(idx, "inventoryItemId", v)}
+                      />
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={line.quantity}
+                      onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value) || 1)}
+                      className="w-20 shrink-0"
+                      placeholder="Qty"
+                    />
+                    {lines.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => removeLine(idx)}>
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button type="button" variant="outline" size="sm" className="text-xs" onClick={addLine}>
+                <Plus className="size-3 mr-1.5" />Add Item
+              </Button>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Notes */}
+            <div className="space-y-3">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea name="notes" placeholder="Optional notes about this transfer..." rows={2} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Transfer" />
         </form>
       </SheetContent>
     </Sheet>

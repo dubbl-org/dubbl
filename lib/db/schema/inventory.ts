@@ -14,6 +14,33 @@ import { organization } from "./auth";
 import { chartAccount } from "./bookkeeping";
 import { contact } from "./contacts";
 
+// --- Inventory Category ---
+
+export const inventoryCategory = pgTable(
+  "inventory_category",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    color: text("color"),
+    description: text("description"),
+    parentId: uuid("parent_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("inventory_category_org_name_idx").on(
+      table.organizationId,
+      table.name
+    ),
+  ]
+);
+
 export const inventoryItem = pgTable(
   "inventory_item",
   {
@@ -28,6 +55,7 @@ export const inventoryItem = pgTable(
     description: text("description"),
     imageUrl: text("image_url"),
     category: text("category"),
+    categoryId: uuid("category_id").references(() => inventoryCategory.id),
     sku: text("sku"),
     purchasePrice: integer("purchase_price").notNull().default(0), // cents
     salePrice: integer("sale_price").notNull().default(0), // cents
@@ -214,12 +242,103 @@ export const inventoryVariant = pgTable("inventory_variant", {
   deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
 
+// --- Warehouse Stock (per-warehouse quantities) ---
+
+export const warehouseStock = pgTable(
+  "warehouse_stock",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItem.id, { onDelete: "cascade" }),
+    warehouseId: uuid("warehouse_id")
+      .notNull()
+      .references(() => warehouse.id, { onDelete: "cascade" }),
+    quantity: integer("quantity").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("warehouse_stock_org_item_wh_idx").on(
+      table.organizationId,
+      table.inventoryItemId,
+      table.warehouseId
+    ),
+  ]
+);
+
+// --- Inventory Transfers ---
+
+export const inventoryTransferStatusEnum = pgEnum("inventory_transfer_status", [
+  "draft",
+  "in_transit",
+  "completed",
+  "cancelled",
+]);
+
+export const inventoryTransfer = pgTable("inventory_transfer", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  fromWarehouseId: uuid("from_warehouse_id")
+    .notNull()
+    .references(() => warehouse.id),
+  toWarehouseId: uuid("to_warehouse_id")
+    .notNull()
+    .references(() => warehouse.id),
+  status: inventoryTransferStatusEnum("status").notNull().default("draft"),
+  notes: text("notes"),
+  transferredBy: text("transferred_by"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { mode: "date" }),
+});
+
+export const inventoryTransferLine = pgTable("inventory_transfer_line", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  transferId: uuid("transfer_id")
+    .notNull()
+    .references(() => inventoryTransfer.id, { onDelete: "cascade" }),
+  inventoryItemId: uuid("inventory_item_id")
+    .notNull()
+    .references(() => inventoryItem.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+  receivedQuantity: integer("received_quantity"),
+});
+
 // --- Relations ---
+
+export const inventoryCategoryRelations = relations(inventoryCategory, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [inventoryCategory.organizationId],
+    references: [organization.id],
+  }),
+  parent: one(inventoryCategory, {
+    fields: [inventoryCategory.parentId],
+    references: [inventoryCategory.id],
+    relationName: "categoryParent",
+  }),
+  children: many(inventoryCategory, { relationName: "categoryParent" }),
+  items: many(inventoryItem),
+}));
 
 export const inventoryItemRelations = relations(inventoryItem, ({ one, many }) => ({
   organization: one(organization, {
     fields: [inventoryItem.organizationId],
     references: [organization.id],
+  }),
+  categoryRef: one(inventoryCategory, {
+    fields: [inventoryItem.categoryId],
+    references: [inventoryCategory.id],
   }),
   costAccount: one(chartAccount, {
     fields: [inventoryItem.costAccountId],
@@ -240,6 +359,7 @@ export const inventoryItemRelations = relations(inventoryItem, ({ one, many }) =
   suppliers: many(inventoryItemSupplier),
   variants: many(inventoryVariant),
   stockTakeLines: many(stockTakeLine),
+  warehouseStocks: many(warehouseStock),
 }));
 
 export const warehouseRelations = relations(warehouse, ({ one, many }) => ({
@@ -249,6 +369,7 @@ export const warehouseRelations = relations(warehouse, ({ one, many }) => ({
   }),
   movements: many(inventoryMovement),
   stockTakes: many(stockTake),
+  warehouseStocks: many(warehouseStock),
 }));
 
 export const inventoryMovementRelations = relations(inventoryMovement, ({ one }) => ({
@@ -311,6 +432,50 @@ export const inventoryVariantRelations = relations(inventoryVariant, ({ one }) =
   }),
   inventoryItem: one(inventoryItem, {
     fields: [inventoryVariant.inventoryItemId],
+    references: [inventoryItem.id],
+  }),
+}));
+
+export const warehouseStockRelations = relations(warehouseStock, ({ one }) => ({
+  organization: one(organization, {
+    fields: [warehouseStock.organizationId],
+    references: [organization.id],
+  }),
+  inventoryItem: one(inventoryItem, {
+    fields: [warehouseStock.inventoryItemId],
+    references: [inventoryItem.id],
+  }),
+  warehouse: one(warehouse, {
+    fields: [warehouseStock.warehouseId],
+    references: [warehouse.id],
+  }),
+}));
+
+export const inventoryTransferRelations = relations(inventoryTransfer, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [inventoryTransfer.organizationId],
+    references: [organization.id],
+  }),
+  fromWarehouse: one(warehouse, {
+    fields: [inventoryTransfer.fromWarehouseId],
+    references: [warehouse.id],
+    relationName: "transferFrom",
+  }),
+  toWarehouse: one(warehouse, {
+    fields: [inventoryTransfer.toWarehouseId],
+    references: [warehouse.id],
+    relationName: "transferTo",
+  }),
+  lines: many(inventoryTransferLine),
+}));
+
+export const inventoryTransferLineRelations = relations(inventoryTransferLine, ({ one }) => ({
+  transfer: one(inventoryTransfer, {
+    fields: [inventoryTransferLine.transferId],
+    references: [inventoryTransfer.id],
+  }),
+  inventoryItem: one(inventoryItem, {
+    fields: [inventoryTransferLine.inventoryItemId],
     references: [inventoryItem.id],
   }),
 }));

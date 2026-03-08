@@ -14,12 +14,23 @@ import {
   Archive,
   ArrowUpDown,
   Download,
+  Upload,
   Trash2,
   Power,
   PowerOff,
   Tag,
   Loader2,
 } from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +115,13 @@ export default function InventoryPage() {
   const [bulkAdjustment, setBulkAdjustment] = useState("");
   const [bulkAdjustReason, setBulkAdjustReason] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [chartData, setChartData] = useState<{ date: string; in: number; out: number; net: number }[]>([]);
+  const [chartPeriod, setChartPeriod] = useState("30d");
+  const [, setChartLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
   const debouncedSearch = useDebounce(search);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -148,6 +166,22 @@ export default function InventoryPage() {
     params.set("sortOrder", sortOrder);
     return `/api/v1/inventory?${params}`;
   }, [debouncedSearch, tab, categoryFilter, sortBy, sortOrder]);
+
+  // Fetch movement chart data
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    setChartLoading(true);
+    fetch(`/api/v1/inventory/movements/chart?period=${chartPeriod}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setChartData(data.data || []);
+      })
+      .finally(() => { if (!cancelled) setChartLoading(false); });
+    return () => { cancelled = true; };
+  }, [orgId, chartPeriod]);
 
   // Initial + filter change fetch
   useEffect(() => {
@@ -300,6 +334,40 @@ export default function InventoryPage() {
     toast.success("CSV exported");
   }
 
+  async function handleImport() {
+    if (!orgId || !importFile) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const res = await fetch("/api/v1/inventory/import", {
+        method: "POST",
+        headers: { "x-organization-id": orgId },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import failed");
+      setImportResult(data);
+      toast.success(`Imported: ${data.created} created, ${data.updated} updated`);
+      // Refresh the list
+      pageRef.current = 1;
+      const refreshRes = await fetch(buildUrl(1), { headers: { "x-organization-id": orgId } });
+      const refreshData = await refreshRes.json();
+      if (refreshData.data) {
+        setItems(refreshData.data);
+        setTotalCount(refreshData.pagination?.total || 0);
+        setHasMore((refreshData.pagination?.page || 1) < (refreshData.pagination?.totalPages || 1));
+      }
+      if (refreshData.categories) setCategories(refreshData.categories);
+      if (refreshData.summary) setSummary(refreshData.summary);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   function toggleSortOrder() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   }
@@ -342,7 +410,10 @@ export default function InventoryPage() {
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{formatMoney(summary.totalValue)}</p>
         </div>
-        <div className="rounded-xl border bg-card p-4">
+        <div
+          className="rounded-xl border bg-card p-4 cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => router.push("/inventory/alerts")}
+        >
           <div className="flex items-center gap-2 text-muted-foreground">
             <AlertTriangle className={cn("size-3.5", summary.lowStockCount > 0 && "text-amber-500")} />
             <span className="text-[11px] font-medium uppercase tracking-wide">Low Stock</span>
@@ -364,6 +435,45 @@ export default function InventoryPage() {
           </p>
         </div>
       </div>
+
+      {/* Movement Chart */}
+      {chartData.length > 0 && (
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium">Stock Movements</p>
+            <select
+              value={chartPeriod}
+              onChange={(e) => setChartPeriod(e.target.value)}
+              className="rounded-md border bg-background px-2 py-1 text-xs"
+            >
+              <option value="30d">30 days</option>
+              <option value="90d">90 days</option>
+              <option value="12m">12 months</option>
+            </select>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <defs>
+                <linearGradient id="inGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="outGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+              <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Area type="monotone" dataKey="in" name="In" stroke="#10b981" fill="url(#inGrad)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="out" name="Out" stroke="#ef4444" fill="url(#outGrad)" strokeWidth={1.5} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Toolbar - top row swaps between tabs and select actions, search/filters always visible */}
       <div className="flex flex-col gap-3">
@@ -447,6 +557,10 @@ export default function InventoryPage() {
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
                   Select
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setImportOpen(true)}>
+                  <Upload className="size-3" />
+                  <span className="hidden sm:inline">Import</span>
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
                   <Download className="size-3" />
@@ -746,6 +860,58 @@ export default function InventoryPage() {
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               {bulkLoading ? "Saving..." : "Apply"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Import CSV sheet */}
+      <Sheet open={importOpen} onOpenChange={setImportOpen}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>Import Inventory</SheetTitle></SheetHeader>
+          <div className="space-y-4 px-4">
+            <p className="text-sm text-muted-foreground">
+              Upload a CSV file with columns: code, name, description, category, sku, purchasePrice, salePrice, quantityOnHand, reorderPoint
+            </p>
+            <div className="space-y-2">
+              <Label>CSV File</Label>
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  setImportFile(e.target.files?.[0] || null);
+                  setImportResult(null);
+                }}
+              />
+            </div>
+            {importResult && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <p className="text-sm font-medium">Import Results</p>
+                <div className="flex gap-4 text-sm">
+                  <span className="text-emerald-600">{importResult.created} created</span>
+                  <span className="text-blue-600">{importResult.updated} updated</span>
+                  {importResult.errors.length > 0 && (
+                    <span className="text-red-600">{importResult.errors.length} errors</span>
+                  )}
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto text-xs space-y-1">
+                    {importResult.errors.map((err, i) => (
+                      <p key={i} className="text-red-600">Row {err.row}: {err.message}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <SheetFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleImport}
+              disabled={!importFile || importLoading}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {importLoading ? "Importing..." : "Import"}
             </Button>
           </SheetFooter>
         </SheetContent>

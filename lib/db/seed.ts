@@ -33,10 +33,14 @@ import {
   fixedAsset,
   payrollEmployee,
   inventoryItem,
+  inventoryCategory,
   warehouse,
+  warehouseStock,
   inventoryMovement,
   inventoryItemSupplier,
   inventoryVariant,
+  inventoryTransfer,
+  inventoryTransferLine,
   expenseClaim,
   expenseItem,
   payment,
@@ -1291,14 +1295,14 @@ async function seed() {
     isActive: true,
   }).returning();
 
-  await db.insert(warehouse).values({
+  const [eastWarehouse] = await db.insert(warehouse).values({
     organizationId: org.id,
     name: "East Distribution Center",
     code: "WH-EAST",
     address: "456 Logistics Way, Building B",
     isDefault: false,
     isActive: true,
-  });
+  }).returning();
 
   console.log("  2 warehouses");
 
@@ -1422,6 +1426,129 @@ async function seed() {
     });
   }
   console.log(`  ${variantData.length} variants`);
+
+  // Inventory categories
+  const categoryData = [
+    { name: "Electronics", color: "#3b82f6", description: "Electronic devices and accessories" },
+    { name: "Furniture", color: "#f59e0b", description: "Office furniture and ergonomic equipment" },
+    { name: "Supplies", color: "#10b981", description: "Office and printing supplies" },
+    { name: "Tools", color: "#8b5cf6", description: "Hardware and diagnostic tools" },
+    { name: "Packaging", color: "#ec4899", description: "Shipping and packaging materials" },
+  ];
+
+  const createdCategories: { id: string; name: string }[] = [];
+  for (const cat of categoryData) {
+    const [created] = await db.insert(inventoryCategory).values({
+      organizationId: org.id,
+      name: cat.name,
+      color: cat.color,
+      description: cat.description,
+    }).returning();
+    createdCategories.push({ id: created.id, name: cat.name });
+  }
+
+  // Add subcategories under Electronics
+  const electronicsCat = createdCategories.find((c) => c.name === "Electronics");
+  if (electronicsCat) {
+    await db.insert(inventoryCategory).values([
+      { organizationId: org.id, name: "Input Devices", color: "#60a5fa", parentId: electronicsCat.id },
+      { organizationId: org.id, name: "Audio", color: "#818cf8", parentId: electronicsCat.id },
+    ]);
+  }
+  console.log(`  ${categoryData.length + 2} categories`);
+
+  // Link items to categories via categoryId
+  const categoryMap: Record<string, string> = {};
+  for (const c of createdCategories) categoryMap[c.name] = c.id;
+
+  for (let i = 0; i < items.length; i++) {
+    const catId = categoryMap[items[i].category];
+    if (catId) {
+      await db.update(inventoryItem)
+        .set({ categoryId: catId })
+        .where(eq(inventoryItem.id, createdItems[i].id));
+    }
+  }
+  console.log("  items linked to categories");
+
+  // Per-warehouse stock levels
+  const warehouseStockData = [
+    // Main warehouse gets majority of stock
+    { itemIdx: 0, whId: mainWarehouse.id, qty: 120 },
+    { itemIdx: 1, whId: mainWarehouse.id, qty: 55 },
+    { itemIdx: 2, whId: mainWarehouse.id, qty: 30 },
+    { itemIdx: 3, whId: mainWarehouse.id, qty: 20 },
+    { itemIdx: 4, whId: mainWarehouse.id, qty: 45 },
+    { itemIdx: 5, whId: mainWarehouse.id, qty: 25 },
+    { itemIdx: 7, whId: mainWarehouse.id, qty: 200 },
+    { itemIdx: 8, whId: mainWarehouse.id, qty: 30 },
+    { itemIdx: 10, whId: mainWarehouse.id, qty: 40 },
+    { itemIdx: 12, whId: mainWarehouse.id, qty: 350 },
+    // East warehouse gets some items
+    { itemIdx: 0, whId: eastWarehouse.id, qty: 30 },
+    { itemIdx: 1, whId: eastWarehouse.id, qty: 20 },
+    { itemIdx: 2, whId: eastWarehouse.id, qty: 12 },
+    { itemIdx: 4, whId: eastWarehouse.id, qty: 15 },
+    { itemIdx: 7, whId: eastWarehouse.id, qty: 100 },
+    { itemIdx: 8, whId: eastWarehouse.id, qty: 15 },
+    { itemIdx: 12, whId: eastWarehouse.id, qty: 150 },
+  ];
+
+  for (const ws of warehouseStockData) {
+    await db.insert(warehouseStock).values({
+      organizationId: org.id,
+      inventoryItemId: createdItems[ws.itemIdx].id,
+      warehouseId: ws.whId,
+      quantity: ws.qty,
+    });
+  }
+  console.log(`  ${warehouseStockData.length} warehouse stock entries`);
+
+  // Stock transfers
+  const [completedTransfer] = await db.insert(inventoryTransfer).values({
+    organizationId: org.id,
+    fromWarehouseId: mainWarehouse.id,
+    toWarehouseId: eastWarehouse.id,
+    status: "completed",
+    notes: "Monthly restock of east distribution center",
+    transferredBy: "seed",
+    completedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+  }).returning();
+
+  await db.insert(inventoryTransferLine).values([
+    { transferId: completedTransfer.id, inventoryItemId: createdItems[0].id, quantity: 15, receivedQuantity: 15 },
+    { transferId: completedTransfer.id, inventoryItemId: createdItems[1].id, quantity: 10, receivedQuantity: 10 },
+  ]);
+
+  const [draftTransfer] = await db.insert(inventoryTransfer).values({
+    organizationId: org.id,
+    fromWarehouseId: eastWarehouse.id,
+    toWarehouseId: mainWarehouse.id,
+    status: "draft",
+    notes: "Return excess packaging materials",
+    transferredBy: "seed",
+  }).returning();
+
+  await db.insert(inventoryTransferLine).values([
+    { transferId: draftTransfer.id, inventoryItemId: createdItems[12].id, quantity: 50 },
+  ]);
+
+  const [inTransitTransfer] = await db.insert(inventoryTransfer).values({
+    organizationId: org.id,
+    fromWarehouseId: mainWarehouse.id,
+    toWarehouseId: eastWarehouse.id,
+    status: "in_transit",
+    notes: "Urgent restock - low stock items",
+    transferredBy: "seed",
+  }).returning();
+
+  await db.insert(inventoryTransferLine).values([
+    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[2].id, quantity: 8 },
+    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[3].id, quantity: 5 },
+    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[10].id, quantity: 10 },
+  ]);
+
+  console.log("  3 stock transfers");
   } else {
     console.log("\nInventory data already exists, skipping...");
   }

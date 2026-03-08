@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Save, Loader2 } from "lucide-react";
+import { Trash2, Save, Loader2, Warehouse, Printer } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,19 +13,41 @@ import { centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
 import { useInventoryItem } from "./layout";
+import JsBarcode from "jsbarcode";
+
+interface WarehouseStockEntry {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  quantity: number;
+  updatedAt: string;
+}
 
 export default function InventoryItemDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { item, setItem } = useInventoryItem();
   const [saving, setSaving] = useState(false);
+  const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  // Fetch per-warehouse stock
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/v1/inventory/${id}/warehouse-stock`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => setWarehouseStocks(data.data || []));
+  }, [id, orgId]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
     const form = new FormData(e.currentTarget);
-    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
     try {
@@ -67,7 +89,6 @@ export default function InventoryItemDetailsPage() {
       destructive: true,
     });
     if (!confirmed) return;
-    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
     await fetch(`/api/v1/inventory/${id}`, {
@@ -77,6 +98,56 @@ export default function InventoryItemDetailsPage() {
     toast.success("Item deleted");
     router.push("/inventory");
   }
+
+  function printBarcode() {
+    const barcodeValue = item.sku || item.code;
+    const canvas = document.createElement("canvas");
+    try {
+      JsBarcode(canvas, barcodeValue, {
+        format: "CODE128",
+        width: 2,
+        height: 80,
+        displayValue: true,
+        fontSize: 14,
+        margin: 10,
+      });
+    } catch {
+      toast.error("Could not generate barcode for this value");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head><title>${item.name} - Barcode</title></head>
+        <body style="display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;flex-direction:column;gap:8px">
+          <h3 style="margin:0;font-family:sans-serif">${item.name}</h3>
+          <img src="${canvas.toDataURL()}" />
+          <script>window.print();window.close();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
+  // Generate barcode preview
+  const barcodeValue = item.sku || item.code;
+  const barcodeRef = (canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return;
+    try {
+      JsBarcode(canvas, barcodeValue, {
+        format: "CODE128",
+        width: 1.5,
+        height: 50,
+        displayValue: true,
+        fontSize: 11,
+        margin: 5,
+      });
+    } catch {
+      // Invalid barcode value
+    }
+  };
 
   return (
     <>
@@ -182,28 +253,71 @@ export default function InventoryItemDetailsPage() {
             )}
           </Button>
         </div>
-
-        <div className="h-px bg-border" />
-
-        <Section title="Danger zone" description="Irreversible actions for this item.">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
-            <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete this item</p>
-              <p className="text-xs text-red-600/70 dark:text-red-400/70">Once deleted, this cannot be undone.</p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleDelete}
-              className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
-            >
-              <Trash2 className="mr-1.5 size-3.5" />
-              Delete Item
-            </Button>
-          </div>
-        </Section>
       </form>
+
+      {/* Per-warehouse stock */}
+      {warehouseStocks.length > 0 && (
+        <>
+          <div className="h-px bg-border mt-10" />
+          <Section title="Stock by Warehouse" description="Quantity breakdown across warehouses.">
+            <div className="rounded-lg border divide-y">
+              {warehouseStocks.map((ws) => (
+                <div key={ws.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Warehouse className="size-3.5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{ws.warehouseName}</p>
+                      <p className="text-xs text-muted-foreground">{ws.warehouseCode}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono tabular-nums font-medium">{ws.quantity}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(ws.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
+
+      {/* Barcode */}
+      <div className="h-px bg-border mt-10" />
+      <Section title="Barcode" description="Generated from SKU or item code.">
+        <div className="flex flex-col items-start gap-3">
+          <div className="rounded-lg border bg-white p-3">
+            <canvas ref={barcodeRef} />
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={printBarcode}>
+            <Printer className="mr-1.5 size-3.5" />
+            Print Barcode
+          </Button>
+        </div>
+      </Section>
+
+      <div className="h-px bg-border" />
+
+      <Section title="Danger zone" description="Irreversible actions for this item.">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete this item</p>
+            <p className="text-xs text-red-600/70 dark:text-red-400/70">Once deleted, this cannot be undone.</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+          >
+            <Trash2 className="mr-1.5 size-3.5" />
+            Delete Item
+          </Button>
+        </div>
+      </Section>
+
       {confirmDialog}
     </>
   );

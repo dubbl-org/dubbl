@@ -1,12 +1,13 @@
 "use client";
 
-import { Package, ClipboardList, Warehouse, BarChart3 } from "lucide-react";
+import { Package, ClipboardList, Warehouse, BarChart3, ArrowLeftRight } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
 const TABS = [
   { href: "/inventory", label: "Items", icon: Package, exact: true },
   { href: "/inventory/stock-takes", label: "Stock Takes", icon: ClipboardList },
   { href: "/inventory/warehouses", label: "Warehouses", icon: Warehouse },
+  { href: "/inventory/transfers", label: "Transfers", icon: ArrowLeftRight },
   { href: "/inventory/valuation", label: "Valuation", icon: BarChart3 },
 ];
 
