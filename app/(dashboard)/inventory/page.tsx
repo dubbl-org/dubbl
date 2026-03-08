@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -82,10 +82,12 @@ export default function InventoryPage() {
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [summary, setSummary] = useState({ totalItems: 0, totalValue: 0, lowStockCount: 0, avgMargin: 0 });
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<FilterTab>("all");
   const [sortBy, setSortBy] = useState<SortKey>("createdAt");
@@ -131,22 +133,22 @@ export default function InventoryPage() {
   useEffect(() => {
     if (!orgId) return;
     setLoading(true);
-    setSelected(new Set());
     pageRef.current = 1;
 
     fetch(buildUrl(1), { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
       .then(async (data) => {
-        await devDelay();
+        if (initialLoading) await devDelay();
         if (data.data) {
           setItems(data.data);
           setTotalCount(data.pagination?.total || 0);
           setHasMore((data.pagination?.page || 1) < (data.pagination?.totalPages || 1));
         }
         if (data.categories) setCategories(data.categories);
+        if (data.summary) setSummary(data.summary);
       })
-      .finally(() => setLoading(false));
-  }, [orgId, debouncedSearch, tab, categoryFilter, sortBy, sortOrder, buildUrl]);
+      .finally(() => { setLoading(false); setInitialLoading(false); });
+  }, [orgId, debouncedSearch, tab, categoryFilter, sortBy, sortOrder, buildUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load more (infinite scroll)
   const loadMore = useCallback(() => {
@@ -180,14 +182,7 @@ export default function InventoryPage() {
     return () => observer.disconnect();
   }, [loadMore, loading]);
 
-  // Stats (computed from total counts, not just loaded items)
-  const allLowStock = items.filter((i) => i.quantityOnHand <= i.reorderPoint && i.isActive);
-  const totalValue = items.reduce((sum, i) => sum + i.quantityOnHand * i.purchasePrice, 0);
-  const avgMargin = useMemo(() => {
-    const withCost = items.filter((i) => i.purchasePrice > 0);
-    if (withCost.length === 0) return 0;
-    return withCost.reduce((sum, i) => sum + ((i.salePrice - i.purchasePrice) / i.purchasePrice) * 100, 0) / withCost.length;
-  }, [items]);
+  // Stats from API summary (real DB aggregates, not just loaded items)
 
   // Selection helpers
   const toggleSelect = (id: string) => {
@@ -208,8 +203,8 @@ export default function InventoryPage() {
   };
 
   const selectionCount = selected.size;
-  const isAllSelected = items.length > 0 && selected.size === items.length;
-  const isPartialSelected = selected.size > 0 && selected.size < items.length;
+  const isAllSelected = items.length > 0 && selected.size === totalCount;
+  const isPartialSelected = selected.size > 0 && selected.size < totalCount;
 
   // Bulk actions
   async function bulkAction(action: string, extra?: Record<string, unknown>) {
@@ -238,6 +233,7 @@ export default function InventoryPage() {
         setHasMore((refreshData.pagination?.page || 1) < (refreshData.pagination?.totalPages || 1));
       }
       if (refreshData.categories) setCategories(refreshData.categories);
+      if (refreshData.summary) setSummary(refreshData.summary);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Bulk action failed");
     } finally {
@@ -283,7 +279,7 @@ export default function InventoryPage() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
-  if (loading && items.length === 0) return <BrandLoader />;
+  if (initialLoading) return <BrandLoader />;
 
   if (!loading && items.length === 0 && !debouncedSearch && tab === "all" && categoryFilter === "all") {
     return (
@@ -310,25 +306,25 @@ export default function InventoryPage() {
             <Package className="size-3.5" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Total Items</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{totalCount}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{summary.totalItems}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <DollarSign className="size-3.5" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Stock Value</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{formatMoney(totalValue)}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{formatMoney(summary.totalValue)}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <AlertTriangle className={cn("size-3.5", allLowStock.length > 0 && "text-amber-500")} />
+            <AlertTriangle className={cn("size-3.5", summary.lowStockCount > 0 && "text-amber-500")} />
             <span className="text-[11px] font-medium uppercase tracking-wide">Low Stock</span>
           </div>
           <p className={cn(
             "mt-2 text-2xl font-bold font-mono tabular-nums",
-            allLowStock.length > 0 && "text-amber-600 dark:text-amber-400"
+            summary.lowStockCount > 0 && "text-amber-600 dark:text-amber-400"
           )}>
-            {allLowStock.length}
+            {summary.lowStockCount}
           </p>
         </div>
         <div className="rounded-xl border bg-card p-4">
@@ -337,23 +333,24 @@ export default function InventoryPage() {
             <span className="text-[11px] font-medium uppercase tracking-wide">Avg. Margin</span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
-            {isFinite(avgMargin) ? `${avgMargin.toFixed(1)}%` : "-"}
+            {summary.avgMargin > 0 ? `${summary.avgMargin.toFixed(1)}%` : "-"}
           </p>
         </div>
       </div>
 
-      {/* Toolbar - transforms when in select mode */}
-      <AnimatePresence initial={false} mode="popLayout">
-        {selectMode ? (
-          <motion.div
-            key="select-toolbar"
-            initial={{ opacity: 0, filter: "blur(4px)" }}
-            animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, filter: "blur(4px)" }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-          >
-            {/* Selection action bar */}
-            <div className="flex items-center gap-2 flex-wrap">
+      {/* Toolbar - top row swaps between tabs and select actions, search/filters always visible */}
+      <div className="flex flex-col gap-3">
+        {/* Top row: tabs+buttons or select actions */}
+        <AnimatePresence initial={false} mode="popLayout">
+          {selectMode ? (
+            <motion.div
+              key="select-bar"
+              initial={{ opacity: 0, filter: "blur(4px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, filter: "blur(4px)" }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="flex items-center gap-2 flex-wrap"
+            >
               <div className="flex items-center gap-2 mr-auto">
                 <Checkbox
                   checked={isAllSelected ? true : isPartialSelected ? "indeterminate" : false}
@@ -401,18 +398,16 @@ export default function InventoryPage() {
               >
                 Done
               </Button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="normal-toolbar"
-            initial={{ opacity: 0, filter: "blur(4px)" }}
-            animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, filter: "blur(4px)" }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="flex flex-col gap-3"
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            </motion.div>
+          ) : (
+            <motion.div
+              key="tabs-bar"
+              initial={{ opacity: 0, filter: "blur(4px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, filter: "blur(4px)" }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
               <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
                 <TabsList>
                   <TabsTrigger value="all">All</TabsTrigger>
@@ -431,64 +426,62 @@ export default function InventoryPage() {
                   <span className="hidden sm:inline">Export</span>
                 </Button>
               </div>
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {/* Search */}
-              <div className="relative flex-1 sm:max-w-xs">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, code, or SKU..."
-                  value={search}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-9 pr-8 h-8 text-sm"
-                />
-                {search && (
-                  <button
-                    onClick={() => handleSearch("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
+        {/* Search, filters, sort - always visible */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, code, or SKU..."
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-9 pr-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => handleSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
 
-              {/* Category filter */}
-              {categories.length > 0 && (
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
-                    <Tag className="size-3 mr-1.5 text-muted-foreground" />
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+          {categories.length > 0 && (
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
+                <Tag className="size-3 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-              {/* Sort */}
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-                <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
-                  <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-              <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
-                <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
+            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
+          </Button>
+        </div>
+      </div>
 
       {/* Item list */}
       {!loading && items.length === 0 ? (

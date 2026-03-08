@@ -104,9 +104,31 @@ export async function GET(request: Request) {
         )
       );
 
+    // Summary stats (always unfiltered, org-wide)
+    const orgConditions = [
+      eq(inventoryItem.organizationId, ctx.organizationId),
+      notDeleted(inventoryItem.deletedAt),
+    ];
+
+    const [summary] = await db
+      .select({
+        totalItems: sql<number>`count(*)::int`,
+        totalValue: sql<number>`coalesce(sum(${inventoryItem.quantityOnHand} * ${inventoryItem.purchasePrice}), 0)::bigint`,
+        lowStockCount: sql<number>`count(*) filter (where ${inventoryItem.quantityOnHand} <= ${inventoryItem.reorderPoint} and ${inventoryItem.isActive} = true)::int`,
+        avgMargin: sql<number>`coalesce(avg(case when ${inventoryItem.purchasePrice} > 0 then (${inventoryItem.salePrice} - ${inventoryItem.purchasePrice})::float / ${inventoryItem.purchasePrice} * 100 end), 0)`,
+      })
+      .from(inventoryItem)
+      .where(and(...orgConditions));
+
     return NextResponse.json({
       ...paginatedResponse(items, Number(countResult?.count || 0), page, limit),
       categories: categories.map((c) => c.category).filter(Boolean),
+      summary: {
+        totalItems: Number(summary?.totalItems || 0),
+        totalValue: Number(summary?.totalValue || 0),
+        lowStockCount: Number(summary?.lowStockCount || 0),
+        avgMargin: Number(summary?.avgMargin || 0),
+      },
     });
   } catch (err) {
     return handleError(err);
