@@ -176,6 +176,8 @@ export default function AuditLogPage() {
   const [dateTo, setDateTo] = useState("");
 
   const limit = 30;
+  const [allEntries, setAllEntries] = useState<AuditEntry[]>([]);
+  const [allTotal, setAllTotal] = useState(0);
 
   // Debounce search
   useEffect(() => {
@@ -188,6 +190,33 @@ export default function AuditLogPage() {
     setPage(1);
   }, [entityTypeFilter, actionFilter, dateFrom, dateTo]);
 
+  // Fetch unfiltered data for tab counts (respects entity type + date, not action)
+  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    let cancelled = false;
+
+    const params = new URLSearchParams();
+    params.set("limit", "100");
+    if (entityTypeFilter !== "all") params.set("entityType", entityTypeFilter);
+    if (dateFrom) params.set("startDate", dateFrom);
+    if (dateTo) params.set("endDate", dateTo);
+
+    fetch(`/api/v1/audit-log?${params}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) {
+          setAllEntries(data.data || []);
+          setAllTotal(data.total || 0);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [entityTypeFilter, dateFrom, dateTo]);
+
+  // Fetch filtered data for display
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
@@ -246,14 +275,14 @@ export default function AuditLogPage() {
   const hasFilters = search || dateFrom || dateTo || entityTypeFilter !== "all" || actionFilter !== "all";
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Stats from current data
+  // Action counts from unfiltered data (so tabs always show correct totals)
   const actionCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    entries.forEach((e) => {
+    allEntries.forEach((e) => {
       counts[e.action] = (counts[e.action] || 0) + 1;
     });
     return counts;
-  }, [entries]);
+  }, [allEntries]);
 
   if (loading && entries.length === 0) return <BrandLoader />;
 
@@ -263,7 +292,7 @@ export default function AuditLogPage() {
           <Tabs value={actionFilter} onValueChange={setActionFilter}>
             <TabsList className="overflow-x-auto">
               <TabsTrigger value="all" className="whitespace-nowrap">
-                All <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">{totalCount}</span>
+                All <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">{allTotal}</span>
               </TabsTrigger>
               {Object.entries(actionCounts).map(([action, count]) => (
                 <TabsTrigger key={action} value={action} className="whitespace-nowrap capitalize">
