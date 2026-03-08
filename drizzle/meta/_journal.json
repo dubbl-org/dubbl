@@ -57,6 +57,13 @@
       "when": 1772951516577,
       "tag": "0007_lying_arachne",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772962457384,
+      "tag": "0008_productive_guardian",
+      "breakpoints": true
     }
   ]
 }
