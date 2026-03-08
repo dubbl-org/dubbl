@@ -498,7 +498,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Activity feed sidebar */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-4rem)] lg:overflow-hidden lg:flex lg:flex-col">
           <ActivityFeed />
         </div>
       </div>

@@ -145,8 +145,8 @@ export function ActivityFeed() {
   }, []);
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b">
+    <div className="rounded-xl border bg-card overflow-hidden flex flex-col max-h-[inherit]">
+      <div className="px-4 py-3 border-b shrink-0">
         <h3 className="text-[13px] font-semibold">Recent Activity</h3>
         {!loading && entries.length > 0 && (
           <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -155,6 +155,7 @@ export function ActivityFeed() {
         )}
       </div>
 
+      <div className="flex-1 overflow-y-auto min-h-0">
       {loading ? (
         <ActivitySkeleton />
       ) : entries.length === 0 ? (
@@ -226,6 +227,7 @@ export function ActivityFeed() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
