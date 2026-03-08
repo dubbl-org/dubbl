@@ -23,6 +23,12 @@ import {
   budgetLine,
   budgetPeriod,
   project,
+  projectTask,
+  projectLabel,
+  projectMilestone,
+  projectNote,
+  taskChecklist,
+  taskComment,
   timeEntry,
   fixedAsset,
   payrollEmployee,
@@ -866,13 +872,22 @@ async function seed() {
   }
   console.log(`  1 budget with ${budgetAccounts.length} line items`);
 
-  // 13. Projects + Time Entries
+  // 13. Projects + Time Entries + Tasks + Milestones + Notes
   console.log("Creating projects...");
+
+  // Get member ID for task assignees
+  const demoMember = await db.query.member.findFirst({
+    where: eq(member.organizationId, org.id),
+  });
+  const memberId = demoMember!.id;
+
   const projectData = [
     { name: "Website Redesign", contactIdx: 0, budget: 2000000, rate: 15000, status: "active" as const },
     { name: "Mobile App MVP", contactIdx: 2, budget: 5000000, rate: 17500, status: "active" as const },
     { name: "API Integration", contactIdx: 8, budget: 800000, rate: 12500, status: "completed" as const },
   ];
+
+  const projectIds: string[] = [];
 
   for (const p of projectData) {
     const [proj] = await db
@@ -887,6 +902,8 @@ async function seed() {
         startDate: "2026-01-01",
       })
       .returning();
+
+    projectIds.push(proj.id);
 
     // Add some time entries
     const entries = [
@@ -910,6 +927,204 @@ async function seed() {
     }
   }
   console.log(`  ${projectData.length} projects with time entries`);
+
+  // 13a. Project Labels
+  console.log("Creating project labels...");
+  const labelColors: Record<string, string> = {
+    bug: "#ef4444", feature: "#3b82f6", design: "#8b5cf6", backend: "#10b981",
+    frontend: "#f59e0b", urgent: "#dc2626", documentation: "#6366f1", performance: "#06b6d4",
+  };
+
+  for (const projId of projectIds) {
+    for (const [name, color] of Object.entries(labelColors)) {
+      await db.insert(projectLabel).values({ projectId: projId, name, color });
+    }
+  }
+
+  // 13b. Project Milestones
+  console.log("Creating project milestones...");
+  const milestonesPerProject: { title: string; description: string; status: "upcoming" | "in_progress" | "completed" | "overdue"; dueDate: string; amount: number; completedAt?: Date }[][] = [
+    // Website Redesign
+    [
+      { title: "Design Approval", description: "Finalize wireframes and visual design with stakeholder sign-off", status: "completed", dueDate: "2026-01-20", amount: 50000, completedAt: new Date("2026-01-18") },
+      { title: "Frontend Build", description: "Implement responsive pages from approved designs", status: "in_progress", dueDate: "2026-03-15", amount: 80000 },
+      { title: "Content Migration", description: "Migrate all existing content to new templates", status: "upcoming", dueDate: "2026-04-01", amount: 30000 },
+      { title: "Launch", description: "Go live with new website and redirect old URLs", status: "upcoming", dueDate: "2026-04-15", amount: 40000 },
+    ],
+    // Mobile App MVP
+    [
+      { title: "Architecture Review", description: "Define tech stack, API contracts, and data models", status: "completed", dueDate: "2026-01-15", amount: 75000, completedAt: new Date("2026-01-14") },
+      { title: "Core Features", description: "Authentication, dashboard, and primary user flows", status: "in_progress", dueDate: "2026-03-01", amount: 150000 },
+      { title: "Beta Release", description: "Internal beta with TestFlight / Play Store internal track", status: "upcoming", dueDate: "2026-04-15", amount: 100000 },
+      { title: "App Store Submission", description: "Submit to Apple and Google for review", status: "upcoming", dueDate: "2026-05-01", amount: 175000 },
+    ],
+    // API Integration
+    [
+      { title: "API Specification", description: "OpenAPI spec and endpoint documentation", status: "completed", dueDate: "2026-01-10", amount: 20000, completedAt: new Date("2026-01-09") },
+      { title: "Implementation", description: "Build all integration endpoints with error handling", status: "completed", dueDate: "2026-02-01", amount: 40000, completedAt: new Date("2026-01-30") },
+      { title: "Testing & QA", description: "End-to-end integration tests and load testing", status: "completed", dueDate: "2026-02-15", amount: 20000, completedAt: new Date("2026-02-14") },
+    ],
+  ];
+
+  for (let i = 0; i < projectIds.length; i++) {
+    for (let j = 0; j < milestonesPerProject[i].length; j++) {
+      const m = milestonesPerProject[i][j];
+      await db.insert(projectMilestone).values({
+        projectId: projectIds[i],
+        title: m.title,
+        description: m.description,
+        status: m.status,
+        dueDate: m.dueDate,
+        amount: m.amount,
+        completedAt: m.completedAt,
+        sortOrder: j,
+      });
+    }
+  }
+
+  // 13c. Project Tasks
+  console.log("Creating project tasks...");
+  type TaskSeed = { title: string; description: string; status: "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled"; priority: "low" | "medium" | "high" | "urgent"; dueDate?: string; estimatedMinutes?: number; labels?: string[]; completedAt?: Date; checklist?: { title: string; done: boolean }[]; comments?: string[] };
+
+  const tasksPerProject: TaskSeed[][] = [
+    // Website Redesign
+    [
+      { title: "Create sitemap", description: "Map out all pages and navigation hierarchy", status: "done", priority: "high", dueDate: "2026-01-12", estimatedMinutes: 120, labels: ["design"], completedAt: new Date("2026-01-11"),
+        checklist: [{ title: "List all current pages", done: true }, { title: "Define new IA structure", done: true }, { title: "Get stakeholder approval", done: true }],
+        comments: ["Mapped 42 pages from the old site", "Consolidated 12 redundant pages into 6"] },
+      { title: "Design homepage mockup", description: "High-fidelity homepage design in Figma", status: "done", priority: "high", dueDate: "2026-01-18", estimatedMinutes: 480, labels: ["design", "frontend"], completedAt: new Date("2026-01-17"),
+        comments: ["Client approved v3 of the design", "Hero section uses the new brand gradient"] },
+      { title: "Implement responsive nav", description: "Build hamburger menu for mobile and sticky header for desktop", status: "done", priority: "high", dueDate: "2026-02-01", estimatedMinutes: 240, labels: ["frontend"], completedAt: new Date("2026-01-31") },
+      { title: "Build contact page", description: "Contact form with validation and Google Maps embed", status: "in_progress", priority: "medium", dueDate: "2026-03-05", estimatedMinutes: 180, labels: ["frontend", "backend"],
+        checklist: [{ title: "Form layout", done: true }, { title: "Validation logic", done: true }, { title: "Email integration", done: false }, { title: "Map embed", done: false }] },
+      { title: "Set up CMS", description: "Configure headless CMS for blog and dynamic pages", status: "in_progress", priority: "high", dueDate: "2026-03-10", estimatedMinutes: 360, labels: ["backend"],
+        comments: ["Going with Sanity for the CMS"] },
+      { title: "SEO optimization", description: "Meta tags, structured data, sitemap.xml, robots.txt", status: "todo", priority: "medium", dueDate: "2026-03-20", estimatedMinutes: 240, labels: ["frontend", "performance"] },
+      { title: "Performance audit", description: "Lighthouse scores, image optimization, lazy loading", status: "todo", priority: "medium", dueDate: "2026-03-25", estimatedMinutes: 180, labels: ["performance"] },
+      { title: "Accessibility review", description: "WCAG 2.1 AA compliance check and fixes", status: "backlog", priority: "low", estimatedMinutes: 300, labels: ["frontend"] },
+      { title: "Analytics setup", description: "Google Analytics 4 + event tracking for key conversions", status: "backlog", priority: "low", labels: ["backend"] },
+      { title: "Dark mode support", description: "Add theme toggle with system preference detection", status: "cancelled", priority: "low", labels: ["design", "frontend"],
+        comments: ["Client decided to skip dark mode for v1"] },
+    ],
+    // Mobile App MVP
+    [
+      { title: "Set up React Native project", description: "Init project with Expo, configure TypeScript, ESLint, Prettier", status: "done", priority: "urgent", dueDate: "2026-01-10", estimatedMinutes: 120, labels: ["frontend"], completedAt: new Date("2026-01-09") },
+      { title: "Design system components", description: "Button, Input, Card, Modal, Toast - reusable component library", status: "done", priority: "high", dueDate: "2026-01-20", estimatedMinutes: 600, labels: ["design", "frontend"], completedAt: new Date("2026-01-19"),
+        checklist: [{ title: "Button variants", done: true }, { title: "Input fields", done: true }, { title: "Card component", done: true }, { title: "Modal/Dialog", done: true }, { title: "Toast notifications", done: true }] },
+      { title: "Authentication flow", description: "Sign up, login, forgot password, biometric auth", status: "done", priority: "urgent", dueDate: "2026-01-25", estimatedMinutes: 480, labels: ["frontend", "backend"], completedAt: new Date("2026-01-24"),
+        comments: ["Using Clerk for auth", "Added Face ID support on iOS"] },
+      { title: "Dashboard screen", description: "Main dashboard with summary cards, recent activity, and quick actions", status: "in_progress", priority: "high", dueDate: "2026-02-28", estimatedMinutes: 360, labels: ["frontend"],
+        checklist: [{ title: "Summary cards", done: true }, { title: "Recent activity list", done: true }, { title: "Quick action buttons", done: false }, { title: "Pull to refresh", done: false }] },
+      { title: "Push notifications", description: "Firebase Cloud Messaging setup for iOS and Android", status: "in_progress", priority: "high", dueDate: "2026-03-05", estimatedMinutes: 300, labels: ["backend"],
+        comments: ["FCM token registration working", "Need to handle notification permissions on iOS"] },
+      { title: "Offline mode", description: "Local SQLite cache for offline data access with sync", status: "todo", priority: "medium", dueDate: "2026-03-15", estimatedMinutes: 480, labels: ["frontend", "backend"] },
+      { title: "Payment integration", description: "Stripe SDK for in-app payments and subscriptions", status: "todo", priority: "high", dueDate: "2026-03-20", estimatedMinutes: 420, labels: ["backend"] },
+      { title: "App icon and splash screen", description: "Design app icon for all sizes, animated splash screen", status: "todo", priority: "medium", dueDate: "2026-03-10", estimatedMinutes: 120, labels: ["design"] },
+      { title: "End-to-end tests", description: "Detox tests for critical user flows", status: "backlog", priority: "medium", estimatedMinutes: 600, labels: ["frontend"] },
+      { title: "Crash reporting", description: "Sentry integration for crash and error tracking", status: "backlog", priority: "high", labels: ["backend", "performance"] },
+      { title: "Localization", description: "i18n setup with English and Spanish translations", status: "backlog", priority: "low", labels: ["frontend"] },
+      { title: "Deep linking", description: "Universal links for iOS, App Links for Android", status: "backlog", priority: "low", labels: ["frontend", "backend"] },
+    ],
+    // API Integration
+    [
+      { title: "Define API contracts", description: "OpenAPI 3.0 specification for all endpoints", status: "done", priority: "urgent", dueDate: "2026-01-08", estimatedMinutes: 180, labels: ["documentation", "backend"], completedAt: new Date("2026-01-07"),
+        comments: ["Spec reviewed and approved by partner team"] },
+      { title: "Auth middleware", description: "OAuth 2.0 client credentials flow with token caching", status: "done", priority: "urgent", dueDate: "2026-01-12", estimatedMinutes: 240, labels: ["backend"], completedAt: new Date("2026-01-11") },
+      { title: "Data sync endpoints", description: "Build CRUD endpoints for contacts, products, and orders sync", status: "done", priority: "high", dueDate: "2026-01-25", estimatedMinutes: 600, labels: ["backend"], completedAt: new Date("2026-01-24"),
+        checklist: [{ title: "Contacts sync", done: true }, { title: "Products sync", done: true }, { title: "Orders sync", done: true }, { title: "Webhook handlers", done: true }] },
+      { title: "Rate limiting", description: "Implement rate limiter respecting partner API limits (100 req/min)", status: "done", priority: "high", dueDate: "2026-01-28", estimatedMinutes: 120, labels: ["backend", "performance"], completedAt: new Date("2026-01-27") },
+      { title: "Error handling & retries", description: "Exponential backoff retry logic with dead letter queue", status: "done", priority: "high", dueDate: "2026-02-05", estimatedMinutes: 180, labels: ["backend"], completedAt: new Date("2026-02-04"),
+        comments: ["Using 3 retries with 1s, 5s, 30s backoff"] },
+      { title: "Integration tests", description: "Test suite against partner sandbox environment", status: "done", priority: "high", dueDate: "2026-02-10", estimatedMinutes: 360, labels: ["backend"], completedAt: new Date("2026-02-09") },
+      { title: "Load testing", description: "K6 load tests simulating 1000 concurrent syncs", status: "done", priority: "medium", dueDate: "2026-02-14", estimatedMinutes: 180, labels: ["performance"], completedAt: new Date("2026-02-13"),
+        comments: ["Handled 1200 concurrent with p99 < 200ms"] },
+      { title: "Monitoring dashboard", description: "Grafana dashboard for sync health, errors, and latency", status: "done", priority: "medium", dueDate: "2026-02-15", estimatedMinutes: 120, labels: ["backend"], completedAt: new Date("2026-02-14") },
+    ],
+  ];
+
+  for (let i = 0; i < projectIds.length; i++) {
+    for (let j = 0; j < tasksPerProject[i].length; j++) {
+      const t = tasksPerProject[i][j];
+      const [task] = await db.insert(projectTask).values({
+        projectId: projectIds[i],
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        assigneeId: memberId,
+        createdById: userId,
+        dueDate: t.dueDate,
+        estimatedMinutes: t.estimatedMinutes,
+        labels: t.labels ?? [],
+        sortOrder: j,
+        completedAt: t.completedAt,
+      }).returning();
+
+      // Checklist items
+      if (t.checklist) {
+        for (let k = 0; k < t.checklist.length; k++) {
+          await db.insert(taskChecklist).values({
+            taskId: task.id,
+            title: t.checklist[k].title,
+            isCompleted: t.checklist[k].done,
+            sortOrder: k,
+          });
+        }
+      }
+
+      // Comments
+      if (t.comments) {
+        for (const content of t.comments) {
+          await db.insert(taskComment).values({
+            taskId: task.id,
+            authorId: userId,
+            content,
+          });
+        }
+      }
+    }
+  }
+
+  // 13d. Project Notes
+  console.log("Creating project notes...");
+  const notesPerProject: { content: string; isPinned: boolean }[][] = [
+    // Website Redesign
+    [
+      { content: "Client prefers clean, minimal design. Reference sites: stripe.com, linear.app. No heavy animations - focus on content readability and fast loading.", isPinned: true },
+      { content: "Brand colors updated: primary #2563eb, secondary #7c3aed. New logo files in shared drive under /brand/2026/.", isPinned: true },
+      { content: "Meeting notes (Jan 15): Agreed on 4-page initial scope - Home, About, Services, Contact. Blog to follow in phase 2.", isPinned: false },
+      { content: "Hosting decision: Vercel for frontend, existing AWS for API. Domain transfer scheduled for March.", isPinned: false },
+      { content: "Image assets: Using Unsplash for stock photos initially. Client will provide custom photography by mid-March.", isPinned: false },
+    ],
+    // Mobile App MVP
+    [
+      { content: "Target platforms: iOS 16+ and Android 13+. Using Expo SDK 50 with custom dev client for native modules.", isPinned: true },
+      { content: "Design tokens synced from Figma via Style Dictionary. Run `pnpm generate:tokens` after design updates.", isPinned: true },
+      { content: "API base URL: staging at api-staging.example.com, prod TBD. Auth tokens expire after 24h.", isPinned: false },
+      { content: "Beta testers list: 15 internal, 30 external. TestFlight invites go out March 20th.", isPinned: false },
+      { content: "Performance budget: app launch < 2s, screen transitions < 300ms, API calls < 500ms p95.", isPinned: true },
+      { content: "App Store requirements checklist: privacy policy page, 6.5\" and 12.9\" screenshots, app preview video (optional for v1).", isPinned: false },
+    ],
+    // API Integration
+    [
+      { content: "Partner API docs: https://partner.example.com/docs (login: shared in 1Password). Rate limit: 100 req/min per client.", isPinned: true },
+      { content: "Sandbox credentials rotated monthly. Current ones expire March 1st - set calendar reminder.", isPinned: true },
+      { content: "Data mapping: partner uses 'customer' we use 'contact', partner 'item' = our 'product'. Field mapping spreadsheet in /docs/mapping.xlsx.", isPinned: false },
+      { content: "Post-launch monitoring: alert if sync failure rate > 2% in 5min window. PagerDuty integration configured.", isPinned: false },
+    ],
+  ];
+
+  for (let i = 0; i < projectIds.length; i++) {
+    for (const note of notesPerProject[i]) {
+      await db.insert(projectNote).values({
+        projectId: projectIds[i],
+        authorId: userId,
+        content: note.content,
+        isPinned: note.isPinned,
+      });
+    }
+  }
+  console.log("  Labels, milestones, tasks, and notes created");
 
   // 14. Fixed Assets
   console.log("Creating fixed assets...");
