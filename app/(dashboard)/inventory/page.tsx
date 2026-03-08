@@ -298,7 +298,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border bg-card p-4">
@@ -708,6 +708,6 @@ export default function InventoryPage() {
       </Sheet>
 
       {confirmDialog}
-    </ContentReveal>
+    </div>
   );
 }
