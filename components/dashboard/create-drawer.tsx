@@ -17,6 +17,7 @@ import {
   Plus,
   CreditCard,
   RefreshCw,
+  Landmark,
 } from "lucide-react";
 import {
   Sheet,
@@ -45,7 +46,7 @@ import { FileUploader } from "@/components/dashboard/file-uploader";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -84,6 +85,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <CreditNoteDrawer open={activeType === "creditNote"} onClose={close} />
       <RecurringDrawer open={activeType === "recurring"} onClose={close} />
       <AccountDrawer open={activeType === "account"} onClose={close} />
+      <BankAccountDrawer open={activeType === "bankAccount"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -2400,6 +2402,157 @@ function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }
               <div className="space-y-2">
                 <Label htmlFor="drawer-account-description">Description</Label>
                 <Textarea id="drawer-account-description" name="description" placeholder="Account description..." rows={2} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Account" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bank Account Drawer
+// ---------------------------------------------------------------------------
+const BANK_ACCOUNT_COLORS = [
+  "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+];
+
+function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [accountName, setAccountName] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountType, setAccountType] = useState("checking");
+  const [currencyCode, setCurrencyCode] = useState("USD");
+  const [countryCode, setCountryCode] = useState("");
+  const [color, setColor] = useState(BANK_ACCOUNT_COLORS[0]);
+
+  useEffect(() => {
+    if (!open) {
+      setAccountName(""); setBankName(""); setAccountNumber("");
+      setAccountType("checking"); setCurrencyCode("USD"); setCountryCode("");
+      setColor(BANK_ACCOUNT_COLORS[0]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!accountName.trim()) { toast.error("Please enter an account name"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/bank-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          accountName,
+          accountNumber: accountNumber || null,
+          bankName: bankName || null,
+          currencyCode,
+          countryCode: countryCode || null,
+          accountType,
+          color,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create bank account");
+      }
+      const data = await res.json();
+      toast.success("Bank account created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("bank-accounts-changed"));
+      router.push(`/accounting/banking/${data.bankAccount.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create bank account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Landmark className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Bank Account</SheetTitle>
+              <SheetDescription>Add an account to track transactions and import statements.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Account Details</SectionLabel>
+              <div className="space-y-2">
+                <Label>Account Name *</Label>
+                <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Global Operating Account" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Bank Name</Label>
+                  <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Revolut Business" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Account Type</Label>
+                  <Select value={accountType} onValueChange={setAccountType}>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="checking">Checking</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="credit_card">Credit Card</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="loan">Loan</SelectItem>
+                      <SelectItem value="investment">Investment</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Account Number / IBAN</Label>
+                <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="1234 or GB29NWBK..." />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Region & Currency</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Input value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value.toUpperCase())} placeholder="USD" maxLength={3} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <Input value={countryCode} onChange={(e) => setCountryCode(e.target.value.toUpperCase())} placeholder="US" maxLength={2} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Accent Color</SectionLabel>
+              <div className="flex gap-2">
+                {BANK_ACCOUNT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`size-6 rounded-full ring-2 ring-transparent transition-all ${color === c ? "ring-offset-2 ring-gray-400" : ""}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
               </div>
             </div>
           </div>
