@@ -6,6 +6,7 @@ import {
   bankAccount,
   bankTransaction,
   bankReconciliation,
+  reminderRule,
 } from "@/lib/db/schema";
 import { eq, and, sql, lt, notInArray, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
@@ -98,6 +99,20 @@ export async function GET(request: Request) {
       return daysSince > 30;
     });
 
+    // Pending reminders count
+    const [pendingReminders] = await db
+      .select({
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(reminderRule)
+      .where(
+        and(
+          eq(reminderRule.organizationId, ctx.organizationId),
+          eq(reminderRule.enabled, true),
+          isNull(reminderRule.deletedAt)
+        )
+      );
+
     return NextResponse.json({
       overdueInvoices: {
         count: Number(overdueInvoices?.count || 0),
@@ -109,6 +124,7 @@ export async function GET(request: Request) {
       },
       uncategorizedTransactions: Number(uncategorized?.count || 0),
       accountsNeedingReconciliation: needsRecon,
+      activeReminderRules: Number(pendingReminders?.count || 0),
     });
   } catch (err) {
     return handleError(err);

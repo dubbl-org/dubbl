@@ -237,6 +237,35 @@ export const attachment = pgTable("attachment", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// Exchange Rate Source
+export const exchangeRateSourceEnum = pgEnum("exchange_rate_source", [
+  "manual",
+  "api",
+]);
+
+// Exchange Rate
+export const exchangeRate = pgTable(
+  "exchange_rate",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    baseCurrency: text("base_currency").notNull(),
+    targetCurrency: text("target_currency").notNull(),
+    rate: integer("rate").notNull(), // 6 decimal places as int (1.000000 = 1000000)
+    date: date("date").notNull(),
+    source: exchangeRateSourceEnum("source").notNull().default("manual"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("exchange_rate_org_currencies_date_idx").on(
+      table.organizationId,
+      table.baseCurrency,
+      table.targetCurrency,
+      table.date
+    ),
+  ]
+);
+
 // Relations
 export const currencyRelations = relations(currency, () => ({}));
 
@@ -356,5 +385,12 @@ export const attachmentRelations = relations(attachment, ({ one }) => ({
   uploadedByUser: one(users, {
     fields: [attachment.uploadedBy],
     references: [users.id],
+  }),
+}));
+
+export const exchangeRateRelations = relations(exchangeRate, ({ one }) => ({
+  organization: one(organization, {
+    fields: [exchangeRate.organizationId],
+    references: [organization.id],
   }),
 }));

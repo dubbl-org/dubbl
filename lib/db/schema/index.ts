@@ -15,3 +15,7 @@ export * from "./payroll";
 export * from "./payments";
 export * from "./recurring";
 export * from "./sequences";
+export * from "./email";
+export * from "./accruals";
+export * from "./revenue-recognition";
+export * from "./loans";

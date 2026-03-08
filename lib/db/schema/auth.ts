@@ -105,6 +105,10 @@ export const organization = pgTable("organization", {
   contactWebsite: text("contact_website"),
   defaultPaymentTerms: text("default_payment_terms"),
   industrySector: text("industry_sector"),
+  billApprovalThreshold: integer("bill_approval_threshold"), // cents, null = no approval needed
+  interestRate: integer("interest_rate"), // basis points, e.g. 500 = 5%
+  interestMethod: text("interest_method"), // "simple" or "compound"
+  interestGraceDays: integer("interest_grace_days").default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),

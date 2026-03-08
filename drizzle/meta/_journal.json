@@ -50,6 +50,13 @@
       "when": 1772902649255,
       "tag": "0006_faulty_darkhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772951516577,
+      "tag": "0007_lying_arachne",
+      "breakpoints": true
     }
   ]
 }
