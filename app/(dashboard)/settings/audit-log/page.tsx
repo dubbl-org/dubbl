@@ -384,10 +384,10 @@ export default function AuditLogPage() {
               {grouped.map((group, gi) => (
                 <div key={group.label}>
                   {/* Day header with dot on timeline */}
-                  <div className="relative flex items-center gap-3 pl-[18px] py-3">
+                  <div className="relative flex items-center gap-3 py-3 pl-[9px]">
                     {/* Timeline line above day label */}
                     {gi > 0 && (
-                      <div className="absolute left-[22px] -top-0 h-3 w-px bg-border" />
+                      <div className="absolute left-[12px] -top-0 h-3 w-px bg-border" />
                     )}
                     <div className="relative z-10 flex size-2 shrink-0 rounded-full bg-border ring-4 ring-background" />
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
@@ -399,7 +399,7 @@ export default function AuditLogPage() {
                   {/* Timeline entries */}
                   <div className="relative">
                     {/* Continuous vertical line */}
-                    <div className="absolute left-[22px] top-0 bottom-0 w-px bg-border" />
+                    <div className="absolute left-[12px] top-0 bottom-0 w-px bg-border" />
 
                     {group.items.map((entry, i) => {
                       const EntityIcon = ENTITY_ICONS[entry.entityType] || ArrowLeftRight;
@@ -411,7 +411,7 @@ export default function AuditLogPage() {
                         <div
                           key={entry.id}
                           className={cn(
-                            "relative flex items-start gap-3 pl-2 pr-3 py-2.5 ml-1 transition-colors hover:bg-muted/30 rounded-lg group",
+                            "relative flex items-start gap-3 pr-3 py-2.5 transition-colors hover:bg-muted/30 rounded-lg group",
                             isLastEntry && "pb-4"
                           )}
                         >
