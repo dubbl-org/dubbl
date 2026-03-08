@@ -42,6 +42,9 @@ export async function GET(
       orderBy: desc(bankTransaction.date),
       limit,
       offset,
+      with: {
+        import: true,
+      },
     });
 
     const [countResult] = await db

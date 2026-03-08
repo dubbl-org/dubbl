@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Check, CreditCard, Sparkles, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 
 interface BillingInfo {
@@ -21,6 +22,8 @@ const plans = [
     name: "Free",
     price: "$0",
     period: "",
+    description: "For individuals getting started",
+    icon: CreditCard,
     features: [
       "1 organization",
       "2 members",
@@ -35,6 +38,8 @@ const plans = [
     name: "Pro",
     price: "$12",
     period: "/seat/mo",
+    description: "For growing teams and businesses",
+    icon: Sparkles,
     features: [
       "3 organizations",
       "10 members",
@@ -50,6 +55,8 @@ const plans = [
     name: "Business",
     price: "$29",
     period: "/seat/mo",
+    description: "For large teams with advanced needs",
+    icon: Building2,
     features: [
       "Unlimited organizations",
       "Unlimited members",
@@ -125,115 +132,164 @@ export default function BillingPage() {
   }
 
   const currentPlan = billing?.plan || "free";
+  const activePlanData = plans.find((p) => p.id === currentPlan)!;
+  const ActiveIcon = activePlanData.icon;
 
   return (
-    <div className="space-y-10">
-      {/* Current plan overview */}
-      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
-        <div className="shrink-0">
-          <p className="text-sm font-medium">Current plan</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Your organization&apos;s subscription and usage.
-          </p>
+    <ContentReveal className="space-y-8">
+      {/* Current plan card */}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-xl border p-6",
+          "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20"
+        )}
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/60">
+              <ActiveIcon className="size-5 text-emerald-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold capitalize">
+                  {currentPlan} plan
+                </h2>
+                <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-400">
+                  Active
+                </Badge>
+              </div>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {billing?.seatCount
+                  ? `${billing.seatCount} seat${billing.seatCount !== 1 ? "s" : ""}`
+                  : "1 seat"}
+                {billing?.currentPeriodEnd
+                  ? ` · Renews ${new Date(billing.currentPeriodEnd).toLocaleDateString()}`
+                  : ""}
+                {billing?.cancelAtPeriodEnd ? " · Cancels at period end" : ""}
+              </p>
+            </div>
+          </div>
+          {currentPlan !== "free" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openPortal}
+              disabled={portalLoading}
+              className="shrink-0"
+            >
+              {portalLoading ? "Loading..." : "Manage Billing"}
+            </Button>
+          )}
         </div>
-        <div className="min-w-0">
-          <div className="flex items-center justify-between rounded-lg border border-border p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                <span className="text-lg font-bold text-emerald-600">
-                  {currentPlan === "free" ? "F" : currentPlan === "pro" ? "P" : "B"}
+      </div>
+
+      {/* Section heading */}
+      <div>
+        <h3 className="text-sm font-medium">Compare plans</h3>
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          Choose the right plan for your team.
+        </p>
+      </div>
+
+      {/* Plan comparison cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {plans.map((plan) => {
+          const isCurrent = plan.id === currentPlan;
+          const PlanIcon = plan.icon;
+          return (
+            <div
+              key={plan.id}
+              className={cn(
+                "flex flex-col rounded-xl border p-6 transition-shadow",
+                isCurrent
+                  ? "border-emerald-300 ring-1 ring-emerald-300 dark:border-emerald-800 dark:ring-emerald-800"
+                  : "hover:shadow-sm"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-lg",
+                      isCurrent
+                        ? "bg-emerald-100 dark:bg-emerald-950/60"
+                        : "bg-muted"
+                    )}
+                  >
+                    <PlanIcon
+                      className={cn(
+                        "size-4",
+                        isCurrent
+                          ? "text-emerald-600"
+                          : "text-muted-foreground"
+                      )}
+                    />
+                  </div>
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                </div>
+                {isCurrent && (
+                  <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-400">
+                    Current
+                  </Badge>
+                )}
+              </div>
+
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                {plan.description}
+              </p>
+
+              <div className="mt-4">
+                <span className="text-3xl font-bold tracking-tight">
+                  {plan.price}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {plan.period}
                 </span>
               </div>
-              <div>
-                <p className="text-sm font-semibold capitalize">{currentPlan} plan</p>
-                <p className="text-[12px] text-muted-foreground">
-                  {billing?.seatCount ? `${billing.seatCount} seat${billing.seatCount !== 1 ? "s" : ""}` : "1 seat"}
-                  {billing?.currentPeriodEnd
-                    ? ` · Renews ${new Date(billing.currentPeriodEnd).toLocaleDateString()}`
-                    : ""}
-                </p>
+
+              <ul className="mt-5 flex-1 space-y-2.5">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-[13px]">
+                    <Check className="size-3.5 shrink-0 text-emerald-600" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-6">
+                {isCurrent ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    size="sm"
+                    disabled
+                  >
+                    Current Plan
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className={cn(
+                      "w-full",
+                      plan.id !== "free" &&
+                        "bg-emerald-600 hover:bg-emerald-700"
+                    )}
+                    variant={plan.id === "free" ? "outline" : "default"}
+                    onClick={() => checkout(plan.id)}
+                    disabled={checkoutPlan !== null}
+                  >
+                    {checkoutPlan === plan.id
+                      ? "Loading..."
+                      : plan.id === "free"
+                        ? "Downgrade"
+                        : "Upgrade"}
+                  </Button>
+                )}
               </div>
             </div>
-            {currentPlan !== "free" && (
-              <Button variant="outline" size="sm" onClick={openPortal} disabled={portalLoading}>
-                {portalLoading ? "Loading..." : "Manage Billing"}
-              </Button>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <div className="h-px bg-border" />
-
-      {/* Plans */}
-      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
-        <div className="shrink-0">
-          <p className="text-sm font-medium">Plans</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Compare features and choose the right plan for your team.
-          </p>
-        </div>
-        <div className="min-w-0 grid gap-4 lg:grid-cols-3">
-          {plans.map((plan) => {
-            const isCurrent = plan.id === currentPlan;
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  "rounded-lg border p-5",
-                  isCurrent && "border-emerald-300 ring-1 ring-emerald-300"
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{plan.name}</h3>
-                  {isCurrent && (
-                    <Badge className="bg-emerald-100 text-emerald-700 border-0">
-                      Current
-                    </Badge>
-                  )}
-                </div>
-                <div className="mt-2">
-                  <span className="text-3xl font-bold tracking-tight">
-                    {plan.price}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {plan.period}
-                  </span>
-                </div>
-                <ul className="mt-4 space-y-2">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-[13px]">
-                      <Check className="size-3.5 text-emerald-600 shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-5">
-                  {isCurrent ? (
-                    <Button variant="outline" className="w-full" size="sm" disabled>
-                      Current Plan
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className={cn(
-                        "w-full",
-                        plan.id !== "free" &&
-                          "bg-emerald-600 hover:bg-emerald-700"
-                      )}
-                      variant={plan.id === "free" ? "outline" : "default"}
-                      onClick={() => checkout(plan.id)}
-                      disabled={checkoutPlan !== null}
-                    >
-                      {checkoutPlan === plan.id ? "Loading..." : plan.id === "free" ? "Downgrade" : "Upgrade"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    </div>
+          );
+        })}
+      </div>
+    </ContentReveal>
   );
 }

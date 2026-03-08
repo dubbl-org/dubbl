@@ -66,19 +66,19 @@ export default function QuoteDetailPage() {
         {q.status === "accepted" && <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700"><FileText className="mr-2 size-4" />Convert to Invoice</Button>}
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge variant="outline" className={statusColors[q.status] || ""}>{q.status}</Badge>
-        <span className="text-sm text-muted-foreground">Issued {q.issueDate} · Expires {q.expiryDate}</span>
+        <span className="text-xs sm:text-sm text-muted-foreground">Issued {q.issueDate} · Expires {q.expiryDate}</span>
       </div>
 
       <div className="rounded-lg border p-4"><p className="text-xl font-bold font-mono">{formatMoney(q.total)}</p></div>
 
-      <div className="rounded-lg border">
-        <div className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+      <div className="rounded-lg border overflow-x-auto">
+        <div className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
           <span>Description</span><span className="text-right">Qty</span><span className="text-right">Price</span><span className="text-right">Amount</span>
         </div>
         {q.lines.map((line) => (
-          <div key={line.id} className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
+          <div key={line.id} className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
             <div><p className="text-sm">{line.description}</p>{line.account && <p className="text-xs text-muted-foreground">{line.account.code} &middot; {line.account.name}</p>}</div>
             <span className="text-right text-sm font-mono">{(line.quantity / 100).toFixed(0)}</span>
             <span className="text-right text-sm font-mono">{formatMoney(line.unitPrice)}</span>

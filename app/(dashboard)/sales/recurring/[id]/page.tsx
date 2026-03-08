@@ -207,14 +207,14 @@ export default function RecurringDetailPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge
           variant="outline"
           className={statusColors[template.status] || ""}
         >
           {template.status}
         </Badge>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs sm:text-sm text-muted-foreground">
           {frequencyLabels[template.frequency] || template.frequency} · Starts{" "}
           {template.startDate} · Ends{" "}
           {template.endDate || "No end date"}
@@ -247,8 +247,8 @@ export default function RecurringDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border">
-        <div className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+      <div className="rounded-lg border overflow-x-auto">
+        <div className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
           <span>Description</span>
           <span className="text-right">Qty</span>
           <span className="text-right">Unit Price</span>
@@ -257,7 +257,7 @@ export default function RecurringDetailPage() {
         {template.lines.map((line) => (
           <div
             key={line.id}
-            className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0"
+            className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0"
           >
             <div>
               <p className="text-sm">{line.description}</p>

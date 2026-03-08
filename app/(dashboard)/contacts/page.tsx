@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
-import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight } from "lucide-react";
+import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -10,8 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
@@ -184,10 +193,12 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [refetching, setRefetching] = useState(false);
   const [fetchKey, setFetchKey] = useState(0);
@@ -196,11 +207,6 @@ export default function ContactsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   // Reset and fetch page 1 when filters change
   useEffect(() => {
@@ -219,6 +225,8 @@ export default function ContactsPage() {
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (sortBy !== "created") params.set("sortBy", sortBy);
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
     params.set("page", "1");
     params.set("limit", "50");
 
@@ -239,7 +247,7 @@ export default function ContactsPage() {
 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, typeFilter, sortBy, sortOrder]);
+  }, [debouncedSearch, typeFilter, sortBy, sortOrder, dateFrom, dateTo]);
 
   // Load next page
   const loadMore = useCallback(() => {
@@ -255,6 +263,8 @@ export default function ContactsPage() {
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (sortBy !== "created") params.set("sortBy", sortBy);
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
     params.set("page", String(nextPage));
     params.set("limit", "50");
 
@@ -271,7 +281,7 @@ export default function ContactsPage() {
         }
       })
       .finally(() => setLoadingMore(false));
-  }, [loadingMore, hasMore, page, debouncedSearch, typeFilter, sortBy, sortOrder]);
+  }, [loadingMore, hasMore, page, debouncedSearch, typeFilter, sortBy, sortOrder, dateFrom, dateTo]);
 
   // IntersectionObserver to trigger loadMore
   useEffect(() => {
@@ -329,11 +339,12 @@ export default function ContactsPage() {
   if (loading) return <BrandLoader />;
 
   /* ---------- Empty state ---------- */
+  const hasFilters = dateFrom || dateTo;
   const pendingSearch = search !== debouncedSearch;
 
-  if (contacts.length === 0 && !search && typeFilter === "all" && !refetching && !pendingSearch) {
+  if (contacts.length === 0 && !search && typeFilter === "all" && !refetching && !pendingSearch && !hasFilters) {
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
           {/* Background skeleton table */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-6">
@@ -375,12 +386,12 @@ export default function ContactsPage() {
           </div>
 
           {/* Top section */}
-          <div className="relative flex flex-1 flex-col items-center justify-center py-12 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-              <Users className="size-7 text-emerald-600 dark:text-emerald-400" />
+          <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
+            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
+              <Users className="size-6 sm:size-7 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h2 className="mt-5 text-xl font-semibold tracking-tight">Manage your contacts</h2>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+            <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Manage your contacts</h2>
+            <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
               Keep track of everyone you do business with. Add customers, suppliers, or contacts that are both.
             </p>
             <Button
@@ -394,7 +405,7 @@ export default function ContactsPage() {
           </div>
 
           {/* Feature cards */}
-          <div className="grid gap-4 sm:grid-cols-3 pb-8">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
             {[
               {
                 icon: Building2,
@@ -420,7 +431,7 @@ export default function ContactsPage() {
             ].map(({ icon: Icon, title, description, color, bg }) => (
               <div
                 key={title}
-                className="group rounded-xl p-5"
+                className="group rounded-xl p-4 sm:p-5"
               >
                 <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
                   <Icon className={`size-4.5 ${color}`} />
@@ -433,13 +444,13 @@ export default function ContactsPage() {
             ))}
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
-      <div className="space-y-6">
+    <ContentReveal>
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <PageHeader
           title="Contacts"
@@ -456,8 +467,8 @@ export default function ContactsPage() {
 
         {/* Summary + search */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
-            <span className="font-medium text-foreground tabular-nums">{total}</span> contacts
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-[13px] text-muted-foreground">
+            <span className="font-medium text-foreground tabular-nums">{contacts.length}</span> contacts
             <span className="text-border">·</span>
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-blue-500" />
@@ -478,6 +489,9 @@ export default function ContactsPage() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
@@ -487,6 +501,58 @@ export default function ContactsPage() {
               className="pl-9"
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">From</span>
+            <DatePicker
+              value={dateFrom}
+              onChange={(v) => setDateFrom(v)}
+              placeholder="Start date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">To</span>
+            <DatePicker
+              value={dateTo}
+              onChange={(v) => setDateTo(v)}
+              placeholder="End date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <Select
+            value={`${sortBy}:${sortOrder}`}
+            onValueChange={(v) => {
+              const [key, order] = v.split(":");
+              setSortBy(key);
+              setSortOrder(order as "asc" | "desc");
+            }}
+          >
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created:desc">Newest first</SelectItem>
+              <SelectItem value="created:asc">Oldest first</SelectItem>
+              <SelectItem value="name:asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name:desc">Name (Z-A)</SelectItem>
+              <SelectItem value="terms:asc">Shortest terms</SelectItem>
+              <SelectItem value="terms:desc">Longest terms</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+            >
+              <X className="mr-1 size-3" />
+              Clear dates
+            </Button>
+          )}
         </div>
 
         {/* Table */}
@@ -505,6 +571,7 @@ export default function ContactsPage() {
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
               style={{ willChange: "opacity, transform, filter" }}
+              className="overflow-x-auto"
             >
               <DataTable
                 columns={columns}
@@ -530,6 +597,6 @@ export default function ContactsPage() {
         )}
       </div>
       {confirmDialog}
-    </BlurReveal>
+    </ContentReveal>
   );
 }

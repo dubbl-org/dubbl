@@ -17,8 +17,18 @@ FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js collects telemetry by default — disable it
+# Next.js collects telemetry by default - disable it
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Dummy build-time values so modules that init at import don't crash
+ARG DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+ARG AUTH_SECRET="build-secret"
+ARG STRIPE_SECRET_KEY="sk_test_placeholder"
+ARG STRIPE_WEBHOOK_SECRET="whsec_placeholder"
+ENV DATABASE_URL=$DATABASE_URL
+ENV AUTH_SECRET=$AUTH_SECRET
+ENV STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY
+ENV STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET
 
 RUN pnpm build
 

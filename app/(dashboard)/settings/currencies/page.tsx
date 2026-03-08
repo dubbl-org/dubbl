@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { DollarSign } from "lucide-react";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
+import { useState, useEffect, useMemo } from "react";
+import { DollarSign, Search, Coins } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Currency {
   id: string;
@@ -14,35 +15,10 @@ interface Currency {
   decimalPlaces: number;
 }
 
-const columns: Column<Currency>[] = [
-  {
-    key: "code",
-    header: "Code",
-    className: "w-24",
-    render: (r) => <span className="font-mono text-sm font-semibold">{r.code}</span>,
-  },
-  {
-    key: "symbol",
-    header: "Symbol",
-    className: "w-20",
-    render: (r) => <span className="text-sm">{r.symbol}</span>,
-  },
-  {
-    key: "name",
-    header: "Name",
-    render: (r) => <span className="text-sm">{r.name}</span>,
-  },
-  {
-    key: "decimals",
-    header: "Decimals",
-    className: "w-24",
-    render: (r) => <span className="text-sm text-muted-foreground">{r.decimalPlaces}</span>,
-  },
-];
-
 export default function CurrenciesPage() {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch("/api/currencies")
@@ -53,32 +29,104 @@ export default function CurrenciesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const filtered = useMemo(() => {
+    if (!search.trim()) return currencies;
+    const q = search.toLowerCase();
+    return currencies.filter(
+      (c) =>
+        c.code.toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        c.symbol.includes(q)
+    );
+  }, [currencies, search]);
+
   return (
-    <BlurReveal className="space-y-10">
-      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
-        <div className="shrink-0">
-          <p className="text-sm font-medium">Currencies</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            ISO 4217 currencies available for transactions, invoices, and reporting.
+    <div className="w-full space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2.5">
+          <Coins className="size-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold tracking-tight">Currencies</h2>
+          {!loading && currencies.length > 0 && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {currencies.length}
+            </span>
+          )}
+        </div>
+        <p className="text-[13px] text-muted-foreground">
+          ISO 4217 currencies available for transactions, invoices, and reporting.
+        </p>
+      </div>
+
+      {/* Search */}
+      {!loading && currencies.length > 0 && (
+        <div className="relative max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Filter by code or name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      )}
+
+      {/* Content */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+      ) : currencies.length === 0 ? (
+        <EmptyState
+          icon={DollarSign}
+          title="No currencies found"
+          description="Run the seed script to populate ISO 4217 currencies."
+        />
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Search className="mb-3 size-10 text-muted-foreground/40" />
+          <p className="text-sm font-medium text-muted-foreground">
+            No currencies match &quot;{search}&quot;
+          </p>
+          <p className="mt-1 text-[12px] text-muted-foreground/70">
+            Try a different code or name
           </p>
         </div>
-        <div className="min-w-0 space-y-4">
-          {currencies.length > 0 && (
-            <p className="text-[12px] text-muted-foreground">
-              {currencies.length} currenc{currencies.length !== 1 ? "ies" : "y"} available
+      ) : (
+        <ContentReveal>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {filtered.map((c) => (
+              <div
+                key={c.id}
+                className="group relative rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="font-mono text-base font-bold tracking-wide">
+                    {c.code}
+                  </span>
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                    {c.symbol}
+                  </span>
+                </div>
+                <p className="mt-2 truncate text-[13px] text-muted-foreground">
+                  {c.name}
+                </p>
+                <p className="mt-1.5 text-[11px] text-muted-foreground/60">
+                  {c.decimalPlaces} decimal{c.decimalPlaces !== 1 ? "s" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {search && (
+            <p className="mt-4 text-[12px] text-muted-foreground">
+              Showing {filtered.length} of {currencies.length} currenc{currencies.length !== 1 ? "ies" : "y"}
             </p>
           )}
-          {!loading && currencies.length === 0 ? (
-            <EmptyState
-              icon={DollarSign}
-              title="No currencies"
-              description="Run the seed script to populate ISO 4217 currencies."
-            />
-          ) : (
-            <DataTable columns={columns} data={currencies} loading={loading} />
-          )}
-        </div>
-      </section>
-    </BlurReveal>
+        </ContentReveal>
+      )}
+    </div>
   );
 }

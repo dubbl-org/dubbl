@@ -64,7 +64,7 @@ export default function BalanceSheetPage() {
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             {section.label}
           </h3>
-          <div className="rounded-lg border">
+          <div className="rounded-lg border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">

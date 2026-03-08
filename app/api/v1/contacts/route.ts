@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contact } from "@/lib/db/schema";
-import { eq, and, or, ilike, desc, asc } from "drizzle-orm";
+import { eq, and, or, ilike, desc, asc, gte, lte } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -28,6 +28,8 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const search = url.searchParams.get("search");
     const type = url.searchParams.get("type");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
     const sortBy = url.searchParams.get("sortBy") || "created";
     const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
@@ -56,6 +58,8 @@ export async function GET(request: Request) {
     if (type && ["customer", "supplier", "both"].includes(type)) {
       conditions.push(eq(contact.type, type as "customer" | "supplier" | "both"));
     }
+    if (from) conditions.push(gte(contact.createdAt, new Date(from)));
+    if (to) conditions.push(lte(contact.createdAt, new Date(to + "T23:59:59")));
 
     const sortCol = SORT_COLUMNS[sortBy] || contact.createdAt;
     const orderFn = sortOrder === "asc" ? asc : desc;

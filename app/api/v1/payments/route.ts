@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { payment, paymentAllocation, invoice, bill } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { getNextNumber } from "@/lib/api/numbering";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { z } from "zod";
 
@@ -90,13 +91,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate payment number (PAY-00001 pattern)
-    const [maxResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(payment)
-      .where(eq(payment.organizationId, ctx.organizationId));
-    const next = (Number(maxResult?.count) || 0) + 1;
-    const paymentNumber = `PAY-${next.toString().padStart(5, "0")}`;
+    // Generate payment number
+    const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
     // Create payment record
     const [created] = await db

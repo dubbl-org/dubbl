@@ -625,7 +625,7 @@ const secondaryFeatures = [
   {
     title: "Bank Integrations",
     description:
-      "Connect to thousands of banks for automatic transaction imports and daily reconciliation.",
+      "Import global bank statement formats today and layer live bank connections in later without changing your reconciliation workflow.",
     icon: Plug,
     iconColor: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400",
   },

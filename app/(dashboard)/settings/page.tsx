@@ -431,7 +431,7 @@ export default function SettingsPage() {
 
       {/* Financials */}
       <Section title="Financials" description="Currency, fiscal year, and default payment terms.">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Default currency</Label>
             <Input
@@ -503,14 +503,14 @@ export default function SettingsPage() {
 
       {/* Danger zone */}
       <Section title="Danger zone" description="Irreversible actions for this organization.">
-        <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
           <div>
             <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete organization</p>
             <p className="text-[12px] text-muted-foreground">
               Permanently delete this organization and all its data.
             </p>
           </div>
-          <Button variant="destructive" size="sm">
+          <Button variant="destructive" size="sm" className="w-fit">
             Delete
           </Button>
         </div>

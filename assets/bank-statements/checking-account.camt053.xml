@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>MSG-20260328-001</MsgId>
+      <CreDtTm>2026-03-28T12:00:00</CreDtTm>
+    </GrpHdr>
+    <Stmt>
+      <Id>STMT-20260328</Id>
+      <ElctrncSeqNb>1</ElctrncSeqNb>
+      <LglSeqNb>1</LglSeqNb>
+      <CreDtTm>2026-03-28T12:00:00</CreDtTm>
+      <Acct>
+        <Id>
+          <IBAN>US12345678901234567890</IBAN>
+        </Id>
+        <Ccy>USD</Ccy>
+      </Acct>
+      <Bal>
+        <Tp><CdOrPrtry><Cd>OPBD</Cd></CdOrPrtry></Tp>
+        <Amt Ccy="USD">15420.50</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt><Dt>2026-03-01</Dt></Dt>
+      </Bal>
+      <Bal>
+        <Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp>
+        <Amt Ccy="USD">26433.81</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt><Dt>2026-03-28</Dt></Dt>
+      </Bal>
+      <Ntry>
+        <NtryRef>TRN20260302001</NtryRef>
+        <Amt Ccy="USD">2500.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-02</Dt></BookgDt>
+        <ValDt><Dt>2026-03-02</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>INV-2026-001</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Invoice Payment - Acme Corp</Ustrd></RmtInf>
+          <RltdPties><Dbtr><Nm>Acme Corp</Nm></Dbtr></RltdPties>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260303001</NtryRef>
+        <Amt Ccy="USD">4830.75</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-03</Dt></BookgDt>
+        <ValDt><Dt>2026-03-03</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>po_3N8xK2</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Stripe Payout - February Sales</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260304001</NtryRef>
+        <Amt Ccy="USD">187.32</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-04</Dt></BookgDt>
+        <ValDt><Dt>2026-03-04</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>TXN-44821</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Office Supplies - Staples</Ustrd></RmtInf>
+          <RltdPties><Cdtr><Nm>Staples Inc</Nm></Cdtr></RltdPties>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260305001</NtryRef>
+        <Amt Ccy="USD">349.99</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-05</Dt></BookgDt>
+        <ValDt><Dt>2026-03-05</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>aws-inv-8812</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>AWS Monthly - Cloud Hosting</Ustrd></RmtInf>
+          <RltdPties><Cdtr><Nm>Amazon Web Services</Nm></Cdtr></RltdPties>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260306001</NtryRef>
+        <Amt Ccy="USD">8750.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-06</Dt></BookgDt>
+        <ValDt><Dt>2026-03-06</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>PAY-2026-03A</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Payroll - March 1st</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260307001</NtryRef>
+        <Amt Ccy="USD">1200.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-07</Dt></BookgDt>
+        <ValDt><Dt>2026-03-07</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>INV-2026-003</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Invoice Payment - Widget Co</Ustrd></RmtInf>
+          <RltdPties><Dbtr><Nm>Widget Co</Nm></Dbtr></RltdPties>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260310001</NtryRef>
+        <Amt Ccy="USD">5000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-10</Dt></BookgDt>
+        <ValDt><Dt>2026-03-10</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>DEP-0042</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Client Deposit - Johnson LLC</Ustrd></RmtInf>
+          <RltdPties><Dbtr><Nm>Johnson LLC</Nm></Dbtr></RltdPties>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260311001</NtryRef>
+        <Amt Ccy="USD">3200.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-11</Dt></BookgDt>
+        <ValDt><Dt>2026-03-11</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>RENT-MAR26</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Rent Payment - 123 Main St</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <NtryRef>TRN20260313001</NtryRef>
+        <Amt Ccy="USD">3750.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt><Dt>2026-03-13</Dt></BookgDt>
+        <ValDt><Dt>2026-03-13</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <Refs><AcctSvcrRef>INV-2026-005</AcctSvcrRef></Refs>
+          <RmtInf><Ustrd>Invoice Payment - DataFlow Inc</Ustrd></RmtInf>
+          <RltdPties><Dbtr><Nm>DataFlow Inc</Nm></Dbtr></RltdPties>
+        </TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

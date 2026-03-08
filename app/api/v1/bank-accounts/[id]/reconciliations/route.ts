@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankAccount, bankReconciliation } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { bankAccount, bankReconciliation, bankTransaction, auditLog } from "@/lib/db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
@@ -44,13 +44,27 @@ export async function GET(
       offset,
     });
 
+    // Enrich with transaction counts per reconciliation
+    const enriched = await Promise.all(
+      reconciliations.map(async (rec) => {
+        const [txCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(bankTransaction)
+          .where(eq(bankTransaction.reconciliationId, rec.id));
+        return {
+          ...rec,
+          transactionCount: txCount?.count || 0,
+        };
+      })
+    );
+
     const [countResult] = await db
       .select({ count: db.$count(bankReconciliation) })
       .from(bankReconciliation)
       .where(eq(bankReconciliation.bankAccountId, id));
 
     return NextResponse.json(
-      paginatedResponse(reconciliations, Number(countResult?.count || 0), page, limit)
+      paginatedResponse(enriched, Number(countResult?.count || 0), page, limit)
     );
   } catch (err) {
     return handleError(err);
@@ -90,6 +104,19 @@ export async function POST(
         endBalance: parsed.endBalance,
       })
       .returning();
+
+    await db.insert(auditLog).values({
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      action: "created_reconciliation",
+      entityType: "bank_account",
+      entityId: id,
+      changes: {
+        reconciliationId: created.id,
+        startDate: parsed.startDate,
+        endDate: parsed.endDate,
+      },
+    });
 
     return NextResponse.json({ reconciliation: created }, { status: 201 });
   } catch (err) {

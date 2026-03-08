@@ -10,6 +10,7 @@ import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 interface PayrollRunDetail {
   id: string;
@@ -81,6 +82,7 @@ export default function PayrollRunDetailPage() {
   const [run, setRun] = useState<PayrollRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -97,7 +99,13 @@ export default function PayrollRunDetailPage() {
   }, [id]);
 
   async function handleProcess() {
-    if (!confirm("Process this payroll run? This will create journal entries and cannot be undone.")) return;
+    const confirmed = await confirm({
+      title: "Process this payroll run?",
+      description: "This will create journal entries and cannot be undone.",
+      confirmLabel: "Process",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     setProcessing(true);
@@ -173,6 +181,7 @@ export default function PayrollRunDetailPage() {
           emptyMessage="No employees in this run."
         />
       </div>
+      {confirmDialog}
     </div>
   );
 }

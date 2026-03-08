@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 
 interface ProjectMember {
@@ -199,7 +199,7 @@ export default function ProjectsPage() {
 
   if (!loading && projects.length === 0 && statusFilter === "all") {
     return (
-      <BlurReveal className="space-y-10">
+      <ContentReveal className="space-y-10">
         <Section title="Projects" description="Create your first project to start tracking time, tasks, and billing.">
           <EmptyState
             icon={FolderKanban}
@@ -215,16 +215,16 @@ export default function ProjectsPage() {
             </Button>
           </EmptyState>
         </Section>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal>
-    <div className="space-y-8">
+    <ContentReveal>
+    <div className="space-y-6 sm:space-y-8">
       <Section title="Overview" description="A summary of your projects and resource allocation.">
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard title="Active" value={activeProjects.length.toString()} icon={FolderKanban} />
             <StatCard title="Total Budget" value={formatMoney(totalBudget)} icon={DollarSign} />
             <StatCard title="Total Billed" value={formatMoney(totalBilled)} icon={Target}
@@ -250,15 +250,17 @@ export default function ProjectsPage() {
 
       <Section title="Projects" description="View and manage all your projects.">
         <div className="space-y-4">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="on_hold">On Hold</TabsTrigger>
-              <TabsTrigger value="archived">Archived</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="overflow-x-auto -mx-1 px-1">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+                <TabsTrigger value="on_hold">On Hold</TabsTrigger>
+                <TabsTrigger value="archived">Archived</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
           <DataTable
               columns={columns}
@@ -270,6 +272,6 @@ export default function ProjectsPage() {
         </div>
       </Section>
     </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

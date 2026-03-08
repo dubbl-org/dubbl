@@ -19,7 +19,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "budgetId is required" }, { status: 400 });
     }
 
-    // Fetch the budget with its lines
     const found = await db.query.budget.findFirst({
       where: and(
         eq(budget.id, budgetId),
@@ -28,7 +27,10 @@ export async function GET(request: Request) {
       ),
       with: {
         lines: {
-          with: { account: true },
+          with: {
+            account: true,
+            periods: true,
+          },
         },
       },
     });
@@ -63,24 +65,102 @@ export async function GET(request: Request) {
       });
     }
 
+    // Get per-period actuals for each account
+    const allPeriods = found.lines.flatMap((l) =>
+      (l.periods || []).map((p) => ({
+        accountId: l.accountId,
+        periodId: p.id,
+        startDate: p.startDate,
+        endDate: p.endDate,
+      }))
+    );
+
+    // Fetch per-period actuals in bulk using date ranges
+    const periodActualMap = new Map<string, { debit: number; credit: number }>();
+
+    if (allPeriods.length > 0) {
+      const uniqueDateRanges = new Map<string, { startDate: string; endDate: string }>();
+      for (const p of allPeriods) {
+        uniqueDateRanges.set(`${p.startDate}_${p.endDate}`, {
+          startDate: p.startDate,
+          endDate: p.endDate,
+        });
+      }
+
+      for (const range of uniqueDateRanges.values()) {
+        const periodActuals = await db
+          .select({
+            accountId: journalLine.accountId,
+            debit: sql<number>`COALESCE(SUM(${journalLine.debitAmount}), 0)`.as("debit"),
+            credit: sql<number>`COALESCE(SUM(${journalLine.creditAmount}), 0)`.as("credit"),
+          })
+          .from(journalLine)
+          .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
+          .where(
+            and(
+              eq(journalEntry.organizationId, ctx.organizationId),
+              eq(journalEntry.status, "posted"),
+              isNull(journalEntry.deletedAt),
+              gte(journalEntry.date, range.startDate),
+              lte(journalEntry.date, range.endDate)
+            )
+          )
+          .groupBy(journalLine.accountId);
+
+        for (const pa of periodActuals) {
+          const key = `${pa.accountId}_${range.startDate}_${range.endDate}`;
+          periodActualMap.set(key, {
+            debit: Number(pa.debit),
+            credit: Number(pa.credit),
+          });
+        }
+      }
+    }
+
+    // Calculate days for burn rate
+    const startMs = new Date(found.startDate + "T00:00:00").getTime();
+    const endMs = new Date(found.endDate + "T00:00:00").getTime();
+    const nowMs = Date.now();
+    const totalDays = Math.max(1, Math.round((endMs - startMs) / 86400000) + 1);
+    const daysElapsed = Math.max(0, Math.min(totalDays, Math.round((nowMs - startMs) / 86400000)));
+    const daysRemaining = Math.max(0, totalDays - daysElapsed);
+
+    function computeActual(accountId: string, accountType: string | undefined, actData: { debit: number; credit: number } | undefined): number {
+      if (!actData) return 0;
+      if (accountType === "expense" || accountType === "asset") {
+        return actData.debit - actData.credit;
+      }
+      return actData.credit - actData.debit;
+    }
+
     const comparisons = found.lines.map((line) => {
       const act = actualMap.get(line.accountId);
       const accountType = line.account?.type;
-
-      // For expense accounts: actual = debit - credit
-      // For revenue accounts: actual = credit - debit
-      let actualAmount = 0;
-      if (act) {
-        if (accountType === "expense" || accountType === "asset") {
-          actualAmount = act.debit - act.credit;
-        } else {
-          actualAmount = act.credit - act.debit;
-        }
-      }
-
+      const actualAmount = computeActual(line.accountId, accountType, act);
       const budgeted = line.total;
       const variance = budgeted - actualAmount;
       const variancePct = budgeted === 0 ? 0 : Math.round((variance / budgeted) * 100);
+
+      // Per-period breakdown
+      const sortedPeriods = [...(line.periods || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+      const periodBreakdown = sortedPeriods.map((p) => {
+        const key = `${line.accountId}_${p.startDate}_${p.endDate}`;
+        const pAct = periodActualMap.get(key);
+        const periodActual = computeActual(line.accountId, accountType, pAct);
+        return {
+          id: p.id,
+          label: p.label,
+          startDate: p.startDate,
+          endDate: p.endDate,
+          budgeted: p.amount,
+          actual: periodActual,
+          variance: p.amount - periodActual,
+          sortOrder: p.sortOrder,
+        };
+      });
+
+      // Burn rate: actual / days elapsed * total days
+      const burnRate = daysElapsed > 0 ? Math.round((actualAmount / daysElapsed) * totalDays) : 0;
 
       return {
         accountId: line.accountId,
@@ -90,12 +170,16 @@ export async function GET(request: Request) {
         actual: actualAmount,
         variance,
         variancePct,
+        burnRate,
+        projected: burnRate,
+        periods: periodBreakdown,
       };
     });
 
     const totalBudgeted = comparisons.reduce((s, c) => s + c.budgeted, 0);
     const totalActual = comparisons.reduce((s, c) => s + c.actual, 0);
     const totalVariance = totalBudgeted - totalActual;
+    const totalBurnRate = daysElapsed > 0 ? Math.round((totalActual / daysElapsed) * totalDays) : 0;
 
     return NextResponse.json({
       budget: {
@@ -103,11 +187,16 @@ export async function GET(request: Request) {
         name: found.name,
         startDate: found.startDate,
         endDate: found.endDate,
+        periodType: found.periodType,
       },
       comparisons,
       totalBudgeted,
       totalActual,
       totalVariance,
+      totalBurnRate,
+      daysElapsed,
+      daysRemaining,
+      totalDays,
     });
   } catch (err) {
     return handleError(err);

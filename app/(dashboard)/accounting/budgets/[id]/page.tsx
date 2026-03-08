@@ -1,388 +1,387 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
-import { Save, Plus, Trash2, ArrowLeft } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
+import { useState, useMemo } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { cn } from "@/lib/utils";
+import { useBudgetContext } from "./layout";
+import type { BudgetLineData, PeriodComparison } from "./layout";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
-interface Account {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-}
-
-interface BudgetLineData {
-  id: string;
-  accountId: string;
-  account: Account | null;
-  jan: number; feb: number; mar: number; apr: number;
-  may: number; jun: number; jul: number; aug: number;
-  sep: number; oct: number; nov: number; dec: number;
-  total: number;
-}
-
-interface BudgetData {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-  createdAt: string;
-  lines: BudgetLineData[];
-}
-
-const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-type MonthKey = typeof MONTHS[number];
-
-interface LineInput {
-  id?: string;
-  accountId: string;
-  jan: number; feb: number; mar: number; apr: number;
-  may: number; jun: number; jul: number; aug: number;
-  sep: number; oct: number; nov: number; dec: number;
-}
-
-function lineTotal(line: LineInput): number {
-  return MONTHS.reduce((s, m) => s + line[m], 0);
-}
-
-function emptyLine(): LineInput {
-  return { accountId: "", jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 };
-}
-
-export default function BudgetDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const router = useRouter();
-  const [budget, setBudget] = useState<BudgetData | null>(null);
-  const [name, setName] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [lines, setLines] = useState<LineInput[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    Promise.all([
-      fetch(`/api/v1/budgets/${id}`, {
-        headers: { "x-organization-id": orgId },
-      }).then((r) => r.json()),
-      fetch("/api/v1/accounts?limit=500", {
-        headers: { "x-organization-id": orgId },
-      }).then((r) => r.json()),
-    ])
-      .then(([budgetData, accountsData]) => {
-        const b = budgetData.budget;
-        if (b) {
-          setBudget(b);
-          setName(b.name);
-          setStartDate(b.startDate);
-          setEndDate(b.endDate);
-          setIsActive(b.isActive);
-          setLines(
-            b.lines.map((l: BudgetLineData) => ({
-              id: l.id,
-              accountId: l.accountId,
-              jan: l.jan, feb: l.feb, mar: l.mar, apr: l.apr,
-              may: l.may, jun: l.jun, jul: l.jul, aug: l.aug,
-              sep: l.sep, oct: l.oct, nov: l.nov, dec: l.dec,
-            }))
-          );
-        }
-        setAccounts(accountsData.data || []);
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  function updateLine(index: number, field: string, value: string | number) {
-    setLines((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
-  }
-
-  function updateMonthCents(index: number, month: string, value: string) {
-    const cents = Math.round(parseFloat(value || "0") * 100);
-    updateLine(index, month, cents);
-  }
-
-  function removeLine(index: number) {
-    setLines((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  async function handleSave() {
-    setError("");
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    const validLines = lines.filter((l) => l.accountId);
-    if (validLines.length === 0) {
-      setError("At least one budget line with an account is required.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/v1/budgets/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
-          name,
-          startDate,
-          endDate,
-          isActive,
-          lines: validLines,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Failed to update budget");
-        return;
-      }
-
-      setEditing(false);
-      // Reload
-      const budgetRes = await fetch(`/api/v1/budgets/${id}`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const budgetData = await budgetRes.json();
-      if (budgetData.budget) {
-        setBudget(budgetData.budget);
-      }
-    } catch {
-      setError("Failed to update budget");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this budget?")) return;
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    await fetch(`/api/v1/budgets/${id}`, {
-      method: "DELETE",
-      headers: { "x-organization-id": orgId },
-    });
-    router.push("/accounting/budgets");
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Loading..." />
-        <div className="h-64 animate-pulse rounded-lg bg-muted" />
-      </div>
-    );
-  }
-
-  if (!budget) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Budget not found" />
-        <Button variant="outline" onClick={() => router.push("/accounting/budgets")}>
-          <ArrowLeft className="mr-2 size-4" />Back to Budgets
-        </Button>
-      </div>
-    );
-  }
+export default function BudgetOverviewPage() {
+  const { budget, comparisons, totalBudgeted, totalActual } = useBudgetContext();
 
   const grandTotal = budget.lines.reduce((s, l) => s + l.total, 0);
+  const totalVariance = totalBudgeted - totalActual;
+  const overallPct = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
+  const over = totalActual > totalBudgeted;
+
+  // Build chart data from period comparisons (aggregate across all accounts)
+  const chartData = useMemo(() => {
+    if (comparisons.length === 0) return [];
+
+    // Collect all unique periods across all comparisons
+    const periodMap = new Map<string, { label: string; sortOrder: number; budgeted: number; actual: number }>();
+
+    for (const c of comparisons) {
+      for (const p of c.periods || []) {
+        const existing = periodMap.get(p.label);
+        if (existing) {
+          existing.budgeted += p.budgeted;
+          existing.actual += p.actual;
+        } else {
+          periodMap.set(p.label, {
+            label: p.label,
+            sortOrder: p.sortOrder,
+            budgeted: p.budgeted,
+            actual: p.actual,
+          });
+        }
+      }
+    }
+
+    return Array.from(periodMap.values())
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((p) => ({
+        name: p.label,
+        budgeted: p.budgeted / 100,
+        actual: p.actual / 100,
+      }));
+  }, [comparisons]);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={editing ? "Edit Budget" : budget.name}
-        description={editing ? "Modify budget allocations." : `${budget.startDate} to ${budget.endDate}`}
-      >
-        <div className="flex items-center gap-2">
-          {!editing && (
-            <>
-              <Badge variant="outline" className={budget.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>
-                {budget.isActive ? "Active" : "Inactive"}
-              </Badge>
-              <Button variant="outline" onClick={() => setEditing(true)}>Edit</Button>
-              <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={handleDelete}>Delete</Button>
-            </>
-          )}
-          {editing && (
-            <>
-              <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                <Save className="mr-2 size-4" />{saving ? "Saving..." : "Save"}
-              </Button>
-            </>
-          )}
+      {/* Spending trend chart */}
+      {chartData.length > 1 && (
+        <div>
+          <p className="text-sm font-medium mb-3">Spending Trend</p>
+          <div className="rounded-lg border p-4">
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="budgetedGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  formatter={(value) => [`$${Number(value).toFixed(2)}`]}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Area type="monotone" dataKey="budgeted" name="Budgeted" stroke="#8b5cf6" fill="url(#budgetedGrad)" strokeWidth={2} />
+                <Area type="monotone" dataKey="actual" name="Actual" stroke="#3b82f6" fill="url(#actualGrad)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </PageHeader>
-
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
       )}
 
-      {editing ? (
-        <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Budget Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Budget Lines</h2>
-            <Button type="button" variant="outline" size="sm" onClick={() => setLines((prev) => [...prev, emptyLine()])}>
-              <Plus className="mr-2 size-4" />Add Line
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50 border-b">
-                  <th className="px-3 py-2 text-left font-medium w-48">Account</th>
-                  {MONTH_LABELS.map((m) => (
-                    <th key={m} className="px-2 py-2 text-right font-medium w-20">{m}</th>
-                  ))}
-                  <th className="px-3 py-2 text-right font-medium w-24">Total</th>
-                  <th className="px-2 py-2 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="px-3 py-2">
-                      <select
-                        className="h-8 w-full rounded border bg-background px-2 text-sm"
-                        value={line.accountId}
-                        onChange={(e) => updateLine(i, "accountId", e.target.value)}
-                      >
-                        <option value="">Select account...</option>
-                        {accounts.map((a) => (
-                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                    {MONTHS.map((m) => (
-                      <td key={m} className="px-1 py-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="h-8 w-full rounded border bg-background px-2 text-right text-sm font-mono tabular-nums"
-                          value={(line[m] / 100).toFixed(2)}
-                          onChange={(e) => updateMonthCents(i, m, e.target.value)}
-                        />
-                      </td>
-                    ))}
-                    <td className="px-3 py-2 text-right font-mono text-sm tabular-nums font-medium">
-                      ${(lineTotal(line) / 100).toFixed(2)}
-                    </td>
-                    <td className="px-2 py-2">
-                      <button type="button" onClick={() => removeLine(i)} className="text-muted-foreground hover:text-red-600">
-                        <Trash2 className="size-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Per-account breakdown */}
+      {comparisons.length > 0 ? (
+        <div className="space-y-3">
+          {comparisons.map((c) => {
+            const pct = c.budgeted === 0 ? 0 : Math.round((c.actual / c.budgeted) * 100);
+            const over = c.actual > c.budgeted;
+            const budgetLine = budget.lines.find((l) => l.accountId === c.accountId);
+            return (
+              <ViewLineCard
+                key={c.accountId}
+                accountName={c.accountName}
+                accountCode={c.accountCode}
+                budgeted={c.budgeted}
+                actual={c.actual}
+                variance={c.variance}
+                pct={pct}
+                over={over}
+                burnRate={c.burnRate}
+                budgetLine={budgetLine}
+                periodComparisons={c.periods}
+              />
+            );
+          })}
+        </div>
+      ) : budget.lines.length > 0 ? (
+        <div className="space-y-3">
+          {budget.lines.map((line) => (
+            <ViewLineCard
+              key={line.id}
+              accountName={line.account?.name || line.accountId}
+              accountCode={line.account?.code || ""}
+              budgeted={line.total}
+              actual={0}
+              variance={line.total}
+              pct={0}
+              over={false}
+              burnRate={0}
+              budgetLine={line}
+              periodComparisons={[]}
+            />
+          ))}
         </div>
       ) : (
-        <div className="space-y-6">
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Budget</p>
-            <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(grandTotal)}</p>
+        <div className="rounded-xl border border-dashed py-12 text-center">
+          <p className="text-sm text-muted-foreground">No budget lines configured.</p>
+          <Button size="sm" variant="outline" className="mt-3" asChild>
+            <a href={`/accounting/budgets/${budget.id}/settings`}>Add lines</a>
+          </Button>
+        </div>
+      )}
+
+      {/* Period breakdown table */}
+      {comparisons.length > 0 && comparisons[0]?.periods?.length > 0 && (
+        <>
+          <div className="h-px bg-border" />
+          <PeriodBreakdownTable comparisons={comparisons} />
+        </>
+      )}
+
+      {/* Grand total */}
+      {grandTotal > 0 && (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Grand Total</p>
+            <p className="font-mono text-lg font-semibold tabular-nums">{formatMoney(grandTotal)}</p>
           </div>
-
-          {budget.lines.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {budget.lines.map((line) => (
-                <div key={line.id} className="rounded-lg border bg-card p-4">
-                  <BudgetProgressBar
-                    budgeted={line.total}
-                    actual={0}
-                    label={line.account ? `${line.account.code} - ${line.account.name}` : line.accountId}
-                  />
-                </div>
-              ))}
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-4 text-muted-foreground">
+              <span>Spent: <span className="font-mono tabular-nums text-foreground">{formatMoney(totalActual)}</span></span>
+              <span className={cn(
+                "font-mono tabular-nums",
+                over ? "text-red-600" : "text-emerald-600"
+              )}>
+                {over ? "Over by " + formatMoney(Math.abs(totalVariance)) : formatMoney(totalVariance) + " remaining"}
+              </span>
             </div>
-          )}
-
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50 border-b">
-                  <th className="px-3 py-2 text-left font-medium">Account</th>
-                  {MONTH_LABELS.map((m) => (
-                    <th key={m} className="px-2 py-2 text-right font-medium w-20">{m}</th>
-                  ))}
-                  <th className="px-3 py-2 text-right font-medium w-24">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {budget.lines.map((line) => (
-                  <tr key={line.id} className="border-b">
-                    <td className="px-3 py-2 font-medium">
-                      {line.account ? `${line.account.code} - ${line.account.name}` : line.accountId}
-                    </td>
-                    {MONTHS.map((m) => (
-                      <td key={m} className="px-2 py-2 text-right font-mono tabular-nums">
-                        {formatMoney(line[m as MonthKey])}
-                      </td>
-                    ))}
-                    <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold">
-                      {formatMoney(line.total)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-muted/50">
-                  <td className="px-3 py-2 font-semibold">Total</td>
-                  {MONTHS.map((m) => {
-                    const monthTotal = budget.lines.reduce((s, l) => s + l[m as MonthKey], 0);
-                    return (
-                      <td key={m} className="px-2 py-2 text-right font-mono tabular-nums font-semibold">
-                        {formatMoney(monthTotal)}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 text-right font-mono tabular-nums font-bold">
-                    {formatMoney(grandTotal)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+            <span className={cn(
+              "text-xs font-mono tabular-nums font-medium",
+              over ? "text-red-600" : overallPct > 80 ? "text-amber-600" : "text-emerald-600"
+            )}>
+              {overallPct}%
+            </span>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ViewLineCard({
+  accountName,
+  accountCode,
+  budgeted,
+  actual,
+  variance,
+  pct,
+  over,
+  burnRate,
+  budgetLine,
+  periodComparisons,
+}: {
+  accountName: string;
+  accountCode: string;
+  budgeted: number;
+  actual: number;
+  variance: number;
+  pct: number;
+  over: boolean;
+  burnRate: number;
+  budgetLine?: BudgetLineData;
+  periodComparisons: PeriodComparison[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const periods = periodComparisons.length > 0
+    ? periodComparisons
+    : (budgetLine?.periods || []).map((p) => ({
+        id: p.id,
+        label: p.label,
+        startDate: p.startDate,
+        endDate: p.endDate,
+        budgeted: p.amount,
+        actual: 0,
+        variance: p.amount,
+        sortOrder: p.sortOrder,
+      }));
+
+  return (
+    <div className="rounded-lg border px-4 py-3 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{accountName}</p>
+            {accountCode && <span className="text-xs text-muted-foreground font-mono">{accountCode}</span>}
+          </div>
+        </div>
+        <div className="text-right shrink-0 ml-4">
+          <p className="text-sm font-mono font-semibold tabular-nums">
+            {actual > 0 ? (
+              <>{formatMoney(actual)} <span className="text-muted-foreground font-normal">/ {formatMoney(budgeted)}</span></>
+            ) : (
+              formatMoney(budgeted)
+            )}
+          </p>
+          {actual > 0 && (
+            <p className={cn(
+              "text-xs font-mono tabular-nums",
+              over ? "text-red-600" : "text-emerald-600"
+            )}>
+              {over ? "Over by " : "Under by "}{formatMoney(Math.abs(variance))}
+            </p>
+          )}
+        </div>
+      </div>
+      {actual > 0 && (
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+            )}
+            style={{ width: `${Math.min(pct, 100)}%` }}
+          />
+        </div>
+      )}
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-3">
+          {actual > 0 && <span>{pct}% utilized</span>}
+          {actual > 0 && <span className="font-mono tabular-nums">{formatMoney(budgeted - actual)} remaining</span>}
+          {burnRate > 0 && <span className="font-mono tabular-nums">Projected: {formatMoney(burnRate)}</span>}
+          {actual === 0 && <span>No spending recorded yet</span>}
+        </div>
+        {periods.length > 0 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            Periods
+          </button>
+        )}
+      </div>
+      {expanded && periods.length > 0 && (
+        <div className="space-y-1 pt-1">
+          {periods.sort((a, b) => a.sortOrder - b.sortOrder).map((p) => {
+            const pPct = p.budgeted === 0 ? 0 : Math.round((p.actual / p.budgeted) * 100);
+            const pOver = p.actual > p.budgeted;
+            return (
+              <div key={p.id} className="flex items-center justify-between text-[11px] py-1 px-2 rounded hover:bg-muted/50">
+                <span className="text-muted-foreground min-w-[80px]">{p.label}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono tabular-nums">{formatMoney(p.budgeted)}</span>
+                  {p.actual > 0 && (
+                    <>
+                      <span className="font-mono tabular-nums text-blue-600">{formatMoney(p.actual)}</span>
+                      <span className={cn(
+                        "font-mono tabular-nums",
+                        pOver ? "text-red-600" : "text-emerald-600"
+                      )}>
+                        {pOver ? "+" : "-"}{formatMoney(Math.abs(p.variance))}
+                      </span>
+                      <span className="text-muted-foreground w-8 text-right">{pPct}%</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeriodBreakdownTable({ comparisons }: { comparisons: { periods: PeriodComparison[] }[] }) {
+  // Aggregate periods across all accounts
+  const periodMap = new Map<string, { label: string; sortOrder: number; budgeted: number; actual: number }>();
+
+  for (const c of comparisons) {
+    for (const p of c.periods || []) {
+      const existing = periodMap.get(p.label);
+      if (existing) {
+        existing.budgeted += p.budgeted;
+        existing.actual += p.actual;
+      } else {
+        periodMap.set(p.label, {
+          label: p.label,
+          sortOrder: p.sortOrder,
+          budgeted: p.budgeted,
+          actual: p.actual,
+        });
+      }
+    }
+  }
+
+  const periods = Array.from(periodMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (periods.length === 0) return null;
+
+  const totBudgeted = periods.reduce((s, p) => s + p.budgeted, 0);
+  const totActual = periods.reduce((s, p) => s + p.actual, 0);
+  const totVariance = totBudgeted - totActual;
+
+  return (
+    <div>
+      <p className="text-sm font-medium mb-3">Period Breakdown</p>
+      <div className="rounded-lg border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/30">
+              <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Period</th>
+              <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Budgeted</th>
+              <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Actual</th>
+              <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground">Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {periods.map((p) => {
+              const variance = p.budgeted - p.actual;
+              return (
+                <tr key={p.label} className="border-b last:border-b-0">
+                  <td className="px-4 py-2 text-sm">{p.label}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums text-sm">{formatMoney(p.budgeted)}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums text-sm text-blue-600">{formatMoney(p.actual)}</td>
+                  <td className={cn(
+                    "px-4 py-2 text-right font-mono tabular-nums text-sm",
+                    variance >= 0 ? "text-emerald-600" : "text-red-600"
+                  )}>
+                    {variance >= 0 ? "" : "-"}{formatMoney(Math.abs(variance))}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t bg-muted/30">
+              <td className="px-4 py-2 text-sm font-medium">Total</td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold">{formatMoney(totBudgeted)}</td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold text-blue-600">{formatMoney(totActual)}</td>
+              <td className={cn(
+                "px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold",
+                totVariance >= 0 ? "text-emerald-600" : "text-red-600"
+              )}>
+                {totVariance >= 0 ? "" : "-"}{formatMoney(Math.abs(totVariance))}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }

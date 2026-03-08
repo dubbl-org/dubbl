@@ -202,7 +202,7 @@ export default function PayrollRunsPage() {
   }
 
   return (
-    <BlurReveal className="space-y-6">
+    <BlurReveal className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Payroll Runs"
         description="Create and manage pay runs."
@@ -217,7 +217,7 @@ export default function PayrollRunsPage() {
       </PageHeader>
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="draft">Draft</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -272,7 +272,7 @@ function NewRunDialog({
         <DialogHeader>
           <DialogTitle>New Payroll Run</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Pay Period Start</Label>
             <Input

@@ -13,20 +13,42 @@ import {
   contact,
   invoice,
   invoiceLine,
+  creditNote,
+  creditNoteLine,
   bill,
   billLine,
   bankAccount,
   bankTransaction,
   budget,
   budgetLine,
+  budgetPeriod,
   project,
+  projectTask,
+  projectLabel,
+  projectMilestone,
+  projectNote,
+  taskChecklist,
+  taskComment,
   timeEntry,
   fixedAsset,
   payrollEmployee,
   inventoryItem,
+  inventoryCategory,
+  warehouse,
+  warehouseStock,
+  inventoryMovement,
+  inventoryItemSupplier,
+  inventoryVariant,
+  inventoryTransfer,
+  inventoryTransferLine,
   expenseClaim,
   expenseItem,
+  payment,
+  paymentAllocation,
+  recurringTemplate,
+  recurringTemplateLine,
 } from "./schema";
+import { eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const CURRENCIES = [
@@ -181,66 +203,106 @@ async function seed() {
   }
   console.log(`  ${CURRENCIES.length} currencies`);
 
-  // 2. Demo User
-  console.log("Creating demo user...");
-  const passwordHash = await bcrypt.hash("password123", 12);
-  const [demoUser] = await db
-    .insert(users)
-    .values({
-      id: "demo-user-001",
-      name: "Demo User",
-      email: "demo@dubbl.app",
-      passwordHash,
-    })
-    .onConflictDoNothing()
-    .returning();
+  // 2. Find existing user + org, or create demo user
+  console.log("Looking for existing user/organization...");
 
-  if (!demoUser) {
-    console.log("  Demo user already exists, skipping...");
-    process.exit(0);
+  // Try to find an existing owner membership
+  const existingMember = await db.query.member.findFirst({
+    where: eq(member.role, "owner"),
+    with: { user: true, organization: true },
+  });
+
+  let userId: string;
+  let org: { id: string; name: string };
+
+  if (existingMember) {
+    userId = existingMember.userId;
+    org = { id: existingMember.organizationId, name: existingMember.organization.name };
+    console.log(`  Using existing user: ${existingMember.user.email}`);
+    console.log(`  Using existing org: ${org.name}`);
+  } else {
+    console.log("  No existing user found, creating demo user...");
+    const passwordHash = await bcrypt.hash("password123", 12);
+    const [demoUser] = await db
+      .insert(users)
+      .values({
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "Demo User",
+        email: "demo@dubbl.app",
+        passwordHash,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (!demoUser) {
+      console.log("  Demo user already exists but no org found. Aborting.");
+      process.exit(1);
+    }
+
+    const [newOrg] = await db
+      .insert(organization)
+      .values({
+        id: "00000000-0000-0000-0000-000000000002",
+        name: "Demo Company",
+        slug: "demo-company",
+        defaultCurrency: "USD",
+        fiscalYearStartMonth: 1,
+      })
+      .returning();
+
+    userId = demoUser.id;
+    org = { id: newOrg.id, name: newOrg.name };
+
+    await db.insert(member).values({
+      organizationId: newOrg.id,
+      userId,
+      role: "owner",
+    });
+
+    await db.insert(subscription).values({
+      organizationId: newOrg.id,
+      plan: "business",
+      status: "active",
+    });
   }
-
-  // 3. Organization
-  console.log("Creating demo organization...");
-  const [org] = await db
-    .insert(organization)
-    .values({
-      id: "demo-org-001",
-      name: "Demo Company",
-      slug: "demo-company",
-      defaultCurrency: "USD",
-      fiscalYearStartMonth: 1,
-    })
-    .returning();
-
-  await db.insert(member).values({
-    organizationId: org.id,
-    userId: demoUser.id,
-    role: "owner",
-  });
-
-  await db.insert(subscription).values({
-    organizationId: org.id,
-    plan: "business",
-    status: "active",
-  });
 
   // 4. Fiscal Year
   console.log("Creating fiscal year...");
-  const [fy] = await db
-    .insert(fiscalYear)
-    .values({
-      organizationId: org.id,
-      name: "FY 2026",
-      startDate: "2026-01-01",
-      endDate: "2026-12-31",
-    })
-    .returning();
+  let fy: { id: string };
+  const existingFy = await db.query.fiscalYear.findFirst({
+    where: eq(fiscalYear.organizationId, org.id),
+  });
+  if (existingFy) {
+    fy = existingFy;
+    console.log("  Fiscal year already exists, reusing...");
+  } else {
+    const [newFy] = await db
+      .insert(fiscalYear)
+      .values({
+        organizationId: org.id,
+        name: "FY 2026",
+        startDate: "2026-01-01",
+        endDate: "2026-12-31",
+      })
+      .returning();
+    fy = newFy;
+  }
 
   // 5. Chart of Accounts
   console.log("Creating chart of accounts...");
   const accountMap = new Map<string, string>(); // code -> id
+
+  // First load any existing accounts for this org
+  const existingAccounts = await db.query.chartAccount.findMany({
+    where: eq(chartAccount.organizationId, org.id),
+  });
+  for (const a of existingAccounts) {
+    accountMap.set(a.code, a.id);
+  }
+
+  let newAccountCount = 0;
   for (const acct of ACCOUNTS) {
+    if (accountMap.has(acct.code)) continue; // skip existing
     const [row] = await db
       .insert(chartAccount)
       .values({
@@ -252,13 +314,19 @@ async function seed() {
       })
       .returning();
     accountMap.set(acct.code, row.id);
+    newAccountCount++;
   }
-  console.log(`  ${ACCOUNTS.length} accounts`);
+  console.log(`  ${newAccountCount} new accounts (${accountMap.size} total)`);
 
   // 6. Tax Rates
   console.log("Creating tax rates...");
-  const taxRateIds: string[] = [];
+  const existingTaxRates = await db.query.taxRate.findMany({
+    where: eq(taxRate.organizationId, org.id),
+  });
+  const taxRateIds: string[] = existingTaxRates.map((t) => t.id);
+  const existingTaxNames = new Set(existingTaxRates.map((t) => t.name));
   for (const tr of TAX_RATES) {
+    if (existingTaxNames.has(tr.name)) continue;
     const [row] = await db
       .insert(taxRate)
       .values({
@@ -271,12 +339,22 @@ async function seed() {
       .returning();
     taxRateIds.push(row.id);
   }
-  console.log(`  ${TAX_RATES.length} tax rates`);
+  console.log(`  ${taxRateIds.length} tax rates`);
 
   // 7. Contacts
   console.log("Creating contacts...");
+  const existingContacts = await db.query.contact.findMany({
+    where: eq(contact.organizationId, org.id),
+  });
+  const existingContactEmails = new Set(existingContacts.map((c) => c.email));
   const contactIds: string[] = [];
+
   for (const c of CONTACTS) {
+    const existing = existingContacts.find((ec) => ec.email === c.email);
+    if (existing) {
+      contactIds.push(existing.id);
+      continue;
+    }
     const [row] = await db
       .insert(contact)
       .values({
@@ -289,8 +367,24 @@ async function seed() {
       .returning();
     contactIds.push(row.id);
   }
-  console.log(`  ${CONTACTS.length} contacts`);
+  console.log(`  ${contactIds.length} contacts`);
 
+  // Check which data already exists to skip those sections
+  const existingEntries = await db.query.journalEntry.findFirst({
+    where: eq(journalEntry.organizationId, org.id),
+  });
+  const existingCreditNotes = await db.query.creditNote.findFirst({
+    where: eq(creditNote.organizationId, org.id),
+  });
+  const hasTransactionalData = !!existingEntries;
+
+  const invoiceIds: { id: string; contactIdx: number; status: string; paid: number; total: number }[] = [];
+
+  if (hasTransactionalData) {
+    console.log("\nTransactional data already exists, skipping journal entries, invoices, bills, etc.");
+  }
+
+  if (!hasTransactionalData) {
   // 8. Journal Entries (manual entries for opening balances)
   console.log("Creating journal entries...");
   let entryNum = 1;
@@ -306,7 +400,7 @@ async function seed() {
       status: "posted",
       fiscalYearId: fy.id,
       sourceType: "manual",
-      createdBy: demoUser.id,
+      createdBy: userId,
       postedAt: new Date(),
     })
     .returning();
@@ -338,7 +432,7 @@ async function seed() {
         status: "posted",
         fiscalYearId: fy.id,
         sourceType: "manual",
-        createdBy: demoUser.id,
+        createdBy: userId,
         postedAt: new Date(),
       })
       .returning();
@@ -375,7 +469,7 @@ async function seed() {
         status: "posted",
         fiscalYearId: fy.id,
         sourceType: "manual",
-        createdBy: demoUser.id,
+        createdBy: userId,
         postedAt: new Date(),
       })
       .returning();
@@ -431,9 +525,96 @@ async function seed() {
       accountId: accountMap.get("4010")!,
       sortOrder: 0,
     });
+    invoiceIds.push({ id: row.id, contactIdx: inv.contact, status: inv.status, paid: inv.paid, total: lineAmount });
   }
   console.log(`  ${invoiceData.length} invoices`);
+  } // end if (!hasTransactionalData) - invoices block
 
+  // 9b. Credit Notes (always check, even on re-run)
+  if (existingCreditNotes) {
+    console.log("Credit notes already exist, skipping...");
+  } else {
+  console.log("Creating credit notes...");
+  const creditNoteData = [
+    {
+      contact: 0,
+      number: "CN-00001",
+      date: "2026-01-25",
+      status: "applied" as const,
+      invoiceIdx: 0,
+      description: "Overcharge correction on web development",
+      qty: 100,
+      price: 20000,
+      subtotal: 20000,
+      total: 20000,
+      amountApplied: 20000,
+      amountRemaining: 0,
+    },
+    {
+      contact: 1,
+      number: "CN-00002",
+      date: "2026-02-05",
+      status: "sent" as const,
+      invoiceIdx: null,
+      description: "Partial refund for consulting services",
+      qty: 100,
+      price: 50000,
+      subtotal: 50000,
+      total: 50000,
+      amountApplied: 0,
+      amountRemaining: 50000,
+    },
+    {
+      contact: 2,
+      number: "CN-00003",
+      date: "2026-02-12",
+      status: "draft" as const,
+      invoiceIdx: null,
+      description: "Discount for delayed delivery",
+      qty: 100,
+      price: 15000,
+      subtotal: 15000,
+      total: 15000,
+      amountApplied: 0,
+      amountRemaining: 15000,
+    },
+  ];
+
+  for (const cn of creditNoteData) {
+    const [row] = await db
+      .insert(creditNote)
+      .values({
+        organizationId: org.id,
+        contactId: contactIds[cn.contact],
+        invoiceId: cn.invoiceIdx !== null && invoiceIds[cn.invoiceIdx] ? invoiceIds[cn.invoiceIdx].id : undefined,
+        creditNoteNumber: cn.number,
+        issueDate: cn.date,
+        status: cn.status,
+        subtotal: cn.subtotal,
+        taxTotal: 0,
+        total: cn.total,
+        amountApplied: cn.amountApplied,
+        amountRemaining: cn.amountRemaining,
+        currencyCode: "USD",
+        createdBy: userId,
+        sentAt: cn.status !== "draft" ? new Date(cn.date) : undefined,
+      })
+      .returning();
+
+    await db.insert(creditNoteLine).values({
+      creditNoteId: row.id,
+      description: cn.description,
+      quantity: cn.qty,
+      unitPrice: cn.price,
+      amount: cn.subtotal,
+      accountId: accountMap.get("4010")!,
+      sortOrder: 0,
+    });
+  }
+  console.log(`  ${creditNoteData.length} credit notes`);
+  } // end credit notes
+
+  if (!hasTransactionalData) {
   // 10. Bills
   console.log("Creating bills...");
   const billData = [
@@ -449,6 +630,7 @@ async function seed() {
     { contact: 12, number: "BILL-00010", date: "2026-02-01", due: "2026-02-02", status: "paid" as const, desc: "Rent February", amount: 350000, paid: 350000 },
   ];
 
+  const billIds: { id: string; contactIdx: number; status: string; paid: number }[] = [];
   for (const b of billData) {
     const [row] = await db
       .insert(bill)
@@ -477,6 +659,7 @@ async function seed() {
       accountId: accountMap.get("5000")!,
       sortOrder: 0,
     });
+    billIds.push({ id: row.id, contactIdx: b.contact, status: b.status, paid: b.paid });
   }
   console.log(`  ${billData.length} bills`);
 
@@ -555,6 +738,104 @@ async function seed() {
   }
   console.log(`  3 bank accounts, ${bankTxns.length} transactions`);
 
+  // 11b. Payments (received for paid invoices, made for paid bills)
+  console.log("Creating payments...");
+  let payNum = 1;
+
+  // Received payments for paid/partial invoices
+  for (const inv of invoiceIds.filter((i) => i.paid > 0)) {
+    const [p] = await db
+      .insert(payment)
+      .values({
+        organizationId: org.id,
+        contactId: contactIds[inv.contactIdx],
+        paymentNumber: `PAY-R${String(payNum++).padStart(4, "0")}`,
+        type: "received",
+        date: "2026-01-25",
+        amount: inv.paid,
+        method: payNum % 2 === 0 ? "bank_transfer" : "card",
+        reference: `REF-${payNum}`,
+        bankAccountId: checkingBank.id,
+        currencyCode: "USD",
+        createdBy: userId,
+      })
+      .returning();
+
+    await db.insert(paymentAllocation).values({
+      paymentId: p.id,
+      documentType: "invoice",
+      documentId: inv.id,
+      amount: inv.paid,
+    });
+  }
+
+  // Made payments for paid bills
+  for (const b of billIds.filter((b) => b.paid > 0)) {
+    const [p] = await db
+      .insert(payment)
+      .values({
+        organizationId: org.id,
+        contactId: contactIds[b.contactIdx],
+        paymentNumber: `PAY-M${String(payNum++).padStart(4, "0")}`,
+        type: "made",
+        date: "2026-02-01",
+        amount: b.paid,
+        method: "bank_transfer",
+        reference: `CHK-${payNum}`,
+        bankAccountId: checkingBank.id,
+        currencyCode: "USD",
+        createdBy: userId,
+      })
+      .returning();
+
+    await db.insert(paymentAllocation).values({
+      paymentId: p.id,
+      documentType: "bill",
+      documentId: b.id,
+      amount: b.paid,
+    });
+  }
+  console.log(`  ${payNum - 1} payments`);
+
+  // 11c. Recurring Templates
+  console.log("Creating recurring templates...");
+  const recurringData = [
+    { name: "Monthly Retainer - Metro Services", type: "invoice", contactIdx: 4, freq: "monthly" as const, desc: "Monthly Retainer", price: 300000 },
+    { name: "Quarterly Consulting - Pinnacle", type: "invoice", contactIdx: 5, freq: "quarterly" as const, desc: "Quarterly Consulting", price: 600000 },
+    { name: "Monthly Rent", type: "bill", contactIdx: 12, freq: "monthly" as const, desc: "Office Rent", price: 350000 },
+    { name: "Monthly AWS", type: "bill", contactIdx: 11, freq: "monthly" as const, desc: "Cloud Hosting", price: 48000 },
+  ];
+
+  for (const rt of recurringData) {
+    const [tmpl] = await db
+      .insert(recurringTemplate)
+      .values({
+        organizationId: org.id,
+        name: rt.name,
+        type: rt.type,
+        contactId: contactIds[rt.contactIdx],
+        frequency: rt.freq,
+        startDate: "2026-01-01",
+        nextRunDate: "2026-03-01",
+        lastRunDate: "2026-02-01",
+        occurrencesGenerated: 2,
+        status: "active",
+        currencyCode: "USD",
+        createdBy: userId,
+      })
+      .returning();
+
+    await db.insert(recurringTemplateLine).values({
+      templateId: tmpl.id,
+      description: rt.desc,
+      quantity: 100,
+      unitPrice: rt.price,
+      accountId: accountMap.get(rt.type === "invoice" ? "4010" : "5200")!,
+      sortOrder: 0,
+    });
+  }
+  console.log(`  ${recurringData.length} recurring templates`);
+
   // 12. Budget
   console.log("Creating budget...");
   const [bud] = await db
@@ -578,34 +859,43 @@ async function seed() {
     { code: "5600", monthly: 50000 },   // $500/mo marketing
   ];
 
+  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   for (const ba of budgetAccounts) {
-    await db.insert(budgetLine).values({
+    const [bl] = await db.insert(budgetLine).values({
       budgetId: bud.id,
       accountId: accountMap.get(ba.code)!,
-      jan: ba.monthly,
-      feb: ba.monthly,
-      mar: ba.monthly,
-      apr: ba.monthly,
-      may: ba.monthly,
-      jun: ba.monthly,
-      jul: ba.monthly,
-      aug: ba.monthly,
-      sep: ba.monthly,
-      oct: ba.monthly,
-      nov: ba.monthly,
-      dec: ba.monthly,
       total: ba.monthly * 12,
-    });
+    }).returning();
+
+    await db.insert(budgetPeriod).values(
+      monthLabels.map((label, i) => ({
+        budgetLineId: bl.id,
+        label: `${label} 2026`,
+        startDate: `2026-${String(i + 1).padStart(2, "0")}-01`,
+        endDate: `2026-${String(i + 1).padStart(2, "0")}-${new Date(2026, i + 1, 0).getDate()}`,
+        amount: ba.monthly,
+        sortOrder: i,
+      }))
+    );
   }
   console.log(`  1 budget with ${budgetAccounts.length} line items`);
 
-  // 13. Projects + Time Entries
+  // 13. Projects + Time Entries + Tasks + Milestones + Notes
   console.log("Creating projects...");
+
+  // Get member ID for task assignees
+  const demoMember = await db.query.member.findFirst({
+    where: eq(member.organizationId, org.id),
+  });
+  const memberId = demoMember!.id;
+
   const projectData = [
     { name: "Website Redesign", contactIdx: 0, budget: 2000000, rate: 15000, status: "active" as const },
     { name: "Mobile App MVP", contactIdx: 2, budget: 5000000, rate: 17500, status: "active" as const },
     { name: "API Integration", contactIdx: 8, budget: 800000, rate: 12500, status: "completed" as const },
   ];
+
+  const projectIds: string[] = [];
 
   for (const p of projectData) {
     const [proj] = await db
@@ -621,6 +911,8 @@ async function seed() {
       })
       .returning();
 
+    projectIds.push(proj.id);
+
     // Add some time entries
     const entries = [
       { date: "2026-01-15", desc: "Initial setup and planning", mins: 120 },
@@ -633,7 +925,7 @@ async function seed() {
     for (const te of entries) {
       await db.insert(timeEntry).values({
         projectId: proj.id,
-        userId: demoUser.id,
+        userId: userId,
         date: te.date,
         description: te.desc,
         minutes: te.mins,
@@ -643,6 +935,204 @@ async function seed() {
     }
   }
   console.log(`  ${projectData.length} projects with time entries`);
+
+  // 13a. Project Labels
+  console.log("Creating project labels...");
+  const labelColors: Record<string, string> = {
+    bug: "#ef4444", feature: "#3b82f6", design: "#8b5cf6", backend: "#10b981",
+    frontend: "#f59e0b", urgent: "#dc2626", documentation: "#6366f1", performance: "#06b6d4",
+  };
+
+  for (const projId of projectIds) {
+    for (const [name, color] of Object.entries(labelColors)) {
+      await db.insert(projectLabel).values({ projectId: projId, name, color });
+    }
+  }
+
+  // 13b. Project Milestones
+  console.log("Creating project milestones...");
+  const milestonesPerProject: { title: string; description: string; status: "upcoming" | "in_progress" | "completed" | "overdue"; dueDate: string; amount: number; completedAt?: Date }[][] = [
+    // Website Redesign
+    [
+      { title: "Design Approval", description: "Finalize wireframes and visual design with stakeholder sign-off", status: "completed", dueDate: "2026-01-20", amount: 50000, completedAt: new Date("2026-01-18") },
+      { title: "Frontend Build", description: "Implement responsive pages from approved designs", status: "in_progress", dueDate: "2026-03-15", amount: 80000 },
+      { title: "Content Migration", description: "Migrate all existing content to new templates", status: "upcoming", dueDate: "2026-04-01", amount: 30000 },
+      { title: "Launch", description: "Go live with new website and redirect old URLs", status: "upcoming", dueDate: "2026-04-15", amount: 40000 },
+    ],
+    // Mobile App MVP
+    [
+      { title: "Architecture Review", description: "Define tech stack, API contracts, and data models", status: "completed", dueDate: "2026-01-15", amount: 75000, completedAt: new Date("2026-01-14") },
+      { title: "Core Features", description: "Authentication, dashboard, and primary user flows", status: "in_progress", dueDate: "2026-03-01", amount: 150000 },
+      { title: "Beta Release", description: "Internal beta with TestFlight / Play Store internal track", status: "upcoming", dueDate: "2026-04-15", amount: 100000 },
+      { title: "App Store Submission", description: "Submit to Apple and Google for review", status: "upcoming", dueDate: "2026-05-01", amount: 175000 },
+    ],
+    // API Integration
+    [
+      { title: "API Specification", description: "OpenAPI spec and endpoint documentation", status: "completed", dueDate: "2026-01-10", amount: 20000, completedAt: new Date("2026-01-09") },
+      { title: "Implementation", description: "Build all integration endpoints with error handling", status: "completed", dueDate: "2026-02-01", amount: 40000, completedAt: new Date("2026-01-30") },
+      { title: "Testing & QA", description: "End-to-end integration tests and load testing", status: "completed", dueDate: "2026-02-15", amount: 20000, completedAt: new Date("2026-02-14") },
+    ],
+  ];
+
+  for (let i = 0; i < projectIds.length; i++) {
+    for (let j = 0; j < milestonesPerProject[i].length; j++) {
+      const m = milestonesPerProject[i][j];
+      await db.insert(projectMilestone).values({
+        projectId: projectIds[i],
+        title: m.title,
+        description: m.description,
+        status: m.status,
+        dueDate: m.dueDate,
+        amount: m.amount,
+        completedAt: m.completedAt,
+        sortOrder: j,
+      });
+    }
+  }
+
+  // 13c. Project Tasks
+  console.log("Creating project tasks...");
+  type TaskSeed = { title: string; description: string; status: "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled"; priority: "low" | "medium" | "high" | "urgent"; dueDate?: string; estimatedMinutes?: number; labels?: string[]; completedAt?: Date; checklist?: { title: string; done: boolean }[]; comments?: string[] };
+
+  const tasksPerProject: TaskSeed[][] = [
+    // Website Redesign
+    [
+      { title: "Create sitemap", description: "Map out all pages and navigation hierarchy", status: "done", priority: "high", dueDate: "2026-01-12", estimatedMinutes: 120, labels: ["design"], completedAt: new Date("2026-01-11"),
+        checklist: [{ title: "List all current pages", done: true }, { title: "Define new IA structure", done: true }, { title: "Get stakeholder approval", done: true }],
+        comments: ["Mapped 42 pages from the old site", "Consolidated 12 redundant pages into 6"] },
+      { title: "Design homepage mockup", description: "High-fidelity homepage design in Figma", status: "done", priority: "high", dueDate: "2026-01-18", estimatedMinutes: 480, labels: ["design", "frontend"], completedAt: new Date("2026-01-17"),
+        comments: ["Client approved v3 of the design", "Hero section uses the new brand gradient"] },
+      { title: "Implement responsive nav", description: "Build hamburger menu for mobile and sticky header for desktop", status: "done", priority: "high", dueDate: "2026-02-01", estimatedMinutes: 240, labels: ["frontend"], completedAt: new Date("2026-01-31") },
+      { title: "Build contact page", description: "Contact form with validation and Google Maps embed", status: "in_progress", priority: "medium", dueDate: "2026-03-05", estimatedMinutes: 180, labels: ["frontend", "backend"],
+        checklist: [{ title: "Form layout", done: true }, { title: "Validation logic", done: true }, { title: "Email integration", done: false }, { title: "Map embed", done: false }] },
+      { title: "Set up CMS", description: "Configure headless CMS for blog and dynamic pages", status: "in_progress", priority: "high", dueDate: "2026-03-10", estimatedMinutes: 360, labels: ["backend"],
+        comments: ["Going with Sanity for the CMS"] },
+      { title: "SEO optimization", description: "Meta tags, structured data, sitemap.xml, robots.txt", status: "todo", priority: "medium", dueDate: "2026-03-20", estimatedMinutes: 240, labels: ["frontend", "performance"] },
+      { title: "Performance audit", description: "Lighthouse scores, image optimization, lazy loading", status: "todo", priority: "medium", dueDate: "2026-03-25", estimatedMinutes: 180, labels: ["performance"] },
+      { title: "Accessibility review", description: "WCAG 2.1 AA compliance check and fixes", status: "backlog", priority: "low", estimatedMinutes: 300, labels: ["frontend"] },
+      { title: "Analytics setup", description: "Google Analytics 4 + event tracking for key conversions", status: "backlog", priority: "low", labels: ["backend"] },
+      { title: "Dark mode support", description: "Add theme toggle with system preference detection", status: "cancelled", priority: "low", labels: ["design", "frontend"],
+        comments: ["Client decided to skip dark mode for v1"] },
+    ],
+    // Mobile App MVP
+    [
+      { title: "Set up React Native project", description: "Init project with Expo, configure TypeScript, ESLint, Prettier", status: "done", priority: "urgent", dueDate: "2026-01-10", estimatedMinutes: 120, labels: ["frontend"], completedAt: new Date("2026-01-09") },
+      { title: "Design system components", description: "Button, Input, Card, Modal, Toast - reusable component library", status: "done", priority: "high", dueDate: "2026-01-20", estimatedMinutes: 600, labels: ["design", "frontend"], completedAt: new Date("2026-01-19"),
+        checklist: [{ title: "Button variants", done: true }, { title: "Input fields", done: true }, { title: "Card component", done: true }, { title: "Modal/Dialog", done: true }, { title: "Toast notifications", done: true }] },
+      { title: "Authentication flow", description: "Sign up, login, forgot password, biometric auth", status: "done", priority: "urgent", dueDate: "2026-01-25", estimatedMinutes: 480, labels: ["frontend", "backend"], completedAt: new Date("2026-01-24"),
+        comments: ["Using Clerk for auth", "Added Face ID support on iOS"] },
+      { title: "Dashboard screen", description: "Main dashboard with summary cards, recent activity, and quick actions", status: "in_progress", priority: "high", dueDate: "2026-02-28", estimatedMinutes: 360, labels: ["frontend"],
+        checklist: [{ title: "Summary cards", done: true }, { title: "Recent activity list", done: true }, { title: "Quick action buttons", done: false }, { title: "Pull to refresh", done: false }] },
+      { title: "Push notifications", description: "Firebase Cloud Messaging setup for iOS and Android", status: "in_progress", priority: "high", dueDate: "2026-03-05", estimatedMinutes: 300, labels: ["backend"],
+        comments: ["FCM token registration working", "Need to handle notification permissions on iOS"] },
+      { title: "Offline mode", description: "Local SQLite cache for offline data access with sync", status: "todo", priority: "medium", dueDate: "2026-03-15", estimatedMinutes: 480, labels: ["frontend", "backend"] },
+      { title: "Payment integration", description: "Stripe SDK for in-app payments and subscriptions", status: "todo", priority: "high", dueDate: "2026-03-20", estimatedMinutes: 420, labels: ["backend"] },
+      { title: "App icon and splash screen", description: "Design app icon for all sizes, animated splash screen", status: "todo", priority: "medium", dueDate: "2026-03-10", estimatedMinutes: 120, labels: ["design"] },
+      { title: "End-to-end tests", description: "Detox tests for critical user flows", status: "backlog", priority: "medium", estimatedMinutes: 600, labels: ["frontend"] },
+      { title: "Crash reporting", description: "Sentry integration for crash and error tracking", status: "backlog", priority: "high", labels: ["backend", "performance"] },
+      { title: "Localization", description: "i18n setup with English and Spanish translations", status: "backlog", priority: "low", labels: ["frontend"] },
+      { title: "Deep linking", description: "Universal links for iOS, App Links for Android", status: "backlog", priority: "low", labels: ["frontend", "backend"] },
+    ],
+    // API Integration
+    [
+      { title: "Define API contracts", description: "OpenAPI 3.0 specification for all endpoints", status: "done", priority: "urgent", dueDate: "2026-01-08", estimatedMinutes: 180, labels: ["documentation", "backend"], completedAt: new Date("2026-01-07"),
+        comments: ["Spec reviewed and approved by partner team"] },
+      { title: "Auth middleware", description: "OAuth 2.0 client credentials flow with token caching", status: "done", priority: "urgent", dueDate: "2026-01-12", estimatedMinutes: 240, labels: ["backend"], completedAt: new Date("2026-01-11") },
+      { title: "Data sync endpoints", description: "Build CRUD endpoints for contacts, products, and orders sync", status: "done", priority: "high", dueDate: "2026-01-25", estimatedMinutes: 600, labels: ["backend"], completedAt: new Date("2026-01-24"),
+        checklist: [{ title: "Contacts sync", done: true }, { title: "Products sync", done: true }, { title: "Orders sync", done: true }, { title: "Webhook handlers", done: true }] },
+      { title: "Rate limiting", description: "Implement rate limiter respecting partner API limits (100 req/min)", status: "done", priority: "high", dueDate: "2026-01-28", estimatedMinutes: 120, labels: ["backend", "performance"], completedAt: new Date("2026-01-27") },
+      { title: "Error handling & retries", description: "Exponential backoff retry logic with dead letter queue", status: "done", priority: "high", dueDate: "2026-02-05", estimatedMinutes: 180, labels: ["backend"], completedAt: new Date("2026-02-04"),
+        comments: ["Using 3 retries with 1s, 5s, 30s backoff"] },
+      { title: "Integration tests", description: "Test suite against partner sandbox environment", status: "done", priority: "high", dueDate: "2026-02-10", estimatedMinutes: 360, labels: ["backend"], completedAt: new Date("2026-02-09") },
+      { title: "Load testing", description: "K6 load tests simulating 1000 concurrent syncs", status: "done", priority: "medium", dueDate: "2026-02-14", estimatedMinutes: 180, labels: ["performance"], completedAt: new Date("2026-02-13"),
+        comments: ["Handled 1200 concurrent with p99 < 200ms"] },
+      { title: "Monitoring dashboard", description: "Grafana dashboard for sync health, errors, and latency", status: "done", priority: "medium", dueDate: "2026-02-15", estimatedMinutes: 120, labels: ["backend"], completedAt: new Date("2026-02-14") },
+    ],
+  ];
+
+  for (let i = 0; i < projectIds.length; i++) {
+    for (let j = 0; j < tasksPerProject[i].length; j++) {
+      const t = tasksPerProject[i][j];
+      const [task] = await db.insert(projectTask).values({
+        projectId: projectIds[i],
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        assigneeId: memberId,
+        createdById: userId,
+        dueDate: t.dueDate,
+        estimatedMinutes: t.estimatedMinutes,
+        labels: t.labels ?? [],
+        sortOrder: j,
+        completedAt: t.completedAt,
+      }).returning();
+
+      // Checklist items
+      if (t.checklist) {
+        for (let k = 0; k < t.checklist.length; k++) {
+          await db.insert(taskChecklist).values({
+            taskId: task.id,
+            title: t.checklist[k].title,
+            isCompleted: t.checklist[k].done,
+            sortOrder: k,
+          });
+        }
+      }
+
+      // Comments
+      if (t.comments) {
+        for (const content of t.comments) {
+          await db.insert(taskComment).values({
+            taskId: task.id,
+            authorId: userId,
+            content,
+          });
+        }
+      }
+    }
+  }
+
+  // 13d. Project Notes
+  console.log("Creating project notes...");
+  const notesPerProject: { content: string; isPinned: boolean }[][] = [
+    // Website Redesign
+    [
+      { content: "Client prefers clean, minimal design. Reference sites: stripe.com, linear.app. No heavy animations - focus on content readability and fast loading.", isPinned: true },
+      { content: "Brand colors updated: primary #2563eb, secondary #7c3aed. New logo files in shared drive under /brand/2026/.", isPinned: true },
+      { content: "Meeting notes (Jan 15): Agreed on 4-page initial scope - Home, About, Services, Contact. Blog to follow in phase 2.", isPinned: false },
+      { content: "Hosting decision: Vercel for frontend, existing AWS for API. Domain transfer scheduled for March.", isPinned: false },
+      { content: "Image assets: Using Unsplash for stock photos initially. Client will provide custom photography by mid-March.", isPinned: false },
+    ],
+    // Mobile App MVP
+    [
+      { content: "Target platforms: iOS 16+ and Android 13+. Using Expo SDK 50 with custom dev client for native modules.", isPinned: true },
+      { content: "Design tokens synced from Figma via Style Dictionary. Run `pnpm generate:tokens` after design updates.", isPinned: true },
+      { content: "API base URL: staging at api-staging.example.com, prod TBD. Auth tokens expire after 24h.", isPinned: false },
+      { content: "Beta testers list: 15 internal, 30 external. TestFlight invites go out March 20th.", isPinned: false },
+      { content: "Performance budget: app launch < 2s, screen transitions < 300ms, API calls < 500ms p95.", isPinned: true },
+      { content: "App Store requirements checklist: privacy policy page, 6.5\" and 12.9\" screenshots, app preview video (optional for v1).", isPinned: false },
+    ],
+    // API Integration
+    [
+      { content: "Partner API docs: https://partner.example.com/docs (login: shared in 1Password). Rate limit: 100 req/min per client.", isPinned: true },
+      { content: "Sandbox credentials rotated monthly. Current ones expire March 1st - set calendar reminder.", isPinned: true },
+      { content: "Data mapping: partner uses 'customer' we use 'contact', partner 'item' = our 'product'. Field mapping spreadsheet in /docs/mapping.xlsx.", isPinned: false },
+      { content: "Post-launch monitoring: alert if sync failure rate > 2% in 5min window. PagerDuty integration configured.", isPinned: false },
+    ],
+  ];
+
+  for (let i = 0; i < projectIds.length; i++) {
+    for (const note of notesPerProject[i]) {
+      await db.insert(projectNote).values({
+        projectId: projectIds[i],
+        authorId: userId,
+        content: note.content,
+        isPinned: note.isPinned,
+      });
+    }
+  }
+  console.log("  Labels, milestones, tasks, and notes created");
 
   // 14. Fixed Assets
   console.log("Creating fixed assets...");
@@ -693,30 +1183,6 @@ async function seed() {
   }
   console.log(`  ${employees.length} employees`);
 
-  // 16. Inventory Items
-  console.log("Creating inventory items...");
-  const items = [
-    { code: "PROD-001", name: "Widget A", sku: "WA-100", purchase: 1500, sale: 2999, qty: 150, reorder: 25 },
-    { code: "PROD-002", name: "Widget B", sku: "WB-200", purchase: 2500, sale: 4999, qty: 75, reorder: 10 },
-    { code: "PROD-003", name: "Gadget X", sku: "GX-300", purchase: 5000, sale: 9999, qty: 30, reorder: 5 },
-    { code: "PROD-004", name: "Accessory Pack", sku: "AP-400", purchase: 500, sale: 1499, qty: 200, reorder: 50 },
-    { code: "PROD-005", name: "Premium Kit", sku: "PK-500", purchase: 8000, sale: 14999, qty: 8, reorder: 10 },
-  ];
-
-  for (const item of items) {
-    await db.insert(inventoryItem).values({
-      organizationId: org.id,
-      code: item.code,
-      name: item.name,
-      sku: item.sku,
-      purchasePrice: item.purchase,
-      salePrice: item.sale,
-      quantityOnHand: item.qty,
-      reorderPoint: item.reorder,
-    });
-  }
-  console.log(`  ${items.length} inventory items`);
-
   // 17. Expense Claims
   console.log("Creating expense claims...");
   const [claim1] = await db
@@ -725,13 +1191,13 @@ async function seed() {
       organizationId: org.id,
       title: "January Travel Expenses",
       description: "Business trip to client site",
-      submittedBy: demoUser.id,
+      submittedBy: userId,
       status: "approved",
       totalAmount: 85000,
       currencyCode: "USD",
       submittedAt: new Date("2026-01-28"),
       approvedAt: new Date("2026-01-30"),
-      approvedBy: demoUser.id,
+      approvedBy: userId,
     })
     .returning();
 
@@ -771,7 +1237,7 @@ async function seed() {
       organizationId: org.id,
       title: "Software Subscriptions",
       description: "Monthly tools and services",
-      submittedBy: demoUser.id,
+      submittedBy: userId,
       status: "submitted",
       totalAmount: 15900,
       currencyCode: "USD",
@@ -809,11 +1275,285 @@ async function seed() {
     },
   ]);
   console.log("  2 expense claims");
+  } // end if (!hasTransactionalData) - bills through expense claims
 
-  console.log("\nSeed complete! Demo credentials:");
-  console.log("  Email: demo@dubbl.app");
-  console.log("  Password: password123");
-  console.log("  Organization: Demo Company");
+  // 18. Inventory Items + Warehouses + Movements + Suppliers + Variants
+  const existingInventory = await db.query.inventoryItem.findFirst({
+    where: eq(inventoryItem.organizationId, org.id),
+  });
+
+  if (!existingInventory) {
+  console.log("Creating inventory...");
+
+  // Warehouses
+  const [mainWarehouse] = await db.insert(warehouse).values({
+    organizationId: org.id,
+    name: "Main Warehouse",
+    code: "WH-MAIN",
+    address: "123 Industrial Blvd, Suite 100",
+    isDefault: true,
+    isActive: true,
+  }).returning();
+
+  const [eastWarehouse] = await db.insert(warehouse).values({
+    organizationId: org.id,
+    name: "East Distribution Center",
+    code: "WH-EAST",
+    address: "456 Logistics Way, Building B",
+    isDefault: false,
+    isActive: true,
+  }).returning();
+
+  console.log("  2 warehouses");
+
+  // Inventory items with categories
+  const items = [
+    { code: "ELEC-001", name: "Wireless Mouse", sku: "WM-100", category: "Electronics", purchase: 1200, sale: 2499, qty: 150, reorder: 25 },
+    { code: "ELEC-002", name: "USB-C Hub 7-Port", sku: "UH-200", category: "Electronics", purchase: 2800, sale: 5499, qty: 75, reorder: 15 },
+    { code: "ELEC-003", name: "Bluetooth Keyboard", sku: "BK-300", category: "Electronics", purchase: 3500, sale: 6999, qty: 42, reorder: 10 },
+    { code: "ELEC-004", name: "Webcam HD 1080p", sku: "WC-400", category: "Electronics", purchase: 4500, sale: 8999, qty: 28, reorder: 10 },
+    { code: "FURN-001", name: "Desk Organizer Set", sku: "DO-100", category: "Furniture", purchase: 1800, sale: 3499, qty: 60, reorder: 15 },
+    { code: "FURN-002", name: "Monitor Stand", sku: "MS-200", category: "Furniture", purchase: 2200, sale: 4499, qty: 35, reorder: 10 },
+    { code: "FURN-003", name: "Ergonomic Footrest", sku: "EF-300", category: "Furniture", purchase: 3200, sale: 5999, qty: 18, reorder: 8 },
+    { code: "SUPP-001", name: "Printer Paper A4 (500 sheets)", sku: "PP-100", category: "Supplies", purchase: 450, sale: 899, qty: 300, reorder: 50 },
+    { code: "SUPP-002", name: "Ink Cartridge Black", sku: "IC-200", category: "Supplies", purchase: 2000, sale: 3999, qty: 45, reorder: 20 },
+    { code: "SUPP-003", name: "Sticky Notes (12-Pack)", sku: "SN-300", category: "Supplies", purchase: 350, sale: 799, qty: 120, reorder: 30 },
+    { code: "TOOL-001", name: "Precision Screwdriver Kit", sku: "SK-100", category: "Tools", purchase: 1500, sale: 2999, qty: 55, reorder: 10 },
+    { code: "TOOL-002", name: "Cable Tester Pro", sku: "CT-200", category: "Tools", purchase: 6500, sale: 12999, qty: 12, reorder: 5 },
+    { code: "PKG-001", name: "Shipping Box (Medium)", sku: "SB-100", category: "Packaging", purchase: 150, sale: 349, qty: 500, reorder: 100 },
+    { code: "PKG-002", name: "Bubble Wrap Roll (50m)", sku: "BW-200", category: "Packaging", purchase: 800, sale: 1599, qty: 25, reorder: 10 },
+    { code: "ELEC-005", name: "Noise Cancelling Headphones", sku: "NH-500", category: "Electronics", purchase: 12000, sale: 24999, qty: 5, reorder: 8, inactive: true },
+  ];
+
+  const createdItems: { id: string; code: string; name: string; qty: number }[] = [];
+  for (const item of items) {
+    const [created] = await db.insert(inventoryItem).values({
+      organizationId: org.id,
+      code: item.code,
+      name: item.name,
+      sku: item.sku,
+      category: item.category,
+      purchasePrice: item.purchase,
+      salePrice: item.sale,
+      quantityOnHand: item.qty,
+      reorderPoint: item.reorder,
+      isActive: !("inactive" in item && item.inactive),
+    }).returning();
+    createdItems.push({ id: created.id, code: item.code, name: item.name, qty: item.qty });
+  }
+  console.log(`  ${items.length} inventory items`);
+
+  // Inventory movements (history for first few items)
+  const movementData = [
+    { itemIdx: 0, type: "initial" as const, qty: 100, prev: 0, reason: "Opening stock" },
+    { itemIdx: 0, type: "purchase" as const, qty: 50, prev: 100, reason: "PO-2026-001" },
+    { itemIdx: 0, type: "sale" as const, qty: -10, prev: 150, reason: "INV-2026-012" },
+    { itemIdx: 0, type: "adjustment" as const, qty: 10, prev: 140, reason: "Found miscounted in warehouse audit" },
+    { itemIdx: 1, type: "initial" as const, qty: 50, prev: 0, reason: "Opening stock" },
+    { itemIdx: 1, type: "purchase" as const, qty: 30, prev: 50, reason: "PO-2026-003" },
+    { itemIdx: 1, type: "sale" as const, qty: -5, prev: 80, reason: "INV-2026-018" },
+    { itemIdx: 2, type: "initial" as const, qty: 30, prev: 0, reason: "Opening stock" },
+    { itemIdx: 2, type: "purchase" as const, qty: 20, prev: 30, reason: "PO-2026-005" },
+    { itemIdx: 2, type: "sale" as const, qty: -8, prev: 50, reason: "INV-2026-022" },
+    { itemIdx: 3, type: "initial" as const, qty: 20, prev: 0, reason: "Opening stock" },
+    { itemIdx: 3, type: "purchase" as const, qty: 15, prev: 20, reason: "PO-2026-007" },
+    { itemIdx: 3, type: "sale" as const, qty: -7, prev: 35, reason: "INV-2026-025" },
+  ];
+
+  for (const m of movementData) {
+    const ci = createdItems[m.itemIdx];
+    await db.insert(inventoryMovement).values({
+      organizationId: org.id,
+      inventoryItemId: ci.id,
+      warehouseId: mainWarehouse.id,
+      type: m.type,
+      quantity: m.qty,
+      previousQuantity: m.prev,
+      newQuantity: m.prev + m.qty,
+      reason: m.reason,
+      createdBy: "seed",
+    });
+  }
+  console.log(`  ${movementData.length} inventory movements`);
+
+  // Link some suppliers (use existing contacts that are suppliers)
+  const supplierContacts = await db.query.contact.findMany({
+    where: eq(contact.organizationId, org.id),
+    limit: 3,
+  });
+
+  if (supplierContacts.length > 0) {
+    const supplierLinks = [
+      { itemIdx: 0, contactIdx: 0, code: "SUP-WM100", lead: 7, price: 1100, preferred: true },
+      { itemIdx: 1, contactIdx: 0, code: "SUP-UH200", lead: 10, price: 2600, preferred: true },
+      { itemIdx: 2, contactIdx: 1 % supplierContacts.length, code: "SUP-BK300", lead: 14, price: 3200, preferred: true },
+      { itemIdx: 0, contactIdx: 1 % supplierContacts.length, code: "ALT-WM100", lead: 21, price: 1250, preferred: false },
+    ];
+
+    for (const sl of supplierLinks) {
+      await db.insert(inventoryItemSupplier).values({
+        organizationId: org.id,
+        inventoryItemId: createdItems[sl.itemIdx].id,
+        contactId: supplierContacts[sl.contactIdx].id,
+        supplierCode: sl.code,
+        leadTimeDays: sl.lead,
+        purchasePrice: sl.price,
+        isPreferred: sl.preferred,
+      });
+    }
+    console.log(`  ${supplierLinks.length} supplier links`);
+  }
+
+  // Variants for a couple of items
+  const variantData = [
+    { itemIdx: 0, name: "Black", sku: "WM-100-BLK", purchase: 1200, sale: 2499, qty: 80, options: { Color: "Black" } as Record<string, string> },
+    { itemIdx: 0, name: "White", sku: "WM-100-WHT", purchase: 1200, sale: 2499, qty: 50, options: { Color: "White" } as Record<string, string> },
+    { itemIdx: 0, name: "Silver", sku: "WM-100-SLV", purchase: 1300, sale: 2699, qty: 20, options: { Color: "Silver" } as Record<string, string> },
+    { itemIdx: 2, name: "Compact", sku: "BK-300-CMP", purchase: 3000, sale: 5999, qty: 22, options: { Size: "Compact" } as Record<string, string> },
+    { itemIdx: 2, name: "Full Size", sku: "BK-300-FUL", purchase: 3500, sale: 6999, qty: 20, options: { Size: "Full" } as Record<string, string> },
+  ];
+
+  for (const v of variantData) {
+    await db.insert(inventoryVariant).values({
+      organizationId: org.id,
+      inventoryItemId: createdItems[v.itemIdx].id,
+      name: v.name,
+      sku: v.sku,
+      purchasePrice: v.purchase,
+      salePrice: v.sale,
+      quantityOnHand: v.qty,
+      options: v.options,
+    });
+  }
+  console.log(`  ${variantData.length} variants`);
+
+  // Inventory categories
+  const categoryData = [
+    { name: "Electronics", color: "#3b82f6", description: "Electronic devices and accessories" },
+    { name: "Furniture", color: "#f59e0b", description: "Office furniture and ergonomic equipment" },
+    { name: "Supplies", color: "#10b981", description: "Office and printing supplies" },
+    { name: "Tools", color: "#8b5cf6", description: "Hardware and diagnostic tools" },
+    { name: "Packaging", color: "#ec4899", description: "Shipping and packaging materials" },
+  ];
+
+  const createdCategories: { id: string; name: string }[] = [];
+  for (const cat of categoryData) {
+    const [created] = await db.insert(inventoryCategory).values({
+      organizationId: org.id,
+      name: cat.name,
+      color: cat.color,
+      description: cat.description,
+    }).returning();
+    createdCategories.push({ id: created.id, name: cat.name });
+  }
+
+  // Add subcategories under Electronics
+  const electronicsCat = createdCategories.find((c) => c.name === "Electronics");
+  if (electronicsCat) {
+    await db.insert(inventoryCategory).values([
+      { organizationId: org.id, name: "Input Devices", color: "#60a5fa", parentId: electronicsCat.id },
+      { organizationId: org.id, name: "Audio", color: "#818cf8", parentId: electronicsCat.id },
+    ]);
+  }
+  console.log(`  ${categoryData.length + 2} categories`);
+
+  // Link items to categories via categoryId
+  const categoryMap: Record<string, string> = {};
+  for (const c of createdCategories) categoryMap[c.name] = c.id;
+
+  for (let i = 0; i < items.length; i++) {
+    const catId = categoryMap[items[i].category];
+    if (catId) {
+      await db.update(inventoryItem)
+        .set({ categoryId: catId })
+        .where(eq(inventoryItem.id, createdItems[i].id));
+    }
+  }
+  console.log("  items linked to categories");
+
+  // Per-warehouse stock levels
+  const warehouseStockData = [
+    // Main warehouse gets majority of stock
+    { itemIdx: 0, whId: mainWarehouse.id, qty: 120 },
+    { itemIdx: 1, whId: mainWarehouse.id, qty: 55 },
+    { itemIdx: 2, whId: mainWarehouse.id, qty: 30 },
+    { itemIdx: 3, whId: mainWarehouse.id, qty: 20 },
+    { itemIdx: 4, whId: mainWarehouse.id, qty: 45 },
+    { itemIdx: 5, whId: mainWarehouse.id, qty: 25 },
+    { itemIdx: 7, whId: mainWarehouse.id, qty: 200 },
+    { itemIdx: 8, whId: mainWarehouse.id, qty: 30 },
+    { itemIdx: 10, whId: mainWarehouse.id, qty: 40 },
+    { itemIdx: 12, whId: mainWarehouse.id, qty: 350 },
+    // East warehouse gets some items
+    { itemIdx: 0, whId: eastWarehouse.id, qty: 30 },
+    { itemIdx: 1, whId: eastWarehouse.id, qty: 20 },
+    { itemIdx: 2, whId: eastWarehouse.id, qty: 12 },
+    { itemIdx: 4, whId: eastWarehouse.id, qty: 15 },
+    { itemIdx: 7, whId: eastWarehouse.id, qty: 100 },
+    { itemIdx: 8, whId: eastWarehouse.id, qty: 15 },
+    { itemIdx: 12, whId: eastWarehouse.id, qty: 150 },
+  ];
+
+  for (const ws of warehouseStockData) {
+    await db.insert(warehouseStock).values({
+      organizationId: org.id,
+      inventoryItemId: createdItems[ws.itemIdx].id,
+      warehouseId: ws.whId,
+      quantity: ws.qty,
+    });
+  }
+  console.log(`  ${warehouseStockData.length} warehouse stock entries`);
+
+  // Stock transfers
+  const [completedTransfer] = await db.insert(inventoryTransfer).values({
+    organizationId: org.id,
+    fromWarehouseId: mainWarehouse.id,
+    toWarehouseId: eastWarehouse.id,
+    status: "completed",
+    notes: "Monthly restock of east distribution center",
+    transferredBy: "seed",
+    completedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+  }).returning();
+
+  await db.insert(inventoryTransferLine).values([
+    { transferId: completedTransfer.id, inventoryItemId: createdItems[0].id, quantity: 15, receivedQuantity: 15 },
+    { transferId: completedTransfer.id, inventoryItemId: createdItems[1].id, quantity: 10, receivedQuantity: 10 },
+  ]);
+
+  const [draftTransfer] = await db.insert(inventoryTransfer).values({
+    organizationId: org.id,
+    fromWarehouseId: eastWarehouse.id,
+    toWarehouseId: mainWarehouse.id,
+    status: "draft",
+    notes: "Return excess packaging materials",
+    transferredBy: "seed",
+  }).returning();
+
+  await db.insert(inventoryTransferLine).values([
+    { transferId: draftTransfer.id, inventoryItemId: createdItems[12].id, quantity: 50 },
+  ]);
+
+  const [inTransitTransfer] = await db.insert(inventoryTransfer).values({
+    organizationId: org.id,
+    fromWarehouseId: mainWarehouse.id,
+    toWarehouseId: eastWarehouse.id,
+    status: "in_transit",
+    notes: "Urgent restock - low stock items",
+    transferredBy: "seed",
+  }).returning();
+
+  await db.insert(inventoryTransferLine).values([
+    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[2].id, quantity: 8 },
+    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[3].id, quantity: 5 },
+    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[10].id, quantity: 10 },
+  ]);
+
+  console.log("  3 stock transfers");
+  } else {
+    console.log("\nInventory data already exists, skipping...");
+  }
+
+  console.log(`\nSeed complete! Organization: ${org.name}`);
   process.exit(0);
 }
 

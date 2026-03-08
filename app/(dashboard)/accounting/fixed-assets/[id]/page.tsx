@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import Link from "next/link";
 
 interface DepEntry {
@@ -74,6 +75,7 @@ export default function FixedAssetDetailPage() {
   const [disposeDate, setDisposeDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const orgId =
     typeof window !== "undefined"
@@ -136,7 +138,14 @@ export default function FixedAssetDetailPage() {
   }
 
   async function handleDelete() {
-    if (!orgId || !confirm("Delete this asset?")) return;
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete this asset?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/v1/fixed-assets/${id}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -244,20 +253,20 @@ export default function FixedAssetDetailPage() {
         )}
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge
           variant="outline"
           className={statusColors[asset.status] || ""}
         >
           {statusLabels[asset.status] || asset.status}
         </Badge>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs sm:text-sm text-muted-foreground">
           {methodLabels[asset.depreciationMethod] || asset.depreciationMethod} ·{" "}
           {asset.usefulLifeMonths} months useful life
         </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Purchase Price</p>
           <p className="text-xl font-bold font-mono">
@@ -290,7 +299,7 @@ export default function FixedAssetDetailPage() {
       {/* Account mappings */}
       <div className="rounded-lg border p-4">
         <h3 className="text-sm font-semibold mb-3">Account Mappings</h3>
-        <div className="grid gap-3 sm:grid-cols-3 text-sm">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">Asset Account</p>
             <p>
@@ -353,8 +362,8 @@ export default function FixedAssetDetailPage() {
             No depreciation entries recorded.
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-[1fr_120px_120px] gap-2 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground">
+          <div className="overflow-x-auto">
+            <div className="grid min-w-[360px] grid-cols-[1fr_120px_120px] gap-2 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground">
               <span>Date</span>
               <span className="text-right">Amount</span>
               <span className="text-right">Journal Entry</span>
@@ -362,7 +371,7 @@ export default function FixedAssetDetailPage() {
             {asset.depreciationEntries.map((entry) => (
               <div
                 key={entry.id}
-                className="grid grid-cols-[1fr_120px_120px] gap-2 border-b px-4 py-2 last:border-b-0"
+                className="grid min-w-[360px] grid-cols-[1fr_120px_120px] gap-2 border-b px-4 py-2 last:border-b-0"
               >
                 <span className="text-sm">{entry.date}</span>
                 <span className="text-right text-sm font-mono">
@@ -375,9 +384,10 @@ export default function FixedAssetDetailPage() {
                 </span>
               </div>
             ))}
-          </>
+          </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

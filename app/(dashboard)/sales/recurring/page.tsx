@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Calendar } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { devDelay } from "@/lib/dev-delay";
+import { formatMoney } from "@/lib/money";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 interface RecurringTemplate {
   id: string;
@@ -103,6 +104,9 @@ export default function RecurringInvoicesPage() {
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [upcoming, setUpcoming] = useState<
+    { templateName: string; contactName: string; lineTotal: number; dates: { date: string; occurrence: number }[] }[]
+  >([]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -116,7 +120,28 @@ export default function RecurringInvoicesPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) setTemplates(data.data);
+        if (data.data) {
+          setTemplates(data.data);
+          // Load previews for active templates
+          const active = (data.data as RecurringTemplate[]).filter((t) => t.status === "active");
+          Promise.all(
+            active.slice(0, 5).map((t) =>
+              fetch(`/api/v1/recurring/${t.id}/preview?count=3`, {
+                headers: { "x-organization-id": orgId },
+              })
+                .then((r) => r.json())
+                .then((d) => ({
+                  templateName: d.template?.name || t.name,
+                  contactName: d.template?.contactName || t.contact?.name || "",
+                  lineTotal: d.template?.lineTotal || 0,
+                  dates: d.upcoming || [],
+                }))
+                .catch(() => null)
+            )
+          ).then((results) => {
+            setUpcoming(results.filter((r): r is NonNullable<typeof r> => r !== null && r.dates.length > 0));
+          });
+        }
       })
       .then(() => devDelay())
       .finally(() => setLoading(false));
@@ -135,7 +160,7 @@ export default function RecurringInvoicesPage() {
     const recurringDays = new Set([1, 15]);
 
     return (
-      <BlurReveal>
+      <ContentReveal>
         <div className="pt-12 pb-12 space-y-10">
           {/* Top: title + CTA */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -154,7 +179,7 @@ export default function RecurringInvoicesPage() {
             </Button>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] items-start">
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
             {/* Left: Calendar */}
             <div className="rounded-xl border bg-card overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
@@ -199,10 +224,10 @@ export default function RecurringInvoicesPage() {
             <div className="space-y-4">
               {/* Mock template card */}
               <div className="rounded-xl border bg-card overflow-hidden">
-                <div className="bg-muted/30 px-5 py-3 border-b">
+                <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Example template</p>
                 </div>
-                <div className="p-5 space-y-3">
+                <div className="p-3 sm:p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">Monthly hosting</p>
@@ -233,7 +258,7 @@ export default function RecurringInvoicesPage() {
               </div>
 
               {/* Supported frequencies */}
-              <div className="rounded-xl border bg-card px-5 py-4">
+              <div className="rounded-xl border bg-card px-3 sm:px-5 py-4">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Supported frequencies</p>
                 <div className="flex flex-wrap gap-2">
                   {["Weekly", "Fortnightly", "Monthly", "Quarterly", "Semi-annual", "Annual"].map((freq) => (
@@ -244,24 +269,24 @@ export default function RecurringInvoicesPage() {
             </div>
           </div>
         </div>
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal className="space-y-10">
+    <ContentReveal className="space-y-10">
       <Section
         title="Recurring Invoices"
         description="Manage recurring templates that automatically generate invoices."
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="paused">Paused</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsList className="overflow-x-auto">
+                <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+                <TabsTrigger value="active" className="whitespace-nowrap">Active</TabsTrigger>
+                <TabsTrigger value="paused" className="whitespace-nowrap">Paused</TabsTrigger>
+                <TabsTrigger value="completed" className="whitespace-nowrap">Completed</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -280,6 +305,37 @@ export default function RecurringInvoicesPage() {
           />
         </div>
       </Section>
-    </BlurReveal>
+
+      {upcoming.length > 0 && (
+        <Section
+          title="Upcoming Generations"
+          description="Next scheduled invoice generations from active templates."
+        >
+          <div className="space-y-3">
+            {upcoming.map((u) => (
+              <div key={u.templateName} className="rounded-lg border px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-medium">{u.templateName}</p>
+                    {u.contactName && (
+                      <p className="text-xs text-muted-foreground">{u.contactName}</p>
+                    )}
+                  </div>
+                  <p className="text-sm font-mono font-semibold tabular-nums">{formatMoney(u.lineTotal)}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {u.dates.map((d) => (
+                    <div key={d.date} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Calendar className="size-3" />
+                      <span>{d.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+    </ContentReveal>
   );
 }

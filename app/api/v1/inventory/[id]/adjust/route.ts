@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inventoryItem } from "@/lib/db/schema";
+import { inventoryItem, inventoryMovement } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -49,8 +49,23 @@ export async function POST(
       .where(eq(inventoryItem.id, id))
       .returning();
 
+    const [movement] = await db
+      .insert(inventoryMovement)
+      .values({
+        organizationId: ctx.organizationId,
+        inventoryItemId: id,
+        type: "adjustment",
+        quantity: parsed.adjustment,
+        previousQuantity: existing.quantityOnHand,
+        newQuantity,
+        reason: parsed.reason,
+        createdBy: ctx.userId,
+      })
+      .returning();
+
     return NextResponse.json({
       inventoryItem: updated,
+      movement,
       adjustment: parsed.adjustment,
       reason: parsed.reason,
       previousQuantity: existing.quantityOnHand,

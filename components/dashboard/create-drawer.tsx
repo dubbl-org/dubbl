@@ -17,6 +17,11 @@ import {
   Plus,
   CreditCard,
   RefreshCw,
+  Landmark,
+  Warehouse,
+  ClipboardList,
+  Tag,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   Sheet,
@@ -42,9 +47,12 @@ import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-item
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
+import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
+import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -82,6 +90,12 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <EmployeeDrawer open={activeType === "employee"} onClose={close} />
       <CreditNoteDrawer open={activeType === "creditNote"} onClose={close} />
       <RecurringDrawer open={activeType === "recurring"} onClose={close} />
+      <AccountDrawer open={activeType === "account"} onClose={close} />
+      <BankAccountDrawer open={activeType === "bankAccount"} onClose={close} />
+      <WarehouseDrawer open={activeType === "warehouse"} onClose={close} />
+      <StockTakeDrawer open={activeType === "stockTake"} onClose={close} />
+      <CategoryDrawer open={activeType === "category"} onClose={close} />
+      <TransferDrawer open={activeType === "transfer"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -115,7 +129,7 @@ function DrawerFooter({
   label: string;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
+    <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
       <Button type="button" variant="outline" onClick={onClose}>
         Cancel
       </Button>
@@ -176,7 +190,7 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Users className="size-5" /></DrawerIcon>
             <div>
@@ -186,7 +200,7 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Basic Info</SectionLabel>
               <div className="space-y-2">
@@ -321,7 +335,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><FolderKanban className="size-5" /></DrawerIcon>
             <div>
@@ -331,7 +345,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Project Info</SectionLabel>
               <div className="space-y-2">
@@ -528,7 +542,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><FileText className="size-5" /></DrawerIcon>
             <div>
@@ -538,7 +552,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Invoice Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -653,7 +667,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><ShoppingCart className="size-5" /></DrawerIcon>
             <div>
@@ -663,7 +677,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Bill Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -779,7 +793,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><BookOpen className="size-5" /></DrawerIcon>
             <div>
@@ -788,7 +802,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
             </div>
           </div>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <EntryForm
             accounts={accounts}
             onSubmit={handleSubmit}
@@ -824,6 +838,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
+          category: form.get("category") || null,
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
@@ -849,7 +864,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Package className="size-5" /></DrawerIcon>
             <div>
@@ -859,7 +874,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Item Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -872,9 +887,15 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
                   <Input id="drawer-inv-name" name="name" required placeholder="Item name" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="drawer-inv-sku">SKU</Label>
-                <Input id="drawer-inv-sku" name="sku" placeholder="Stock keeping unit" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-category">Category</Label>
+                  <Input id="drawer-inv-category" name="category" placeholder="e.g. Electronics" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-inv-sku">SKU</Label>
+                  <Input id="drawer-inv-sku" name="sku" placeholder="Stock keeping unit" />
+                </div>
               </div>
             </div>
 
@@ -993,7 +1014,7 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><FileText className="size-5" /></DrawerIcon>
             <div>
@@ -1003,7 +1024,7 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Quote Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1115,7 +1136,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
             <div>
@@ -1125,7 +1146,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Order Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1260,7 +1281,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Receipt className="size-5" /></DrawerIcon>
             <div>
@@ -1270,7 +1291,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Claim Info</SectionLabel>
               <div className="space-y-2">
@@ -1436,7 +1457,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Building2 className="size-5" /></DrawerIcon>
             <div>
@@ -1446,7 +1467,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Asset Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1558,22 +1579,35 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 // ---------------------------------------------------------------------------
 // Budget Drawer
 // ---------------------------------------------------------------------------
+import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
+import type { PeriodType } from "@/lib/budget-periods";
+
+interface BudgetPeriodInput {
+  label: string;
+  startDate: string;
+  endDate: string;
+  amount: number;
+  sortOrder: number;
+}
+
 interface BudgetLineInput {
   accountId: string;
-  jan: number; feb: number; mar: number; apr: number;
-  may: number; jun: number; jul: number; aug: number;
-  sep: number; oct: number; nov: number; dec: number;
+  total: number;
+  periods: BudgetPeriodInput[];
 }
 
-const BUDGET_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
-const BUDGET_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const PERIOD_TYPE_OPTIONS: { value: PeriodType; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+  { value: "custom", label: "Custom" },
+];
 
-function emptyBudgetLine(): BudgetLineInput {
-  return { accountId: "", jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 };
-}
-
-function budgetLineTotal(line: BudgetLineInput): number {
-  return BUDGET_MONTHS.reduce((s, m) => s + line[m], 0);
+function emptyBudgetLine(periodType: PeriodType, startDate: string, endDate: string): BudgetLineInput {
+  const periods = generatePeriods(periodType, startDate, endDate).map((p) => ({ ...p, amount: 0 }));
+  return { accountId: "", total: 0, periods };
 }
 
 interface BudgetAccount {
@@ -1589,34 +1623,102 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
   const [budgetName, setBudgetName] = useState("");
   const [startDate, setStartDate] = useState(`${new Date().getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(`${new Date().getFullYear()}-12-31`);
-  const [budgetLines, setBudgetLines] = useState<BudgetLineInput[]>([emptyBudgetLine()]);
+  const [periodType, setPeriodType] = useState<PeriodType>("monthly");
+  const [budgetLines, setBudgetLines] = useState<BudgetLineInput[]>([emptyBudgetLine("monthly", `${new Date().getFullYear()}-01-01`, `${new Date().getFullYear()}-12-31`)]);
+  const [annualAmounts, setAnnualAmounts] = useState<Record<number, string>>({});
   const [budgetAccounts, setBudgetAccounts] = useState<BudgetAccount[]>([]);
+  const [expandedLine, setExpandedLine] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) {
-      setBudgetName(""); setBudgetLines([emptyBudgetLine()]);
-      setStartDate(`${new Date().getFullYear()}-01-01`);
-      setEndDate(`${new Date().getFullYear()}-12-31`);
+      const yr = new Date().getFullYear();
+      setBudgetName(""); setPeriodType("monthly");
+      setBudgetLines([emptyBudgetLine("monthly", `${yr}-01-01`, `${yr}-12-31`)]);
+      setAnnualAmounts({}); setExpandedLine(null);
+      setStartDate(`${yr}-01-01`);
+      setEndDate(`${yr}-12-31`);
       return;
     }
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     fetch("/api/v1/accounts?limit=500", { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
-      .then((data) => { if (data.data) setBudgetAccounts(data.data); });
+      .then((data) => { if (data.accounts) setBudgetAccounts(data.accounts); else if (data.data) setBudgetAccounts(data.data); });
   }, [open]);
 
-  function updateBudgetLine(index: number, field: string, value: string | number) {
+  function regenerateAllPeriods(newType: PeriodType, newStart: string, newEnd: string) {
+    setBudgetLines((prev) =>
+      prev.map((line) => {
+        const newPeriods = generatePeriods(newType, newStart, newEnd).map((p) => ({ ...p, amount: 0 }));
+        const amounts = distributeAmount(line.total, newPeriods.length);
+        return {
+          ...line,
+          periods: newPeriods.map((p, i) => ({ ...p, amount: amounts[i] })),
+        };
+      })
+    );
+  }
+
+  function handlePeriodTypeChange(newType: PeriodType) {
+    setPeriodType(newType);
+    regenerateAllPeriods(newType, startDate, endDate);
+  }
+
+  function handleStartDateChange(v: string) {
+    setStartDate(v);
+    regenerateAllPeriods(periodType, v, endDate);
+  }
+
+  function handleEndDateChange(v: string) {
+    setEndDate(v);
+    regenerateAllPeriods(periodType, startDate, v);
+  }
+
+  function handleAnnualChange(index: number, value: string) {
+    setAnnualAmounts((prev) => ({ ...prev, [index]: value }));
+    const cents = Math.round(parseFloat(value || "0") * 100);
+    if (cents >= 0) {
+      setBudgetLines((prev) => {
+        const copy = [...prev];
+        const line = copy[index];
+        const amounts = distributeAmount(cents, line.periods.length);
+        copy[index] = {
+          ...line,
+          total: cents,
+          periods: line.periods.map((p, i) => ({ ...p, amount: amounts[i] })),
+        };
+        return copy;
+      });
+    }
+  }
+
+  function updatePeriodAmount(lineIndex: number, periodIndex: number, value: string) {
+    const cents = Math.round(parseFloat(value || "0") * 100);
     setBudgetLines((prev) => {
       const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
+      const line = { ...copy[lineIndex] };
+      const periods = [...line.periods];
+      periods[periodIndex] = { ...periods[periodIndex], amount: cents };
+      line.periods = periods;
+      line.total = periods.reduce((s, p) => s + p.amount, 0);
+      copy[lineIndex] = line;
+      return copy;
+    });
+    setAnnualAmounts((prev) => {
+      const copy = { ...prev };
+      delete copy[lineIndex];
       return copy;
     });
   }
 
-  function updateMonthCents(index: number, month: string, value: string) {
-    const cents = Math.round(parseFloat(value || "0") * 100);
-    updateBudgetLine(index, month, cents);
+  function removeLine(index: number) {
+    setBudgetLines((prev) => prev.filter((_, i) => i !== index));
+    setAnnualAmounts((prev) => {
+      const copy = { ...prev };
+      delete copy[index];
+      return copy;
+    });
+    if (expandedLine === index) setExpandedLine(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1631,7 +1733,17 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       const res = await fetch("/api/v1/budgets", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ name: budgetName, startDate, endDate, lines: validLines }),
+        body: JSON.stringify({
+          name: budgetName,
+          startDate,
+          endDate,
+          periodType,
+          lines: validLines.map((l) => ({
+            accountId: l.accountId,
+            total: l.total,
+            periods: l.periods,
+          })),
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1639,6 +1751,7 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       }
       toast.success("Budget created");
       onClose();
+      window.dispatchEvent(new Event("budgets-changed"));
       router.push("/accounting/budgets");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create budget");
@@ -1647,35 +1760,48 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
     }
   }
 
+  const grandTotal = budgetLines.reduce((s, l) => s + l.total, 0);
+
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Target className="size-5" /></DrawerIcon>
             <div>
               <SheetTitle className="text-lg">New Budget</SheetTitle>
-              <SheetDescription>Create a budget with monthly allocations.</SheetDescription>
+              <SheetDescription>Plan spending by account with flexible period types.</SheetDescription>
             </div>
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Budget Info</SectionLabel>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Budget Name *</Label>
-                  <Input value={budgetName} onChange={(e) => setBudgetName(e.target.value)} placeholder="FY 2026 Operating Budget" required />
-                </div>
+              <div className="space-y-2">
+                <Label>Budget Name *</Label>
+                <Input value={budgetName} onChange={(e) => setBudgetName(e.target.value)} placeholder="FY 2026 Operating Budget" required />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                  <DatePicker value={startDate} onChange={handleStartDateChange} placeholder="Start date" />
                 </div>
                 <div className="space-y-2">
                   <Label>End Date</Label>
-                  <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" />
+                  <DatePicker value={endDate} onChange={handleEndDateChange} placeholder="End date" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Period Type</Label>
+                <Select value={periodType} onValueChange={(v) => handlePeriodTypeChange(v as PeriodType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PERIOD_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -1684,63 +1810,102 @@ function BudgetDrawer({ open, onClose }: { open: boolean; onClose: () => void })
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <SectionLabel>Budget Lines</SectionLabel>
-                <Button type="button" variant="outline" size="sm" onClick={() => setBudgetLines((prev) => [...prev, emptyBudgetLine()])}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setBudgetLines((prev) => [...prev, emptyBudgetLine(periodType, startDate, endDate)])}>
                   <Plus className="mr-2 size-3.5" />Add Line
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/50 border-b">
-                      <th className="px-3 py-2 text-left font-medium w-48">Account</th>
-                      {BUDGET_MONTH_LABELS.map((m) => (
-                        <th key={m} className="px-2 py-2 text-right font-medium w-20">{m}</th>
-                      ))}
-                      <th className="px-3 py-2 text-right font-medium w-24">Total</th>
-                      <th className="px-2 py-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {budgetLines.map((line, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="px-3 py-2">
-                          <select
-                            className="h-8 w-full rounded border bg-background px-2 text-sm"
-                            value={line.accountId}
-                            onChange={(e) => updateBudgetLine(i, "accountId", e.target.value)}
-                          >
-                            <option value="">Select account...</option>
+
+              {budgetLines.map((line, i) => {
+                const isExpanded = expandedLine === i;
+                return (
+                  <div key={i} className="space-y-2.5">
+                    {/* Account + remove */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <Select
+                          value={line.accountId || undefined}
+                          onValueChange={(val) => {
+                            setBudgetLines((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], accountId: val };
+                              return copy;
+                            });
+                          }}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                          <SelectContent>
                             {budgetAccounts.map((a) => (
-                              <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                              <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
                             ))}
-                          </select>
-                        </td>
-                        {BUDGET_MONTHS.map((m) => (
-                          <td key={m} className="px-1 py-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="h-8 w-full rounded border bg-background px-2 text-right text-sm font-mono tabular-nums"
-                              value={(line[m] / 100).toFixed(2)}
-                              onChange={(e) => updateMonthCents(i, m, e.target.value)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <button type="button" onClick={() => removeLine(i)} className="text-muted-foreground hover:text-red-600 shrink-0 p-1">
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+
+                    {/* Annual amount + per-period info */}
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs text-muted-foreground shrink-0 w-16">Annual</Label>
+                      <CurrencyInput
+                        prefix="$"
+                        value={annualAmounts[i] ?? (line.total > 0 ? (line.total / 100).toFixed(2) : "")}
+                        onChange={(v) => handleAnnualChange(i, v)}
+                        placeholder="0.00"
+                        className="flex-1"
+                      />
+                      {line.total > 0 && line.periods.length > 0 && (
+                        <span className="text-xs text-muted-foreground font-mono tabular-nums shrink-0">
+                          {formatMoney(Math.floor(line.total / line.periods.length))}/period
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Customize periods toggle */}
+                    {line.total > 0 && line.periods.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLine(isExpanded ? null : i)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                      >
+                        {isExpanded ? "Hide period breakdown" : `Customize period amounts (${line.periods.length} periods)`}
+                      </button>
+                    )}
+
+                    {/* Period grid */}
+                    {isExpanded && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {line.periods.map((p, pi) => (
+                          <div key={pi} className="space-y-1">
+                            <label className="text-[10px] text-muted-foreground pl-0.5">{p.label}</label>
+                            <CurrencyInput
+                              size="sm"
+                              value={(p.amount / 100).toFixed(2)}
+                              onChange={(v) => updatePeriodAmount(i, pi, v)}
                             />
-                          </td>
+                          </div>
                         ))}
-                        <td className="px-3 py-2 text-right font-mono text-sm tabular-nums font-medium">
-                          ${(budgetLineTotal(line) / 100).toFixed(2)}
-                        </td>
-                        <td className="px-2 py-2">
-                          <button type="button" onClick={() => setBudgetLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-red-600">
-                            <Trash2 className="size-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      </div>
+                    )}
+
+                    {i < budgetLines.length - 1 && <div className="h-px bg-border" />}
+                  </div>
+                );
+              })}
+
+              {budgetLines.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No lines yet. Add one to start planning.</p>
+              )}
             </div>
           </div>
+
+          {grandTotal > 0 && (
+            <div className="flex items-center justify-between border-t px-4 py-2.5 sm:px-6 text-sm">
+              <span className="text-muted-foreground">Total budget</span>
+              <span className="font-mono font-semibold tabular-nums">{formatMoney(grandTotal)}</span>
+            </div>
+          )}
           <DrawerFooter onClose={onClose} saving={saving} label="Create Budget" />
         </form>
       </SheetContent>
@@ -1813,7 +1978,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><Users className="size-5" /></DrawerIcon>
             <div>
@@ -1823,7 +1988,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Personal Info</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1962,7 +2127,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><CreditCard className="size-5" /></DrawerIcon>
             <div>
@@ -1972,7 +2137,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Credit Note Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -2082,7 +2247,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
             <DrawerIcon><RefreshCw className="size-5" /></DrawerIcon>
             <div>
@@ -2092,7 +2257,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
           </div>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Template Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -2152,6 +2317,648 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Template" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Account Drawer
+// ---------------------------------------------------------------------------
+function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          code: form.get("code"),
+          name: form.get("name"),
+          type: form.get("type") || "asset",
+          subType: form.get("subType") || null,
+          description: form.get("description") || null,
+          currencyCode: form.get("currencyCode") || "USD",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create account");
+      }
+      toast.success("Account created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("accounts-changed"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><BookOpen className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Account</SheetTitle>
+              <SheetDescription>Add an account to your chart of accounts.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Account Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-account-code">Code *</Label>
+                  <Input id="drawer-account-code" name="code" required placeholder="1000" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-account-name">Name *</Label>
+                  <Input id="drawer-account-name" name="name" required placeholder="Cash" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select name="type" defaultValue="asset">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asset">Asset</SelectItem>
+                      <SelectItem value="liability">Liability</SelectItem>
+                      <SelectItem value="equity">Equity</SelectItem>
+                      <SelectItem value="revenue">Revenue</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-account-currency">Currency</Label>
+                  <Input id="drawer-account-currency" name="currencyCode" defaultValue="USD" placeholder="USD" maxLength={3} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Optional</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-account-description">Description</Label>
+                <Textarea id="drawer-account-description" name="description" placeholder="Account description..." rows={2} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Account" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bank Account Drawer
+// ---------------------------------------------------------------------------
+const BANK_ACCOUNT_COLORS = [
+  "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+];
+
+function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [accountName, setAccountName] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountType, setAccountType] = useState("checking");
+  const [currencyCode, setCurrencyCode] = useState("USD");
+  const [countryCode, setCountryCode] = useState("");
+  const [color, setColor] = useState(BANK_ACCOUNT_COLORS[0]);
+
+  useEffect(() => {
+    if (!open) {
+      setAccountName(""); setBankName(""); setAccountNumber("");
+      setAccountType("checking"); setCurrencyCode("USD"); setCountryCode("");
+      setColor(BANK_ACCOUNT_COLORS[0]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!accountName.trim()) { toast.error("Please enter an account name"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/bank-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          accountName,
+          accountNumber: accountNumber || null,
+          bankName: bankName || null,
+          currencyCode,
+          countryCode: countryCode || null,
+          accountType,
+          color,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create bank account");
+      }
+      const data = await res.json();
+      toast.success("Bank account created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("bank-accounts-changed"));
+      router.push(`/accounting/banking/${data.bankAccount.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create bank account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Landmark className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Bank Account</SheetTitle>
+              <SheetDescription>Add an account to track transactions and import statements.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Account Details</SectionLabel>
+              <div className="space-y-2">
+                <Label>Account Name *</Label>
+                <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Global Operating Account" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Bank Name</Label>
+                  <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Revolut Business" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Account Type</Label>
+                  <Select value={accountType} onValueChange={setAccountType}>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="checking">Checking</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="credit_card">Credit Card</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="loan">Loan</SelectItem>
+                      <SelectItem value="investment">Investment</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Account Number / IBAN</Label>
+                <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="1234 or GB29NWBK..." />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Region & Currency</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Input value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value.toUpperCase())} placeholder="USD" maxLength={3} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <Input value={countryCode} onChange={(e) => setCountryCode(e.target.value.toUpperCase())} placeholder="US" maxLength={2} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Accent Color</SectionLabel>
+              <div className="flex gap-2">
+                {BANK_ACCOUNT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`size-6 rounded-full ring-2 ring-transparent transition-all ${color === c ? "ring-offset-2 ring-gray-400" : ""}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Account" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse Drawer
+// ---------------------------------------------------------------------------
+function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/warehouses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          code: form.get("code"),
+          address: form.get("address") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create warehouse");
+      }
+      toast.success("Warehouse created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("refetch-warehouses"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create warehouse");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Warehouse className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Warehouse</SheetTitle>
+              <SheetDescription>Add a warehouse location for inventory tracking.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Warehouse Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-wh-name">Name *</Label>
+                  <Input id="drawer-wh-name" name="name" required placeholder="Main Warehouse" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-wh-code">Code *</Label>
+                  <Input id="drawer-wh-code" name="code" required placeholder="WH-001" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Location</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-wh-address">Address</Label>
+                <Textarea id="drawer-wh-address" name="address" placeholder="Street address, city, country..." rows={3} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Warehouse" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stock Take Drawer
+// ---------------------------------------------------------------------------
+function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/stock-takes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          notes: form.get("notes") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create stock take");
+      }
+      toast.success("Stock take created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("refetch-stock-takes"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create stock take");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><ClipboardList className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Stock Take</SheetTitle>
+              <SheetDescription>Create a physical inventory count to reconcile stock levels.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-st-name">Name *</Label>
+                <Input id="drawer-st-name" name="name" required placeholder="e.g. Q1 2026 Full Count" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea name="notes" placeholder="Optional notes about this stock take..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Stock Take" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Category Drawer
+// ---------------------------------------------------------------------------
+function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/inventory/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          color: form.get("color") || null,
+          description: form.get("description") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create category");
+      }
+      toast.success("Category created");
+      onClose();
+      window.dispatchEvent(new CustomEvent("refetch-categories"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create category");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Tag className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Category</SheetTitle>
+              <SheetDescription>Organize inventory items with categories.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Category Info</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-cat-name">Name *</Label>
+                <Input id="drawer-cat-name" name="name" required placeholder="e.g. Electronics" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-cat-color">Color</Label>
+                <Input id="drawer-cat-color" name="color" placeholder="#10b981" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-cat-desc">Description</Label>
+                <Textarea id="drawer-cat-desc" name="description" placeholder="Optional description..." rows={2} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Category" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Transfer Drawer
+// ---------------------------------------------------------------------------
+function TransferDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [lines, setLines] = useState<{ inventoryItemId: string; quantity: number }[]>([{ inventoryItemId: "", quantity: 1 }]);
+  const [fromWarehouseId, setFromWarehouseId] = useState("");
+  const [toWarehouseId, setToWarehouseId] = useState("");
+
+  function resetState() {
+    setLines([{ inventoryItemId: "", quantity: 1 }]);
+    setFromWarehouseId("");
+    setToWarehouseId("");
+  }
+
+  function addLine() {
+    setLines((prev) => [...prev, { inventoryItemId: "", quantity: 1 }]);
+  }
+
+  function removeLine(idx: number) {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateLine(idx: number, field: "inventoryItemId" | "quantity", value: string | number) {
+    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    if (!fromWarehouseId || !toWarehouseId) {
+      toast.error("Select both warehouses");
+      setSaving(false);
+      return;
+    }
+
+    const validLines = lines.filter((l) => l.inventoryItemId && l.quantity > 0);
+    if (validLines.length === 0) {
+      toast.error("Add at least one item");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/v1/inventory/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          fromWarehouseId,
+          toWarehouseId,
+          notes: (e.currentTarget.elements.namedItem("notes") as HTMLTextAreaElement)?.value || null,
+          lines: validLines,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create transfer");
+      }
+      toast.success("Transfer created");
+      onClose();
+      resetState();
+      window.dispatchEvent(new CustomEvent("refetch-transfers"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create transfer");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) { onClose(); resetState(); } }}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><ArrowLeftRight className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Transfer</SheetTitle>
+              <SheetDescription>Move inventory between warehouses.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            {/* Warehouses */}
+            <div className="space-y-3">
+              <SectionLabel>Warehouses</SectionLabel>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">From *</Label>
+                  <WarehousePicker value={fromWarehouseId} onChange={setFromWarehouseId} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">To *</Label>
+                  <WarehousePicker value={toWarehouseId} onChange={setToWarehouseId} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Line items */}
+            <div className="space-y-3">
+              <SectionLabel>Items</SectionLabel>
+              <div className="space-y-2">
+                {lines.map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <InventoryItemPicker
+                        value={line.inventoryItemId}
+                        onChange={(v) => updateLine(idx, "inventoryItemId", v)}
+                      />
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={line.quantity}
+                      onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value) || 1)}
+                      className="w-20 shrink-0"
+                      placeholder="Qty"
+                    />
+                    {lines.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => removeLine(idx)}>
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button type="button" variant="outline" size="sm" className="text-xs" onClick={addLine}>
+                <Plus className="size-3 mr-1.5" />Add Item
+              </Button>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Notes */}
+            <div className="space-y-3">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea name="notes" placeholder="Optional notes about this transfer..." rows={2} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create Transfer" />
         </form>
       </SheetContent>
     </Sheet>

@@ -420,3 +420,60 @@ export async function createPaymentJournalEntry(
 
   return entry;
 }
+
+/**
+ * Create journal entry for FX gain/loss.
+ * Gain: DR Bank, CR FX Gain (4200)
+ * Loss: DR FX Loss (5200), CR Bank
+ */
+export async function createFxGainLossEntry(
+  ctx: JournalAutomationContext,
+  data: {
+    reference: string;
+    amount: number; // positive = gain, negative = loss
+    date: string;
+    description: string;
+  }
+) {
+  const entryNumber = await getNextEntryNumber(ctx.organizationId);
+
+  // FX Gain account "4200" (revenue), FX Loss account "5200" (expense)
+  const isGain = data.amount > 0;
+  const fxAccount = await findAccountByCode(ctx.organizationId, isGain ? "4200" : "5200");
+  const bankAccount = await findAccountByCode(ctx.organizationId, "1100");
+
+  if (!fxAccount || !bankAccount) return null;
+
+  const absAmount = Math.abs(data.amount);
+
+  const [entry] = await db
+    .insert(journalEntry)
+    .values({
+      organizationId: ctx.organizationId,
+      entryNumber,
+      date: data.date,
+      description: data.description,
+      reference: data.reference,
+      status: "posted",
+      sourceType: "fx_gain_loss",
+      postedAt: new Date(),
+      createdBy: ctx.userId,
+    })
+    .returning();
+
+  if (isGain) {
+    // DR Bank, CR FX Gain
+    await db.insert(journalLine).values([
+      { journalEntryId: entry.id, accountId: bankAccount.id, description: data.description, debitAmount: absAmount, creditAmount: 0 },
+      { journalEntryId: entry.id, accountId: fxAccount.id, description: data.description, debitAmount: 0, creditAmount: absAmount },
+    ]);
+  } else {
+    // DR FX Loss, CR Bank
+    await db.insert(journalLine).values([
+      { journalEntryId: entry.id, accountId: fxAccount.id, description: data.description, debitAmount: absAmount, creditAmount: 0 },
+      { journalEntryId: entry.id, accountId: bankAccount.id, description: data.description, debitAmount: 0, creditAmount: absAmount },
+    ]);
+  }
+
+  return entry;
+}

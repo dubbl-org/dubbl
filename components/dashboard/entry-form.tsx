@@ -98,8 +98,8 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         <div className="space-y-2">
           <Label htmlFor="date">Date</Label>
           <Input
@@ -134,8 +134,8 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
 
       <div className="space-y-3">
         <Label>Journal Lines</Label>
-        <div className="rounded-lg border">
-          <div className="grid grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+        <div className="overflow-x-auto rounded-lg border">
+          <div className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
             <span>Account</span>
             <span>Description</span>
             <span className="text-right">Debit</span>
@@ -145,7 +145,7 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
           {lines.map((line, i) => (
             <div
               key={i}
-              className="grid grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b px-3 py-2 last:border-b-0"
+              className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b px-3 py-2 last:border-b-0"
             >
               <Select
                 value={line.accountId}
@@ -157,7 +157,7 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
                 <SelectContent>
                   {accounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.code} — {a.name}
+                      {a.code} - {a.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -198,7 +198,7 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
               </Button>
             </div>
           ))}
-          <div className="grid grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-t bg-muted/30 px-3 py-2">
+          <div className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-t bg-muted/30 px-3 py-2">
             <Button
               type="button"
               variant="ghost"
@@ -227,7 +227,7 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
         )}
       </div>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         ) : (

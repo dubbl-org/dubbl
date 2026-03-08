@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { chartAccount, journalLine, journalEntry } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, asc, desc } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
+import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 
 const updateSchema = z.object({
+  code: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   subType: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
@@ -20,6 +22,14 @@ export async function GET(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    const url = new URL(request.url);
+    const { page, limit, offset } = parsePagination(url);
+    const search = url.searchParams.get("search");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const entryType = url.searchParams.get("entryType");
+    const sortBy = url.searchParams.get("sortBy") || "date";
+    const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
     const account = await db.query.chartAccount.findFirst({
       where: and(
@@ -32,8 +42,8 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Get ledger entries
-    const ledger = await db
+    // Get ALL ledger entries for running balance calculation
+    const allLedger = await db
       .select({
         entryId: journalEntry.id,
         entryNumber: journalEntry.entryNumber,
@@ -50,14 +60,17 @@ export async function GET(
           eq(journalEntry.status, "posted")
         )
       )
-      .orderBy(journalEntry.date);
+      .orderBy(asc(journalEntry.date));
 
-    // Compute running balance (amounts are integer cents)
+    // Compute running balance and totals on full set
     let balance = 0;
-    const ledgerWithBalance = ledger.map((row) => {
+    let totalDebits = 0;
+    let totalCredits = 0;
+    const fullLedger = allLedger.map((row) => {
       const debit = row.debitAmount || 0;
       const credit = row.creditAmount || 0;
-      // Assets & expenses: debit-normal; liabilities, equity, revenue: credit-normal
+      totalDebits += debit;
+      totalCredits += credit;
       if (["asset", "expense"].includes(account.type)) {
         balance += debit - credit;
       } else {
@@ -66,9 +79,46 @@ export async function GET(
       return { ...row, balance };
     });
 
+    // Apply filters
+    let filtered = fullLedger;
+
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(
+        (e) =>
+          e.description.toLowerCase().includes(q) ||
+          String(e.entryNumber).includes(q)
+      );
+    }
+
+    if (from) filtered = filtered.filter((e) => e.date >= from);
+    if (to) filtered = filtered.filter((e) => e.date <= to);
+
+    if (entryType === "debits") {
+      filtered = filtered.filter((e) => (e.debitAmount || 0) > 0);
+    } else if (entryType === "credits") {
+      filtered = filtered.filter((e) => (e.creditAmount || 0) > 0);
+    }
+
+    // Sort
+    const mul = sortOrder === "asc" ? 1 : -1;
+    filtered.sort((a, b) => {
+      if (sortBy === "date") return mul * a.date.localeCompare(b.date);
+      if (sortBy === "number") return mul * (a.entryNumber - b.entryNumber);
+      if (sortBy === "amount") {
+        const aAmt = (a.debitAmount || 0) + (a.creditAmount || 0);
+        const bAmt = (b.debitAmount || 0) + (b.creditAmount || 0);
+        return mul * (aAmt - bAmt);
+      }
+      return 0;
+    });
+
+    const total = filtered.length;
+    const paged = filtered.slice(offset, offset + limit);
+
     return NextResponse.json({
-      account: { ...account, balance },
-      ledger: ledgerWithBalance,
+      account: { ...account, balance, totalDebits, totalCredits, entryCount: allLedger.length },
+      ...paginatedResponse(paged, total, page, limit),
     });
   } catch (err) {
     if (err instanceof AuthError) {

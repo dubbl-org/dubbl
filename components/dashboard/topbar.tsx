@@ -3,9 +3,10 @@
 import { useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Menu } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { useSidebar } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
@@ -57,6 +58,16 @@ const LABELS: Record<string, string> = {
   "budget-vs-actual": "Budget vs Actual",
   general: "General",
   time: "Time Tracking",
+  // Inventory subtabs
+  "stock-takes": "Stock Takes",
+  warehouses: "Warehouses",
+  valuation: "Valuation",
+  categories: "Categories",
+  transfers: "Transfers",
+  alerts: "Alerts",
+  history: "History",
+  suppliers: "Suppliers",
+  variants: "Variants",
   // Sales subtabs
   "credit-notes": "Credit Notes",
   recurring: "Recurring",
@@ -68,19 +79,36 @@ const LABELS: Record<string, string> = {
   team: "Team",
 };
 
-const CTA_MAP: Record<string, { label: string; drawer: "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" }> = {
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
+
+const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
+  "sales/quotes": { label: "New Quote", drawer: "quote" },
+  "sales/credit-notes": { label: "New Credit Note", drawer: "creditNote" },
+  "sales/recurring": { label: "New Recurring", drawer: "recurring" },
   purchases: { label: "New Bill", drawer: "bill" },
+  "purchases/expenses": { label: "New Expense", drawer: "expense" },
+  "purchases/orders": { label: "New PO", drawer: "purchaseOrder" },
   accounting: { label: "New Entry", drawer: "entry" },
+  "accounting/accounts": { label: "New Account", drawer: "account" },
+  "accounting/banking": { label: "New Account", drawer: "bankAccount" },
+  "accounting/fixed-assets": { label: "New Asset", drawer: "fixedAsset" },
+  "accounting/budgets": { label: "New Budget", drawer: "budget" },
   contacts: { label: "New Contact", drawer: "contact" },
   projects: { label: "New Project", drawer: "project" },
   inventory: { label: "New Item", drawer: "inventory" },
+  "inventory/stock-takes": { label: "New Stock Take", drawer: "stockTake" },
+  "inventory/warehouses": { label: "New Warehouse", drawer: "warehouse" },
+  "inventory/transfers": { label: "New Transfer", drawer: "transfer" },
+  "inventory/valuation": null,
+  "payroll/employees": { label: "New Employee", drawer: "employee" },
 };
 
 export function Topbar() {
   const pathname = usePathname();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
+  const { toggleSidebar, isMobile } = useSidebar();
   const segments = pathname.split("/").filter(Boolean);
 
   // For group roots, show the default subtab in the breadcrumb
@@ -93,14 +121,26 @@ export function Topbar() {
   const defaultSub = segments.length === 1 ? DEFAULT_SUBTABS[segments[0]] : undefined;
   const effectiveSegments = defaultSub ? [segments[0], defaultSub] : segments;
 
-  // For entity detail pages like /projects/[id] or /projects/[id]/time,
+  // For entity detail pages like /projects/[id] or /accounting/banking/[id],
   // detect the pattern and show proper breadcrumbs
   const isEntityDetail = segments.length >= 2 && segments[0] in LABELS && !(segments[1] in LABELS);
+  // Also detect nested entity detail: /accounting/banking/[id] where segments[2] is not a known label
+  const isNestedEntityDetail = segments.length >= 3 && segments[0] in LABELS && segments[1] in LABELS && !(segments[2] in LABELS);
   let pageTitle: string;
   let parentLabel: string | null;
   let parentHref: string | null = null;
 
-  if (isEntityDetail) {
+  if (isNestedEntityDetail) {
+    parentLabel = LABELS[segments[1]] || segments[1];
+    parentHref = `/${segments[0]}/${segments[1]}`;
+    if (entityTitle) {
+      pageTitle = entityTitle;
+    } else {
+      const subTab = segments.length > 3 ? segments[segments.length - 1] : null;
+      pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[1]] || segments[1]);
+      if (!subTab) parentLabel = null;
+    }
+  } else if (isEntityDetail) {
     parentLabel = LABELS[segments[0]] || segments[0];
     parentHref = `/${segments[0]}`;
     if (entityTitle) {
@@ -115,7 +155,8 @@ export function Topbar() {
     parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
   }
 
-  const cta = CTA_MAP[segments[0]];
+  const subtabKey = `${segments[0]}/${segments[1]}`;
+  const cta = subtabKey in CTA_MAP ? CTA_MAP[subtabKey] : CTA_MAP[segments[0]];
 
   const openCommandPalette = useCallback(() => {
     document.dispatchEvent(new CustomEvent("open-command-palette"));
@@ -123,15 +164,20 @@ export function Topbar() {
 
   return (
     <header className="shrink-0">
-      <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-6">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-3 sm:px-6">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {isMobile && (
+            <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={toggleSidebar}>
+              <Menu className="size-4" />
+            </Button>
+          )}
           <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <Logo className="h-5 w-auto" />
-            <span className="text-[14px] font-semibold tracking-tight">dubbl</span>
+            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">dubbl</span>
           </Link>
-          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
           {parentLabel && effectiveSegments.length > 1 && (
-            <>
+            <div className="hidden sm:contents">
               {parentHref ? (
                 <Link href={parentHref} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
                   {parentLabel}
@@ -140,7 +186,7 @@ export function Topbar() {
                 <span className="text-[13px] text-muted-foreground shrink-0">{parentLabel}</span>
               )}
               <span className="text-muted-foreground/40 shrink-0">/</span>
-            </>
+            </div>
           )}
           <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
@@ -168,7 +214,7 @@ export function Topbar() {
                 onClick={() => openDrawer(cta.drawer)}
               >
                 <Plus className="size-3" />
-                {cta.label}
+                <span className="hidden sm:inline">{cta.label}</span>
               </Button>
             </>
           )}

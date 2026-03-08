@@ -1,9 +1,11 @@
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
   description: string;
+  compact?: boolean;
   children?: React.ReactNode;
 }
 
@@ -11,10 +13,14 @@ export function EmptyState({
   icon: Icon,
   title,
   description,
+  compact,
   children,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-200 dark:border-emerald-900/50 min-h-[50vh] py-16 px-6 text-center">
+    <div className={cn(
+      "flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-200 dark:border-emerald-900/50 py-16 px-6 text-center",
+      !compact && "min-h-[50vh]"
+    )}>
       <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
         <Icon className="size-6 text-emerald-600 dark:text-emerald-400" />
       </div>

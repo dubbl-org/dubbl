@@ -261,11 +261,11 @@ export default function CreditNoteDetailPage() {
         )}
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge variant="outline" className={statusColors[cn.status] || ""}>
           {cn.status}
         </Badge>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs sm:text-sm text-muted-foreground">
           Issued {cn.issueDate}
         </span>
       </div>
@@ -285,15 +285,15 @@ export default function CreditNoteDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border">
-        <div className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+      <div className="rounded-lg border overflow-x-auto">
+        <div className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
           <span>Description</span>
           <span className="text-right">Qty</span>
           <span className="text-right">Price</span>
           <span className="text-right">Amount</span>
         </div>
         {cn.lines.map((line) => (
-          <div key={line.id} className="grid grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
+          <div key={line.id} className="grid min-w-[500px] grid-cols-[1fr_80px_100px_120px] gap-2 border-b px-4 py-2 last:border-b-0">
             <div>
               <p className="text-sm">{line.description}</p>
               {line.account && (
@@ -305,12 +305,12 @@ export default function CreditNoteDetailPage() {
             <span className="text-right text-sm font-mono font-medium">{formatMoney(line.amount)}</span>
           </div>
         ))}
-        <div className="border-t bg-muted/30 px-4 py-2 text-right">
+        <div className="border-t bg-muted/30 px-4 py-2 text-right flex flex-wrap justify-end gap-x-4 gap-y-1">
           <span className="text-sm font-medium">Subtotal: {formatMoney(cn.subtotal)}</span>
           {cn.taxTotal > 0 && (
-            <span className="ml-4 text-sm">Tax: {formatMoney(cn.taxTotal)}</span>
+            <span className="text-sm">Tax: {formatMoney(cn.taxTotal)}</span>
           )}
-          <span className="ml-4 text-sm font-bold">Total: {formatMoney(cn.total)}</span>
+          <span className="text-sm font-bold">Total: {formatMoney(cn.total)}</span>
         </div>
       </div>
 

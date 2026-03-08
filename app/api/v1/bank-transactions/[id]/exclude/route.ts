@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount } from "@/lib/db/schema";
+import { bankTransaction, bankAccount, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -49,6 +49,15 @@ export async function POST(
       .set({ status: newStatus })
       .where(eq(bankTransaction.id, id))
       .returning();
+
+    await db.insert(auditLog).values({
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      action: newStatus === "excluded" ? "excluded" : "restored",
+      entityType: "bank_transaction",
+      entityId: id,
+      changes: { previousStatus: transaction.status },
+    });
 
     return NextResponse.json({ transaction: updated });
   } catch (err) {

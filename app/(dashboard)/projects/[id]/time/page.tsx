@@ -462,12 +462,12 @@ export default function TimePage() {
   const timerIsPaused = !!timerData?.pausedAt;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Top: Timer + Weekly Chart side by side */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1fr_1.5fr]">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-[1fr_1.5fr]">
         {/* Timer Card */}
         <div className={cn(
-          "rounded-xl border bg-card p-5 flex flex-col",
+          "rounded-xl border bg-card p-4 sm:p-5 flex flex-col",
           timerIsRunning && !timerIsPaused && "border-emerald-300 bg-gradient-to-b from-emerald-50/40 to-card dark:from-emerald-950/20",
           timerIsPaused && "border-amber-300 bg-gradient-to-b from-amber-50/30 to-card dark:from-amber-950/20",
         )}>
@@ -491,10 +491,10 @@ export default function TimePage() {
           </div>
 
           {/* Timer Display */}
-          <div className="flex items-center justify-center py-4">
+          <div className="flex items-center justify-center py-3 sm:py-4">
             <div className="flex items-baseline gap-1 select-none">
               <span className={cn(
-                "text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
+                "text-3xl sm:text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
                 timerIsRunning && !timerIsPaused && "text-emerald-700 dark:text-emerald-400",
                 timerIsPaused && "text-amber-700 dark:text-amber-400",
                 !timerIsRunning && "text-muted-foreground/30",
@@ -502,11 +502,11 @@ export default function TimePage() {
                 {timerTime.h}
               </span>
               <span className={cn(
-                "text-2xl font-light transition-colors",
+                "text-xl sm:text-2xl font-light transition-colors",
                 timerIsRunning && !timerIsPaused ? "text-emerald-400 animate-pulse" : "text-muted-foreground/20",
               )}>:</span>
               <span className={cn(
-                "text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
+                "text-3xl sm:text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
                 timerIsRunning && !timerIsPaused && "text-emerald-700 dark:text-emerald-400",
                 timerIsPaused && "text-amber-700 dark:text-amber-400",
                 !timerIsRunning && "text-muted-foreground/30",
@@ -514,11 +514,11 @@ export default function TimePage() {
                 {timerTime.m}
               </span>
               <span className={cn(
-                "text-2xl font-light transition-colors",
+                "text-xl sm:text-2xl font-light transition-colors",
                 timerIsRunning && !timerIsPaused ? "text-emerald-400 animate-pulse" : "text-muted-foreground/20",
               )}>:</span>
               <span className={cn(
-                "text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
+                "text-3xl sm:text-4xl font-bold font-mono tabular-nums tracking-tight transition-colors",
                 timerIsRunning && !timerIsPaused && "text-emerald-600 dark:text-emerald-500",
                 timerIsPaused && "text-amber-600 dark:text-amber-500",
                 !timerIsRunning && "text-muted-foreground/20",
@@ -621,8 +621,8 @@ export default function TimePage() {
         </div>
 
         {/* Weekly Chart */}
-        <div className="rounded-xl border bg-card p-5 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
+        <div className="rounded-xl border bg-card p-4 sm:p-5 flex flex-col">
+          <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-1">
             <div className="flex items-center gap-2">
               <CalendarDays className="size-3.5 text-muted-foreground/60" />
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">This Week</span>
@@ -669,7 +669,7 @@ export default function TimePage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 sm:grid-cols-4">
         <StatCard
           label="Today"
           value={formatHours(todayMinutes)}
@@ -701,7 +701,7 @@ export default function TimePage() {
 
       {/* Action bar + Filters */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             All Entries
             {hasActiveFilters && (

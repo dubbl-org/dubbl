@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { formatMoney } from "@/lib/money";
+import { ExportButton } from "@/components/dashboard/export-button";
 
 interface BillRow {
   id: string;
@@ -59,9 +60,15 @@ export default function AgedPayablesPage() {
       <PageHeader
         title="Aged Payables"
         description="Outstanding bills grouped by aging buckets."
-      />
+      >
+        <ExportButton
+          data={allBills}
+          columns={["billNumber", "contactName", "dueDate", "daysOverdue", "amountDue", "bucket"]}
+          filename="aged-payables"
+        />
+      </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {buckets.map((b) => (
           <StatCard
             key={b.label}
@@ -73,9 +80,9 @@ export default function AgedPayablesPage() {
         ))}
       </div>
 
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg border bg-card p-3 sm:p-4">
         <p className="text-sm font-medium text-muted-foreground mb-1">Total Outstanding</p>
-        <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(grandTotal)}</p>
+        <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums">{formatMoney(grandTotal)}</p>
       </div>
 
       <DataTable

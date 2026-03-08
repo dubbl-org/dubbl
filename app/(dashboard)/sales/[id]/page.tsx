@@ -27,7 +27,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import Link from "next/link";
 
 interface InvoiceDetail {
@@ -254,7 +254,7 @@ export default function InvoiceDetailPage() {
   const sc = statusConfig[inv.status] || statusConfig.draft;
 
   return (
-    <BlurReveal>
+    <ContentReveal>
       <div className="space-y-6">
         {/* Top bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -276,7 +276,7 @@ export default function InvoiceDetailPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {inv.status === "draft" && (
               <Button size="sm" onClick={handleSend} className="bg-emerald-600 hover:bg-emerald-700">
                 <Send className="mr-2 size-4" />Send
@@ -344,7 +344,7 @@ export default function InvoiceDetailPage() {
         {/* Invoice document */}
         <div className="rounded-xl border bg-card overflow-hidden">
           {/* Document header */}
-          <div className="border-b bg-muted/30 px-6 py-5">
+          <div className="border-b bg-muted/30 px-4 py-4 sm:px-6 sm:py-5">
             <div className="grid gap-6 sm:grid-cols-2">
               {/* Left: Bill to */}
               <div>
@@ -388,7 +388,7 @@ export default function InvoiceDetailPage() {
 
           {/* Line items */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[500px] text-sm">
               <thead>
                 <tr className="border-b bg-muted/20">
                   <th className="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Description</th>
@@ -416,7 +416,7 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* Totals */}
-          <div className="border-t bg-muted/10 px-6 py-4">
+          <div className="border-t bg-muted/10 px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex justify-end">
               <div className="w-full max-w-xs space-y-1.5">
                 <div className="flex justify-between text-sm">
@@ -529,6 +529,6 @@ export default function InvoiceDetailPage() {
 
         {confirmDialog}
       </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

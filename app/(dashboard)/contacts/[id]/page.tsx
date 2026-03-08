@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { centsToDecimal, decimalToCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
@@ -448,7 +448,7 @@ export default function ContactDetailPage() {
       </button>
 
       {/* Tab nav - same style as settings */}
-      <nav className="-mt-2 mb-8 flex items-center gap-1 border-b border-border">
+      <nav className="-mt-2 mb-8 flex items-center gap-1 overflow-x-auto border-b border-border">
         {TABS.map((t) => {
           const Icon = t.icon;
           return (
@@ -456,7 +456,7 @@ export default function ContactDetailPage() {
             key={t.value}
             onClick={() => setTab(t.value)}
             className={cn(
-              "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
+              "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
               tab === t.value
                 ? "border-foreground text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -474,7 +474,7 @@ export default function ContactDetailPage() {
         })}
       </nav>
 
-      <BlurReveal key={tab}>
+      <ContentReveal key={tab}>
         {/* Details tab */}
         {tab === "details" && (
           <form onSubmit={handleSubmit} className="space-y-10">
@@ -606,7 +606,7 @@ export default function ContactDetailPage() {
 
             {/* Danger zone */}
             <Section title="Danger zone" description="Irreversible actions for this contact.">
-              <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
                 <div>
                   <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete contact</p>
                   <p className="text-[12px] text-muted-foreground">
@@ -1011,7 +1011,7 @@ export default function ContactDetailPage() {
             </Section>
           </div>
         )}
-      </BlurReveal>
+      </ContentReveal>
       {confirmDialog}
     </div>
   );

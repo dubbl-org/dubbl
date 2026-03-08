@@ -275,8 +275,8 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto">
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList className="h-8">
               <TabsTrigger value="all" className="text-xs">All ({tasks.length})</TabsTrigger>
@@ -655,14 +655,14 @@ function TaskBoardView({ tasks, proj, labels, onUpdate, onView }: {
   const columns = ["backlog", "todo", "in_progress", "in_review", "done"] as const;
 
   return (
-    <div className="grid grid-cols-5 gap-3 min-h-[40vh]">
+    <div className="flex gap-3 min-h-[40vh] overflow-x-auto pb-2 sm:grid sm:grid-cols-5 sm:overflow-x-visible sm:pb-0">
       {columns.map(col => {
         const tsc = taskStatusConfig[col];
         const colTasks = tasks.filter(t => t.status === col);
         return (
           <div
             key={col}
-            className="rounded-lg border bg-muted/20 flex flex-col"
+            className="rounded-lg border bg-muted/20 flex flex-col min-w-[200px] sm:min-w-0"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               const taskId = e.dataTransfer.getData("taskId");

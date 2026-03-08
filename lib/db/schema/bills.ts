@@ -14,6 +14,7 @@ import { journalEntry, chartAccount, taxRate } from "./bookkeeping";
 
 export const billStatusEnum = pgEnum("bill_status", [
   "draft",
+  "pending_approval",
   "received",
   "partial",
   "paid",
@@ -58,6 +59,10 @@ export const bill = pgTable("bill", {
   receivedAt: timestamp("received_at", { mode: "date" }),
   paidAt: timestamp("paid_at", { mode: "date" }),
   voidedAt: timestamp("voided_at", { mode: "date" }),
+  approvedBy: uuid("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at", { mode: "date" }),
+  rejectedAt: timestamp("rejected_at", { mode: "date" }),
+  rejectionReason: text("rejection_reason"),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

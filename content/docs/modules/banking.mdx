@@ -1,11 +1,11 @@
 ---
 title: Banking & Reconciliation
-description: Manage bank accounts, import transactions, and reconcile.
+description: Manage bank accounts, import global statement formats, and reconcile.
 ---
 
 ## Bank Accounts
 
-Create bank accounts linked to your chart of accounts. Each bank account maps to a GL account (e.g., Checking Account → 1100).
+Create bank accounts linked to your chart of accounts. Each account owns its own statement imports, transactions, and reconciliation workflow.
 
 ### Fields
 
@@ -15,21 +15,39 @@ Create bank accounts linked to your chart of accounts. Each bank account maps to
 | Account Number | Masked number for display |
 | Bank Name | Name of the bank |
 | Currency | Account currency |
+| Country | Country or region of the account |
+| Account Type | Checking, savings, credit card, cash, loan, investment, or other |
+| Accent Color | Visual identity used across the banking UI |
 | GL Account | Chart of accounts link |
 
 ## Importing Transactions
 
-Import bank statements via CSV:
+Import bank statements into a specific bank account:
 
 1. Navigate to your bank account
-2. Click **Import CSV**
-3. Paste or upload CSV data
-4. The parser auto-detects column formats
+2. Click **Import Statement**
+3. Upload a file or paste raw statement data
+4. Preview detected rows, duplicates, warnings, and date ranges
+5. Confirm the import
 
-Supported CSV formats:
-- Date, Description, Amount
-- Date, Description, Debit, Credit
-- Date, Reference, Description, Debit, Credit
+Supported formats:
+- CSV
+- TSV
+- QIF
+- OFX / QFX / QBO
+- CAMT.052 / CAMT.053 / CAMT.054
+- MT940 / MT942
+- BAI2
+
+Every imported transaction stores provenance such as the import batch and source format.
+
+## Live Connections
+
+Live bank connections are not enabled yet.
+
+- The banking UI shows **No bank connected**
+- Statement imports are the active workflow today
+- **Salt Edge** is planned for a future release
 
 ## Reconciliation
 

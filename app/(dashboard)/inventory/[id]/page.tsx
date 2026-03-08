@@ -3,65 +3,51 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Plus } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { Trash2, Save, Loader2, Warehouse, Printer } from "lucide-react";
+import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { formatMoney, centsToDecimal } from "@/lib/money";
-import Link from "next/link";
+import { centsToDecimal } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
+import { setEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useInventoryItem } from "./layout";
+import JsBarcode from "jsbarcode";
 
-interface InventoryItemDetail {
+interface WarehouseStockEntry {
   id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  sku: string | null;
-  purchasePrice: number;
-  salePrice: number;
-  quantityOnHand: number;
-  reorderPoint: number;
-  isActive: boolean;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  quantity: number;
+  updatedAt: string;
 }
 
-export default function InventoryItemDetailPage() {
+export default function InventoryItemDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [item, setItem] = useState<InventoryItemDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { item, setItem } = useInventoryItem();
   const [saving, setSaving] = useState(false);
-  const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustment, setAdjustment] = useState("");
-  const [adjustReason, setAdjustReason] = useState("");
+  const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  // Fetch per-warehouse stock
   useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-
-    fetch(`/api/v1/inventory/${id}`, {
+    fetch(`/api/v1/inventory/${id}/warehouse-stock`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then((data) => {
-        if (data.inventoryItem) setItem(data.inventoryItem);
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
+      .then((data) => setWarehouseStocks(data.data || []));
+  }, [id, orgId]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
     const form = new FormData(e.currentTarget);
-    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
     try {
@@ -75,6 +61,7 @@ export default function InventoryItemDetailPage() {
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
+          category: form.get("category") || null,
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
@@ -84,7 +71,8 @@ export default function InventoryItemDetailPage() {
 
       if (!res.ok) throw new Error("Failed to update");
       const data = await res.json();
-      setItem(data.inventoryItem);
+      setItem(() => data.inventoryItem);
+      setEntityTitle(data.inventoryItem.name);
       toast.success("Item updated");
     } catch {
       toast.error("Failed to update item");
@@ -93,45 +81,14 @@ export default function InventoryItemDetailPage() {
     }
   }
 
-  async function handleAdjust() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    const adj = parseInt(adjustment);
-    if (!adj || !adjustReason.trim()) {
-      toast.error("Enter a valid adjustment and reason");
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/v1/inventory/${id}/adjust`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": orgId,
-        },
-        body: JSON.stringify({ adjustment: adj, reason: adjustReason }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to adjust");
-      }
-
-      const data = await res.json();
-      setItem(data.inventoryItem);
-      setAdjustOpen(false);
-      setAdjustment("");
-      setAdjustReason("");
-      toast.success(`Quantity adjusted by ${adj > 0 ? "+" : ""}${adj}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to adjust quantity");
-    }
-  }
-
   async function handleDelete() {
-    if (!confirm("Delete this inventory item?")) return;
-    const orgId = localStorage.getItem("activeOrgId");
+    const confirmed = await confirm({
+      title: "Delete this inventory item?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     if (!orgId) return;
 
     await fetch(`/api/v1/inventory/${id}`, {
@@ -142,179 +99,226 @@ export default function InventoryItemDetailPage() {
     router.push("/inventory");
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Loading..." />
-      </div>
-    );
+  function printBarcode() {
+    const barcodeValue = item.sku || item.code;
+    const canvas = document.createElement("canvas");
+    try {
+      JsBarcode(canvas, barcodeValue, {
+        format: "CODE128",
+        width: 2,
+        height: 80,
+        displayValue: true,
+        fontSize: 14,
+        margin: 10,
+      });
+    } catch {
+      toast.error("Could not generate barcode for this value");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head><title>${item.name} - Barcode</title></head>
+        <body style="display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;flex-direction:column;gap:8px">
+          <h3 style="margin:0;font-family:sans-serif">${item.name}</h3>
+          <img src="${canvas.toDataURL()}" />
+          <script>window.print();window.close();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
-  if (!item) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Item not found" />
-      </div>
-    );
-  }
-
-  const isLowStock = item.quantityOnHand <= item.reorderPoint;
+  // Generate barcode preview
+  const barcodeValue = item.sku || item.code;
+  const barcodeRef = (canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return;
+    try {
+      JsBarcode(canvas, barcodeValue, {
+        format: "CODE128",
+        width: 1.5,
+        height: 50,
+        displayValue: true,
+        fontSize: 11,
+        margin: 5,
+      });
+    } catch {
+      // Invalid barcode value
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={item.name}
-        description={`Code: ${item.code}`}
-      >
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/inventory">
-            <ArrowLeft className="mr-2 size-4" />
-            Back
-          </Link>
-        </Button>
-        <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="mr-2 size-4" />
-              Adjust Stock
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Adjust Quantity</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Current Quantity</Label>
-                <p className="text-lg font-bold font-mono">{item.quantityOnHand}</p>
+    <>
+      <form onSubmit={handleSubmit} className="space-y-10">
+        <Section title="General" description="Item code, name, and identifiers.">
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="code">Code</Label>
+                <Input id="code" name="code" required defaultValue={item.code} />
               </div>
-              <div className="space-y-2">
-                <Label>Adjustment (positive or negative)</Label>
-                <Input
-                  type="number"
-                  value={adjustment}
-                  onChange={(e) => setAdjustment(e.target.value)}
-                  placeholder="e.g. 10 or -5"
-                />
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="name">Name</Label>
+                <Input id="name" name="name" required defaultValue={item.name} />
               </div>
-              <div className="space-y-2">
-                <Label>Reason *</Label>
-                <Input
-                  value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value)}
-                  placeholder="Reason for adjustment"
-                />
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="category">Category</Label>
+                <Input id="category" name="category" defaultValue={item.category || ""} placeholder="e.g. Electronics" />
               </div>
-              <Button onClick={handleAdjust} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                Apply Adjustment
-              </Button>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="sku">SKU</Label>
+                <Input id="sku" name="sku" defaultValue={item.sku || ""} placeholder="Optional" />
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-        <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600">
-          <Trash2 className="mr-2 size-4" />
-          Delete
-        </Button>
-      </PageHeader>
+          </div>
+        </Section>
 
-      <div className="flex items-center gap-3">
-        {isLowStock && (
-          <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
-            Low Stock
-          </Badge>
-        )}
-        <Badge
-          variant="outline"
-          className={
-            item.isActive
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-gray-200 bg-gray-50 text-gray-700"
-          }
-        >
-          {item.isActive ? "Active" : "Inactive"}
-        </Badge>
-      </div>
+        <div className="h-px bg-border" />
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">On Hand</p>
-          <p className="text-xl font-bold font-mono">{item.quantityOnHand}</p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">Reorder Point</p>
-          <p className="text-xl font-bold font-mono">{item.reorderPoint}</p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">Purchase Price</p>
-          <p className="text-xl font-bold font-mono">{formatMoney(item.purchasePrice)}</p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">Sale Price</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(item.salePrice)}</p>
-        </div>
-      </div>
+        <Section title="Pricing" description="Purchase cost and sale price for this item.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="purchasePrice">Purchase Price</Label>
+              <Input
+                id="purchasePrice"
+                name="purchasePrice"
+                type="number"
+                step="0.01"
+                min={0}
+                defaultValue={centsToDecimal(item.purchasePrice)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="salePrice">Sale Price</Label>
+              <Input
+                id="salePrice"
+                name="salePrice"
+                type="number"
+                step="0.01"
+                min={0}
+                defaultValue={centsToDecimal(item.salePrice)}
+              />
+            </div>
+          </div>
+        </Section>
 
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="code">Code</Label>
-            <Input id="code" name="code" required defaultValue={item.code} />
+        <div className="h-px bg-border" />
+
+        <Section title="Stock" description="Reorder point for low stock alerts.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="reorderPoint">Reorder Point</Label>
+              <Input
+                id="reorderPoint"
+                name="reorderPoint"
+                type="number"
+                min={0}
+                defaultValue={item.reorderPoint}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" required defaultValue={item.name} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sku">SKU</Label>
-            <Input id="sku" name="sku" defaultValue={item.sku || ""} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchasePrice">Purchase Price</Label>
-            <Input
-              id="purchasePrice"
-              name="purchasePrice"
-              type="number"
-              step="0.01"
-              min={0}
-              defaultValue={centsToDecimal(item.purchasePrice)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="salePrice">Sale Price</Label>
-            <Input
-              id="salePrice"
-              name="salePrice"
-              type="number"
-              step="0.01"
-              min={0}
-              defaultValue={centsToDecimal(item.salePrice)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="reorderPoint">Reorder Point</Label>
-            <Input
-              id="reorderPoint"
-              name="reorderPoint"
-              type="number"
-              min={0}
-              defaultValue={item.reorderPoint}
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea id="description" name="description" defaultValue={item.description || ""} rows={3} />
-        </div>
+        </Section>
+
+        <div className="h-px bg-border" />
+
+        <Section title="Description" description="Optional notes about this item.">
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={item.description || ""}
+            rows={3}
+            placeholder="Item description..."
+          />
+        </Section>
+
         <div className="flex justify-end">
           <Button
             type="submit"
+            size="sm"
             disabled={saving}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? (
+              <>
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-1.5 size-3.5" />
+                Save Changes
+              </>
+            )}
           </Button>
         </div>
       </form>
-    </div>
+
+      {/* Per-warehouse stock */}
+      {warehouseStocks.length > 0 && (
+        <>
+          <div className="h-px bg-border mt-10" />
+          <Section title="Stock by Warehouse" description="Quantity breakdown across warehouses.">
+            <div className="rounded-lg border divide-y">
+              {warehouseStocks.map((ws) => (
+                <div key={ws.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Warehouse className="size-3.5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{ws.warehouseName}</p>
+                      <p className="text-xs text-muted-foreground">{ws.warehouseCode}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono tabular-nums font-medium">{ws.quantity}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(ws.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
+
+      {/* Barcode */}
+      <div className="h-px bg-border mt-10" />
+      <Section title="Barcode" description="Generated from SKU or item code.">
+        <div className="flex flex-col items-start gap-3">
+          <div className="rounded-lg border bg-white p-3">
+            <canvas ref={barcodeRef} />
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={printBarcode}>
+            <Printer className="mr-1.5 size-3.5" />
+            Print Barcode
+          </Button>
+        </div>
+      </Section>
+
+      <div className="h-px bg-border" />
+
+      <Section title="Danger zone" description="Irreversible actions for this item.">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete this item</p>
+            <p className="text-xs text-red-600/70 dark:text-red-400/70">Once deleted, this cannot be undone.</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+          >
+            <Trash2 className="mr-1.5 size-3.5" />
+            Delete Item
+          </Button>
+        </div>
+      </Section>
+
+      {confirmDialog}
+    </>
   );
 }

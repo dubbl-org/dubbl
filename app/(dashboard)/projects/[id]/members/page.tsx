@@ -89,8 +89,8 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 text-[12px] text-muted-foreground flex-wrap">
           <span>{members.length} total</span>
           {managers.length > 0 && <><span className="text-border">|</span><span>{managers.length} manager{managers.length !== 1 ? "s" : ""}</span></>}
           {contributors.length > 0 && <><span className="text-border">|</span><span>{contributors.length} contributor{contributors.length !== 1 ? "s" : ""}</span></>}
@@ -179,7 +179,7 @@ export default function MembersPage() {
           <p className="mt-2 text-sm text-muted-foreground">No team members assigned</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((m) => (
             <div key={m.id} className="rounded-lg border bg-card p-4 group hover:border-emerald-200 transition-colors relative">
               <div className="flex items-start gap-3">
@@ -205,7 +205,7 @@ export default function MembersPage() {
       {members.length > 0 && (
         <>
           <div className="h-px bg-border mt-6" />
-          <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 mt-4">
+          <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border grid-cols-1 sm:grid-cols-3 mt-4">
             <div className="bg-card p-4">
               <p className="text-[13px] font-medium">Manager</p>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">Full project access. Can manage tasks, time, milestones, and members.</p>

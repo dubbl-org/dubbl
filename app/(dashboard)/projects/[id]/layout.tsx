@@ -81,7 +81,7 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div>
       {/* ── Header: full-width spread ── */}
-      <div className="flex items-center gap-2.5 mb-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 mb-3">
         <Button variant="ghost" size="icon" asChild className="shrink-0 size-7 -ml-1">
           <Link href="/projects"><ArrowLeft className="size-3.5" /></Link>
         </Button>
@@ -138,7 +138,7 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
       <div className="h-px mb-3" style={{ background: `linear-gradient(to right, ${proj.color}30, transparent)` }} />
 
       {/* ── Tabs ── */}
-      <nav className="mb-6 flex items-center gap-1 border-b border-border">
+      <nav className="mb-6 flex items-center gap-1 overflow-x-auto border-b border-border scrollbar-none">
         {tabs.map((tab) => {
           const isActive = tab.exact
             ? pathname === tab.href
@@ -149,7 +149,7 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
               key={tab.href}
               href={tab.href}
               className={cn(
-                "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
+                "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors whitespace-nowrap shrink-0",
                 isActive
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"

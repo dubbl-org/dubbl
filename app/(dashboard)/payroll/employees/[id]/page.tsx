@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import Link from "next/link";
 
 interface EmployeeDetail {
@@ -40,6 +41,7 @@ export default function EmployeeDetailPage() {
   const [emp, setEmp] = useState<EmployeeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Edit form state
   const [name, setName] = useState("");
@@ -117,7 +119,14 @@ export default function EmployeeDetailPage() {
   }
 
   async function handleDelete() {
-    if (!orgId || !confirm("Delete this employee?")) return;
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete this employee?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/v1/payroll/employees/${id}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -175,7 +184,7 @@ export default function EmployeeDetailPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge
           variant="outline"
           className={
@@ -186,13 +195,13 @@ export default function EmployeeDetailPage() {
         >
           {emp.isActive ? "Active" : "Inactive"}
         </Badge>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs sm:text-sm text-muted-foreground">
           Started {emp.startDate} · Annual salary{" "}
           {formatMoney(emp.salary)}
         </span>
       </div>
 
-      <div className="max-w-4xl space-y-6">
+      <div className="max-w-4xl space-y-4 sm:space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Full Name</Label>
@@ -233,7 +242,7 @@ export default function EmployeeDetailPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label>Annual Salary</Label>
             <Input
@@ -275,6 +284,7 @@ export default function EmployeeDetailPage() {
           />
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

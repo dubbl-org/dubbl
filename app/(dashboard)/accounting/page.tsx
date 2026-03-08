@@ -1,22 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowLeftRight, BookOpen, BarChart3 } from "lucide-react";
-import { Section } from "@/components/dashboard/section";
+import {
+  Plus,
+  ArrowLeftRight,
+  BookOpen,
+  BarChart3,
+  Search,
+  X,
+  CheckCircle2,
+  FileEdit,
+  Ban,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
-
-import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
-
 
 interface Entry {
   id: string;
@@ -28,6 +44,13 @@ interface Entry {
   totalDebit: string;
   createdAt: string;
 }
+
+const statusColors: Record<string, string> = {
+  posted:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  draft: "",
+  void: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+};
 
 const columns: Column<Entry>[] = [
   {
@@ -63,16 +86,7 @@ const columns: Column<Entry>[] = [
     header: "Status",
     className: "w-24",
     render: (r) => (
-      <Badge
-        variant="outline"
-        className={
-          r.status === "posted"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-            : r.status === "void"
-            ? "border-red-200 bg-red-50 text-red-700"
-            : ""
-        }
-      >
+      <Badge variant="outline" className={statusColors[r.status] || ""}>
         {r.status}
       </Badge>
     ),
@@ -95,6 +109,11 @@ export default function TransactionsPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState("date:desc");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -113,112 +132,371 @@ export default function TransactionsPage() {
 
   const posted = entries.filter((e) => e.status === "posted");
   const drafts = entries.filter((e) => e.status === "draft");
+  const voids = entries.filter((e) => e.status === "void");
   const totalPosted = posted.reduce(
     (sum, e) => sum + Math.round(parseFloat(e.totalDebit) * 100),
     0
   );
 
-  const filtered =
-    statusFilter === "all"
-      ? entries
-      : entries.filter((e) => e.status === statusFilter);
+  const filtered = useMemo(() => {
+    let result = entries;
+
+    // Status filter
+    if (statusFilter !== "all") {
+      result = result.filter((e) => e.status === statusFilter);
+    }
+
+    // Search filter
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter(
+        (e) =>
+          e.description.toLowerCase().includes(q) ||
+          (e.reference || "").toLowerCase().includes(q) ||
+          String(e.entryNumber).includes(q)
+      );
+    }
+
+    // Date range filter
+    if (dateFrom) {
+      result = result.filter((e) => e.date >= dateFrom);
+    }
+    if (dateTo) {
+      result = result.filter((e) => e.date <= dateTo);
+    }
+
+    // Sort
+    const [key, order] = sortBy.split(":");
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      if (key === "date") {
+        cmp = a.date.localeCompare(b.date);
+      } else if (key === "number") {
+        cmp = a.entryNumber - b.entryNumber;
+      } else if (key === "amount") {
+        cmp = parseFloat(a.totalDebit) - parseFloat(b.totalDebit);
+      }
+      return order === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  }, [entries, statusFilter, debouncedSearch, dateFrom, dateTo, sortBy]);
+
+  const hasFilters = search || dateFrom || dateTo;
+  const pendingSearch = search !== debouncedSearch;
+
+  const [contentKey, setContentKey] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setContentKey((k) => k + 1);
+  }, [debouncedSearch, statusFilter, sortBy]);
 
   if (loading) return <BrandLoader />;
 
   if (!loading && entries.length === 0) {
     return (
-      <BlurReveal className="space-y-10">
-        <Section title="Transactions" description="Create and manage journal entries to track your financial activity.">
-          <div className="space-y-8 min-h-[50vh] flex flex-col justify-center">
-            <div className="grid gap-4 sm:grid-cols-3">
+      <ContentReveal className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Journal Entries
+          </h2>
+          <Button
+            onClick={() => openDrawer("entry")}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            New Entry
+          </Button>
+        </div>
+
+        <div className="flex flex-col items-center gap-10 pt-8 pb-12">
+          {/* Entry lifecycle stepper */}
+          <div className="w-full max-w-xl">
+            <div className="grid grid-cols-3 gap-0">
               {[
-                { step: 1, icon: BookOpen, label: "Set up accounts", desc: "Create your chart of accounts to categorize transactions" },
-                { step: 2, icon: ArrowLeftRight, label: "Record entries", desc: "Create journal entries with balanced debits and credits" },
-                { step: 3, icon: BarChart3, label: "View reports", desc: "Generate financial statements from your recorded data" },
-              ].map(({ step, icon: StepIcon, label, desc }) => (
-                <div key={step} className="relative rounded-lg border bg-card p-5">
-                  <span className="absolute -top-3 left-4 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                {
+                  step: "1",
+                  icon: BookOpen,
+                  label: "Set up accounts",
+                  sub: "Define your chart of accounts and categories",
+                  color: "bg-blue-500",
+                  ring: "ring-blue-200 dark:ring-blue-900",
+                },
+                {
+                  step: "2",
+                  icon: ArrowLeftRight,
+                  label: "Record entries",
+                  sub: "Create journal entries with balanced debits and credits",
+                  color: "bg-amber-500",
+                  ring: "ring-amber-200 dark:ring-amber-900",
+                },
+                {
+                  step: "3",
+                  icon: BarChart3,
+                  label: "Generate reports",
+                  sub: "View trial balance, income statement, and more",
+                  color: "bg-emerald-500",
+                  ring: "ring-emerald-200 dark:ring-emerald-900",
+                },
+              ].map(({ step, icon: StepIcon, label, sub, color, ring }, i) => (
+                <div
+                  key={step}
+                  className="flex flex-col items-center text-center relative"
+                >
+                  {i < 2 && (
+                    <div className="absolute top-4 left-[calc(50%+16px)] w-[calc(100%-32px)] h-px bg-border" />
+                  )}
+                  <div
+                    className={`relative z-10 flex size-8 items-center justify-center rounded-full ${color} ring-4 ${ring} text-white text-xs font-bold`}
+                  >
                     {step}
-                  </span>
-                  <StepIcon className="size-5 text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <StepIcon className="size-3.5 text-muted-foreground" />
+                    <p className="text-sm font-medium">{label}</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-[150px] leading-relaxed">
+                    {sub}
+                  </p>
                 </div>
               ))}
             </div>
-            <div className="flex flex-col items-center py-4 text-center">
-              <h3 className="text-sm font-medium">Ready to get started?</h3>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Create your first journal entry to start tracking your finances.
-              </p>
-              <div className="mt-4">
-                <Button
-                  onClick={() => openDrawer("entry")}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Plus className="mr-2 size-4" />
-                  New Entry
-                </Button>
-              </div>
-            </div>
           </div>
-        </Section>
-      </BlurReveal>
-    );
-  }
 
-  return (
-    <BlurReveal>
-    <div className="space-y-10">
-      <Section title="Overview" description="Summary of transactions and journal entries across all statuses.">
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Total Posted" value={formatMoney(totalPosted)} icon={ArrowLeftRight} />
-            <StatCard title="Posted Entries" value={posted.length.toString()} icon={ArrowLeftRight} />
-            <StatCard title="Drafts" value={drafts.length.toString()} icon={ArrowLeftRight} />
-          </div>
-          <div className="flex justify-end">
+          {/* CTA */}
+          <div className="text-center">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Start tracking transactions
+            </h2>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Create your first journal entry to begin recording transactions.
+            </p>
             <Button
               onClick={() => openDrawer("entry")}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              size="lg"
+              className="mt-5 bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
               New Entry
             </Button>
           </div>
+
+          {/* Preview stat cards (empty) */}
+          <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-40">
+            {[
+              { label: "Total Posted", value: "$0.00" },
+              { label: "Posted Entries", value: "0" },
+              { label: "Drafts", value: "0" },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                className="rounded-lg border border-dashed p-3 text-center"
+              >
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </p>
+                <p className="mt-1 text-sm font-mono font-medium text-muted-foreground">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-      </Section>
+      </ContentReveal>
+    );
+  }
+
+  return (
+    <ContentReveal className="space-y-6">
+      {/* Inline stats row */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          {/* Total Posted */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+              Total Posted
+            </p>
+            <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
+              {formatMoney(totalPosted)}
+            </p>
+          </div>
+
+          {/* Posted count */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <CheckCircle2 className="size-3 text-emerald-500" />
+              Posted
+            </p>
+            <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
+              {posted.length}
+            </p>
+          </div>
+
+          {/* Drafts count */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <FileEdit className="size-3 text-amber-500" />
+              Drafts
+            </p>
+            <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+              {drafts.length}
+            </p>
+          </div>
+
+          {/* Void count */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Ban className="size-3 text-red-500" />
+              Void
+            </p>
+            <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
+              {voids.length}
+            </p>
+          </div>
+        </div>
+
+        <Button
+          onClick={() => openDrawer("entry")}
+          size="sm"
+          className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+        >
+          <Plus className="mr-2 size-4" />
+          New Entry
+        </Button>
+      </div>
 
       <div className="h-px bg-border" />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <Section title="Journal Entries" description="View, filter, and manage all your journal entries.">
-          <div className="space-y-4">
+      {/* Main content + activity feed */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_380px]">
+        <div className="space-y-4">
+          {/* Status filter tabs with counts */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="posted">Posted</TabsTrigger>
-                <TabsTrigger value="void">Void</TabsTrigger>
+              <TabsList className="overflow-x-auto">
+                <TabsTrigger value="all" className="whitespace-nowrap">
+                  All{" "}
+                  <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">
+                    {entries.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="posted" className="whitespace-nowrap">
+                  Posted{" "}
+                  <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">
+                    {posted.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="draft" className="whitespace-nowrap">
+                  Draft{" "}
+                  <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">
+                    {drafts.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="void" className="whitespace-nowrap">
+                  Void{" "}
+                  <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">
+                    {voids.length}
+                  </span>
+                </TabsTrigger>
               </TabsList>
             </Tabs>
+          </div>
 
-            <DataTable
+          {/* Filter bar: search, date range, sort */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search entries..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 w-56 pl-8 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">
+                From
+              </span>
+              <DatePicker
+                value={dateFrom}
+                onChange={(v) => setDateFrom(v)}
+                placeholder="Start date"
+                className="h-8 w-40 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">To</span>
+              <DatePicker
+                value={dateTo}
+                onChange={(v) => setDateTo(v)}
+                placeholder="End date"
+                className="h-8 w-40 text-xs"
+              />
+            </div>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date:desc">Newest first</SelectItem>
+                <SelectItem value="date:asc">Oldest first</SelectItem>
+                <SelectItem value="number:desc">Entry # (desc)</SelectItem>
+                <SelectItem value="number:asc">Entry # (asc)</SelectItem>
+                <SelectItem value="amount:desc">Highest amount</SelectItem>
+                <SelectItem value="amount:asc">Lowest amount</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => {
+                  setSearch("");
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+              >
+                <X className="mr-1 size-3" />
+                Clear filters
+              </Button>
+            )}
+          </div>
+
+          {/* Table */}
+          {pendingSearch ? (
+            <BrandLoader className="h-48" />
+          ) : (
+            <ContentReveal key={contentKey}>
+              <DataTable
                 columns={columns}
                 data={filtered}
-                loading={loading}
-                emptyMessage="No entries found."
+                loading={false}
+                emptyMessage={
+                  hasFilters || statusFilter !== "all"
+                    ? "No entries match your filters."
+                    : "No entries found."
+                }
                 onRowClick={(r) => router.push(`/accounting/${r.id}`)}
               />
-          </div>
-        </Section>
+            </ContentReveal>
+          )}
 
+          {/* Count */}
+          {!pendingSearch && filtered.length > 0 && (
+            <p className="text-xs text-muted-foreground pt-1">
+              Showing {filtered.length} of {entries.length} entr
+              {entries.length !== 1 ? "ies" : "y"}
+            </p>
+          )}
+        </div>
+
+        {/* Activity feed sidebar */}
         <div className="lg:sticky lg:top-6 lg:self-start">
           <ActivityFeed />
         </div>
       </div>
-    </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }
