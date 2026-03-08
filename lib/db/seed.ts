@@ -13,6 +13,8 @@ import {
   contact,
   invoice,
   invoiceLine,
+  creditNote,
+  creditNoteLine,
   bill,
   billLine,
   bankAccount,
@@ -32,6 +34,7 @@ import {
   recurringTemplate,
   recurringTemplateLine,
 } from "./schema";
+import { eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const CURRENCIES = [
@@ -186,66 +189,106 @@ async function seed() {
   }
   console.log(`  ${CURRENCIES.length} currencies`);
 
-  // 2. Demo User
-  console.log("Creating demo user...");
-  const passwordHash = await bcrypt.hash("password123", 12);
-  const [demoUser] = await db
-    .insert(users)
-    .values({
-      id: "00000000-0000-0000-0000-000000000001",
-      name: "Demo User",
-      email: "demo@dubbl.app",
-      passwordHash,
-    })
-    .onConflictDoNothing()
-    .returning();
+  // 2. Find existing user + org, or create demo user
+  console.log("Looking for existing user/organization...");
 
-  if (!demoUser) {
-    console.log("  Demo user already exists, skipping...");
-    process.exit(0);
+  // Try to find an existing owner membership
+  const existingMember = await db.query.member.findFirst({
+    where: eq(member.role, "owner"),
+    with: { user: true, organization: true },
+  });
+
+  let userId: string;
+  let org: { id: string; name: string };
+
+  if (existingMember) {
+    userId = existingMember.userId;
+    org = { id: existingMember.organizationId, name: existingMember.organization.name };
+    console.log(`  Using existing user: ${existingMember.user.email}`);
+    console.log(`  Using existing org: ${org.name}`);
+  } else {
+    console.log("  No existing user found, creating demo user...");
+    const passwordHash = await bcrypt.hash("password123", 12);
+    const [demoUser] = await db
+      .insert(users)
+      .values({
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "Demo User",
+        email: "demo@dubbl.app",
+        passwordHash,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (!demoUser) {
+      console.log("  Demo user already exists but no org found. Aborting.");
+      process.exit(1);
+    }
+
+    const [newOrg] = await db
+      .insert(organization)
+      .values({
+        id: "00000000-0000-0000-0000-000000000002",
+        name: "Demo Company",
+        slug: "demo-company",
+        defaultCurrency: "USD",
+        fiscalYearStartMonth: 1,
+      })
+      .returning();
+
+    userId = demoUser.id;
+    org = { id: newOrg.id, name: newOrg.name };
+
+    await db.insert(member).values({
+      organizationId: newOrg.id,
+      userId,
+      role: "owner",
+    });
+
+    await db.insert(subscription).values({
+      organizationId: newOrg.id,
+      plan: "business",
+      status: "active",
+    });
   }
-
-  // 3. Organization
-  console.log("Creating demo organization...");
-  const [org] = await db
-    .insert(organization)
-    .values({
-      id: "00000000-0000-0000-0000-000000000002",
-      name: "Demo Company",
-      slug: "demo-company",
-      defaultCurrency: "USD",
-      fiscalYearStartMonth: 1,
-    })
-    .returning();
-
-  await db.insert(member).values({
-    organizationId: org.id,
-    userId: demoUser.id,
-    role: "owner",
-  });
-
-  await db.insert(subscription).values({
-    organizationId: org.id,
-    plan: "business",
-    status: "active",
-  });
 
   // 4. Fiscal Year
   console.log("Creating fiscal year...");
-  const [fy] = await db
-    .insert(fiscalYear)
-    .values({
-      organizationId: org.id,
-      name: "FY 2026",
-      startDate: "2026-01-01",
-      endDate: "2026-12-31",
-    })
-    .returning();
+  let fy: { id: string };
+  const existingFy = await db.query.fiscalYear.findFirst({
+    where: eq(fiscalYear.organizationId, org.id),
+  });
+  if (existingFy) {
+    fy = existingFy;
+    console.log("  Fiscal year already exists, reusing...");
+  } else {
+    const [newFy] = await db
+      .insert(fiscalYear)
+      .values({
+        organizationId: org.id,
+        name: "FY 2026",
+        startDate: "2026-01-01",
+        endDate: "2026-12-31",
+      })
+      .returning();
+    fy = newFy;
+  }
 
   // 5. Chart of Accounts
   console.log("Creating chart of accounts...");
   const accountMap = new Map<string, string>(); // code -> id
+
+  // First load any existing accounts for this org
+  const existingAccounts = await db.query.chartAccount.findMany({
+    where: eq(chartAccount.organizationId, org.id),
+  });
+  for (const a of existingAccounts) {
+    accountMap.set(a.code, a.id);
+  }
+
+  let newAccountCount = 0;
   for (const acct of ACCOUNTS) {
+    if (accountMap.has(acct.code)) continue; // skip existing
     const [row] = await db
       .insert(chartAccount)
       .values({
@@ -257,13 +300,19 @@ async function seed() {
       })
       .returning();
     accountMap.set(acct.code, row.id);
+    newAccountCount++;
   }
-  console.log(`  ${ACCOUNTS.length} accounts`);
+  console.log(`  ${newAccountCount} new accounts (${accountMap.size} total)`);
 
   // 6. Tax Rates
   console.log("Creating tax rates...");
-  const taxRateIds: string[] = [];
+  const existingTaxRates = await db.query.taxRate.findMany({
+    where: eq(taxRate.organizationId, org.id),
+  });
+  const taxRateIds: string[] = existingTaxRates.map((t) => t.id);
+  const existingTaxNames = new Set(existingTaxRates.map((t) => t.name));
   for (const tr of TAX_RATES) {
+    if (existingTaxNames.has(tr.name)) continue;
     const [row] = await db
       .insert(taxRate)
       .values({
@@ -276,12 +325,22 @@ async function seed() {
       .returning();
     taxRateIds.push(row.id);
   }
-  console.log(`  ${TAX_RATES.length} tax rates`);
+  console.log(`  ${taxRateIds.length} tax rates`);
 
   // 7. Contacts
   console.log("Creating contacts...");
+  const existingContacts = await db.query.contact.findMany({
+    where: eq(contact.organizationId, org.id),
+  });
+  const existingContactEmails = new Set(existingContacts.map((c) => c.email));
   const contactIds: string[] = [];
+
   for (const c of CONTACTS) {
+    const existing = existingContacts.find((ec) => ec.email === c.email);
+    if (existing) {
+      contactIds.push(existing.id);
+      continue;
+    }
     const [row] = await db
       .insert(contact)
       .values({
@@ -294,8 +353,24 @@ async function seed() {
       .returning();
     contactIds.push(row.id);
   }
-  console.log(`  ${CONTACTS.length} contacts`);
+  console.log(`  ${contactIds.length} contacts`);
 
+  // Check which data already exists to skip those sections
+  const existingEntries = await db.query.journalEntry.findFirst({
+    where: eq(journalEntry.organizationId, org.id),
+  });
+  const existingCreditNotes = await db.query.creditNote.findFirst({
+    where: eq(creditNote.organizationId, org.id),
+  });
+  const hasTransactionalData = !!existingEntries;
+
+  const invoiceIds: { id: string; contactIdx: number; status: string; paid: number; total: number }[] = [];
+
+  if (hasTransactionalData) {
+    console.log("\nTransactional data already exists, skipping journal entries, invoices, bills, etc.");
+  }
+
+  if (!hasTransactionalData) {
   // 8. Journal Entries (manual entries for opening balances)
   console.log("Creating journal entries...");
   let entryNum = 1;
@@ -311,7 +386,7 @@ async function seed() {
       status: "posted",
       fiscalYearId: fy.id,
       sourceType: "manual",
-      createdBy: demoUser.id,
+      createdBy: userId,
       postedAt: new Date(),
     })
     .returning();
@@ -343,7 +418,7 @@ async function seed() {
         status: "posted",
         fiscalYearId: fy.id,
         sourceType: "manual",
-        createdBy: demoUser.id,
+        createdBy: userId,
         postedAt: new Date(),
       })
       .returning();
@@ -380,7 +455,7 @@ async function seed() {
         status: "posted",
         fiscalYearId: fy.id,
         sourceType: "manual",
-        createdBy: demoUser.id,
+        createdBy: userId,
         postedAt: new Date(),
       })
       .returning();
@@ -407,7 +482,6 @@ async function seed() {
     { contact: 8, number: "INV-00010", date: "2026-02-25", due: "2026-03-27", status: "draft" as const, desc: "Cloud Architecture", qty: 100, price: 450000, paid: 0 },
   ];
 
-  const invoiceIds: { id: string; contactIdx: number; status: string; paid: number; total: number }[] = [];
   for (const inv of invoiceData) {
     const lineAmount = (inv.qty / 100) * inv.price;
     const [row] = await db
@@ -440,7 +514,93 @@ async function seed() {
     invoiceIds.push({ id: row.id, contactIdx: inv.contact, status: inv.status, paid: inv.paid, total: lineAmount });
   }
   console.log(`  ${invoiceData.length} invoices`);
+  } // end if (!hasTransactionalData) - invoices block
 
+  // 9b. Credit Notes (always check, even on re-run)
+  if (existingCreditNotes) {
+    console.log("Credit notes already exist, skipping...");
+  } else {
+  console.log("Creating credit notes...");
+  const creditNoteData = [
+    {
+      contact: 0,
+      number: "CN-00001",
+      date: "2026-01-25",
+      status: "applied" as const,
+      invoiceIdx: 0,
+      description: "Overcharge correction on web development",
+      qty: 100,
+      price: 20000,
+      subtotal: 20000,
+      total: 20000,
+      amountApplied: 20000,
+      amountRemaining: 0,
+    },
+    {
+      contact: 1,
+      number: "CN-00002",
+      date: "2026-02-05",
+      status: "sent" as const,
+      invoiceIdx: null,
+      description: "Partial refund for consulting services",
+      qty: 100,
+      price: 50000,
+      subtotal: 50000,
+      total: 50000,
+      amountApplied: 0,
+      amountRemaining: 50000,
+    },
+    {
+      contact: 2,
+      number: "CN-00003",
+      date: "2026-02-12",
+      status: "draft" as const,
+      invoiceIdx: null,
+      description: "Discount for delayed delivery",
+      qty: 100,
+      price: 15000,
+      subtotal: 15000,
+      total: 15000,
+      amountApplied: 0,
+      amountRemaining: 15000,
+    },
+  ];
+
+  for (const cn of creditNoteData) {
+    const [row] = await db
+      .insert(creditNote)
+      .values({
+        organizationId: org.id,
+        contactId: contactIds[cn.contact],
+        invoiceId: cn.invoiceIdx !== null && invoiceIds[cn.invoiceIdx] ? invoiceIds[cn.invoiceIdx].id : undefined,
+        creditNoteNumber: cn.number,
+        issueDate: cn.date,
+        status: cn.status,
+        subtotal: cn.subtotal,
+        taxTotal: 0,
+        total: cn.total,
+        amountApplied: cn.amountApplied,
+        amountRemaining: cn.amountRemaining,
+        currencyCode: "USD",
+        createdBy: userId,
+        sentAt: cn.status !== "draft" ? new Date(cn.date) : undefined,
+      })
+      .returning();
+
+    await db.insert(creditNoteLine).values({
+      creditNoteId: row.id,
+      description: cn.description,
+      quantity: cn.qty,
+      unitPrice: cn.price,
+      amount: cn.subtotal,
+      accountId: accountMap.get("4010")!,
+      sortOrder: 0,
+    });
+  }
+  console.log(`  ${creditNoteData.length} credit notes`);
+  } // end credit notes
+
+  if (!hasTransactionalData) {
   // 10. Bills
   console.log("Creating bills...");
   const billData = [
@@ -583,7 +743,7 @@ async function seed() {
         reference: `REF-${payNum}`,
         bankAccountId: checkingBank.id,
         currencyCode: "USD",
-        createdBy: demoUser.id,
+        createdBy: userId,
       })
       .returning();
 
@@ -610,7 +770,7 @@ async function seed() {
         reference: `CHK-${payNum}`,
         bankAccountId: checkingBank.id,
         currencyCode: "USD",
-        createdBy: demoUser.id,
+        createdBy: userId,
       })
       .returning();
 
@@ -647,7 +807,7 @@ async function seed() {
         occurrencesGenerated: 2,
         status: "active",
         currencyCode: "USD",
-        createdBy: demoUser.id,
+        createdBy: userId,
       })
       .returning();
 
@@ -740,7 +900,7 @@ async function seed() {
     for (const te of entries) {
       await db.insert(timeEntry).values({
         projectId: proj.id,
-        userId: demoUser.id,
+        userId: userId,
         date: te.date,
         description: te.desc,
         minutes: te.mins,
@@ -832,13 +992,13 @@ async function seed() {
       organizationId: org.id,
       title: "January Travel Expenses",
       description: "Business trip to client site",
-      submittedBy: demoUser.id,
+      submittedBy: userId,
       status: "approved",
       totalAmount: 85000,
       currencyCode: "USD",
       submittedAt: new Date("2026-01-28"),
       approvedAt: new Date("2026-01-30"),
-      approvedBy: demoUser.id,
+      approvedBy: userId,
     })
     .returning();
 
@@ -878,7 +1038,7 @@ async function seed() {
       organizationId: org.id,
       title: "Software Subscriptions",
       description: "Monthly tools and services",
-      submittedBy: demoUser.id,
+      submittedBy: userId,
       status: "submitted",
       totalAmount: 15900,
       currencyCode: "USD",
@@ -916,11 +1076,9 @@ async function seed() {
     },
   ]);
   console.log("  2 expense claims");
+  } // end if (!hasTransactionalData) - bills through expense claims
 
-  console.log("\nSeed complete! Demo credentials:");
-  console.log("  Email: demo@dubbl.app");
-  console.log("  Password: password123");
-  console.log("  Organization: Demo Company");
+  console.log(`\nSeed complete! Organization: ${org.name}`);
   process.exit(0);
 }
 

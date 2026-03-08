@@ -17,11 +17,13 @@ export async function getNextNumber(
 ): Promise<string> {
   return await db.transaction(async (tx) => {
     // Try to lock and increment the existing sequence row
-    const rows = await tx.execute(
+    const result = await tx.execute(
       sql`SELECT id, last_number FROM number_sequence WHERE organization_id = ${organizationId} AND entity_type = ${entityType} FOR UPDATE`
     );
 
-    const existing = (rows as unknown as Array<{ id: string; last_number: number }>)[0];
+    // drizzle execute() returns QueryResult with .rows
+    const rows = Array.isArray(result) ? result : (result as any).rows ?? [];
+    const existing = rows[0] as { id: string; last_number: number } | undefined;
 
     if (existing) {
       const next = existing.last_number + 1;
@@ -44,7 +46,8 @@ export async function getNextNumber(
           `SELECT MAX(CAST(NULLIF(regexp_replace(${columnName}, '^[A-Z]+-', ''), '') AS integer)) as max_num FROM ${tableName} WHERE organization_id = '${organizationId}'`
         )
       );
-      maxNum = Number((maxResult as unknown as Array<{ max_num: string | null }>)[0]?.max_num || 0);
+      const maxRows = Array.isArray(maxResult) ? maxResult : (maxResult as any).rows ?? [];
+      maxNum = Number(maxRows[0]?.max_num || 0);
     }
 
     const next = maxNum + 1;
