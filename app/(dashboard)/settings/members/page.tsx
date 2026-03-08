@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User, Loader2 } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User, Loader2, CalendarDays } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 interface Member {
   id: string;
@@ -148,162 +148,188 @@ export default function MembersPage() {
   const memberCount = members.filter((m) => m.role === "member").length;
 
   return (
-    <BlurReveal className="space-y-10">
-      {/* Header */}
-      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
-        <div className="shrink-0">
-          <p className="text-sm font-medium">Team members</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+    <ContentReveal className="space-y-6">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+        <div>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <Users className="size-3 text-muted-foreground" />
+            Total Members
+          </p>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
+            {members.length}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <Shield className="size-3 text-purple-500" />
+            {ownerCount === 1 ? "Owner" : "Owners"}
+          </p>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-purple-600 dark:text-purple-400">
+            {ownerCount}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <ShieldCheck className="size-3 text-blue-500" />
+            {adminCount === 1 ? "Admin" : "Admins"}
+          </p>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+            {adminCount}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <User className="size-3 text-muted-foreground" />
+            {memberCount === 1 ? "Member" : "Members"}
+          </p>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
+            {memberCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Team</h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
             Manage who has access to this organization and their roles.
           </p>
         </div>
-        <div className="min-w-0 space-y-4">
-          {/* Stats + action */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {members.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[12px] text-muted-foreground">
-                <span>{members.length} total</span>
-                <span className="text-border">|</span>
-                <span>{ownerCount} owner{ownerCount !== 1 ? "s" : ""}</span>
-                <span className="text-border">|</span>
-                <span>{adminCount} admin{adminCount !== 1 ? "s" : ""}</span>
-                <span className="text-border">|</span>
-                <span>{memberCount} member{memberCount !== 1 ? "s" : ""}</span>
-              </div>
-            ) : (
-              <div />
-            )}
-            <Button
-              size="sm"
-              onClick={() => setInviteOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-1.5 size-3.5" />
-              Add Member
-            </Button>
-          </div>
+        <Button
+          size="sm"
+          onClick={() => setInviteOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Plus className="mr-1.5 size-3.5" />
+          Add Member
+        </Button>
+      </div>
 
-          {/* Member list */}
-          {!loading && members.length === 0 ? (
-            <EmptyState
-              icon={Users}
-              title="No members"
-              description="Invite team members to collaborate."
-            />
-          ) : (
-            <div className="divide-y rounded-lg border">
-              {members.map((m) => {
-                const RoleIcon = ROLE_ICONS[m.role];
-                return (
-                  <div
-                    key={m.id}
-                    className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="size-9">
-                        <AvatarFallback className="text-xs">
-                          {(m.userName || m.userEmail)[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {m.userName || m.userEmail}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {m.userEmail}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={ROLE_COLORS[m.role]}>
-                        <RoleIcon className="mr-1 size-3" />
-                        {m.role}
-                      </Badge>
-                      {m.role !== "owner" && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-8" disabled={actionMemberId === m.id}>
-                              {actionMemberId === m.id ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() =>
-                                changeRole(
-                                  m.id,
-                                  m.role === "admin" ? "member" : "admin"
-                                )
-                              }
-                              disabled={actionMemberId !== null}
-                            >
-                              Make {m.role === "admin" ? "member" : "admin"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => removeMember(m.id)}
-                              className="text-red-600"
-                              disabled={actionMemberId !== null}
-                            >
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
+      {/* Member list */}
+      {!loading && members.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No members"
+          description="Invite team members to collaborate."
+        />
+      ) : (
+        <div className="divide-y rounded-lg border">
+          {members.map((m) => {
+            const RoleIcon = ROLE_ICONS[m.role];
+            const joinDate = new Date(m.createdAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+            return (
+              <div
+                key={m.id}
+                className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                {/* Left: avatar + name/email */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="size-9 shrink-0">
+                    <AvatarFallback className="text-xs">
+                      {(m.userName || m.userEmail)[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {m.userName || m.userEmail}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {m.userEmail}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+
+                {/* Right: role badge, join date, actions */}
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Badge variant="outline" className={ROLE_COLORS[m.role]}>
+                    <RoleIcon className="mr-1 size-3" />
+                    {m.role}
+                  </Badge>
+                  <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+                    <CalendarDays className="size-3" />
+                    {joinDate}
+                  </span>
+                  {m.role !== "owner" ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8" disabled={actionMemberId === m.id}>
+                          {actionMemberId === m.id ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            changeRole(
+                              m.id,
+                              m.role === "admin" ? "member" : "admin"
+                            )
+                          }
+                          disabled={actionMemberId !== null}
+                        >
+                          Make {m.role === "admin" ? "member" : "admin"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => removeMember(m.id)}
+                          className="text-red-600"
+                          disabled={actionMemberId !== null}
+                        >
+                          Remove
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <div className="size-8" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </section>
+      )}
 
-      <div className="h-px bg-border" />
-
-      {/* Roles explanation */}
-      <section className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
-        <div className="shrink-0">
-          <p className="text-sm font-medium">Roles</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            What each role can do within the organization.
+      {/* Roles explanation - 3 cards in a row */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-2">
+            <Shield className="size-3.5 text-purple-600" />
+            <p className="text-[13px] font-medium">Owner</p>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+            Full access. Manage billing, members, and all settings. Cannot be removed.
           </p>
         </div>
-        <div className="min-w-0 grid gap-px overflow-hidden rounded-lg border border-border bg-border grid-cols-1 sm:grid-cols-3">
-          <div className="bg-card p-4">
-            <div className="flex items-center gap-2">
-              <Shield className="size-3.5 text-purple-600" />
-              <p className="text-[13px] font-medium">Owner</p>
-            </div>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              Full access. Manage billing, members, and all settings. Cannot be removed.
-            </p>
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-3.5 text-blue-600" />
+            <p className="text-[13px] font-medium">Admin</p>
           </div>
-          <div className="bg-card p-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="size-3.5 text-blue-600" />
-              <p className="text-[13px] font-medium">Admin</p>
-            </div>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              Manage members, create and edit all records. Cannot access billing.
-            </p>
-          </div>
-          <div className="bg-card p-4">
-            <div className="flex items-center gap-2">
-              <User className="size-3.5 text-muted-foreground" />
-              <p className="text-[13px] font-medium">Member</p>
-            </div>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              View and create records. Cannot manage members or settings.
-            </p>
-          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+            Manage members, create and edit all records. Cannot access billing.
+          </p>
         </div>
-      </section>
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-2">
+            <User className="size-3.5 text-muted-foreground" />
+            <p className="text-[13px] font-medium">Member</p>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+            View and create records. Cannot manage members or settings.
+          </p>
+        </div>
+      </div>
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Member</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
+      <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add Member</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 px-4">
             <div className="space-y-2">
               <Label>Email</Label>
               <Input
@@ -326,7 +352,7 @@ export default function MembersPage() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <SheetFooter>
             <Button variant="outline" onClick={() => setInviteOpen(false)}>
               Cancel
             </Button>
@@ -337,9 +363,9 @@ export default function MembersPage() {
             >
               {saving ? "Adding..." : "Add Member"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </BlurReveal>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </ContentReveal>
   );
 }
