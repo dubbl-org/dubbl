@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Layers, Plus } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,11 +97,17 @@ export default function InventoryItemVariantsPage() {
       </div>
 
       {variants.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Layers className="size-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No variants</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">Add variants for different sizes, colors, or configurations.</p>
-        </div>
+        <EmptyState
+          icon={Layers}
+          title="No variants"
+          description="Add variants for different sizes, colors, or configurations."
+          compact
+        >
+          <Button size="sm" onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Plus className="mr-1.5 size-3.5" />
+            Add Variant
+          </Button>
+        </EmptyState>
       ) : (
         <div className="rounded-xl border bg-card divide-y">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}

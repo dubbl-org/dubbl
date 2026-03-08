@@ -2,10 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardList, Plus, ChevronRight, Loader2 } from "lucide-react";
+import {
+  ClipboardList,
+  Plus,
+  ChevronRight,
+  Loader2,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +31,8 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 interface StockTake {
   id: string;
@@ -68,6 +79,7 @@ export default function StockTakesPage() {
   const [createName, setCreateName] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [creating, setCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const orgId =
     typeof window !== "undefined"
@@ -131,18 +143,95 @@ export default function StockTakesPage() {
 
   if (loading) return <BrandLoader />;
 
-  const filtered =
-    tab === "all"
-      ? stockTakes
-      : stockTakes.filter((st) => st.status === tab);
+  const draftCount = stockTakes.filter((s) => s.status === "draft").length;
+  const inProgressCount = stockTakes.filter((s) => s.status === "in_progress").length;
+  const completedCount = stockTakes.filter((s) => s.status === "completed").length;
+  const totalItems = stockTakes.reduce((sum, s) => sum + (s.itemCount || 0), 0);
 
-  if (stockTakes.length === 0) {
-    return (
-      <ContentReveal>
+  const stats = [
+    { label: "Total Counts", value: stockTakes.length, icon: ClipboardList },
+    { label: "Drafts", value: draftCount, icon: FileText, color: "text-zinc-500" },
+    { label: "In Progress", value: inProgressCount, icon: Clock, color: "text-blue-600 dark:text-blue-400" },
+    { label: "Completed", value: completedCount, icon: ClipboardCheck, color: "text-emerald-600 dark:text-emerald-400" },
+  ];
+
+  const filtered = stockTakes
+    .filter((st) => tab === "all" || st.status === tab)
+    .filter((st) =>
+      !searchQuery || st.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+  return (
+    <ContentReveal className="space-y-6">
+      <PageHeader
+        title="Stock Takes"
+        description="Plan, conduct, and review physical inventory counts to keep your records accurate."
+      >
+        <Button
+          size="sm"
+          onClick={() => setCreateOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Plus className="mr-1.5 size-3.5" />
+          New Stock Take
+        </Button>
+      </PageHeader>
+
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.05 }}
+            className="rounded-xl border bg-card p-4"
+          >
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <stat.icon className="size-3.5" />
+              <span className="text-[11px] font-medium uppercase tracking-wide">
+                {stat.label}
+              </span>
+            </div>
+            <p className={cn(
+              "mt-2 text-2xl font-bold font-mono tabular-nums",
+              stat.color
+            )}>
+              {stat.value}
+            </p>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="h-px bg-border" />
+
+      {/* Filters row */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
+          <TabsList>
+            <TabsTrigger value="all">All ({stockTakes.length})</TabsTrigger>
+            <TabsTrigger value="draft">Draft ({draftCount})</TabsTrigger>
+            <TabsTrigger value="in_progress">In Progress ({inProgressCount})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({completedCount})</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search stock takes..."
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* List */}
+      {stockTakes.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
           title="No stock takes yet"
-          description="Create your first stock take to start counting inventory."
+          description="Create your first stock take to start counting inventory and reconciling stock levels."
         >
           <Button
             onClick={() => setCreateOpen(true)}
@@ -152,101 +241,25 @@ export default function StockTakesPage() {
             New Stock Take
           </Button>
         </EmptyState>
-
-        <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>New Stock Take</SheetTitle>
-              <SheetDescription>
-                Create a new stock take to count your inventory.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="space-y-4 px-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Name</Label>
-                <Input
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="e.g. Q1 2026 Full Count"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Notes</Label>
-                <Textarea
-                  value={createNotes}
-                  onChange={(e) => setCreateNotes(e.target.value)}
-                  placeholder="Optional notes..."
-                  rows={3}
-                />
-              </div>
-            </div>
-            <SheetFooter>
-              <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={creating || !createName.trim()}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                {creating ? (
-                  <>
-                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create"
-                )}
-              </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-      </ContentReveal>
-    );
-  }
-
-  return (
-    <ContentReveal className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold">Stock Takes</h1>
-        <Button
-          size="sm"
-          onClick={() => setCreateOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-1.5 size-3.5" />
-          New Stock Take
-        </Button>
-      </div>
-
-      {/* Filter tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="draft">Draft</TabsTrigger>
-          <TabsTrigger value="in_progress">In Progress</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* List */}
-      {filtered.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
             <ClipboardList className="size-5 text-muted-foreground" />
           </div>
           <p className="text-sm font-medium text-muted-foreground">
-            No stock takes found
+            No stock takes match your filters
           </p>
         </div>
       ) : (
         <div className="rounded-xl border bg-card divide-y">
-          {filtered.map((st) => {
+          {filtered.map((st, i) => {
             const statusCfg = STATUS_CONFIG[st.status];
             return (
-              <div
+              <motion.div
                 key={st.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2, delay: i * 0.03 }}
                 className={cn(
                   "group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-200",
                   "hover:bg-muted/40"
@@ -278,7 +291,7 @@ export default function StockTakesPage() {
                   </div>
                 </div>
                 <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
-              </div>
+              </motion.div>
             );
           })}
         </div>

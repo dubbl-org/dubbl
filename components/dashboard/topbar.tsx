@@ -58,6 +58,13 @@ const LABELS: Record<string, string> = {
   "budget-vs-actual": "Budget vs Actual",
   general: "General",
   time: "Time Tracking",
+  // Inventory subtabs
+  "stock-takes": "Stock Takes",
+  warehouses: "Warehouses",
+  valuation: "Valuation",
+  history: "History",
+  suppliers: "Suppliers",
+  variants: "Variants",
   // Sales subtabs
   "credit-notes": "Credit Notes",
   recurring: "Recurring",

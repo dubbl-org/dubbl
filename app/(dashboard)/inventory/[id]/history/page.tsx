@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Clock } from "lucide-react";
+import { Clock, ArrowUpDown } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useInventoryItem } from "../layout";
 import { cn } from "@/lib/utils";
 
 const movementTypeColors: Record<string, string> = {
@@ -39,11 +42,12 @@ export default function InventoryItemHistoryPage() {
 
   if (movements.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Clock className="size-8 text-muted-foreground/40 mb-3" />
-        <p className="text-sm font-medium text-muted-foreground">No stock movements yet</p>
-        <p className="text-xs text-muted-foreground/70 mt-1">Movements will appear here when stock is adjusted, purchased, or sold.</p>
-      </div>
+      <EmptyState
+        icon={Clock}
+        title="No stock movements yet"
+        description="Movements will appear here when stock is adjusted, purchased, or sold."
+        compact
+      />
     );
   }
 

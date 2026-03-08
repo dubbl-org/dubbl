@@ -10,14 +10,18 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
+import { motion } from "motion/react";
 
 interface ValuationItem {
   id: string;
@@ -73,6 +77,7 @@ export default function InventoryValuationPage() {
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const orgId =
     typeof window !== "undefined"
@@ -113,7 +118,17 @@ export default function InventoryValuationPage() {
     [sortKey]
   );
 
-  const sortedItems = [...items].sort((a, b) => {
+  const filteredItems = items.filter((item) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.code.toLowerCase().includes(q) ||
+      (item.category && item.category.toLowerCase().includes(q))
+    );
+  });
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
     const aVal = a[sortKey];
     const bVal = b[sortKey];
     const dir = sortOrder === "asc" ? 1 : -1;
@@ -168,16 +183,26 @@ export default function InventoryValuationPage() {
 
   if (loading) return <BrandLoader />;
 
+  const profitAmount = summary.totalRetailValue - summary.totalCost;
+
+  const stats = [
+    { label: "Total Items", value: String(summary.totalItems), icon: Package },
+    { label: "Total Cost", value: formatMoney(summary.totalCost), icon: DollarSign },
+    { label: "Retail Value", value: formatMoney(summary.totalRetailValue), icon: BarChart3, color: "text-emerald-600 dark:text-emerald-400" },
+    {
+      label: "Avg Margin",
+      value: summary.totalMargin > 0 ? `${summary.totalMargin.toFixed(1)}%` : "-",
+      icon: TrendingUp,
+      color: summary.totalMargin > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined,
+    },
+  ];
+
   return (
     <ContentReveal className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">Inventory Valuation</h1>
-          <p className="text-sm text-muted-foreground">
-            Overview of inventory cost and retail value across all items.
-          </p>
-        </div>
+      <PageHeader
+        title="Inventory Valuation"
+        description="Analyze the cost, retail value, and margin of every item in your inventory."
+      >
         <Button
           variant="outline"
           size="sm"
@@ -188,65 +213,80 @@ export default function InventoryValuationPage() {
           <Download className="size-3" />
           <span className="hidden sm:inline">Export CSV</span>
         </Button>
+      </PageHeader>
+
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.05 }}
+            className="rounded-xl border bg-card p-4"
+          >
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <stat.icon className="size-3.5" />
+              <span className="text-[11px] font-medium uppercase tracking-wide">
+                {stat.label}
+              </span>
+            </div>
+            <p className={cn(
+              "mt-2 text-2xl font-bold font-mono tabular-nums",
+              stat.color
+            )}>
+              {stat.value}
+            </p>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Package className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">
-              Total Items
-            </span>
+      {/* Profit callout */}
+      {profitAmount > 0 && items.length > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-3">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
+            <TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
-            {summary.totalItems}
-          </p>
-        </div>
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <DollarSign className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">
-              Total Cost
-            </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium">Potential Profit</p>
+            <p className="text-sm text-muted-foreground">
+              {formatMoney(profitAmount)} unrealized margin across {summary.totalItems} items at current pricing
+            </p>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
-            {formatMoney(summary.totalCost)}
-          </p>
         </div>
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <BarChart3 className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">
-              Total Retail Value
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
-            {formatMoney(summary.totalRetailValue)}
-          </p>
+      )}
+
+      <div className="h-px bg-border" />
+
+      {/* Search */}
+      {items.length > 0 && (
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search items..."
+            className="pl-9 h-9 text-sm"
+          />
         </div>
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <TrendingUp className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">
-              Total Margin
-            </span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
-            {summary.totalMargin > 0
-              ? `${summary.totalMargin.toFixed(1)}%`
-              : "-"}
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* Table */}
       {items.length === 0 ? (
         <EmptyState
           icon={Package}
           title="No inventory data"
-          description="Add inventory items to see valuation data here."
+          description="Add inventory items with pricing to see valuation and margin analysis here."
         />
+      ) : sortedItems.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+            <Package className="size-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">
+            No items match your search
+          </p>
+        </div>
       ) : (
         <div className="rounded-xl border bg-card overflow-x-auto">
           <table className="w-full text-sm">

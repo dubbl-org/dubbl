@@ -8,8 +8,12 @@ import {
   Trash2,
   MapPin,
   Star,
+  Building2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 interface WarehouseItem {
   id: string;
@@ -189,16 +194,25 @@ export default function WarehousesPage() {
 
   if (loading) return <BrandLoader />;
 
+  const totalWarehouses = warehouses.length;
+  const activeCount = warehouses.filter((w) => w.isActive).length;
+  const inactiveCount = warehouses.filter((w) => !w.isActive).length;
+  const defaultWarehouse = warehouses.find((w) => w.isDefault);
+  const withAddress = warehouses.filter((w) => w.address).length;
+
+  const stats = [
+    { label: "Total Warehouses", value: totalWarehouses, icon: Building2 },
+    { label: "Active", value: activeCount, icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Inactive", value: inactiveCount, icon: XCircle, color: "text-zinc-500" },
+    { label: "With Address", value: withAddress, icon: MapPin, color: "text-blue-600 dark:text-blue-400" },
+  ];
+
   return (
     <ContentReveal className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">Warehouses</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your warehouse locations for inventory tracking.
-          </p>
-        </div>
+      <PageHeader
+        title="Warehouses"
+        description="Manage your warehouse locations for inventory tracking and stock allocation."
+      >
         <Button
           size="sm"
           className="bg-emerald-600 hover:bg-emerald-700"
@@ -207,7 +221,51 @@ export default function WarehousesPage() {
           <Plus className="mr-1.5 size-3.5" />
           New Warehouse
         </Button>
+      </PageHeader>
+
+      {/* Stats strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.05 }}
+            className="rounded-xl border bg-card p-4"
+          >
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <stat.icon className="size-3.5" />
+              <span className="text-[11px] font-medium uppercase tracking-wide">
+                {stat.label}
+              </span>
+            </div>
+            <p className={cn(
+              "mt-2 text-2xl font-bold font-mono tabular-nums",
+              stat.color
+            )}>
+              {stat.value}
+            </p>
+          </motion.div>
+        ))}
       </div>
+
+      {/* Default warehouse callout */}
+      {defaultWarehouse && (
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-3">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
+            <Star className="size-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium">Default Warehouse</p>
+            <p className="text-sm text-muted-foreground truncate">
+              {defaultWarehouse.name} ({defaultWarehouse.code})
+              {defaultWarehouse.address ? ` - ${defaultWarehouse.address}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="h-px bg-border" />
 
       {/* Warehouse list */}
       {warehouses.length === 0 ? (
@@ -225,9 +283,12 @@ export default function WarehousesPage() {
         </EmptyState>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {warehouses.map((warehouse) => (
-            <div
+          {warehouses.map((warehouse, i) => (
+            <motion.div
               key={warehouse.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 + i * 0.04 }}
               className="rounded-xl border bg-card p-4 space-y-3"
             >
               <div className="flex items-start justify-between gap-2">
@@ -316,7 +377,7 @@ export default function WarehousesPage() {
                   </Button>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}

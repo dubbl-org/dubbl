@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Truck, Link2, Unlink } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,11 +114,17 @@ export default function InventoryItemSuppliersPage() {
       </div>
 
       {suppliers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Truck className="size-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No suppliers linked</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">Link suppliers to track purchasing sources and lead times.</p>
-        </div>
+        <EmptyState
+          icon={Truck}
+          title="No suppliers linked"
+          description="Link suppliers to track purchasing sources and lead times."
+          compact
+        >
+          <Button size="sm" onClick={() => setLinkOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Link2 className="mr-1.5 size-3.5" />
+            Link Supplier
+          </Button>
+        </EmptyState>
       ) : (
         <div className="rounded-xl border bg-card divide-y">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
