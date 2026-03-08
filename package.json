@@ -10,7 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "pnpm tsx lib/db/seed.ts"
+    "db:seed": "pnpm tsx --env-file=.env lib/db/seed.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

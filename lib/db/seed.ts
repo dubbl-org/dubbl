@@ -192,7 +192,7 @@ async function seed() {
   const [demoUser] = await db
     .insert(users)
     .values({
-      id: "demo-user-001",
+      id: "00000000-0000-0000-0000-000000000001",
       name: "Demo User",
       email: "demo@dubbl.app",
       passwordHash,
@@ -210,7 +210,7 @@ async function seed() {
   const [org] = await db
     .insert(organization)
     .values({
-      id: "demo-org-001",
+      id: "00000000-0000-0000-0000-000000000002",
       name: "Demo Company",
       slug: "demo-company",
       defaultCurrency: "USD",
