@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FileText, X, Banknote } from "lucide-react";
-import { Section } from "@/components/dashboard/section";
+import { Plus, FileText, X, Banknote, Search, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -162,40 +162,83 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [fetchKey, setFetchKey] = useState(0);
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("created");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  const PAGE_SIZE = 50;
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   const columns = useMemo(() => buildColumns(), []);
 
+  // Debounce search
   useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
+  const buildParams = useCallback((p: number) => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (sortBy !== "created") params.set("sortBy", sortBy);
     if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
-    params.set("limit", "200");
+    params.set("page", String(p));
+    params.set("limit", String(PAGE_SIZE));
+    return params;
+  }, [statusFilter, sortBy, sortOrder, dateFrom, dateTo]);
 
-    fetch(`/api/v1/invoices?${params}`, {
+  // Fetch first page when filters change
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    setLoading(true);
+    setPage(1);
+
+    fetch(`/api/v1/invoices?${buildParams(1)}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled && data.data) setInvoices(data.data);
+        if (cancelled) return;
+        setInvoices(data.data || []);
+        setTotalCount(data.pagination?.total || 0);
       })
       .then(() => devDelay())
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => { if (!cancelled) { setLoading(false); setFetchKey((k) => k + 1); } });
 
     return () => { cancelled = true; };
-  }, [orgId, statusFilter, sortBy, sortOrder, dateFrom, dateTo]);
+  }, [orgId, buildParams]);
+
+  // Load more
+  const loadMore = useCallback(() => {
+    if (!orgId || loadingMore) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+
+    fetch(`/api/v1/invoices?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) {
+          setInvoices((prev) => [...prev, ...data.data]);
+          setPage(nextPage);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [orgId, page, buildParams, loadingMore]);
+
+  const hasMore = invoices.length < totalCount;
 
   // Fetch recent payments separately
   useEffect(() => {
@@ -220,7 +263,24 @@ export default function InvoicesPage() {
     });
   }, []);
 
-  const hasFilters = dateFrom || dateTo;
+  const hasFilters = search || dateFrom || dateTo;
+  const pendingSearch = search !== debouncedSearch;
+
+  const [searchKey, setSearchKey] = useState(0);
+  const filteredInvoices = useMemo(() => {
+    if (!debouncedSearch) return invoices;
+    const q = debouncedSearch.toLowerCase();
+    return invoices.filter(
+      (i) =>
+        i.invoiceNumber.toLowerCase().includes(q) ||
+        (i.contact?.name || "").toLowerCase().includes(q)
+    );
+  }, [invoices, debouncedSearch]);
+
+  // Bump searchKey when debounced search changes to trigger ContentReveal
+  useEffect(() => {
+    setSearchKey((k) => k + 1);
+  }, [debouncedSearch]);
 
   const outstanding = invoices
     .filter((i) => ["sent", "partial", "overdue"].includes(i.status))
@@ -314,189 +374,215 @@ export default function InvoicesPage() {
   }
 
   return (
-    <ContentReveal className="space-y-10">
-      <Section title="Overview" description="Revenue summary and outstanding amounts across all invoices.">
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Outstanding" value={formatMoney(outstanding)} icon={FileText} />
-            <StatCard title="Overdue" value={formatMoney(overdue)} icon={FileText} changeType="negative" />
-            <StatCard title="Total Invoices" value={invoices.length.toString()} icon={FileText} />
-          </div>
-          {agingTotal > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Aging Breakdown</p>
-              <div className="h-3 w-full rounded-full overflow-hidden flex">
-                {([
-                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
-                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
-                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
-                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
-                ] as const).map(({ key, color }) => {
-                  const pct = (aging[key].amount / agingTotal) * 100;
-                  if (pct === 0) return null;
-                  return (
-                    <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />
-                  );
-                })}
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {([
-                  { key: "current" as const, color: "bg-emerald-500", label: "Current" },
-                  { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
-                  { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
-                  { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
-                ] as const).map(({ key, color, label }) => (
-                  <div key={key} className="text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`inline-block size-2 rounded-full ${color}`} />
-                      <span className="text-muted-foreground">{label}</span>
-                    </div>
-                    <p className="font-mono tabular-nums mt-0.5 pl-3.5">
-                      {aging[key].count} · {formatMoney(aging[key].amount)}
-                    </p>
+    <ContentReveal className="space-y-6">
+      {/* Top: Stats */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard title="Outstanding" value={formatMoney(outstanding)} icon={FileText} />
+        <StatCard title="Overdue" value={formatMoney(overdue)} icon={FileText} changeType="negative" />
+        <StatCard title="Total Invoices" value={invoices.length.toString()} icon={FileText} />
+      </div>
+
+      {/* Aging + Recent Payments side by side */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Aging Breakdown */}
+        {agingTotal > 0 && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Aging Breakdown</p>
+            <div className="h-2.5 w-full rounded-full overflow-hidden flex">
+              {([
+                { key: "current" as const, color: "bg-emerald-500" },
+                { key: "1-30" as const, color: "bg-amber-400" },
+                { key: "31-60" as const, color: "bg-orange-500" },
+                { key: "60+" as const, color: "bg-red-500" },
+              ] as const).map(({ key, color }) => {
+                const pct = (aging[key].amount / agingTotal) * 100;
+                if (pct === 0) return null;
+                return <div key={key} className={`${color} h-full`} style={{ width: `${pct}%` }} />;
+              })}
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              {([
+                { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
+                { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
+                { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
+              ] as const).map(({ key, color, label }) => (
+                <div key={key} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-block size-2 rounded-full ${color}`} />
+                    <span className="text-muted-foreground">{label}</span>
                   </div>
-                ))}
-              </div>
+                  <span className="font-mono tabular-nums">
+                    {aging[key].count} · {formatMoney(aging[key].amount)}
+                  </span>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-      </Section>
-
-      <div className="h-px bg-border" />
-
-      <Section title="Invoices" description="View, filter, and manage all your invoices.">
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList className="overflow-x-auto">
-                <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
-                <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
-                <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
-                <TabsTrigger value="partial" className="whitespace-nowrap">Partial</TabsTrigger>
-                <TabsTrigger value="paid" className="whitespace-nowrap">Paid</TabsTrigger>
-                <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <Button
-              onClick={() => openDrawer("invoice")}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="mr-2 size-4" />
-              New Invoice
-            </Button>
           </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground shrink-0">From</span>
-              <DatePicker
-                value={dateFrom}
-                onChange={(v) => setDateFrom(v)}
-                placeholder="Start date"
-                className="h-8 w-40 text-xs"
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground shrink-0">To</span>
-              <DatePicker
-                value={dateTo}
-                onChange={(v) => setDateTo(v)}
-                placeholder="End date"
-                className="h-8 w-40 text-xs"
-              />
-            </div>
-            <Select
-              value={`${sortBy}:${sortOrder}`}
-              onValueChange={(v) => {
-                const [key, order] = v.split(":");
-                setSortBy(key);
-                setSortOrder(order as "asc" | "desc");
-              }}
-            >
-              <SelectTrigger className="h-8 w-44 text-xs">
-                <SelectValue placeholder="Sort by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created:desc">Newest first</SelectItem>
-                <SelectItem value="created:asc">Oldest first</SelectItem>
-                <SelectItem value="due:asc">Due soonest</SelectItem>
-                <SelectItem value="due:desc">Due latest</SelectItem>
-                <SelectItem value="total:desc">Highest amount</SelectItem>
-                <SelectItem value="total:asc">Lowest amount</SelectItem>
-                <SelectItem value="amountDue:desc">Highest balance</SelectItem>
-                <SelectItem value="number:desc">Number (desc)</SelectItem>
-                <SelectItem value="number:asc">Number (asc)</SelectItem>
-              </SelectContent>
-            </Select>
-            {hasFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs text-muted-foreground"
-                onClick={() => { setDateFrom(""); setDateTo(""); }}
-              >
-                <X className="mr-1 size-3" />
-                Clear dates
+        {/* Recent Payments */}
+        {payments.length > 0 && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent Payments</p>
+              <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground px-2" onClick={() => router.push("/sales/payments")}>
+                View all
               </Button>
-            )}
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={invoices}
-            loading={loading}
-            emptyMessage="No invoices match your filters."
-            onRowClick={(r) => router.push(`/sales/${r.id}`)}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSort={handleSort}
-          />
-        </div>
-      </Section>
-
-      {/* Recent Payments */}
-      {payments.length > 0 && (
-        <>
-          <div className="h-px bg-border" />
-
-          <Section title="Recent Payments" description="Latest payments received against your invoices.">
-            <div className="rounded-lg border">
-              {payments.map((p, i) => (
+            </div>
+            <div className="space-y-0.5">
+              {payments.map((p) => (
                 <div
                   key={p.id}
-                  className={`flex items-center justify-between px-3 sm:px-4 py-3 ${i < payments.length - 1 ? "border-b" : ""}`}
+                  className="flex items-center justify-between py-1.5 text-sm"
                 >
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="hidden sm:flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
-                      <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-mono">{p.paymentNumber}</span>
-                        <span className="text-xs text-muted-foreground">{p.contact?.name || "-"}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground">{p.date}</span>
-                        <span className="text-xs text-muted-foreground">{methodLabels[p.method] || p.method}</span>
-                        {p.allocations?.length > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            · {p.allocations.length} invoice{p.allocations.length !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Banknote className="size-3.5 text-emerald-600 shrink-0" />
+                    <span className="font-mono text-xs">{p.paymentNumber}</span>
+                    <span className="text-xs text-muted-foreground truncate">{p.contact?.name || "-"}</span>
+                    <span className="text-[11px] text-muted-foreground hidden sm:inline">{p.date}</span>
                   </div>
-                  <span className="text-sm font-mono font-medium text-emerald-600 shrink-0">
+                  <span className="text-xs font-mono font-medium text-emerald-600 shrink-0 ml-2">
                     {formatMoney(p.amount)}
                   </span>
                 </div>
               ))}
             </div>
-          </Section>
-        </>
-      )}
+          </div>
+        )}
+      </div>
+
+      <div className="h-px bg-border" />
+
+      {/* Invoice table */}
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+            <TabsList className="overflow-x-auto">
+              <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+              <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
+              <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
+              <TabsTrigger value="partial" className="whitespace-nowrap">Partial</TabsTrigger>
+              <TabsTrigger value="paid" className="whitespace-nowrap">Paid</TabsTrigger>
+              <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Button
+            onClick={() => openDrawer("invoice")}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            New Invoice
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search invoices..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 w-56 pl-8 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">From</span>
+            <DatePicker
+              value={dateFrom}
+              onChange={(v) => setDateFrom(v)}
+              placeholder="Start date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">To</span>
+            <DatePicker
+              value={dateTo}
+              onChange={(v) => setDateTo(v)}
+              placeholder="End date"
+              className="h-8 w-40 text-xs"
+            />
+          </div>
+          <Select
+            value={`${sortBy}:${sortOrder}`}
+            onValueChange={(v) => {
+              const [key, order] = v.split(":");
+              setSortBy(key);
+              setSortOrder(order as "asc" | "desc");
+            }}
+          >
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created:desc">Newest first</SelectItem>
+              <SelectItem value="created:asc">Oldest first</SelectItem>
+              <SelectItem value="due:asc">Due soonest</SelectItem>
+              <SelectItem value="due:desc">Due latest</SelectItem>
+              <SelectItem value="total:desc">Highest amount</SelectItem>
+              <SelectItem value="total:asc">Lowest amount</SelectItem>
+              <SelectItem value="amountDue:desc">Highest balance</SelectItem>
+              <SelectItem value="number:desc">Number (desc)</SelectItem>
+              <SelectItem value="number:asc">Number (asc)</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => { setSearch(""); setDebouncedSearch(""); setDateFrom(""); setDateTo(""); }}
+            >
+              <X className="mr-1 size-3" />
+              Clear filters
+            </Button>
+          )}
+        </div>
+
+        {loading || pendingSearch ? (
+          <BrandLoader className="h-48" />
+        ) : (
+          <ContentReveal key={`${fetchKey}-${searchKey}`}>
+            <DataTable
+              columns={columns}
+              data={filteredInvoices}
+              loading={false}
+              emptyMessage="No invoices match your filters."
+              onRowClick={(r) => router.push(`/sales/${r.id}`)}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={handleSort}
+            />
+          </ContentReveal>
+        )}
+
+        {/* Load more / count */}
+        {!loading && !pendingSearch && filteredInvoices.length > 0 && (
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-xs text-muted-foreground">
+              Showing {invoices.length} of {totalCount} invoice{totalCount !== 1 ? "s" : ""}
+            </p>
+            {hasMore && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <><Loader2 className="mr-1.5 size-3 animate-spin" />Loading...</>
+                ) : (
+                  `Load more (${totalCount - invoices.length} remaining)`
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </ContentReveal>
   );
 }
