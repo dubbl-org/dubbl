@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion } from "motion/react";
-import { Trash2, Package, ArrowUpDown, Save, Loader2, ArrowLeft } from "lucide-react";
+import { Trash2, Package, ArrowUpDown, Save, Loader2, ArrowLeft, Power, PowerOff } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -232,6 +232,33 @@ export default function InventoryItemDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const orgId = localStorage.getItem("activeOrgId");
+                if (!orgId) return;
+                try {
+                  const res = await fetch(`/api/v1/inventory/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+                    body: JSON.stringify({ isActive: !item.isActive }),
+                  });
+                  if (!res.ok) throw new Error();
+                  const data = await res.json();
+                  setItem(data.inventoryItem);
+                  toast.success(data.inventoryItem.isActive ? "Item activated" : "Item deactivated");
+                } catch {
+                  toast.error("Failed to update status");
+                }
+              }}
+            >
+              {item.isActive ? (
+                <><PowerOff className="mr-1.5 size-3.5" />Deactivate</>
+              ) : (
+                <><Power className="mr-1.5 size-3.5" />Activate</>
+              )}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)}>
               <ArrowUpDown className="mr-1.5 size-3.5" />
               Adjust Stock

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence, LayoutGroup } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Package,
   AlertTriangle,
@@ -343,155 +343,152 @@ export default function InventoryPage() {
       </div>
 
       {/* Toolbar - transforms when in select mode */}
-      <div className="relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          {selectMode ? (
-            <motion.div
-              key="select-toolbar"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="space-y-3"
-            >
-              {/* Selection action bar */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-2 mr-auto">
-                  <Checkbox
-                    checked={isAllSelected ? true : isPartialSelected ? "indeterminate" : false}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                  <span className="text-sm font-medium">
-                    {selectionCount > 0 ? `${selectionCount} selected` : "Select items"}
-                  </span>
-                </div>
+      <AnimatePresence initial={false} mode="popLayout">
+        {selectMode ? (
+          <motion.div
+            key="select-toolbar"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, filter: "blur(4px)" }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            {/* Selection action bar */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 mr-auto">
+                <Checkbox
+                  checked={isAllSelected ? true : isPartialSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm font-medium">
+                  {selectionCount > 0 ? `${selectionCount} selected` : "Select items"}
+                </span>
+              </div>
 
-                <AnimatePresence>
-                  {selectionCount > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="flex items-center gap-2 flex-wrap"
-                    >
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_active")} disabled={bulkLoading}>
-                        <Power className="size-3 mr-1.5" />Active
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_inactive")} disabled={bulkLoading}>
-                        <PowerOff className="size-3 mr-1.5" />Inactive
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkCategoryOpen(true)} disabled={bulkLoading}>
-                        <Tag className="size-3 mr-1.5" />Category
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkAdjustOpen(true)} disabled={bulkLoading}>
-                        <ArrowUpDown className="size-3 mr-1.5" />Adjust
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={handleBulkDelete} disabled={bulkLoading}>
-                        <Trash2 className="size-3 mr-1.5" />Delete
-                      </Button>
-                      {bulkLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              <AnimatePresence>
+                {selectionCount > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, filter: "blur(4px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(4px)" }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-2 flex-wrap"
+                  >
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_active")} disabled={bulkLoading}>
+                      <Power className="size-3 mr-1.5" />Active
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_inactive")} disabled={bulkLoading}>
+                      <PowerOff className="size-3 mr-1.5" />Inactive
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkCategoryOpen(true)} disabled={bulkLoading}>
+                      <Tag className="size-3 mr-1.5" />Category
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkAdjustOpen(true)} disabled={bulkLoading}>
+                      <ArrowUpDown className="size-3 mr-1.5" />Adjust
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={handleBulkDelete} disabled={bulkLoading}>
+                      <Trash2 className="size-3 mr-1.5" />Delete
+                    </Button>
+                    {bulkLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => { setSelectMode(false); setSelected(new Set()); }}
-                >
-                  Done
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => { setSelectMode(false); setSelected(new Set()); }}
+              >
+                Done
+              </Button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="normal-toolbar"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, filter: "blur(4px)" }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="flex flex-col gap-3"
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
+                <TabsList>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="low_stock">Low Stock</TabsTrigger>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
+                  Select
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
+                  <Download className="size-3" />
+                  <span className="hidden sm:inline">Export</span>
                 </Button>
               </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="normal-toolbar"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-col gap-3"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                  <TabsList>
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="low_stock">Low Stock</TabsTrigger>
-                    <TabsTrigger value="active">Active</TabsTrigger>
-                    <TabsTrigger value="inactive">Inactive</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+            </div>
 
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
-                    Select
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
-                    <Download className="size-3" />
-                    <span className="hidden sm:inline">Export</span>
-                  </Button>
-                </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Search */}
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, code, or SKU..."
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-9 pr-8 h-8 text-sm"
+                />
+                {search && (
+                  <button
+                    onClick={() => handleSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                {/* Search */}
-                <div className="relative flex-1 sm:max-w-xs">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, code, or SKU..."
-                    value={search}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    className="pl-9 pr-8 h-8 text-sm"
-                  />
-                  {search && (
-                    <button
-                      onClick={() => handleSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Category filter */}
-                {categories.length > 0 && (
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
-                      <Tag className="size-3 mr-1.5 text-muted-foreground" />
-                      <SelectValue placeholder="Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {/* Sort */}
-                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-                  <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
-                    <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
-                    <SelectValue />
+              {/* Category filter */}
+              {categories.length > 0 && (
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
+                    <Tag className="size-3 mr-1.5 text-muted-foreground" />
+                    <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SORT_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              )}
 
-                <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
-                  <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              {/* Sort */}
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+                <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+                  <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
+                <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Item list */}
       {!loading && items.length === 0 ? (
@@ -513,41 +510,31 @@ export default function InventoryPage() {
               : 100;
 
             return (
-              <motion.div
+              <div
                 key={item.id}
-                layout
                 className={cn(
                   "group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-200",
                   "hover:bg-muted/40",
                   isSelected && "bg-primary/5"
                 )}
-                animate={{
-                  backgroundColor: isSelected ? "hsl(var(--primary) / 0.05)" : "transparent",
-                }}
-                transition={{ duration: 0.15 }}
                 onClick={() => {
                   if (selectMode) toggleSelect(item.id);
                   else router.push(`/inventory/${item.id}`);
                 }}
               >
                 {/* Checkbox - slides in during select mode */}
-                <AnimatePresence>
-                  {selectMode && (
-                    <motion.div
-                      initial={{ width: 0, opacity: 0 }}
-                      animate={{ width: "auto", opacity: 1 }}
-                      exit={{ width: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                      className="shrink-0 overflow-hidden"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelect(item.id)}
-                      />
-                    </motion.div>
+                <div
+                  className={cn(
+                    "shrink-0 overflow-hidden transition-all duration-200 ease-out",
+                    selectMode ? "w-5 opacity-100" : "w-0 opacity-0"
                   )}
-                </AnimatePresence>
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelect(item.id)}
+                  />
+                </div>
 
                 {/* Icon + info */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -605,20 +592,13 @@ export default function InventoryPage() {
                   <p className="text-[11px] text-muted-foreground">value</p>
                 </div>
 
-                <AnimatePresence>
-                  {!selectMode && (
-                    <motion.div
-                      initial={{ width: 0, opacity: 0 }}
-                      animate={{ width: "auto", opacity: 1 }}
-                      exit={{ width: 0, opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="overflow-hidden shrink-0"
-                    >
-                      <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+                <div className={cn(
+                  "shrink-0 overflow-hidden transition-all duration-200 ease-out",
+                  selectMode ? "w-0 opacity-0" : "w-4 opacity-100"
+                )}>
+                  <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                </div>
+              </div>
             );
           })}
 
