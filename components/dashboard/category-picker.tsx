@@ -49,9 +49,10 @@ interface CategoryPickerProps {
   value: string;
   onChange: (categoryId: string) => void;
   placeholder?: string;
+  triggerClassName?: string;
 }
 
-export function CategoryPicker({ value, onChange, placeholder = "Select category..." }: CategoryPickerProps) {
+export function CategoryPicker({ value, onChange, placeholder = "Select category...", triggerClassName }: CategoryPickerProps) {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
@@ -198,7 +199,7 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between font-normal h-9 bg-transparent dark:bg-transparent"
+            className={cn("w-full justify-between font-normal h-9", triggerClassName)}
           >
             {selected ? (
               <span className="flex items-center gap-2 truncate">

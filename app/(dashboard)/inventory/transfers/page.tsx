@@ -458,7 +458,7 @@ export default function TransfersPage() {
           </div>
 
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs bg-transparent dark:bg-transparent">
+            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
               <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
@@ -469,7 +469,7 @@ export default function TransfersPage() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="icon" className="size-8 shrink-0 bg-transparent dark:bg-transparent" onClick={toggleSortOrder}>
+          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
             <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
           </Button>
         </div>

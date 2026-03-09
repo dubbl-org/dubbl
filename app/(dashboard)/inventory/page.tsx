@@ -55,6 +55,7 @@ import {
 import { formatMoney } from "@/lib/money";
 
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -105,7 +106,7 @@ export default function InventoryPage() {
   const [tab, setTab] = useState<FilterTab>("all");
   const [sortBy, setSortBy] = useState<SortKey>("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [categories, setCategories] = useState<string[]>([]);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -161,7 +162,7 @@ export default function InventoryPage() {
     if (tab === "low_stock") params.set("status", "low_stock");
     else if (tab === "active") params.set("status", "active");
     else if (tab === "inactive") params.set("status", "inactive");
-    if (categoryFilter && categoryFilter !== "all") params.set("category", categoryFilter);
+    if (categoryFilter) params.set("categoryId", categoryFilter);
     params.set("sortBy", sortBy);
     params.set("sortOrder", sortOrder);
     return `/api/v1/inventory?${params}`;
@@ -376,7 +377,7 @@ export default function InventoryPage() {
 
   const pendingSearch = search !== debouncedSearch;
 
-  if (!refetching && !pendingSearch && items.length === 0 && !debouncedSearch && tab === "all" && categoryFilter === "all") {
+  if (!refetching && !pendingSearch && items.length === 0 && !debouncedSearch && tab === "all" && !categoryFilter) {
     return (
       <ContentReveal>
         <EmptyState
@@ -592,20 +593,14 @@ export default function InventoryPage() {
             )}
           </div>
 
-          {categories.length > 0 && (
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
-                <Tag className="size-3 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <div className="w-full sm:w-[180px]">
+            <CategoryPicker
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              placeholder="All Categories"
+              triggerClassName="h-8 text-xs"
+            />
+          </div>
 
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
             <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
