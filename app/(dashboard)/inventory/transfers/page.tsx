@@ -6,26 +6,31 @@ import {
   Plus,
   Loader2,
   ArrowRight,
-
   Check,
   X,
   Warehouse,
-  Package,
-
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
 interface WarehouseInfo {
@@ -59,11 +64,20 @@ interface InventoryItemOption {
   quantityOnHand: number;
 }
 
+type StatusFilter = "all" | "draft" | "in_transit" | "completed" | "cancelled";
+
 const STATUS_STYLES: Record<string, string> = {
   draft: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300",
   in_transit: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   cancelled: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  in_transit: "In Transit",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 export default function TransfersPage() {
@@ -75,6 +89,12 @@ export default function TransfersPage() {
   const [completing, setCompleting] = useState(false);
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // Search and filter state
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
+  const pendingSearch = search !== debouncedSearch;
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -94,7 +114,7 @@ export default function TransfersPage() {
 
   useEffect(() => {
     if (!orgId) return;
-    fetch("/api/v1/inventory?limit=100", { headers: { "x-organization-id": orgId } })
+    fetch("/api/v1/inventory?limit=200", { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
       .then((data) => setItems(data.data || []));
   }, [orgId]);
@@ -104,6 +124,28 @@ export default function TransfersPage() {
     window.addEventListener("refetch-transfers", handler);
     return () => window.removeEventListener("refetch-transfers", handler);
   }, [fetchTransfers]);
+
+  // Client-side filtering
+  const filtered = transfers.filter((t) => {
+    if (statusFilter !== "all" && t.status !== statusFilter) return false;
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      const fromMatch = t.fromWarehouse.name.toLowerCase().includes(q) || t.fromWarehouse.code.toLowerCase().includes(q);
+      const toMatch = t.toWarehouse.name.toLowerCase().includes(q) || t.toWarehouse.code.toLowerCase().includes(q);
+      const noteMatch = t.notes?.toLowerCase().includes(q);
+      if (!fromMatch && !toMatch && !noteMatch) return false;
+    }
+    return true;
+  });
+
+  // Stats from all transfers (unfiltered)
+  const stats = {
+    total: transfers.length,
+    draft: transfers.filter((t) => t.status === "draft").length,
+    inTransit: transfers.filter((t) => t.status === "in_transit").length,
+    completed: transfers.filter((t) => t.status === "completed").length,
+    totalItems: transfers.reduce((sum, t) => sum + t.lines.reduce((s, l) => s + l.quantity, 0), 0),
+  };
 
   async function handleComplete(transfer: Transfer) {
     const confirmed = await confirm({
@@ -154,6 +196,18 @@ export default function TransfersPage() {
     } catch {
       toast.error("Failed to cancel transfer");
     }
+  }
+
+  function getItemName(inventoryItemId: string) {
+    return items.find((i) => i.id === inventoryItemId)?.name || "Unknown item";
+  }
+
+  function getItemCode(inventoryItemId: string) {
+    return items.find((i) => i.id === inventoryItemId)?.code || "";
+  }
+
+  function totalQty(lines: TransferLine[]) {
+    return lines.reduce((sum, l) => sum + l.quantity, 0);
   }
 
   if (loading) return <BrandLoader />;
@@ -275,56 +329,141 @@ export default function TransfersPage() {
   return (
     <ContentReveal className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total</p>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{transfers.length}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{stats.total}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Draft</p>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{transfers.filter((t) => t.status === "draft").length}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{stats.draft}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">In Transit</p>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums text-blue-600 dark:text-blue-400">{transfers.filter((t) => t.status === "in_transit").length}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums text-blue-600 dark:text-blue-400">{stats.inTransit}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Completed</p>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{transfers.filter((t) => t.status === "completed").length}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{stats.completed}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4 hidden lg:block">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Units</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{stats.totalItems}</p>
+        </div>
+      </div>
+
+      {/* Tabs + Search + New */}
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="draft">Draft</TabsTrigger>
+              <TabsTrigger value="in_transit">In Transit</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Button
+            size="sm"
+            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => openDrawer("transfer")}
+          >
+            <Plus className="size-3" />
+            New Transfer
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by warehouse name or code..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* List */}
-      <div className="rounded-xl border bg-card divide-y">
-        {transfers.map((transfer) => (
-          <div
-            key={transfer.id}
-            className="group flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors"
-            onClick={() => { setActiveTransfer(transfer); setDetailOpen(true); }}
-          >
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40">
-              <ArrowLeftRight className="size-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium truncate">
-                  {transfer.fromWarehouse.name}
-                </p>
-                <ArrowRight className="size-3 text-muted-foreground shrink-0" />
-                <p className="text-sm font-medium truncate">
-                  {transfer.toWarehouse.name}
-                </p>
-                <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", STATUS_STYLES[transfer.status])}>
-                  {transfer.status.replace("_", " ")}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {transfer.lines.length} item{transfer.lines.length !== 1 ? "s" : ""} · {new Date(transfer.createdAt).toLocaleDateString()}
-              </p>
-            </div>
+      {pendingSearch ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="brand-loader" aria-label="Loading">
+            <div className="brand-loader-circle brand-loader-circle-1" />
+            <div className="brand-loader-circle brand-loader-circle-2" />
           </div>
-        ))}
-      </div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+            <ArrowLeftRight className="size-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium">No transfers found</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {search ? "Try a different search term" : "No transfers match this filter"}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-card divide-y">
+          {filtered.map((transfer) => {
+            const qty = totalQty(transfer.lines);
+            return (
+              <div
+                key={transfer.id}
+                className="group flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors"
+                onClick={() => { setActiveTransfer(transfer); setDetailOpen(true); }}
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40">
+                  <ArrowLeftRight className="size-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">
+                      {transfer.fromWarehouse.name}
+                    </p>
+                    <ArrowRight className="size-3 text-muted-foreground shrink-0" />
+                    <p className="text-sm font-medium truncate">
+                      {transfer.toWarehouse.name}
+                    </p>
+                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 shrink-0", STATUS_STYLES[transfer.status])}>
+                      {STATUS_LABELS[transfer.status]}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground">
+                      {transfer.lines.length} item{transfer.lines.length !== 1 ? "s" : ""} · {qty} unit{qty !== 1 ? "s" : ""}
+                    </p>
+                    {transfer.notes && (
+                      <p className="text-xs text-muted-foreground truncate hidden sm:block">· {transfer.notes}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0 hidden sm:block">
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(transfer.createdAt).toLocaleDateString()}
+                  </p>
+                  {transfer.completedAt && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      Completed {new Date(transfer.completedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Detail Sheet */}
       <Sheet open={detailOpen} onOpenChange={(v) => { if (!v) { setDetailOpen(false); setActiveTransfer(null); } }}>
@@ -333,34 +472,81 @@ export default function TransfersPage() {
             <SheetTitle>Transfer Details</SheetTitle>
           </SheetHeader>
           {activeTransfer && (
-            <div className="space-y-4 px-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">{activeTransfer.fromWarehouse.name}</span>
-                <ArrowRight className="size-3 text-muted-foreground" />
-                <span className="font-medium">{activeTransfer.toWarehouse.name}</span>
-              </div>
-              <Badge variant="outline" className={cn(STATUS_STYLES[activeTransfer.status])}>
-                {activeTransfer.status.replace("_", " ")}
-              </Badge>
-              {activeTransfer.notes && (
-                <p className="text-sm text-muted-foreground">{activeTransfer.notes}</p>
-              )}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Items</p>
-                <div className="rounded-lg border divide-y">
-                  {activeTransfer.lines.map((line) => {
-                    const item = items.find((i) => i.id === line.inventoryItemId);
-                    return (
-                      <div key={line.id} className="flex items-center justify-between px-3 py-2">
-                        <span className="text-sm">{item?.name || "Unknown item"}</span>
-                        <span className="text-sm font-mono">{line.quantity}</span>
-                      </div>
-                    );
-                  })}
+            <div className="space-y-5 px-4">
+              {/* Warehouse flow */}
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">From</p>
+                  <p className="text-sm font-medium truncate">{activeTransfer.fromWarehouse.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{activeTransfer.fromWarehouse.code}</p>
+                </div>
+                <ArrowRight className="size-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0 text-right">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">To</p>
+                  <p className="text-sm font-medium truncate">{activeTransfer.toWarehouse.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{activeTransfer.toWarehouse.code}</p>
                 </div>
               </div>
+
+              {/* Status + dates */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge variant="outline" className={cn("text-xs", STATUS_STYLES[activeTransfer.status])}>
+                  {STATUS_LABELS[activeTransfer.status]}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Created {new Date(activeTransfer.createdAt).toLocaleDateString()}
+                </span>
+                {activeTransfer.completedAt && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                    Completed {new Date(activeTransfer.completedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+
+              {/* Notes */}
+              {activeTransfer.notes && (
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Notes</p>
+                  <p className="text-sm text-muted-foreground">{activeTransfer.notes}</p>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="flex gap-4">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Items</p>
+                  <p className="text-lg font-bold font-mono tabular-nums">{activeTransfer.lines.length}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total Units</p>
+                  <p className="text-lg font-bold font-mono tabular-nums">{totalQty(activeTransfer.lines)}</p>
+                </div>
+              </div>
+
+              {/* Items list */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Line Items</p>
+                <div className="rounded-lg border divide-y">
+                  {activeTransfer.lines.map((line) => (
+                    <div key={line.id} className="flex items-center justify-between px-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm truncate">{getItemName(line.inventoryItemId)}</p>
+                        <p className="text-[11px] text-muted-foreground">{getItemCode(line.inventoryItemId)}</p>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <span className="text-sm font-mono font-medium tabular-nums">{line.quantity}</span>
+                        {line.receivedQuantity != null && line.receivedQuantity !== line.quantity && (
+                          <p className="text-[10px] text-amber-600">Received: {line.receivedQuantity}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
               {(activeTransfer.status === "draft" || activeTransfer.status === "in_transit") && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2">
                   <Button
                     size="sm"
                     className="bg-emerald-600 hover:bg-emerald-700"
