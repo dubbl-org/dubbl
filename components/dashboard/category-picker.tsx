@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, ChevronsUpDown, Plus, Loader2, Tag, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, ChevronsUpDown, Plus, Loader2, Tag, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -17,6 +20,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -29,6 +39,11 @@ interface Category {
   description: string | null;
   parentId: string | null;
 }
+
+const COLORS = [
+  "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+];
 
 interface CategoryPickerProps {
   value: string;
@@ -47,9 +62,14 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
+  // Edit sheet state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCategory, setEditCategory] = useState<Category | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const fetchCategories = useCallback(() => {
+  function doFetch() {
     if (!orgId) return;
     const id = ++fetchIdRef.current;
     setFetchCount((c) => c + 1);
@@ -62,22 +82,25 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
       })
       .catch(() => {})
       .finally(() => setFetchCount((c) => c - 1));
-  }, [orgId]);
+  }
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (nextOpen) {
-      fetchCategories();
+      doFetch();
     } else {
       setSearch("");
     }
   }
 
   // Listen for refetch-categories event (dispatched by CategoryDrawer on create)
+  const doFetchRef = useRef(doFetch);
+  doFetchRef.current = doFetch;
   useEffect(() => {
-    window.addEventListener("refetch-categories", fetchCategories);
-    return () => window.removeEventListener("refetch-categories", fetchCategories);
-  }, [fetchCategories]);
+    function handler() { doFetchRef.current(); }
+    window.addEventListener("refetch-categories", handler);
+    return () => window.removeEventListener("refetch-categories", handler);
+  }, []);
 
   const parentMap = new Map(categories.map((c) => [c.id, c]));
   const selected = categories.find((c) => c.id === value);
@@ -101,8 +124,7 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
       confirmLabel: "Delete",
       destructive: true,
     });
-    if (!confirmed) return;
-    if (!orgId) return;
+    if (!confirmed || !orgId) return;
 
     try {
       const res = await fetch(`/api/v1/inventory/categories/${cat.id}`, {
@@ -118,6 +140,48 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
       setCategories((prev) => prev.filter((c) => c.id !== cat.id));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete category");
+    }
+  }
+
+  function handleEdit(e: React.MouseEvent, cat: Category) {
+    e.stopPropagation();
+    e.preventDefault();
+    setOpen(false);
+    setEditCategory(cat);
+    setEditOpen(true);
+  }
+
+  async function handleEditSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!orgId || !editCategory) return;
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+
+    try {
+      const res = await fetch(`/api/v1/inventory/categories/${editCategory.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: form.get("name"),
+          color: form.get("color") || null,
+          description: form.get("description") || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update category");
+      }
+      const data = await res.json();
+      toast.success("Category updated");
+      setCategories((prev) =>
+        prev.map((c) => (c.id === editCategory.id ? { ...c, ...data.category } : c))
+      );
+      setEditOpen(false);
+      setEditCategory(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update category");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -197,13 +261,22 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
                             <span className="text-xs text-muted-foreground truncate">{parent.name}</span>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 transition-opacity shrink-0"
-                          onClick={(e) => handleDelete(e, cat)}
-                        >
-                          <Trash2 className="size-3.5 text-destructive" />
-                        </button>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button
+                            type="button"
+                            className="p-0.5 rounded hover:bg-accent"
+                            onClick={(e) => handleEdit(e, cat)}
+                          >
+                            <Pencil className="size-3.5 text-muted-foreground" />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-0.5 rounded hover:bg-destructive/10"
+                            onClick={(e) => handleDelete(e, cat)}
+                          >
+                            <Trash2 className="size-3.5 text-destructive" />
+                          </button>
+                        </div>
                       </CommandItem>
                     );
                   })}
@@ -226,6 +299,57 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
           </Command>
         </PopoverContent>
       </Popover>
+
+      {/* Edit Category Sheet */}
+      <Sheet open={editOpen} onOpenChange={(v) => { if (!v) { setEditOpen(false); setEditCategory(null); } }}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Edit Category</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 px-4">
+            <div className="space-y-2">
+              <Label htmlFor="picker-cat-name">Name *</Label>
+              <Input
+                id="picker-cat-name"
+                name="name"
+                required
+                defaultValue={editCategory?.name || ""}
+                key={editCategory?.id || "new"}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="flex gap-2 flex-wrap">
+                {COLORS.map((c) => (
+                  <label key={c} className="cursor-pointer">
+                    <input type="radio" name="color" value={c} className="sr-only peer" defaultChecked={editCategory?.color === c} key={editCategory?.id || "new-c"} />
+                    <div
+                      className="size-7 rounded-full border-2 border-transparent peer-checked:border-foreground transition-colors"
+                      style={{ backgroundColor: c }}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="picker-cat-desc">Description</Label>
+              <Textarea
+                id="picker-cat-desc"
+                name="description"
+                rows={2}
+                defaultValue={editCategory?.description || ""}
+                key={editCategory?.id || "new-d"}
+              />
+            </div>
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={() => { setEditOpen(false); setEditCategory(null); }}>Cancel</Button>
+              <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                {saving ? "Saving..." : "Update"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
