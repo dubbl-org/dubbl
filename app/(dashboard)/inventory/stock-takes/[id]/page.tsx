@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
 type SortKey = "name" | "code" | "expected" | "counted" | "discrepancy";
@@ -208,6 +209,7 @@ export default function StockTakeDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [blindMode, setBlindMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery);
   const [lineFilter, setLineFilter] = useState<LineFilter>("all");
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [savingLines, setSavingLines] = useState<Set<string>>(new Set());
@@ -445,8 +447,8 @@ export default function StockTakeDetailPage() {
   const filteredLines = useMemo(() => {
     let result = lines;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
       result = result.filter(
         (l) =>
           l.inventoryItem.name.toLowerCase().includes(q) ||
@@ -495,7 +497,7 @@ export default function StockTakeDetailPage() {
     });
 
     return result;
-  }, [lines, searchQuery, lineFilter, sortBy, sortOrder]);
+  }, [lines, debouncedSearch, lineFilter, sortBy, sortOrder]);
 
   if (loading) return <BrandLoader />;
 
@@ -835,6 +837,14 @@ export default function StockTakeDetailPage() {
               </div>
             </div>
 
+            {searchQuery !== debouncedSearch ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="brand-loader" aria-label="Loading">
+                  <div className="brand-loader-circle brand-loader-circle-1" />
+                  <div className="brand-loader-circle brand-loader-circle-2" />
+                </div>
+              </div>
+            ) : (
             <div className="rounded-xl border bg-card overflow-hidden">
               {/* Table header */}
               <div className="grid grid-cols-[1fr_70px_96px_70px_50px] sm:grid-cols-[1fr_90px_110px_90px_70px] gap-2 px-4 py-2.5 border-b bg-muted/50">
@@ -966,10 +976,11 @@ export default function StockTakeDetailPage() {
                 </AnimatePresence>
               </div>
             </div>
+            )}
 
             {/* Showing X of Y */}
             <AnimatePresence>
-              {(searchQuery || lineFilter !== "all") && (
+              {(debouncedSearch || lineFilter !== "all") && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
