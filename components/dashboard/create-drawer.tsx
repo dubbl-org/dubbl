@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Tag,
   ArrowLeftRight,
+  Briefcase,
 } from "lucide-react";
 import {
   Sheet,
@@ -53,7 +54,7 @@ import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -97,6 +98,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <StockTakeDrawer open={activeType === "stockTake"} onClose={close} />
       <CategoryDrawer open={activeType === "category"} onClose={close} />
       <TransferDrawer open={activeType === "transfer"} onClose={close} />
+      <ContractorDrawer open={activeType === "contractor"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -2981,6 +2983,110 @@ function TransferDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Transfer" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [cName, setCName] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const [cCompany, setCCompany] = useState("");
+  const [cRate, setCRate] = useState("");
+  const [cCurrency, setCCurrency] = useState("USD");
+
+  useEffect(() => {
+    if (!open) {
+      setCName(""); setCEmail(""); setCCompany(""); setCRate(""); setCCurrency("USD");
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cName) { toast.error("Name is required"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/payroll/contractors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: cName,
+          email: cEmail || null,
+          company: cCompany || null,
+          defaultRate: cRate ? Math.round(parseFloat(cRate) * 100) : null,
+          currency: cCurrency,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add contractor");
+      }
+      const data = await res.json();
+      toast.success("Contractor added");
+      onClose();
+      router.push(`/payroll/contractors/${data.contractor.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add contractor");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Briefcase className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Contractor</SheetTitle>
+              <SheetDescription>Add a contractor for payments.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Contractor Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Jane Smith" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input type="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} placeholder="jane@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <Input value={cCompany} onChange={(e) => setCCompany(e.target.value)} placeholder="Acme LLC" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Default Rate ($)</Label>
+                  <Input type="number" step="0.01" value={cRate} onChange={(e) => setCRate(e.target.value)} placeholder="150.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={cCurrency} onValueChange={setCCurrency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="CAD">CAD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Add Contractor" />
         </form>
       </SheetContent>
     </Sheet>

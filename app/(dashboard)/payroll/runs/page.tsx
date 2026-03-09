@@ -9,6 +9,7 @@ import {
   Search,
   ArrowUpDown,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -35,6 +36,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -50,9 +57,11 @@ interface PayrollRun {
   totalDeductions: number;
   totalNet: number;
   processedAt: string | null;
+  runType: string | null;
 }
 
-type StatusFilter = "all" | "draft" | "completed" | "void";
+type StatusFilter = "all" | "draft" | "completed" | "void" | "pending_approval";
+type RunTypeFilter = "all" | "regular" | "termination" | "bonus_only" | "correction" | "off_cycle";
 type SortKey = "date" | "gross" | "net";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -66,6 +75,22 @@ const statusColors: Record<string, string> = {
   processing: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
+  pending_approval: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
+};
+
+const runTypeLabels: Record<string, string> = {
+  regular: "Regular",
+  termination: "Termination",
+  bonus_only: "Bonus",
+  correction: "Correction",
+  off_cycle: "Off-cycle",
+};
+
+const runTypeColors: Record<string, string> = {
+  termination: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+  bonus_only: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300",
+  correction: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300",
+  off_cycle: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300",
 };
 
 export default function PayrollRunsPage() {
@@ -80,6 +105,7 @@ export default function PayrollRunsPage() {
   const debouncedSearch = useDebounce(search);
   const pendingSearch = search !== debouncedSearch;
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [runTypeFilter, setRunTypeFilter] = useState<RunTypeFilter>("all");
   const [sortBy, setSortBy] = useState<SortKey>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
@@ -126,12 +152,16 @@ export default function PayrollRunsPage() {
   useEffect(() => {
     if (!loading) setFetchKey((k) => k + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, sortBy, sortOrder, debouncedSearch]);
+  }, [statusFilter, runTypeFilter, sortBy, sortOrder, debouncedSearch]);
 
   // Client-side filtering + sorting
   const filtered = runs
     .filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (runTypeFilter !== "all") {
+        const type = r.runType || "regular";
+        if (type !== runTypeFilter) return false;
+      }
       if (debouncedSearch) {
         const q = debouncedSearch.toLowerCase();
         const startMatch = r.payPeriodStart.includes(q);
@@ -188,6 +218,47 @@ export default function PayrollRunsPage() {
       );
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleCreateOffCycleRun(type: "termination" | "bonus-only" | "correction") {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    const endpoints: Record<string, string> = {
+      termination: "/api/v1/payroll/runs/termination",
+      "bonus-only": "/api/v1/payroll/runs/bonus-only",
+      correction: "/api/v1/payroll/runs/correction",
+    };
+
+    const bodies: Record<string, object> = {
+      termination: { employeeId: "", payPeriodEnd },
+      "bonus-only": { payPeriodStart, payPeriodEnd, items: [] },
+      correction: { parentRunId: "", payPeriodStart, payPeriodEnd },
+    };
+
+    try {
+      const res = await fetch(endpoints[type], {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": orgId,
+        },
+        body: JSON.stringify(bodies[type]),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || `Failed to create ${type} run`);
+      }
+
+      const data = await res.json();
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} run created`);
+      router.push(`/payroll/runs/${data.run.id}`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : `Failed to create ${type} run`
+      );
     }
   }
 
@@ -338,19 +409,53 @@ export default function PayrollRunsPage() {
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="draft">Draft</TabsTrigger>
               <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="pending_approval">Pending Approval</TabsTrigger>
               <TabsTrigger value="void">Void</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <Button
-            size="sm"
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => setDialogOpen(true)}
-          >
-            <Plus className="size-3" />
-            New Payroll Run
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="size-3" />
+              New Payroll Run
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                  Off-cycle
+                  <ChevronDown className="size-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("termination")}>
+                  Termination Run
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("bonus-only")}>
+                  Bonus Run
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("correction")}>
+                  Correction Run
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
+
+        <Tabs value={runTypeFilter} onValueChange={(v) => setRunTypeFilter(v as RunTypeFilter)}>
+          <TabsList className="flex-wrap">
+            <TabsTrigger value="all">All Types</TabsTrigger>
+            <TabsTrigger value="regular">Regular</TabsTrigger>
+            <TabsTrigger value="termination">Termination</TabsTrigger>
+            <TabsTrigger value="bonus_only">Bonus</TabsTrigger>
+            <TabsTrigger value="correction">Correction</TabsTrigger>
+            <TabsTrigger value="off_cycle">Off-cycle</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Search + Sort */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -434,9 +539,16 @@ export default function PayrollRunsPage() {
                       <p className="text-sm font-medium truncate">
                         {run.payPeriodStart} to {run.payPeriodEnd}
                       </p>
-                      <Badge variant="outline" className={cn("mt-0.5 text-[11px]", statusColors[run.status] || "")}>
-                        {run.status}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Badge variant="outline" className={cn("text-[11px]", statusColors[run.status] || "")}>
+                          {run.status}
+                        </Badge>
+                        {run.runType && run.runType !== "regular" && (
+                          <Badge variant="outline" className={cn("text-[11px]", runTypeColors[run.runType] || "")}>
+                            {runTypeLabels[run.runType] || run.runType}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 

@@ -40,6 +40,42 @@ interface EmployeeDetail {
   hourlyRate: number | null;
   memberId: string | null;
   member: { user: { name: string | null; email: string } } | null;
+  department: string | null;
+  ptoBalanceHours: number | null;
+  currency: string | null;
+  compensationBandId: string | null;
+}
+
+interface EmployeeDeduction {
+  id: string;
+  deductionType: { name: string; category: string; timing: string };
+  amount: number;
+  isPercentage: boolean;
+  isActive: boolean;
+}
+
+interface TaxConfig {
+  id: string;
+  filingStatus: string;
+  federalAllowances: number;
+  stateAllowances: number;
+  additionalFederalWithholding: number;
+  additionalStateWithholding: number;
+}
+
+interface LeaveBalance {
+  id: string;
+  balance: number;
+  usedHours: number;
+  policy: { name: string; leaveType: string } | null;
+}
+
+interface CompensationBand {
+  id: string;
+  name: string;
+  minSalary: number;
+  midSalary: number;
+  maxSalary: number;
 }
 
 const anim = (delay: number) => ({
@@ -64,6 +100,20 @@ export default function EmployeeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // New section state
+  const [deductions, setDeductions] = useState<EmployeeDeduction[]>([]);
+  const [taxConfig, setTaxConfig] = useState<TaxConfig | null>(null);
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
+  const [compensationBand, setCompensationBand] = useState<CompensationBand | null>(null);
+  const [taxSaving, setTaxSaving] = useState(false);
+
+  // Tax config form state
+  const [tcFilingStatus, setTcFilingStatus] = useState("");
+  const [tcFederalAllowances, setTcFederalAllowances] = useState("0");
+  const [tcStateAllowances, setTcStateAllowances] = useState("0");
+  const [tcAddlFederal, setTcAddlFederal] = useState("0");
+  const [tcAddlState, setTcAddlState] = useState("0");
 
   // Edit form state
   const [name, setName] = useState("");
@@ -112,6 +162,87 @@ export default function EmployeeDetailPage() {
       })
       .finally(() => setLoading(false));
   }, [id, orgId]);
+
+  // Fetch deductions, tax config, leave balances, compensation band
+  useEffect(() => {
+    if (!orgId) return;
+    const headers = { "x-organization-id": orgId };
+
+    fetch(`/api/v1/payroll/employees/${id}/deductions`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.deductions) setDeductions(data.deductions);
+      })
+      .catch(() => {});
+
+    fetch(`/api/v1/payroll/employees/${id}/tax-config`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.taxConfig) {
+          const tc = data.taxConfig;
+          setTaxConfig(tc);
+          setTcFilingStatus(tc.filingStatus || "");
+          setTcFederalAllowances(String(tc.federalAllowances ?? 0));
+          setTcStateAllowances(String(tc.stateAllowances ?? 0));
+          setTcAddlFederal(String(tc.additionalFederalWithholding ?? 0));
+          setTcAddlState(String(tc.additionalStateWithholding ?? 0));
+        }
+      })
+      .catch(() => {});
+
+    fetch(`/api/v1/payroll/employees/${id}/leave-balances`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.leaveBalances) setLeaveBalances(data.leaveBalances);
+      })
+      .catch(() => {});
+  }, [id, orgId]);
+
+  // Fetch compensation band when employee loads
+  useEffect(() => {
+    if (!orgId || !emp?.compensationBandId) return;
+    fetch(`/api/v1/payroll/compensation-bands/${emp.compensationBandId}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.band) setCompensationBand(data.band);
+      })
+      .catch(() => {});
+  }, [orgId, emp?.compensationBandId]);
+
+  async function handleSaveTaxConfig() {
+    if (!orgId) return;
+    setTaxSaving(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/employees/${id}/tax-config`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": orgId,
+        },
+        body: JSON.stringify({
+          filingStatus: tcFilingStatus,
+          federalAllowances: parseInt(tcFederalAllowances) || 0,
+          stateAllowances: parseInt(tcStateAllowances) || 0,
+          additionalFederalWithholding: parseFloat(tcAddlFederal) || 0,
+          additionalStateWithholding: parseFloat(tcAddlState) || 0,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.taxConfig) setTaxConfig(data.taxConfig);
+        toast.success("Tax configuration updated");
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to update tax config");
+      }
+    } catch {
+      toast.error("Failed to update tax configuration");
+    } finally {
+      setTaxSaving(false);
+    }
+  }
 
   async function handleSave() {
     if (!orgId) return;
@@ -404,6 +535,241 @@ export default function EmployeeDetailPage() {
             </div>
           </div>
         </Section>
+
+        <div className="h-px bg-border" />
+
+        {/* Deductions */}
+        <Section title="Deductions" description="Assigned deductions for this employee. Manage deduction types in settings.">
+          {deductions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No deductions assigned.</p>
+          ) : (
+            <div className="space-y-2">
+              {deductions.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between rounded-md border px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{d.deductionType.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="outline" className="text-[11px]">
+                          {d.deductionType.category}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[11px]",
+                            d.deductionType.timing === "pre_tax"
+                              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                          )}
+                        >
+                          {d.deductionType.timing === "pre_tax" ? "Pre-tax" : "Post-tax"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-mono tabular-nums">
+                      {d.isPercentage ? `${d.amount}%` : formatMoney(d.amount)}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[11px]",
+                        d.isActive
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          : ""
+                      )}
+                    >
+                      {d.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <div className="h-px bg-border" />
+
+        {/* Tax Configuration */}
+        <Section title="Tax Configuration" description="Federal and state tax withholding settings.">
+          {!taxConfig ? (
+            <p className="text-sm text-muted-foreground">No tax configuration found.</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Filing Status</Label>
+                  <Select value={tcFilingStatus} onValueChange={setTcFilingStatus}>
+                    <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single</SelectItem>
+                      <SelectItem value="married_filing_jointly">Married Filing Jointly</SelectItem>
+                      <SelectItem value="married_filing_separately">Married Filing Separately</SelectItem>
+                      <SelectItem value="head_of_household">Head of Household</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Federal Allowances</Label>
+                  <Input
+                    type="number"
+                    value={tcFederalAllowances}
+                    onChange={(e) => setTcFederalAllowances(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">State Allowances</Label>
+                  <Input
+                    type="number"
+                    value={tcStateAllowances}
+                    onChange={(e) => setTcStateAllowances(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Additional Federal Withholding</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tcAddlFederal}
+                    onChange={(e) => setTcAddlFederal(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Additional State Withholding</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tcAddlState}
+                    onChange={(e) => setTcAddlState(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveTaxConfig}
+                  disabled={taxSaving}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Save className="mr-1.5 size-3.5" />
+                  {taxSaving ? "Saving..." : "Save Tax Config"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Section>
+
+        <div className="h-px bg-border" />
+
+        {/* Leave Balances */}
+        <Section title="Leave Balances" description="Current leave balance and usage for assigned policies.">
+          {leaveBalances.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No leave balances found.</p>
+          ) : (
+            <div className="space-y-2">
+              {leaveBalances.map((lb) => (
+                <div
+                  key={lb.id}
+                  className="flex items-center justify-between rounded-md border px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{lb.policy?.name || "-"}</p>
+                      {lb.policy?.leaveType && (
+                        <Badge variant="outline" className="mt-0.5 text-[11px]">
+                          {lb.policy.leaveType}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm font-mono tabular-nums">
+                    <div className="text-right">
+                      <p className="text-[11px] font-sans text-muted-foreground">Balance</p>
+                      <p>{lb.balance}h</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] font-sans text-muted-foreground">Used</p>
+                      <p>{lb.usedHours}h</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* Compensation Band */}
+        {emp.compensationBandId && compensationBand && (
+          <>
+            <div className="h-px bg-border" />
+
+            <Section title="Compensation Band" description="Salary band positioning for this employee.">
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Band</p>
+                    <p className="text-sm font-medium">{compensationBand.name}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Salary</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(compensationBand.minSalary)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Mid Salary</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(compensationBand.midSalary)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Salary</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(compensationBand.maxSalary)}</p>
+                  </div>
+                </div>
+                {compensationBand.maxSalary > compensationBand.minSalary && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>Range Penetration</span>
+                      <span className="font-mono tabular-nums">
+                        {Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            Math.round(
+                              ((salaryInCents - compensationBand.minSalary) /
+                                (compensationBand.maxSalary - compensationBand.minSalary)) *
+                                100
+                            )
+                          )
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full bg-emerald-500 transition-all"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              Math.round(
+                                ((salaryInCents - compensationBand.minSalary) /
+                                  (compensationBand.maxSalary - compensationBand.minSalary)) *
+                                  100
+                              )
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+          </>
+        )}
 
         <div className="h-px bg-border" />
 

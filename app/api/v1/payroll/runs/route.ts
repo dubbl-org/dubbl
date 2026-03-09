@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { payrollRun, payrollItem, payrollEmployee } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import {
+  payrollRun,
+  payrollItem,
+  payrollEmployee,
+  payrollSettings,
+  employeeDeduction,
+  deductionType,
+  timesheet,
+  timesheetEntry,
+} from "@/lib/db/schema";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -12,6 +21,7 @@ import { z } from "zod";
 const createSchema = z.object({
   payPeriodStart: z.string().min(1),
   payPeriodEnd: z.string().min(1),
+  runType: z.string().optional(),
 });
 
 /**
@@ -100,6 +110,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Fetch org payroll settings for OT rules
+    const settings = await db.query.payrollSettings.findFirst({
+      where: eq(payrollSettings.organizationId, ctx.organizationId),
+    });
+
+    const overtimeThreshold = settings?.overtimeThresholdHours ?? 40;
+    const overtimeMultiplier = settings?.overtimeMultiplier ?? 1.5;
+
     // Create the payroll run
     let totalGross = 0;
     let totalDeductions = 0;
@@ -116,23 +134,74 @@ export async function POST(request: Request) {
       netAmount: number;
       projectId: string | null;
       milestoneId: string | null;
+      overtimeHours: number | null;
+      overtimeAmount: number | null;
+      preTaxDeductions: number;
+      postTaxDeductions: number;
+      timesheetId: string | null;
     }> = [];
 
     for (const emp of employees) {
       let grossAmount = 0;
       let itemType: PayrollItemType = "regular_salary";
       let description: string | null = null;
+      let otHours: number | null = null;
+      let otAmount: number | null = null;
+      let linkedTimesheetId: string | null = null;
 
       switch (emp.compensationType) {
         case "hourly": {
-          // For hourly employees, we need time entries for the period
-          // Calculate from time entries if available, otherwise skip
           if (!emp.hourlyRate) continue;
-          // Default to standard hours if no time tracking
-          const hoursPerPeriod = emp.payFrequency === "weekly" ? 40 : emp.payFrequency === "biweekly" ? 80 : 173;
-          grossAmount = Math.round((emp.hourlyRate * hoursPerPeriod));
+
+          // Try to pull hours from approved timesheets for the pay period
+          const approvedTimesheets = await db.query.timesheet.findMany({
+            where: and(
+              eq(timesheet.employeeId, emp.id),
+              eq(timesheet.status, "approved"),
+              lte(timesheet.periodStart, parsed.payPeriodEnd),
+              gte(timesheet.periodEnd, parsed.payPeriodStart)
+            ),
+            with: { entries: true },
+          });
+
+          let totalHours = 0;
+
+          if (approvedTimesheets.length > 0) {
+            // Sum hours from timesheet entries
+            for (const ts of approvedTimesheets) {
+              for (const entry of ts.entries) {
+                totalHours += entry.hours;
+              }
+            }
+            // Link the first timesheet for reference
+            linkedTimesheetId = approvedTimesheets[0].id;
+          } else {
+            // Default to standard hours if no approved timesheets
+            totalHours = emp.payFrequency === "weekly" ? 40 : emp.payFrequency === "biweekly" ? 80 : 173;
+          }
+
+          // Apply overtime rules
+          let regularHours = totalHours;
+          let overtimeHrs = 0;
+
+          if (totalHours > overtimeThreshold) {
+            regularHours = overtimeThreshold;
+            overtimeHrs = totalHours - overtimeThreshold;
+          }
+
+          const regularAmount = Math.round(emp.hourlyRate * regularHours);
+          const overtimeAmt = Math.round(emp.hourlyRate * overtimeMultiplier * overtimeHrs);
+          grossAmount = regularAmount + overtimeAmt;
+
+          if (overtimeHrs > 0) {
+            otHours = overtimeHrs;
+            otAmount = overtimeAmt;
+            description = `${regularHours}h @ ${(emp.hourlyRate / 100).toFixed(2)}/hr + ${overtimeHrs}h OT @ ${((emp.hourlyRate * overtimeMultiplier) / 100).toFixed(2)}/hr`;
+          } else {
+            description = `${totalHours}h @ ${(emp.hourlyRate / 100).toFixed(2)}/hr`;
+          }
+
           itemType = "hourly_pay";
-          description = `${hoursPerPeriod}h @ ${(emp.hourlyRate / 100).toFixed(2)}/hr`;
           break;
         }
         case "milestone":
@@ -148,12 +217,54 @@ export async function POST(request: Request) {
         }
       }
 
-      const taxAmount = Math.round((grossAmount * emp.taxRate) / 10000);
-      const deductions = taxAmount;
-      const netAmount = grossAmount - deductions;
+      // Fetch active employee deductions with their deduction type
+      const empDeductions = await db.query.employeeDeduction.findMany({
+        where: and(
+          eq(employeeDeduction.employeeId, emp.id),
+          eq(employeeDeduction.isActive, true),
+          notDeleted(employeeDeduction.deletedAt)
+        ),
+        with: { deductionType: true },
+      });
+
+      let preTaxDeductionTotal = 0;
+      let postTaxDeductionTotal = 0;
+
+      for (const ded of empDeductions) {
+        // Skip inactive deduction types
+        if (!ded.deductionType?.isActive) continue;
+
+        // Calculate deduction amount: use employee override, then deduction type defaults
+        let dedAmount = 0;
+        if (ded.amount != null) {
+          dedAmount = ded.amount;
+        } else if (ded.percent != null) {
+          dedAmount = Math.round((grossAmount * ded.percent) / 100);
+        } else if (ded.deductionType.defaultAmount != null) {
+          dedAmount = ded.deductionType.defaultAmount;
+        } else if (ded.deductionType.defaultPercent != null) {
+          dedAmount = Math.round((grossAmount * ded.deductionType.defaultPercent) / 100);
+        }
+
+        if (dedAmount <= 0) continue;
+
+        if (ded.deductionType.category === "pre_tax") {
+          preTaxDeductionTotal += dedAmount;
+        } else {
+          postTaxDeductionTotal += dedAmount;
+        }
+      }
+
+      // Pre-tax deductions reduce taxable income
+      const taxableIncome = Math.max(0, grossAmount - preTaxDeductionTotal);
+      const taxAmount = Math.round((taxableIncome * emp.taxRate) / 10000);
+
+      // Total deductions = tax + pre-tax + post-tax
+      const totalItemDeductions = taxAmount + preTaxDeductionTotal + postTaxDeductionTotal;
+      const netAmount = grossAmount - totalItemDeductions;
 
       totalGross += grossAmount;
-      totalDeductions += deductions;
+      totalDeductions += totalItemDeductions;
       totalNet += netAmount;
 
       items.push({
@@ -162,10 +273,15 @@ export async function POST(request: Request) {
         description,
         grossAmount,
         taxAmount,
-        deductions,
+        deductions: totalItemDeductions,
         netAmount,
         projectId: null,
         milestoneId: null,
+        overtimeHours: otHours,
+        overtimeAmount: otAmount,
+        preTaxDeductions: preTaxDeductionTotal,
+        postTaxDeductions: postTaxDeductionTotal,
+        timesheetId: linkedTimesheetId,
       });
     }
 
@@ -182,6 +298,7 @@ export async function POST(request: Request) {
         organizationId: ctx.organizationId,
         payPeriodStart: parsed.payPeriodStart,
         payPeriodEnd: parsed.payPeriodEnd,
+        runType: (parsed.runType as typeof payrollRun.runType.enumValues[number]) ?? "regular",
         totalGross,
         totalDeductions,
         totalNet,

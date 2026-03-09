@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Plus, Users, DollarSign, FileText, CalendarDays } from "lucide-react";
+import { Plus, Users, DollarSign, FileText, CalendarDays, Clock, Briefcase, BarChart3 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +81,7 @@ export default function PayrollPage() {
   const completedRuns = runs.filter((r) => r.status === "completed");
   const lastRun = runs.length > 0 ? runs[0] : null;
   const ytdPaid = completedRuns.reduce((sum, r) => sum + r.totalNet, 0);
+  const draftRuns = runs.filter((r) => r.status === "draft");
   const hasData = employees.length > 0 || runs.length > 0;
   const recentRuns = runs.slice(0, 5);
 
@@ -220,7 +221,7 @@ export default function PayrollPage() {
   return (
     <ContentReveal className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Users className="size-4" />
@@ -260,6 +261,26 @@ export default function PayrollPage() {
             {formatMoney(ytdPaid)}
           </p>
         </motion.div>
+
+        <motion.div {...anim(0.17)} className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <FileText className="size-4" />
+            <span className="text-[11px] font-medium uppercase tracking-wide">Draft Runs</span>
+          </div>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
+            {draftRuns.length}
+          </p>
+        </motion.div>
+
+        <motion.div {...anim(0.21)} className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <BarChart3 className="size-4" />
+            <span className="text-[11px] font-medium uppercase tracking-wide">Total Runs</span>
+          </div>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
+            {runs.length}
+          </p>
+        </motion.div>
       </div>
 
       {/* Quick actions */}
@@ -281,6 +302,28 @@ export default function PayrollPage() {
           <FileText className="mr-1.5 size-3" />
           New Payroll Run
         </Button>
+      </div>
+
+      {/* Quick links */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { icon: Clock, label: "Time & Leave", href: "/payroll/time-leave" },
+          { icon: Briefcase, label: "Contractors", href: "/payroll/contractors" },
+          { icon: BarChart3, label: "Analytics", href: "/payroll/analytics" },
+          { icon: DollarSign, label: "Compensation", href: "/payroll/compensation" },
+        ].map((link, i) => (
+          <motion.div
+            key={link.label}
+            {...anim(0.25 + i * 0.05)}
+            onClick={() => router.push(link.href)}
+            className="flex cursor-pointer items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <link.icon className="size-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm font-medium">{link.label}</span>
+          </motion.div>
+        ))}
       </div>
 
       {/* Recent Runs */}

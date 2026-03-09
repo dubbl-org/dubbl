@@ -10,6 +10,9 @@ import {
   ArrowUpDown,
   X,
   FolderKanban,
+  Target,
+  BarChart3,
+  Crown,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -32,15 +35,16 @@ interface Team {
   name: string;
   description: string | null;
   color: string | null;
-  members?: { id: string }[];
+  members?: { id: string; name?: string }[];
   _count?: { members: number };
   memberCount?: number;
 }
 
-type SortKey = "name";
+type SortKey = "name" | "members";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "name", label: "Name" },
+  { value: "members", label: "Members" },
 ];
 
 const anim = (delay: number) => ({
@@ -54,6 +58,31 @@ function getMemberCount(team: Team): number {
   if (team._count?.members != null) return team._count.members;
   if (team.members) return team.members.length;
   return 0;
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+const ACCENT_COLORS = [
+  "#10b981",
+  "#3b82f6",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+];
+
+function getTeamColor(team: Team, index: number): string {
+  return team.color || ACCENT_COLORS[index % ACCENT_COLORS.length];
 }
 
 export default function TeamsPage() {
@@ -112,53 +141,199 @@ export default function TeamsPage() {
     })
     .sort((a, b) => {
       const dir = sortOrder === "asc" ? 1 : -1;
+      if (sortBy === "members") {
+        return dir * (getMemberCount(a) - getMemberCount(b));
+      }
       return dir * a.name.localeCompare(b.name);
     });
 
   const totalMembers = teams.reduce((sum, t) => sum + getMemberCount(t), 0);
+  const avgTeamSize = teams.length > 0 ? Math.round((totalMembers / teams.length) * 10) / 10 : 0;
+  const largestTeam = teams.length > 0
+    ? teams.reduce((max, t) => (getMemberCount(t) > getMemberCount(max) ? t : max), teams[0])
+    : null;
 
   function toggleSortOrder() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
+  function handleCreateTeam() {
+    window.dispatchEvent(new CustomEvent("create-team"));
+  }
+
   if (loading) return <BrandLoader />;
 
+  /* ── Empty state ── */
   if (teams.length === 0) {
     return (
       <ContentReveal className="space-y-6">
         <PageHeader
           title="Teams"
-          description="Organize members into teams."
+          description="Organize members into collaborative teams"
         />
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-            <FolderKanban className="size-5 text-muted-foreground" />
-          </div>
-          <p className="text-sm font-medium">No teams yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Create your first team to organize your members.
-          </p>
-          <Button
-            className="mt-4 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => router.push("/teams")}
-          >
-            <Plus className="mr-2 size-4" />
-            New Team
-          </Button>
+
+        {/* Ghost stat cards */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: FolderKanban, label: "Total Teams" },
+            { icon: Users, label: "Total Members" },
+            { icon: BarChart3, label: "Avg Team Size" },
+            { icon: Crown, label: "Largest Team" },
+          ].map((card, i) => (
+            <motion.div
+              key={card.label}
+              {...anim(i * 0.05)}
+              className="rounded-xl border border-dashed border-muted-foreground/20 bg-card p-4"
+            >
+              <div className="flex items-center gap-2 text-muted-foreground/40">
+                <card.icon className="size-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wide">{card.label}</span>
+              </div>
+              <div className="mt-3 h-7 w-20 rounded-md bg-muted/50" />
+            </motion.div>
+          ))}
         </div>
+
+        {/* Main hero empty state */}
+        <motion.div
+          {...anim(0.2)}
+          className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/20 dark:to-transparent"
+        >
+          {/* Background pattern */}
+          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+
+          <div className="relative flex flex-col items-center justify-center py-20 px-6 text-center">
+            {/* Animated icon cluster */}
+            <div className="relative mb-6">
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="flex size-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+              >
+                <FolderKanban className="size-8 text-emerald-600 dark:text-emerald-400" />
+              </motion.div>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                className="absolute -top-2 -right-3 flex size-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/60 ring-2 ring-blue-100/50 dark:ring-blue-900/30"
+              >
+                <Users className="size-4 text-blue-600 dark:text-blue-400" />
+              </motion.div>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                className="absolute -bottom-1 -left-3 flex size-7 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/60 ring-2 ring-amber-100/50 dark:ring-amber-900/30"
+              >
+                <Target className="size-3.5 text-amber-600 dark:text-amber-400" />
+              </motion.div>
+            </div>
+
+            <motion.h3
+              {...anim(0.4)}
+              className="text-lg font-semibold"
+            >
+              Organize your workspace
+            </motion.h3>
+            <motion.p
+              {...anim(0.45)}
+              className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed"
+            >
+              Create teams to group members together, streamline collaboration, and assign projects efficiently across your organization.
+            </motion.p>
+
+            {/* Steps */}
+            <motion.div
+              {...anim(0.5)}
+              className="mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-6"
+            >
+              <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
+                <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-xs font-bold text-emerald-700 dark:text-emerald-300">1</div>
+                <span className="text-sm font-medium">Create a team</span>
+              </div>
+              <div className="hidden sm:block h-px w-6 bg-muted-foreground/20" />
+              <div className="sm:hidden w-px h-4 bg-muted-foreground/20" />
+              <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm opacity-60">
+                <div className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">2</div>
+                <span className="text-sm font-medium text-muted-foreground">Add members</span>
+              </div>
+              <div className="hidden sm:block h-px w-6 bg-muted-foreground/20" />
+              <div className="sm:hidden w-px h-4 bg-muted-foreground/20" />
+              <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm opacity-40">
+                <div className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">3</div>
+                <span className="text-sm font-medium text-muted-foreground">Assign projects</span>
+              </div>
+            </motion.div>
+
+            <motion.div {...anim(0.55)} className="mt-8">
+              <Button
+                onClick={handleCreateTeam}
+                size="lg"
+                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+              >
+                <Plus className="mr-2 size-4" />
+                Create Your First Team
+              </Button>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Ghost team cards */}
+        <motion.div {...anim(0.6)} className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground/50">Your Teams</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-dashed border-muted-foreground/15 bg-card p-4 overflow-hidden"
+                style={{ opacity: 1 - (i - 1) * 0.25 }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-10 rounded-full bg-muted/40" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-28 rounded bg-muted/40" />
+                    <div className="h-3 w-40 rounded bg-muted/30" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="flex -space-x-1.5">
+                    {[1, 2, 3].map((j) => (
+                      <div key={j} className="size-6 rounded-full bg-muted/40 ring-2 ring-card" />
+                    ))}
+                  </div>
+                  <div className="h-3 w-16 rounded bg-muted/30 ml-1" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </ContentReveal>
     );
   }
 
+  /* ── Data state ── */
   return (
     <ContentReveal className="space-y-6">
       <PageHeader
         title="Teams"
-        description="Organize members into teams."
-      />
+        description="Organize members into collaborative teams"
+      >
+        <Button
+          onClick={handleCreateTeam}
+          size="sm"
+          className="h-8 bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Plus className="mr-1.5 size-3.5" />
+          New Team
+        </Button>
+      </PageHeader>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <FolderKanban className="size-4" />
@@ -176,6 +351,39 @@ export default function TeamsPage() {
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
             {totalMembers}
+          </p>
+        </motion.div>
+
+        <motion.div {...anim(0.1)} className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <BarChart3 className="size-4" />
+            <span className="text-[11px] font-medium uppercase tracking-wide">Avg Team Size</span>
+          </div>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
+            {avgTeamSize}
+          </p>
+        </motion.div>
+
+        <motion.div {...anim(0.15)} className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Crown className="size-4" />
+            <span className="text-[11px] font-medium uppercase tracking-wide">Largest Team</span>
+          </div>
+          <p className="mt-2 text-sm font-bold truncate" title={largestTeam?.name}>
+            {largestTeam ? (
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="size-2 rounded-full shrink-0"
+                  style={{ backgroundColor: largestTeam.color || "#6b7280" }}
+                />
+                <span className="truncate">{largestTeam.name}</span>
+                <span className="text-muted-foreground font-normal text-xs ml-auto shrink-0">
+                  {getMemberCount(largestTeam)} members
+                </span>
+              </span>
+            ) : (
+              "-"
+            )}
           </p>
         </motion.div>
       </div>
@@ -251,35 +459,88 @@ export default function TeamsPage() {
             style={{ willChange: "opacity, transform, filter" }}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filtered.map((team) => (
-                <button
-                  key={team.id}
-                  onClick={() => router.push(`/teams/${team.id}`)}
-                  className="rounded-xl border bg-card p-4 text-left hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="size-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: team.color || "#6b7280" }}
+              {filtered.map((team, index) => {
+                const memberCount = getMemberCount(team);
+                const color = getTeamColor(team, index);
+                return (
+                  <motion.button
+                    key={team.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.04 }}
+                    onClick={() => router.push(`/teams/${team.id}`)}
+                    className="group relative rounded-xl border bg-card text-left hover:bg-muted/50 transition-colors overflow-hidden"
+                  >
+                    {/* Colored accent bar */}
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+                      style={{ backgroundColor: color }}
                     />
-                    <p className="text-sm font-medium truncate">{team.name}</p>
-                  </div>
-                  {team.description && (
-                    <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
-                      {team.description}
-                    </p>
-                  )}
-                  <div className="mt-3 flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="text-[11px] border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
-                    >
-                      <Users className="size-3 mr-1" />
-                      {getMemberCount(team)} {getMemberCount(team) === 1 ? "member" : "members"}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+
+                    <div className="p-4 pl-5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">{team.name}</p>
+                          </div>
+                          {team.description ? (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {team.description}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground/50 mt-1 italic">
+                              No description
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className="size-3 rounded-full shrink-0 mt-1 ring-2 ring-card"
+                          style={{ backgroundColor: color }}
+                        />
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {/* Member avatar stack */}
+                          {team.members && team.members.length > 0 ? (
+                            <div className="flex -space-x-1.5">
+                              {team.members.slice(0, 4).map((m, mi) => (
+                                <div
+                                  key={m.id}
+                                  className="flex size-6 items-center justify-center rounded-full bg-muted text-[9px] font-medium ring-2 ring-card"
+                                  title={m.name}
+                                >
+                                  {m.name ? getInitials(m.name) : "?"}
+                                </div>
+                              ))}
+                              {team.members.length > 4 && (
+                                <div className="flex size-6 items-center justify-center rounded-full bg-muted text-[9px] font-medium ring-2 ring-card text-muted-foreground">
+                                  +{team.members.length - 4}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Users className="size-3.5" />
+                            </div>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {memberCount} {memberCount === 1 ? "member" : "members"}
+                          </span>
+                        </div>
+
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400"
+                        >
+                          <FolderKanban className="size-2.5 mr-0.5" />
+                          Team
+                        </Badge>
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
             </div>
           </motion.div>
         </MotionConfig>
