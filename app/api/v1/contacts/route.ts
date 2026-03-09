@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { contact } from "@/lib/db/schema";
-import { eq, and, or, ilike, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, or, ilike, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(contact) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(contact)
       .where(and(...conditions));
 

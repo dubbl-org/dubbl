@@ -92,7 +92,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(inventoryItem) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(inventoryItem)
       .where(and(...conditions));
 

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(accrualSchedule) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(accrualSchedule)
       .where(and(...conditions));
 

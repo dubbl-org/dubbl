@@ -9,6 +9,7 @@ import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { formatMoney } from "@/lib/money";
 import { BlurReveal } from "@/components/ui/blur-reveal";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
 
 interface Budget {
   id: string;
@@ -96,7 +97,9 @@ export default function BudgetVsActualPage() {
     return () => { cancelled = true; };
   }, [selectedBudgetId]);
 
-  if (!loading && budgets.length === 0) {
+  if (loading) return <BrandLoader />;
+
+  if (budgets.length === 0) {
     return (
       <BlurReveal className="space-y-6">
         <PageHeader title="Budget vs Actual" description="Compare budgeted amounts to actual GL balances." />

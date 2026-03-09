@@ -206,11 +206,21 @@ async function seed() {
   // 2. Find existing user + org, or create demo user
   console.log("Looking for existing user/organization...");
 
-  // Try to find an existing owner membership
-  const existingMember = await db.query.member.findFirst({
-    where: eq(member.role, "owner"),
-    with: { user: true, organization: true },
-  });
+  // Prefer the dev user's org first, then fall back to any owner membership
+  const existingMember =
+    (await db.query.member.findFirst({
+      where: eq(member.userId, (
+        await db.query.users.findFirst({
+          where: eq(users.email, "dev@dubbl.local"),
+          columns: { id: true },
+        })
+      )?.id ?? ""),
+      with: { user: true, organization: true },
+    })) ??
+    (await db.query.member.findFirst({
+      where: eq(member.role, "owner"),
+      with: { user: true, organization: true },
+    }));
 
   let userId: string;
   let org: { id: string; name: string };

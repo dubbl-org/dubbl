@@ -59,7 +59,7 @@ export async function GET(
     );
 
     const [countResult] = await db
-      .select({ count: db.$count(bankReconciliation) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(bankReconciliation)
       .where(eq(bankReconciliation.bankAccountId, id));
 

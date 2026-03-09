@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bankAccount, bankTransaction } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -48,7 +48,7 @@ export async function GET(
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(bankTransaction) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(bankTransaction)
       .where(and(...conditions));
 
