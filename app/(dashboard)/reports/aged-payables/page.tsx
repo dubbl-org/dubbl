@@ -82,7 +82,7 @@ export default function AgedPayablesPage() {
 
       <div className="rounded-lg border bg-card p-3 sm:p-4">
         <p className="text-sm font-medium text-muted-foreground mb-1">Total Outstanding</p>
-        <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums">{formatMoney(grandTotal)}</p>
+        <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(grandTotal)}</p>
       </div>
 
       <DataTable

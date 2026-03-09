@@ -393,7 +393,7 @@ export default function TransfersPage() {
   return (
     <ContentReveal className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: "Total", value: stats.total, color: "" },
           { label: "Draft", value: stats.draft, color: "" },
@@ -409,7 +409,7 @@ export default function TransfersPage() {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 + i * 0.05 }}
           >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</p>
-            <p className={cn("mt-2 text-2xl font-bold font-mono tabular-nums", stat.color)}>{stat.value}</p>
+            <p className={cn("mt-2 text-2xl font-bold font-mono tabular-nums truncate", stat.color)}>{stat.value}</p>
           </motion.div>
         ))}
       </div>

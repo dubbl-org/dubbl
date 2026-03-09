@@ -396,20 +396,20 @@ export default function InventoryPage() {
   return (
     <ContentReveal className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Package className="size-3.5" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Total Items</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{summary.totalItems}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">{summary.totalItems}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <DollarSign className="size-3.5" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Stock Value</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">{formatMoney(summary.totalValue)}</p>
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(summary.totalValue)}</p>
         </div>
         <div
           className="rounded-xl border bg-card p-4 cursor-pointer hover:bg-muted/40 transition-colors"
@@ -420,7 +420,7 @@ export default function InventoryPage() {
             <span className="text-[11px] font-medium uppercase tracking-wide">Low Stock</span>
           </div>
           <p className={cn(
-            "mt-2 text-2xl font-bold font-mono tabular-nums",
+            "mt-2 text-2xl font-bold font-mono tabular-nums truncate",
             summary.lowStockCount > 0 && "text-amber-600 dark:text-amber-400"
           )}>
             {summary.lowStockCount}
@@ -431,7 +431,7 @@ export default function InventoryPage() {
             <TrendingUp className="size-3.5" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Avg. Margin</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
             {summary.avgMargin > 0 ? `${summary.avgMargin.toFixed(1)}%` : "-"}
           </p>
         </div>

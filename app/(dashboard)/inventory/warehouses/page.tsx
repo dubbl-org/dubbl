@@ -367,7 +367,7 @@ export default function WarehousesPage() {
         </motion.div>
 
         {/* Right: quick info cards */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
