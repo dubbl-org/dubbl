@@ -155,22 +155,101 @@ export default function EmployeesPage() {
           title="Employees"
           description="Manage your payroll employees."
         />
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-            <Users className="size-5 text-muted-foreground" />
+
+        {/* Visual empty state */}
+        <div className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50">
+          <div className="relative flex flex-col items-center py-16 px-6">
+            {/* Floating avatar placeholders */}
+            <div className="relative h-24 w-64 mb-6">
+              {[
+                { left: "10%", top: "0%", size: 44, delay: 0.2, initials: "JD" },
+                { left: "38%", top: "5%", size: 52, delay: 0.1, initials: "?" },
+                { left: "68%", top: "2%", size: 40, delay: 0.3, initials: "AK" },
+              ].map((avatar, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.5, delay: avatar.delay, ease: [0.22, 1, 0.36, 1] }}
+                  className={cn(
+                    "absolute flex items-center justify-center rounded-full font-semibold",
+                    i === 1
+                      ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30 text-base"
+                      : "bg-muted text-muted-foreground/40 text-xs ring-2 ring-muted/50"
+                  )}
+                  style={{
+                    left: avatar.left,
+                    top: avatar.top,
+                    width: avatar.size,
+                    height: avatar.size,
+                  }}
+                >
+                  {avatar.initials}
+                </motion.div>
+              ))}
+              {/* Connecting dotted lines */}
+              <svg className="absolute inset-0 w-full h-full" style={{ opacity: 0.15 }}>
+                <line x1="25%" y1="50%" x2="50%" y2="50%" stroke="currentColor" strokeDasharray="4 4" strokeWidth="1" />
+                <line x1="50%" y1="50%" x2="78%" y2="50%" stroke="currentColor" strokeDasharray="4 4" strokeWidth="1" />
+              </svg>
+            </div>
+
+            <motion.h3
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.35 }}
+              className="text-lg font-semibold"
+            >
+              Build your team
+            </motion.h3>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+              className="mt-2 max-w-sm text-sm text-muted-foreground text-center leading-relaxed"
+            >
+              Add employees with their compensation details, pay frequency, and tax information to start managing payroll.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.5 }}
+              className="mt-6"
+            >
+              <Button
+                size="lg"
+                onClick={() => openDrawer("employee")}
+                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+              >
+                <Plus className="mr-2 size-4" />
+                Add Employee
+              </Button>
+            </motion.div>
           </div>
-          <p className="text-sm font-medium">No employees yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Add your first employee to get started with payroll.
-          </p>
-          <Button
-            className="mt-4 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => openDrawer("employee")}
-          >
-            <Plus className="mr-2 size-4" />
-            Add Employee
-          </Button>
         </div>
+
+        {/* Ghost list rows */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="rounded-xl border border-dashed border-muted-foreground/15 divide-y divide-dashed divide-muted-foreground/10"
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ opacity: 1 - i * 0.2 }}>
+              <div className="size-9 rounded-full bg-muted/40" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 w-28 rounded bg-muted/40" />
+                <div className="h-3 w-20 rounded bg-muted/30" />
+              </div>
+              <div className="hidden sm:flex items-center gap-3">
+                <div className="h-3.5 w-16 rounded bg-muted/30" />
+                <div className="h-5 w-14 rounded-full bg-muted/25" />
+              </div>
+            </div>
+          ))}
+        </motion.div>
       </ContentReveal>
     );
   }

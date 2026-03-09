@@ -200,22 +200,114 @@ export default function PayrollRunsPage() {
           title="Payroll Runs"
           description="Create and manage pay runs."
         />
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-            <FileText className="size-5 text-muted-foreground" />
+
+        {/* Visual empty state */}
+        <div className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50">
+          <div className="relative flex flex-col items-center py-16 px-6">
+            {/* Timeline illustration */}
+            <div className="relative mb-8 w-full max-w-sm">
+              <div className="absolute top-1/2 left-4 right-4 h-px bg-muted-foreground/15 -translate-y-1/2" />
+              <div className="flex items-center justify-between relative">
+                {[
+                  { icon: FileText, label: "Create", delay: 0.15, active: true },
+                  { icon: ArrowUpDown, label: "Process", delay: 0.25, active: false },
+                  { icon: Search, label: "Review", delay: 0.35, active: false },
+                ].map((step, i) => (
+                  <motion.div
+                    key={step.label}
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: step.delay, ease: [0.22, 1, 0.36, 1] }}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    <div className={cn(
+                      "flex size-12 items-center justify-center rounded-xl",
+                      step.active
+                        ? "bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+                        : "bg-muted/60 ring-2 ring-muted/40"
+                    )}>
+                      <step.icon className={cn(
+                        "size-5",
+                        step.active
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground/40"
+                      )} />
+                    </div>
+                    <span className={cn(
+                      "text-xs font-medium",
+                      step.active ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground/40"
+                    )}>
+                      {step.label}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            <motion.h3
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+              className="text-lg font-semibold"
+            >
+              Run your first payroll
+            </motion.h3>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.45 }}
+              className="mt-2 max-w-sm text-sm text-muted-foreground text-center leading-relaxed"
+            >
+              Create a pay run with a period range, review the calculated amounts for each employee, then process it to finalize payments.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.55 }}
+              className="mt-6"
+            >
+              <Button
+                size="lg"
+                onClick={() => setDialogOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+              >
+                <Plus className="mr-2 size-4" />
+                New Payroll Run
+              </Button>
+            </motion.div>
           </div>
-          <p className="text-sm font-medium">No payroll runs</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Create your first payroll run to pay employees.
-          </p>
-          <Button
-            className="mt-4 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => setDialogOpen(true)}
-          >
-            <Plus className="mr-2 size-4" />
-            New Payroll Run
-          </Button>
         </div>
+
+        {/* Ghost run rows with fake data */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.65 }}
+          className="rounded-xl border border-dashed border-muted-foreground/15 divide-y divide-dashed divide-muted-foreground/10"
+        >
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 px-4 py-3.5" style={{ opacity: 1 - i * 0.25 }}>
+              <div className="flex items-center gap-3">
+                <div className="size-9 rounded-lg bg-muted/40" />
+                <div className="space-y-1.5">
+                  <div className="h-3.5 w-40 rounded bg-muted/40" />
+                  <div className="h-4 w-16 rounded-full bg-muted/25" />
+                </div>
+              </div>
+              <div className="hidden sm:flex items-center gap-4">
+                <div className="space-y-1 text-right">
+                  <div className="h-2.5 w-8 rounded bg-muted/25 ml-auto" />
+                  <div className="h-3.5 w-16 rounded bg-muted/30" />
+                </div>
+                <div className="space-y-1 text-right">
+                  <div className="h-2.5 w-8 rounded bg-muted/25 ml-auto" />
+                  <div className="h-3.5 w-16 rounded bg-muted/30" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </motion.div>
 
         <NewRunDialog
           open={dialogOpen}

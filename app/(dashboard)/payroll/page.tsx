@@ -86,20 +86,133 @@ export default function PayrollPage() {
 
   if (!hasData) {
     return (
-      <ContentReveal>
-        <EmptyState
-          icon={Users}
-          title="No payroll data"
-          description="Add employees to get started with payroll."
+      <ContentReveal className="space-y-6">
+        {/* Ghost stat cards */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: Users, label: "Active Employees" },
+            { icon: DollarSign, label: "Monthly Cost" },
+            { icon: FileText, label: "Last Run Net" },
+            { icon: CalendarDays, label: "YTD Paid" },
+          ].map((card, i) => (
+            <motion.div
+              key={card.label}
+              {...anim(i * 0.05)}
+              className="rounded-xl border border-dashed border-muted-foreground/20 bg-card p-4"
+            >
+              <div className="flex items-center gap-2 text-muted-foreground/40">
+                <card.icon className="size-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wide">{card.label}</span>
+              </div>
+              <div className="mt-3 h-7 w-20 rounded-md bg-muted/50" />
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Main hero empty state */}
+        <motion.div
+          {...anim(0.2)}
+          className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/20 dark:to-transparent"
         >
-          <Button
-            onClick={() => openDrawer("employee")}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Plus className="mr-2 size-4" />
-            Add Employee
-          </Button>
-        </EmptyState>
+          {/* Background pattern */}
+          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+
+          <div className="relative flex flex-col items-center justify-center py-20 px-6 text-center">
+            {/* Animated circles */}
+            <div className="relative mb-6">
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="flex size-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+              >
+                <DollarSign className="size-8 text-emerald-600 dark:text-emerald-400" />
+              </motion.div>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                className="absolute -top-2 -right-3 flex size-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/60 ring-2 ring-blue-100/50 dark:ring-blue-900/30"
+              >
+                <Users className="size-4 text-blue-600 dark:text-blue-400" />
+              </motion.div>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                className="absolute -bottom-1 -left-3 flex size-7 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/60 ring-2 ring-amber-100/50 dark:ring-amber-900/30"
+              >
+                <CalendarDays className="size-3.5 text-amber-600 dark:text-amber-400" />
+              </motion.div>
+            </div>
+
+            <motion.h3
+              {...anim(0.4)}
+              className="text-lg font-semibold"
+            >
+              Set up your payroll
+            </motion.h3>
+            <motion.p
+              {...anim(0.45)}
+              className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed"
+            >
+              Add employees with their salary details, then create payroll runs to process payments. Track costs, deductions, and net payouts all in one place.
+            </motion.p>
+
+            {/* Steps */}
+            <motion.div
+              {...anim(0.5)}
+              className="mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-6"
+            >
+              <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
+                <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-xs font-bold text-emerald-700 dark:text-emerald-300">1</div>
+                <span className="text-sm font-medium">Add employees</span>
+              </div>
+              <div className="hidden sm:block h-px w-6 bg-muted-foreground/20" />
+              <div className="sm:hidden w-px h-4 bg-muted-foreground/20" />
+              <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm opacity-60">
+                <div className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">2</div>
+                <span className="text-sm font-medium text-muted-foreground">Run payroll</span>
+              </div>
+              <div className="hidden sm:block h-px w-6 bg-muted-foreground/20" />
+              <div className="sm:hidden w-px h-4 bg-muted-foreground/20" />
+              <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm opacity-40">
+                <div className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">3</div>
+                <span className="text-sm font-medium text-muted-foreground">Track payments</span>
+              </div>
+            </motion.div>
+
+            <motion.div {...anim(0.55)} className="mt-8">
+              <Button
+                onClick={() => openDrawer("employee")}
+                size="lg"
+                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+              >
+                <Plus className="mr-2 size-4" />
+                Add Your First Employee
+              </Button>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Ghost recent runs section */}
+        <motion.div {...anim(0.6)} className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground/50">Recent Runs</h3>
+          <div className="rounded-xl border border-dashed border-muted-foreground/15 divide-y divide-dashed divide-muted-foreground/10">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3.5" style={{ opacity: 1 - i * 0.25 }}>
+                <div className="size-9 rounded-lg bg-muted/40" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-36 rounded bg-muted/40" />
+                  <div className="h-3 w-16 rounded bg-muted/30" />
+                </div>
+                <div className="hidden sm:block h-3.5 w-20 rounded bg-muted/30" />
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </ContentReveal>
     );
   }
