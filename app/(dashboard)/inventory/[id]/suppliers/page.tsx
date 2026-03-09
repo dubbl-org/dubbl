@@ -34,7 +34,7 @@ export default function InventoryItemSuppliersPage() {
   const [price, setPrice] = useState("");
   const [preferred, setPreferred] = useState(false);
 
-  useEffect(() => {
+  function fetchSuppliers() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -42,8 +42,13 @@ export default function InventoryItemSuppliersPage() {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then((data) => { if (data.suppliers) setSuppliers(data.suppliers); })
+      .then((data) => { if (data.data) setSuppliers(data.data); })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    fetchSuppliers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleLink() {
@@ -71,9 +76,8 @@ export default function InventoryItemSuppliersPage() {
         throw new Error(data.error || "Failed to link supplier");
       }
 
-      const data = await res.json();
-      setSuppliers((prev) => [...prev, data.supplier]);
       setLinkOpen(false);
+      fetchSuppliers();
       setContactId("");
       setSupplierCode("");
       setLeadDays("");
