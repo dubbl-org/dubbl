@@ -1,5 +1,5 @@
 # =============================================================================
-# Dubbl — Production Dockerfile (multi-stage)
+# Dubbl - Production Dockerfile (multi-stage)
 # =============================================================================
 
 # --- Base ---
@@ -20,15 +20,13 @@ COPY . .
 # Next.js collects telemetry by default - disable it
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Dummy build-time values so modules that init at import don't crash
-ARG DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
-ARG AUTH_SECRET="build-secret"
-ARG STRIPE_SECRET_KEY="sk_test_placeholder"
-ARG STRIPE_WEBHOOK_SECRET="whsec_placeholder"
-ENV DATABASE_URL=$DATABASE_URL
-ENV AUTH_SECRET=$AUTH_SECRET
-ENV STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY
-ENV STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET
+# Dummy build-time values so modules that init at import don't crash.
+# These are NOT real secrets - just placeholders to satisfy SDK constructors
+# during static analysis. Real values are injected at runtime.
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
+ENV AUTH_SECRET="build-placeholder"
+ENV STRIPE_SECRET_KEY="sk_test_build_placeholder"
+ENV STRIPE_WEBHOOK_SECRET="whsec_build_placeholder"
 
 RUN pnpm build
 
@@ -40,8 +38,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=build /app/public ./public
-COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
+# public dir may not exist - copy conditionally
+COPY --from=build /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs

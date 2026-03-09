@@ -1,8 +1,11 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 
-export const { auth: middleware } = NextAuth(authConfig);
-export default middleware;
+const { auth } = NextAuth(authConfig);
+
+export async function proxy(...args: Parameters<typeof auth>) {
+  return auth(...args);
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
