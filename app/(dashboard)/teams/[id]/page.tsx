@@ -102,7 +102,12 @@ export default function TeamDetailPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        setOrgMembers(data.data || []);
+        const members = data.members || data.data || [];
+        setOrgMembers(members.map((m: { id: string; userName?: string; userEmail?: string; name?: string; email?: string }) => ({
+          id: m.id,
+          name: m.userName || m.name || "",
+          email: m.userEmail || m.email || "",
+        })));
       })
       .finally(() => {
         setLoadingMembers(false);

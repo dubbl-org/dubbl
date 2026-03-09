@@ -51,7 +51,13 @@ export default function TeamMembersPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        setMembers(data.data || []);
+        const raw = data.members || data.data || [];
+        setMembers(raw.map((m: { id: string; userName?: string; userEmail?: string; name?: string; email?: string; teams?: MemberTeam[] }) => ({
+          id: m.id,
+          name: m.userName || m.name || "",
+          email: m.userEmail || m.email || "",
+          teams: m.teams || [],
+        })));
       })
       .finally(() => {
         setLoading(false);

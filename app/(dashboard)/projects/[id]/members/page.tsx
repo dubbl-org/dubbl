@@ -35,7 +35,7 @@ export default function MembersPage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [orgMembers, setOrgMembers] = useState<{ id: string; user: { name: string | null; email: string } }[]>([]);
+  const [orgMembers, setOrgMembers] = useState<{ id: string; userName: string | null; userEmail: string }[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState("none");
   const [selectedRole, setSelectedRole] = useState("contributor");
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -129,7 +129,7 @@ export default function MembersPage() {
                     <SelectItem value="none" disabled>Select member...</SelectItem>
                     {availableMembers.length === 0 && <div className="py-2 px-3 text-sm text-muted-foreground">All members already added</div>}
                     {availableMembers.map(m => (
-                      <SelectItem key={m.id} value={m.id}>{m.user.name || m.user.email}</SelectItem>
+                      <SelectItem key={m.id} value={m.id}>{m.userName || m.userEmail}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
