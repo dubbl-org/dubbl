@@ -25,7 +25,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetFooter,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useConfirm } from "@/lib/hooks/use-confirm";
@@ -56,9 +56,10 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
+  const isSearching = search !== debouncedSearch;
   const fetchIdRef = useRef(0);
   const [fetchCount, setFetchCount] = useState(0);
-  const loading = fetchCount > 0;
+  const fetching = fetchCount > 0;
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -114,6 +115,8 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
       })
     : categories;
 
+  const loading = fetching || isSearching;
+
   async function handleDelete(e: React.MouseEvent, cat: Category) {
     e.stopPropagation();
     e.preventDefault();
@@ -153,6 +156,7 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
 
   async function handleEditSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    e.stopPropagation();
     if (!orgId || !editCategory) return;
     setSaving(true);
     const form = new FormData(e.currentTarget);
@@ -302,51 +306,78 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
 
       {/* Edit Category Sheet */}
       <Sheet open={editOpen} onOpenChange={(v) => { if (!v) { setEditOpen(false); setEditCategory(null); } }}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Edit Category</SheetTitle>
-          </SheetHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 px-4">
-            <div className="space-y-2">
-              <Label htmlFor="picker-cat-name">Name *</Label>
-              <Input
-                id="picker-cat-name"
-                name="name"
-                required
-                defaultValue={editCategory?.name || ""}
-                key={editCategory?.id || "new"}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="flex gap-2 flex-wrap">
-                {COLORS.map((c) => (
-                  <label key={c} className="cursor-pointer">
-                    <input type="radio" name="color" value={c} className="sr-only peer" defaultChecked={editCategory?.color === c} key={editCategory?.id || "new-c"} />
-                    <div
-                      className="size-7 rounded-full border-2 border-transparent peer-checked:border-foreground transition-colors"
-                      style={{ backgroundColor: c }}
-                    />
-                  </label>
-                ))}
+        <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+          <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                <Tag className="size-5" />
+              </div>
+              <div>
+                <SheetTitle className="text-lg">Edit Category</SheetTitle>
+                <SheetDescription>Update category details.</SheetDescription>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="picker-cat-desc">Description</Label>
-              <Textarea
-                id="picker-cat-desc"
-                name="description"
-                rows={2}
-                defaultValue={editCategory?.description || ""}
-                key={editCategory?.id || "new-d"}
-              />
+          </SheetHeader>
+          <form onSubmit={handleEditSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="picker-cat-name">Name *</Label>
+                  <Input
+                    id="picker-cat-name"
+                    name="name"
+                    required
+                    defaultValue={editCategory?.name || ""}
+                    key={editCategory?.id || "new"}
+                  />
+                </div>
+              </div>
+
+              <div className="h-px bg-border" />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Color</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {COLORS.map((c) => (
+                      <label key={c} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="color"
+                          value={c}
+                          className="sr-only peer"
+                          defaultChecked={editCategory?.color === c}
+                          key={`${editCategory?.id || "new"}-${c}`}
+                        />
+                        <div
+                          className="size-6 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-gray-400 transition-all"
+                          style={{ backgroundColor: c }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="picker-cat-desc">Description</Label>
+                  <Textarea
+                    id="picker-cat-desc"
+                    name="description"
+                    rows={2}
+                    placeholder="Optional description..."
+                    defaultValue={editCategory?.description || ""}
+                    key={editCategory?.id || "new-d"}
+                  />
+                </div>
+              </div>
             </div>
-            <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => { setEditOpen(false); setEditCategory(null); }}>Cancel</Button>
-              <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                {saving ? "Saving..." : "Update"}
+            <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
+              <Button type="button" variant="outline" onClick={() => { setEditOpen(false); setEditCategory(null); }}>
+                Cancel
               </Button>
-            </SheetFooter>
+              <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                {saving ? "Saving..." : "Update Category"}
+              </Button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>
