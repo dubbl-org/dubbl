@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, MotionConfig } from "motion/react";
 import { toast } from "sonner";
@@ -16,7 +16,6 @@ import {
   ArrowUpDown,
   X,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,22 +73,21 @@ const anim = (delay: number) => ({
 });
 
 type ReviewFilter = "all" | "draft" | "in_progress" | "completed" | "cancelled";
-type BandSortKey = "name" | "level" | "min" | "max";
-type ReviewSortKey = "name" | "date" | "status" | "budget";
 
-const BAND_SORT_OPTIONS: { value: BandSortKey; label: string }[] = [
-  { value: "name", label: "Name" },
-  { value: "level", label: "Level" },
-  { value: "min", label: "Min Salary" },
-  { value: "max", label: "Max Salary" },
-];
+const BAND_SORT_OPTIONS = [
+  { value: "name:asc", label: "Name (A-Z)" },
+  { value: "name:desc", label: "Name (Z-A)" },
+  { value: "min:asc", label: "Min salary" },
+  { value: "max:desc", label: "Max salary" },
+] as const;
 
-const REVIEW_SORT_OPTIONS: { value: ReviewSortKey; label: string }[] = [
-  { value: "name", label: "Name" },
-  { value: "date", label: "Date" },
-  { value: "status", label: "Status" },
-  { value: "budget", label: "Budget" },
-];
+const REVIEW_SORT_OPTIONS = [
+  { value: "date:desc", label: "Newest first" },
+  { value: "date:asc", label: "Oldest first" },
+  { value: "name:asc", label: "Name (A-Z)" },
+  { value: "budget:desc", label: "Budget (high)" },
+  { value: "budget:asc", label: "Budget (low)" },
+] as const;
 
 export default function CompensationPage() {
   const router = useRouter();
@@ -101,16 +99,14 @@ export default function CompensationPage() {
   const [bandSearch, setBandSearch] = useState("");
   const debouncedBandSearch = useDebounce(bandSearch);
   const pendingBandSearch = bandSearch !== debouncedBandSearch;
-  const [bandSortBy, setBandSortBy] = useState<BandSortKey>("name");
-  const [bandSortOrder, setBandSortOrder] = useState<"asc" | "desc">("asc");
+  const [bandSort, setBandSort] = useState("name:asc");
   const [bandFetchKey, setBandFetchKey] = useState(0);
 
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [reviewSearch, setReviewSearch] = useState("");
   const debouncedReviewSearch = useDebounce(reviewSearch);
   const pendingReviewSearch = reviewSearch !== debouncedReviewSearch;
-  const [reviewSortBy, setReviewSortBy] = useState<ReviewSortKey>("date");
-  const [reviewSortOrder, setReviewSortOrder] = useState<"asc" | "desc">("desc");
+  const [reviewSort, setReviewSort] = useState("date:desc");
   const [reviewFetchKey, setReviewFetchKey] = useState(0);
 
   const [bandSheet, setBandSheet] = useState(false);
@@ -143,46 +139,52 @@ export default function CompensationPage() {
   useEffect(() => {
     if (!loading) setBandFetchKey((k) => k + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bandSortBy, bandSortOrder, debouncedBandSearch]);
+  }, [bandSort, debouncedBandSearch]);
 
   useEffect(() => {
     if (!loading) setReviewFetchKey((k) => k + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewFilter, reviewSortBy, reviewSortOrder, debouncedReviewSearch]);
+  }, [reviewFilter, reviewSort, debouncedReviewSearch]);
 
   /* Filtered + sorted */
-  const filteredBands = bands
-    .filter((b) => {
-      if (!debouncedBandSearch) return true;
-      const q = debouncedBandSearch.toLowerCase();
-      return b.name.toLowerCase().includes(q) || b.level?.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      const dir = bandSortOrder === "asc" ? 1 : -1;
-      switch (bandSortBy) {
-        case "level": return dir * (a.level ?? "").localeCompare(b.level ?? "");
-        case "min": return dir * (a.minSalary - b.minSalary);
-        case "max": return dir * (a.maxSalary - b.maxSalary);
-        case "name": default: return dir * a.name.localeCompare(b.name);
-      }
-    });
+  const filteredBands = useMemo(() => {
+    const [sortBy, sortOrder] = bandSort.split(":") as [string, string];
+    const dir = sortOrder === "asc" ? 1 : -1;
 
-  const filteredReviews = reviews
-    .filter((r) => {
-      if (reviewFilter !== "all" && r.status !== reviewFilter) return false;
-      if (!debouncedReviewSearch) return true;
-      const q = debouncedReviewSearch.toLowerCase();
-      return r.name.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      const dir = reviewSortOrder === "asc" ? 1 : -1;
-      switch (reviewSortBy) {
-        case "name": return dir * a.name.localeCompare(b.name);
-        case "status": return dir * a.status.localeCompare(b.status);
-        case "budget": return dir * ((a.totalBudget ?? 0) - (b.totalBudget ?? 0));
-        case "date": default: return dir * a.effectiveDate.localeCompare(b.effectiveDate);
-      }
-    });
+    return bands
+      .filter((b) => {
+        if (!debouncedBandSearch) return true;
+        const q = debouncedBandSearch.toLowerCase();
+        return b.name.toLowerCase().includes(q) || b.level?.toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case "min": return dir * (a.minSalary - b.minSalary);
+          case "max": return dir * (a.maxSalary - b.maxSalary);
+          case "name": default: return dir * a.name.localeCompare(b.name);
+        }
+      });
+  }, [bands, debouncedBandSearch, bandSort]);
+
+  const filteredReviews = useMemo(() => {
+    const [sortBy, sortOrder] = reviewSort.split(":") as [string, string];
+    const dir = sortOrder === "asc" ? 1 : -1;
+
+    return reviews
+      .filter((r) => {
+        if (reviewFilter !== "all" && r.status !== reviewFilter) return false;
+        if (!debouncedReviewSearch) return true;
+        const q = debouncedReviewSearch.toLowerCase();
+        return r.name.toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case "name": return dir * a.name.localeCompare(b.name);
+          case "budget": return dir * ((a.totalBudget ?? 0) - (b.totalBudget ?? 0));
+          case "date": default: return dir * a.effectiveDate.localeCompare(b.effectiveDate);
+        }
+      });
+  }, [reviews, reviewFilter, debouncedReviewSearch, reviewSort]);
 
   async function handleAddBand(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -252,14 +254,15 @@ export default function CompensationPage() {
   if (!hasData) {
     return (
       <ContentReveal className="space-y-6">
-        <PageHeader title="Compensation" description="Manage compensation bands and salary reviews.">
+        {/* Actions */}
+        <div className="flex justify-end gap-2">
           <Button size="sm" onClick={() => setBandSheet(true)}>
             <Plus className="mr-1.5 size-3.5" /> Add Band
           </Button>
           <Button size="sm" variant="outline" onClick={() => setReviewSheet(true)}>
             <Plus className="mr-1.5 size-3.5" /> New Review
           </Button>
-        </PageHeader>
+        </div>
 
         {/* Ghost stat cards */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -286,12 +289,8 @@ export default function CompensationPage() {
         {/* Main hero empty state */}
         <motion.div
           {...anim(0.2)}
-          className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/20 dark:to-transparent"
+          className="relative overflow-hidden rounded-2xl border-2 border-dashed"
         >
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-
           <div className="relative flex flex-col items-center justify-center py-20 px-6 text-center">
             {/* Animated icon cluster */}
             <div className="relative mb-6">
@@ -299,9 +298,9 @@ export default function CompensationPage() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="flex size-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+                className="flex size-16 items-center justify-center rounded-2xl bg-muted ring-4 ring-muted/50"
               >
-                <DollarSign className="size-8 text-emerald-600 dark:text-emerald-400" />
+                <DollarSign className="size-8 text-foreground" />
               </motion.div>
               <motion.div
                 initial={{ scale: 0 }}
@@ -391,14 +390,15 @@ export default function CompensationPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader title="Compensation" description="Manage compensation bands and salary reviews.">
+      {/* Actions */}
+      <div className="flex justify-end gap-2">
         <Button size="sm" onClick={() => setBandSheet(true)}>
           <Plus className="mr-1.5 size-3.5" /> Add Band
         </Button>
         <Button size="sm" variant="outline" onClick={() => setReviewSheet(true)}>
           <Plus className="mr-1.5 size-3.5" /> New Review
         </Button>
-      </PageHeader>
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -467,8 +467,8 @@ export default function CompensationPage() {
             )}
           </div>
 
-          <Select value={bandSortBy} onValueChange={(v) => setBandSortBy(v as BandSortKey)}>
-            <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs">
+          <Select value={bandSort} onValueChange={setBandSort}>
+            <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
               <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
@@ -478,19 +478,10 @@ export default function CompensationPage() {
               ))}
             </SelectContent>
           </Select>
-
-          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => setBandSortOrder((p) => (p === "asc" ? "desc" : "asc"))}>
-            <ArrowUpDown className={cn("size-3.5 transition-transform", bandSortOrder === "asc" && "rotate-180")} />
-          </Button>
         </div>
 
         {pendingBandSearch ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="brand-loader" aria-label="Loading">
-              <div className="brand-loader-circle brand-loader-circle-1" />
-              <div className="brand-loader-circle brand-loader-circle-2" />
-            </div>
-          </div>
+          <BrandLoader className="h-48" />
         ) : filteredBands.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
@@ -500,29 +491,21 @@ export default function CompensationPage() {
             <p className="text-xs text-muted-foreground mt-1">{bandSearch ? "Try a different search" : "Define salary ranges for each role level"}</p>
           </div>
         ) : (
-          <MotionConfig reducedMotion="never">
-            <motion.div
-              key={bandFetchKey}
-              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-              style={{ willChange: "opacity, transform, filter" }}
-            >
-              <div className="rounded-xl border bg-card divide-y">
-                {filteredBands.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {b.level ? `${b.level} · ` : ""}{formatMoney(b.minSalary)} - {formatMoney(b.maxSalary)}
-                      </p>
-                    </div>
-                    <p className="text-sm font-mono tabular-nums text-muted-foreground">Mid: {formatMoney(b.midSalary)}</p>
+          <ContentReveal key={`bands-${bandFetchKey}-${debouncedBandSearch}`}>
+            <div className="rounded-xl border bg-card divide-y">
+              {filteredBands.map((b) => (
+                <div key={b.id} className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {b.level ? `${b.level} · ` : ""}{formatMoney(b.minSalary)} - {formatMoney(b.maxSalary)}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </motion.div>
-          </MotionConfig>
+                  <p className="text-sm font-mono tabular-nums text-muted-foreground">Mid: {formatMoney(b.midSalary)}</p>
+                </div>
+              ))}
+            </div>
+          </ContentReveal>
         )}
       </div>
 
@@ -560,8 +543,8 @@ export default function CompensationPage() {
               )}
             </div>
 
-            <Select value={reviewSortBy} onValueChange={(v) => setReviewSortBy(v as ReviewSortKey)}>
-              <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs">
+            <Select value={reviewSort} onValueChange={setReviewSort}>
+              <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
                 <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
                 <SelectValue />
               </SelectTrigger>
@@ -571,20 +554,11 @@ export default function CompensationPage() {
                 ))}
               </SelectContent>
             </Select>
-
-            <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => setReviewSortOrder((p) => (p === "asc" ? "desc" : "asc"))}>
-              <ArrowUpDown className={cn("size-3.5 transition-transform", reviewSortOrder === "asc" && "rotate-180")} />
-            </Button>
           </div>
         </div>
 
         {pendingReviewSearch ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="brand-loader" aria-label="Loading">
-              <div className="brand-loader-circle brand-loader-circle-1" />
-              <div className="brand-loader-circle brand-loader-circle-2" />
-            </div>
-          </div>
+          <BrandLoader className="h-48" />
         ) : filteredReviews.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
@@ -594,36 +568,28 @@ export default function CompensationPage() {
             <p className="text-xs text-muted-foreground mt-1">{reviewSearch ? "Try a different search" : "Start a compensation review"}</p>
           </div>
         ) : (
-          <MotionConfig reducedMotion="never">
-            <motion.div
-              key={reviewFetchKey}
-              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-              style={{ willChange: "opacity, transform, filter" }}
-            >
-              <div className="rounded-xl border bg-card divide-y">
-                {filteredReviews.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => router.push(`/payroll/compensation/reviews/${r.id}`)}
-                    className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">Effective: {r.effectiveDate}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {r.totalBudget && <span className="text-sm font-mono tabular-nums">{formatMoney(r.totalBudget)}</span>}
-                      <Badge variant="outline" className={cn("text-[10px]", statusColors[r.status] || "")}>
-                        {r.status.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </MotionConfig>
+          <ContentReveal key={`reviews-${reviewFetchKey}-${debouncedReviewSearch}`}>
+            <div className="rounded-xl border bg-card divide-y">
+              {filteredReviews.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => router.push(`/payroll/compensation/reviews/${r.id}`)}
+                  className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{r.name}</p>
+                    <p className="text-xs text-muted-foreground">Effective: {r.effectiveDate}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {r.totalBudget && <span className="text-sm font-mono tabular-nums">{formatMoney(r.totalBudget)}</span>}
+                    <Badge variant="outline" className={cn("text-[10px]", statusColors[r.status] || "")}>
+                      {r.status.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ContentReveal>
         )}
       </div>
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, MotionConfig } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import {
   Clock,
@@ -12,11 +12,9 @@ import {
   ClipboardCheck,
   CheckCircle2,
   Timer,
-  ArrowUpDown,
   X,
+  Loader2,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,29 +99,6 @@ const leaveStatusColors: Record<string, string> = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Sort + filter types                                                */
-/* ------------------------------------------------------------------ */
-
-type TsFilter = "all" | "draft" | "submitted" | "approved" | "rejected";
-type LeaveFilter = "all" | "pending" | "approved" | "rejected";
-type TsSortKey = "employee" | "period" | "hours" | "status";
-type LeaveSortKey = "employee" | "date" | "hours" | "status";
-
-const TS_SORT_OPTIONS: { value: TsSortKey; label: string }[] = [
-  { value: "employee", label: "Employee" },
-  { value: "period", label: "Period" },
-  { value: "hours", label: "Hours" },
-  { value: "status", label: "Status" },
-];
-
-const LEAVE_SORT_OPTIONS: { value: LeaveSortKey; label: string }[] = [
-  { value: "employee", label: "Employee" },
-  { value: "date", label: "Date" },
-  { value: "hours", label: "Hours" },
-  { value: "status", label: "Status" },
-];
-
-/* ------------------------------------------------------------------ */
 /*  Motion helpers                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -134,36 +109,70 @@ const anim = (delay: number) => ({
 });
 
 /* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const PAGE_SIZE = 50;
+
+type View = "timesheets" | "leave";
+type TsFilter = "all" | "draft" | "submitted" | "approved" | "rejected";
+type LeaveFilter = "all" | "pending" | "approved" | "rejected";
+
+/* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function TimeLeavePage() {
   const router = useRouter();
 
-  /* ---- data ---- */
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [loading, setLoading] = useState(true);
+  const orgId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("activeOrgId")
+      : null;
 
-  /* ---- timesheet filters ---- */
+  /* ---- view ---- */
+  const [view, setView] = useState<View>("timesheets");
+  const swipeDirRef = useRef(1);
+
+  /* ---- timesheet state ---- */
+  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
+  const [tsPage, setTsPage] = useState(1);
+  const [tsTotalCount, setTsTotalCount] = useState(0);
+  const [tsLoadingMore, setTsLoadingMore] = useState(false);
+  const [tsRefetching, setTsRefetching] = useState(false);
+  const [tsInitialLoad, setTsInitialLoad] = useState(true);
+  const [tsFetchKey, setTsFetchKey] = useState(0);
   const [tsFilter, setTsFilter] = useState<TsFilter>("all");
+  const [tsSortBy, setTsSortBy] = useState("period");
+  const [tsSortOrder, setTsSortOrder] = useState<"asc" | "desc">("desc");
   const [tsSearch, setTsSearch] = useState("");
   const debouncedTsSearch = useDebounce(tsSearch);
   const pendingTsSearch = tsSearch !== debouncedTsSearch;
-  const [tsSortBy, setTsSortBy] = useState<TsSortKey>("period");
-  const [tsSortOrder, setTsSortOrder] = useState<"asc" | "desc">("desc");
-  const [tsFetchKey, setTsFetchKey] = useState(0);
+  const [tsSearchKey, setTsSearchKey] = useState(0);
+  const tsSentinelRef = useRef<HTMLDivElement>(null);
+  const tsHasMore = timesheets.length < tsTotalCount;
 
-  /* ---- leave filters ---- */
+  /* ---- leave state ---- */
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leavePage, setLeavePage] = useState(1);
+  const [leaveTotalCount, setLeaveTotalCount] = useState(0);
+  const [leaveLoadingMore, setLeaveLoadingMore] = useState(false);
+  const [leaveRefetching, setLeaveRefetching] = useState(false);
+  const [leaveInitialLoad, setLeaveInitialLoad] = useState(true);
+  const [leaveFetchKey, setLeaveFetchKey] = useState(0);
   const [leaveFilter, setLeaveFilter] = useState<LeaveFilter>("all");
+  const [leaveSortBy, setLeaveSortBy] = useState("date");
+  const [leaveSortOrder, setLeaveSortOrder] = useState<"asc" | "desc">("desc");
   const [leaveSearch, setLeaveSearch] = useState("");
   const debouncedLeaveSearch = useDebounce(leaveSearch);
   const pendingLeaveSearch = leaveSearch !== debouncedLeaveSearch;
-  const [leaveSortBy, setLeaveSortBy] = useState<LeaveSortKey>("date");
-  const [leaveSortOrder, setLeaveSortOrder] = useState<"asc" | "desc">("desc");
-  const [leaveFetchKey, setLeaveFetchKey] = useState(0);
+  const [leaveSearchKey, setLeaveSearchKey] = useState(0);
+  const leaveSentinelRef = useRef<HTMLDivElement>(null);
+  const leaveHasMore = leaveRequests.length < leaveTotalCount;
+
+  /* ---- shared data ---- */
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [policies, setPolicies] = useState<Policy[]>([]);
 
   /* ---- drawers ---- */
   const [tsDrawerOpen, setTsDrawerOpen] = useState(false);
@@ -185,57 +194,289 @@ export default function TimeLeavePage() {
     reason: "",
   });
 
-  const orgId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("activeOrgId")
-      : null;
+  /* ---------------------------------------------------------------- */
+  /*  Build params                                                     */
+  /* ---------------------------------------------------------------- */
 
-  /* ---- fetch ---- */
-  const fetchData = useCallback(() => {
+  const buildTsParams = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams();
+      if (tsFilter !== "all") params.set("status", tsFilter);
+      params.set("page", String(p));
+      params.set("limit", String(PAGE_SIZE));
+      return params;
+    },
+    [tsFilter],
+  );
+
+  const buildLeaveParams = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams();
+      if (leaveFilter !== "all") params.set("status", leaveFilter);
+      params.set("page", String(p));
+      params.set("limit", String(PAGE_SIZE));
+      return params;
+    },
+    [leaveFilter],
+  );
+
+  /* ---------------------------------------------------------------- */
+  /*  Fetch first page - timesheets                                    */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    setTsRefetching(true);
+    setTsPage(1);
+
+    fetch(`/api/v1/payroll/timesheets?${buildTsParams(1)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setTimesheets(data.data || []);
+        setTsTotalCount(data.pagination?.total || 0);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTsInitialLoad(false);
+          setTsRefetching(false);
+          setTsFetchKey((k) => k + 1);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, buildTsParams]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Fetch first page - leave                                         */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    setLeaveRefetching(true);
+    setLeavePage(1);
+
+    fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setLeaveRequests(data.data || []);
+        setLeaveTotalCount(data.pagination?.total || 0);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLeaveInitialLoad(false);
+          setLeaveRefetching(false);
+          setLeaveFetchKey((k) => k + 1);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, buildLeaveParams]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Fetch employees + policies (independent of filters)              */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
     if (!orgId) return;
     const headers = { "x-organization-id": orgId };
 
-    Promise.all([
-      fetch("/api/v1/payroll/timesheets", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/leave/requests", { headers }).then((r) =>
-        r.json(),
-      ),
-      fetch("/api/v1/payroll/employees", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/leave/policies", { headers }).then((r) =>
-        r.json(),
-      ),
-    ])
-      .then(([tsData, leaveData, empData, polData]) => {
-        if (tsData.data) setTimesheets(tsData.data);
-        if (leaveData.data) setLeaveRequests(leaveData.data);
-        if (empData.data)
+    fetch("/api/v1/payroll/employees", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data)
           setEmployees(
-            empData.data.map((e: any) => ({ id: e.id, name: e.name })),
+            data.data.map((e: any) => ({ id: e.id, name: e.name })),
           );
-        if (polData.data)
+      });
+
+    fetch("/api/v1/payroll/leave/policies", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data)
           setPolicies(
-            polData.data.map((p: any) => ({ id: p.id, name: p.name })),
+            data.data.map((p: any) => ({ id: p.id, name: p.name })),
           );
-      })
-      .finally(() => setLoading(false));
+      });
   }, [orgId]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  /* ---------------------------------------------------------------- */
+  /*  Load more - timesheets                                           */
+  /* ---------------------------------------------------------------- */
 
-  /* Re-animate on filter changes */
-  useEffect(() => {
-    if (!loading) setTsFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tsFilter, tsSortBy, tsSortOrder, debouncedTsSearch]);
+  const loadMoreTs = useCallback(() => {
+    if (!orgId || tsLoadingMore) return;
+    const nextPage = tsPage + 1;
+    setTsLoadingMore(true);
+
+    fetch(`/api/v1/payroll/timesheets?${buildTsParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) {
+          setTimesheets((prev) => [...prev, ...data.data]);
+          setTsPage(nextPage);
+        }
+      })
+      .finally(() => setTsLoadingMore(false));
+  }, [orgId, tsPage, buildTsParams, tsLoadingMore]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Load more - leave                                                */
+  /* ---------------------------------------------------------------- */
+
+  const loadMoreLeave = useCallback(() => {
+    if (!orgId || leaveLoadingMore) return;
+    const nextPage = leavePage + 1;
+    setLeaveLoadingMore(true);
+
+    fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) {
+          setLeaveRequests((prev) => [...prev, ...data.data]);
+          setLeavePage(nextPage);
+        }
+      })
+      .finally(() => setLeaveLoadingMore(false));
+  }, [orgId, leavePage, buildLeaveParams, leaveLoadingMore]);
+
+  /* ---------------------------------------------------------------- */
+  /*  IntersectionObserver - timesheets                                */
+  /* ---------------------------------------------------------------- */
 
   useEffect(() => {
-    if (!loading) setLeaveFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaveFilter, leaveSortBy, leaveSortOrder, debouncedLeaveSearch]);
+    const el = tsSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !tsRefetching) loadMoreTs();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMoreTs, tsRefetching]);
 
-  /* ---- derived stats ---- */
+  /* ---------------------------------------------------------------- */
+  /*  IntersectionObserver - leave                                     */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    const el = leaveSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !leaveRefetching) loadMoreLeave();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMoreLeave, leaveRefetching]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Search key bumps                                                 */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    setTsSearchKey((k) => k + 1);
+  }, [debouncedTsSearch]);
+
+  useEffect(() => {
+    setLeaveSearchKey((k) => k + 1);
+  }, [debouncedLeaveSearch]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Client-side search filtering                                     */
+  /* ---------------------------------------------------------------- */
+
+  const filteredTs = useMemo(() => {
+    if (!debouncedTsSearch) return timesheets;
+    const q = debouncedTsSearch.toLowerCase();
+    return timesheets.filter(
+      (ts) =>
+        ts.employee?.name.toLowerCase().includes(q) ||
+        ts.periodStart.includes(q) ||
+        ts.periodEnd.includes(q),
+    );
+  }, [timesheets, debouncedTsSearch]);
+
+  const filteredLeave = useMemo(() => {
+    if (!debouncedLeaveSearch) return leaveRequests;
+    const q = debouncedLeaveSearch.toLowerCase();
+    return leaveRequests.filter(
+      (r) =>
+        r.employee?.name.toLowerCase().includes(q) ||
+        r.policy?.name.toLowerCase().includes(q) ||
+        r.startDate.includes(q),
+    );
+  }, [leaveRequests, debouncedLeaveSearch]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Client-side sorting                                              */
+  /* ---------------------------------------------------------------- */
+
+  const sortedTs = useMemo(() => {
+    const [key, order] = [tsSortBy, tsSortOrder];
+    const dir = order === "asc" ? 1 : -1;
+    return [...filteredTs].sort((a, b) => {
+      switch (key) {
+        case "employee":
+          return (
+            dir *
+            (a.employee?.name ?? "").localeCompare(b.employee?.name ?? "")
+          );
+        case "hours":
+          return dir * (a.totalHours - b.totalHours);
+        case "status":
+          return dir * a.status.localeCompare(b.status);
+        case "period":
+        default:
+          return dir * a.periodStart.localeCompare(b.periodStart);
+      }
+    });
+  }, [filteredTs, tsSortBy, tsSortOrder]);
+
+  const sortedLeave = useMemo(() => {
+    const [key, order] = [leaveSortBy, leaveSortOrder];
+    const dir = order === "asc" ? 1 : -1;
+    return [...filteredLeave].sort((a, b) => {
+      switch (key) {
+        case "employee":
+          return (
+            dir *
+            (a.employee?.name ?? "").localeCompare(b.employee?.name ?? "")
+          );
+        case "hours":
+          return dir * (a.hours - b.hours);
+        case "status":
+          return dir * a.status.localeCompare(b.status);
+        case "date":
+        default:
+          return dir * a.startDate.localeCompare(b.startDate);
+      }
+    });
+  }, [filteredLeave, leaveSortBy, leaveSortOrder]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Derived stats (from both datasets)                               */
+  /* ---------------------------------------------------------------- */
+
   const activeTimesheets = timesheets.filter(
     (t) => t.status === "draft" || t.status === "submitted",
   ).length;
@@ -260,64 +501,10 @@ export default function TimeLeavePage() {
     .filter((r) => r.status === "approved")
     .reduce((sum, r) => sum + r.hours, 0);
 
-  /* ---- filtered + sorted lists ---- */
-  const filteredTs = timesheets
-    .filter((ts) => {
-      if (tsFilter !== "all" && ts.status !== tsFilter) return false;
-      if (debouncedTsSearch) {
-        const q = debouncedTsSearch.toLowerCase();
-        return (
-          ts.employee?.name.toLowerCase().includes(q) ||
-          ts.periodStart.includes(q) ||
-          ts.periodEnd.includes(q)
-        );
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const dir = tsSortOrder === "asc" ? 1 : -1;
-      switch (tsSortBy) {
-        case "employee":
-          return dir * (a.employee?.name ?? "").localeCompare(b.employee?.name ?? "");
-        case "hours":
-          return dir * (a.totalHours - b.totalHours);
-        case "status":
-          return dir * a.status.localeCompare(b.status);
-        case "period":
-        default:
-          return dir * a.periodStart.localeCompare(b.periodStart);
-      }
-    });
+  /* ---------------------------------------------------------------- */
+  /*  Actions                                                          */
+  /* ---------------------------------------------------------------- */
 
-  const filteredLeave = leaveRequests
-    .filter((r) => {
-      if (leaveFilter !== "all" && r.status !== leaveFilter) return false;
-      if (debouncedLeaveSearch) {
-        const q = debouncedLeaveSearch.toLowerCase();
-        return (
-          r.employee?.name.toLowerCase().includes(q) ||
-          r.policy?.name.toLowerCase().includes(q) ||
-          r.startDate.includes(q)
-        );
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const dir = leaveSortOrder === "asc" ? 1 : -1;
-      switch (leaveSortBy) {
-        case "employee":
-          return dir * (a.employee?.name ?? "").localeCompare(b.employee?.name ?? "");
-        case "hours":
-          return dir * (a.hours - b.hours);
-        case "status":
-          return dir * a.status.localeCompare(b.status);
-        case "date":
-        default:
-          return dir * a.startDate.localeCompare(b.startDate);
-      }
-    });
-
-  /* ---- actions ---- */
   async function handleCreateTs(e: React.FormEvent) {
     e.preventDefault();
     if (!orgId || !newTs.employeeId) return;
@@ -372,7 +559,21 @@ export default function TimeLeavePage() {
           hours: "",
           reason: "",
         });
-        fetchData();
+        // Trigger refetch for leave
+        setLeaveRefetching(true);
+        setLeavePage(1);
+        fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
+          headers: { "x-organization-id": orgId },
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            setLeaveRequests(data.data || []);
+            setLeaveTotalCount(data.pagination?.total || 0);
+          })
+          .finally(() => {
+            setLeaveRefetching(false);
+            setLeaveFetchKey((k) => k + 1);
+          });
       }
     } catch {
       toast.error("Failed to create leave request");
@@ -389,7 +590,21 @@ export default function TimeLeavePage() {
     });
     if (res.ok) {
       toast.success("Request approved");
-      fetchData();
+      // Refetch leave
+      setLeaveRefetching(true);
+      setLeavePage(1);
+      fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
+        headers: { "x-organization-id": orgId },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          setLeaveRequests(data.data || []);
+          setLeaveTotalCount(data.pagination?.total || 0);
+        })
+        .finally(() => {
+          setLeaveRefetching(false);
+          setLeaveFetchKey((k) => k + 1);
+        });
     }
   }
 
@@ -405,12 +620,29 @@ export default function TimeLeavePage() {
     });
     if (res.ok) {
       toast.success("Request rejected");
-      fetchData();
+      // Refetch leave
+      setLeaveRefetching(true);
+      setLeavePage(1);
+      fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
+        headers: { "x-organization-id": orgId },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          setLeaveRequests(data.data || []);
+          setLeaveTotalCount(data.pagination?.total || 0);
+        })
+        .finally(() => {
+          setLeaveRefetching(false);
+          setLeaveFetchKey((k) => k + 1);
+        });
     }
   }
 
-  /* ---- loading ---- */
-  if (loading) return <BrandLoader />;
+  /* ---------------------------------------------------------------- */
+  /*  Initial load                                                     */
+  /* ---------------------------------------------------------------- */
+
+  if (tsInitialLoad && leaveInitialLoad) return <BrandLoader />;
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
@@ -418,11 +650,8 @@ export default function TimeLeavePage() {
 
   return (
     <ContentReveal className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        title="Time & Leave"
-        description="Track hours and manage leave requests."
-      >
+      {/* Actions */}
+      <div className="flex justify-end gap-2">
         <Button
           size="sm"
           className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
@@ -439,9 +668,9 @@ export default function TimeLeavePage() {
           <Plus className="size-3" />
           New Request
         </Button>
-      </PageHeader>
+      </div>
 
-      {/* Stat cards */}
+      {/* Stat cards - always visible */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
@@ -480,8 +709,7 @@ export default function TimeLeavePage() {
             <p
               className={cn(
                 "mt-2 text-2xl font-bold font-mono tabular-nums truncate",
-                card.highlight &&
-                  "text-emerald-600 dark:text-emerald-400",
+                card.highlight && "text-emerald-600 dark:text-emerald-400",
               )}
             >
               {card.value}
@@ -490,41 +718,97 @@ export default function TimeLeavePage() {
         ))}
       </div>
 
-      {/* ============================================================ */}
-      {/*  Two-column grid: Timesheets + Leave side by side             */}
-      {/* ============================================================ */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="h-px bg-border" />
 
-        {/* ---- Timesheets Column ---- */}
-        <motion.div {...anim(0.2)} className="flex flex-col">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Timesheets</h3>
-            <span className="text-xs text-muted-foreground">{filteredTs.length} entries</span>
-          </div>
-
-          {/* Filters */}
-          <div className="space-y-2 mb-3">
-            <Tabs
-              value={tsFilter}
-              onValueChange={(v) => setTsFilter(v as TsFilter)}
+      {/* View tabs */}
+      <div className="space-y-4">
+        <div className="inline-flex h-10 items-center gap-1 rounded-lg bg-muted p-[3px]">
+          {([
+            { value: "timesheets" as const, icon: Clock, label: "Timesheets" },
+            { value: "leave" as const, icon: CalendarDays, label: "Leave Requests" },
+          ]).map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => {
+                swipeDirRef.current = tab.value === "leave" ? 1 : -1;
+                setView(tab.value);
+              }}
+              className={cn(
+                "relative inline-flex h-[calc(100%-1px)] items-center gap-1.5 rounded-md px-5 text-sm font-medium whitespace-nowrap transition-colors",
+                view === tab.value
+                  ? "text-foreground"
+                  : "text-foreground/60 hover:text-foreground"
+              )}
             >
-              <TabsList className="flex-wrap h-auto">
-                <TabsTrigger value="all" className="text-xs h-7">All</TabsTrigger>
-                <TabsTrigger value="draft" className="text-xs h-7">Draft</TabsTrigger>
-                <TabsTrigger value="submitted" className="text-xs h-7">Submitted</TabsTrigger>
-                <TabsTrigger value="approved" className="text-xs h-7">Approved</TabsTrigger>
-                <TabsTrigger value="rejected" className="text-xs h-7">Rejected</TabsTrigger>
-              </TabsList>
-            </Tabs>
+              {view === tab.value && (
+                <motion.div
+                  layoutId="view-tab-bg"
+                  className="absolute inset-0 rounded-md bg-background shadow-sm dark:border dark:border-input dark:bg-input/30"
+                  transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-1.5">
+                <tab.icon className="size-3.5" />
+                {tab.label}
+              </span>
+            </button>
+          ))}
+        </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+        <div className="overflow-hidden">
+        <AnimatePresence mode="wait" custom={swipeDirRef.current}>
+        {/* ============================================================ */}
+        {/*  Timesheets View                                              */}
+        {/* ============================================================ */}
+        {view === "timesheets" && (
+          <motion.div
+            key="timesheets"
+            custom={swipeDirRef.current}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            variants={{
+              enter: (d: number) => ({ opacity: 0, x: d * 60, filter: "blur(6px)" }),
+              center: { opacity: 1, x: 0, filter: "blur(0px)" },
+              exit: (d: number) => ({ opacity: 0, x: d * -60, filter: "blur(6px)" }),
+            }}
+            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+            className="space-y-4"
+          >
+            {/* Status filter tabs */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Tabs
+                value={tsFilter}
+                onValueChange={(v) => setTsFilter(v as TsFilter)}
+              >
+                <TabsList className="overflow-x-auto">
+                  <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+                  <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
+                  <TabsTrigger value="submitted" className="whitespace-nowrap">Submitted</TabsTrigger>
+                  <TabsTrigger value="approved" className="whitespace-nowrap">Approved</TabsTrigger>
+                  <TabsTrigger value="rejected" className="whitespace-nowrap">Rejected</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setTsDrawerOpen(true)}
+              >
+                <Plus className="mr-2 size-4" />
+                New Timesheet
+              </Button>
+            </div>
+
+            {/* Search + sort */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input
                   placeholder="Search employee..."
                   value={tsSearch}
                   onChange={(e) => setTsSearch(e.target.value)}
-                  className="pl-8 pr-7 h-7 text-xs"
+                  className="h-8 w-56 pl-8 pr-7 text-xs"
                 />
                 {tsSearch && (
                   <button
@@ -536,128 +820,173 @@ export default function TimeLeavePage() {
                 )}
               </div>
 
-              <Select value={tsSortBy} onValueChange={(v) => setTsSortBy(v as TsSortKey)}>
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <ArrowUpDown className="size-2.5 mr-1 text-muted-foreground" />
-                  <SelectValue />
+              <Select
+                value={`${tsSortBy}:${tsSortOrder}`}
+                onValueChange={(v) => {
+                  const [key, order] = v.split(":");
+                  setTsSortBy(key);
+                  setTsSortOrder(order as "asc" | "desc");
+                }}
+              >
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue placeholder="Sort by..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {TS_SORT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                  ))}
+                  <SelectItem value="period:desc">Newest period</SelectItem>
+                  <SelectItem value="period:asc">Oldest period</SelectItem>
+                  <SelectItem value="employee:asc">Employee A-Z</SelectItem>
+                  <SelectItem value="employee:desc">Employee Z-A</SelectItem>
+                  <SelectItem value="hours:desc">Most hours</SelectItem>
+                  <SelectItem value="hours:asc">Fewest hours</SelectItem>
+                  <SelectItem value="status:asc">Status A-Z</SelectItem>
+                  <SelectItem value="status:desc">Status Z-A</SelectItem>
                 </SelectContent>
               </Select>
 
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0"
-                onClick={() => setTsSortOrder((p) => (p === "asc" ? "desc" : "asc"))}
+              {tsSearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={() => setTsSearch("")}
+                >
+                  <X className="mr-1 size-3" />
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {/* Data */}
+            {tsRefetching || pendingTsSearch ? (
+              <BrandLoader className="h-48" />
+            ) : sortedTs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed">
+                <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+                  <Clock className="size-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium">No timesheets found</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {tsSearch
+                    ? "Try a different search"
+                    : "Create a timesheet to start tracking hours"}
+                </p>
+              </div>
+            ) : (
+              <ContentReveal key={`ts-${tsFetchKey}-${tsSearchKey}`}>
+                <div className="rounded-xl border bg-card divide-y">
+                  {sortedTs.map((ts) => (
+                    <button
+                      key={ts.id}
+                      onClick={() =>
+                        router.push(`/payroll/timesheets/${ts.id}`)
+                      }
+                      className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <Clock className="size-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {ts.employee?.name || "-"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {ts.periodStart} to {ts.periodEnd}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-mono tabular-nums">
+                          {ts.totalHours}h
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px]",
+                            tsStatusColors[ts.status] || "",
+                          )}
+                        >
+                          {ts.status}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </ContentReveal>
+            )}
+
+            {/* Infinite scroll sentinel & count */}
+            {!tsRefetching && !pendingTsSearch && sortedTs.length > 0 && (
+              <>
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {timesheets.length} of {tsTotalCount} timesheet
+                    {tsTotalCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                {tsHasMore && (
+                  <div ref={tsSentinelRef} className="flex justify-center py-4">
+                    {tsLoadingMore && (
+                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* ============================================================ */}
+        {/*  Leave Requests View                                          */}
+        {/* ============================================================ */}
+        {view === "leave" && (
+          <motion.div
+            key="leave"
+            custom={swipeDirRef.current}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            variants={{
+              enter: (d: number) => ({ opacity: 0, x: d * 60, filter: "blur(6px)" }),
+              center: { opacity: 1, x: 0, filter: "blur(0px)" },
+              exit: (d: number) => ({ opacity: 0, x: d * -60, filter: "blur(6px)" }),
+            }}
+            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+            className="space-y-4"
+          >
+            {/* Status filter tabs */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Tabs
+                value={leaveFilter}
+                onValueChange={(v) => setLeaveFilter(v as LeaveFilter)}
               >
-                <ArrowUpDown className={cn("size-3 transition-transform", tsSortOrder === "asc" && "rotate-180")} />
+                <TabsList className="overflow-x-auto">
+                  <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+                  <TabsTrigger value="pending" className="whitespace-nowrap">Pending</TabsTrigger>
+                  <TabsTrigger value="approved" className="whitespace-nowrap">Approved</TabsTrigger>
+                  <TabsTrigger value="rejected" className="whitespace-nowrap">Rejected</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setLeaveDrawerOpen(true)}
+              >
+                <Plus className="mr-2 size-4" />
+                New Request
               </Button>
             </div>
-          </div>
 
-          {/* List */}
-          {pendingTsSearch ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="brand-loader" aria-label="Loading">
-                <div className="brand-loader-circle brand-loader-circle-1" />
-                <div className="brand-loader-circle brand-loader-circle-2" />
-              </div>
-            </div>
-          ) : filteredTs.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed">
-              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-                <Clock className="size-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">No timesheets found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {tsSearch ? "Try a different search" : "Create a timesheet to start tracking hours"}
-              </p>
-            </div>
-          ) : (
-            <MotionConfig reducedMotion="never">
-              <motion.div
-                key={tsFetchKey}
-                initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                style={{ willChange: "opacity, transform, filter" }}
-                className="rounded-xl border bg-card divide-y max-h-[480px] overflow-y-auto"
-              >
-                {filteredTs.map((ts) => (
-                  <button
-                    key={ts.id}
-                    onClick={() =>
-                      router.push(`/payroll/timesheets/${ts.id}`)
-                    }
-                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Clock className="size-3.5 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {ts.employee?.name || "-"}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {ts.periodStart} to {ts.periodEnd}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-mono tabular-nums">
-                        {ts.totalHours}h
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px]",
-                          tsStatusColors[ts.status] || "",
-                        )}
-                      >
-                        {ts.status}
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
-              </motion.div>
-            </MotionConfig>
-          )}
-        </motion.div>
-
-        {/* ---- Leave Requests Column ---- */}
-        <motion.div {...anim(0.25)} className="flex flex-col">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Leave Requests</h3>
-            <span className="text-xs text-muted-foreground">{filteredLeave.length} requests</span>
-          </div>
-
-          {/* Filters */}
-          <div className="space-y-2 mb-3">
-            <Tabs
-              value={leaveFilter}
-              onValueChange={(v) => setLeaveFilter(v as LeaveFilter)}
-            >
-              <TabsList className="flex-wrap h-auto">
-                <TabsTrigger value="all" className="text-xs h-7">All</TabsTrigger>
-                <TabsTrigger value="pending" className="text-xs h-7">Pending</TabsTrigger>
-                <TabsTrigger value="approved" className="text-xs h-7">Approved</TabsTrigger>
-                <TabsTrigger value="rejected" className="text-xs h-7">Rejected</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+            {/* Search + sort */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input
                   placeholder="Search employee or policy..."
                   value={leaveSearch}
                   onChange={(e) => setLeaveSearch(e.target.value)}
-                  className="pl-8 pr-7 h-7 text-xs"
+                  className="h-8 w-56 pl-8 pr-7 text-xs"
                 />
                 {leaveSearch && (
                   <button
@@ -669,113 +998,141 @@ export default function TimeLeavePage() {
                 )}
               </div>
 
-              <Select value={leaveSortBy} onValueChange={(v) => setLeaveSortBy(v as LeaveSortKey)}>
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <ArrowUpDown className="size-2.5 mr-1 text-muted-foreground" />
-                  <SelectValue />
+              <Select
+                value={`${leaveSortBy}:${leaveSortOrder}`}
+                onValueChange={(v) => {
+                  const [key, order] = v.split(":");
+                  setLeaveSortBy(key);
+                  setLeaveSortOrder(order as "asc" | "desc");
+                }}
+              >
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue placeholder="Sort by..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {LEAVE_SORT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                  ))}
+                  <SelectItem value="date:desc">Newest first</SelectItem>
+                  <SelectItem value="date:asc">Oldest first</SelectItem>
+                  <SelectItem value="employee:asc">Employee A-Z</SelectItem>
+                  <SelectItem value="employee:desc">Employee Z-A</SelectItem>
+                  <SelectItem value="hours:desc">Most hours</SelectItem>
+                  <SelectItem value="hours:asc">Fewest hours</SelectItem>
+                  <SelectItem value="status:asc">Status A-Z</SelectItem>
+                  <SelectItem value="status:desc">Status Z-A</SelectItem>
                 </SelectContent>
               </Select>
 
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0"
-                onClick={() => setLeaveSortOrder((p) => (p === "asc" ? "desc" : "asc"))}
-              >
-                <ArrowUpDown className={cn("size-3 transition-transform", leaveSortOrder === "asc" && "rotate-180")} />
-              </Button>
+              {leaveSearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={() => setLeaveSearch("")}
+                >
+                  <X className="mr-1 size-3" />
+                  Clear
+                </Button>
+              )}
             </div>
-          </div>
 
-          {/* List */}
-          {pendingLeaveSearch ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="brand-loader" aria-label="Loading">
-                <div className="brand-loader-circle brand-loader-circle-1" />
-                <div className="brand-loader-circle brand-loader-circle-2" />
+            {/* Data */}
+            {leaveRefetching || pendingLeaveSearch ? (
+              <BrandLoader className="h-48" />
+            ) : sortedLeave.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed">
+                <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+                  <CalendarDays className="size-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium">No leave requests found</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {leaveSearch
+                    ? "Try a different search"
+                    : "Submit a leave request to get started"}
+                </p>
               </div>
-            </div>
-          ) : filteredLeave.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed">
-              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-                <CalendarDays className="size-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">No leave requests found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {leaveSearch ? "Try a different search" : "Submit a leave request to get started"}
-              </p>
-            </div>
-          ) : (
-            <MotionConfig reducedMotion="never">
-              <motion.div
-                key={leaveFetchKey}
-                initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                style={{ willChange: "opacity, transform, filter" }}
-                className="rounded-xl border bg-card divide-y max-h-[480px] overflow-y-auto"
-              >
-                {filteredLeave.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between gap-3 px-4 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {r.employee?.name || "-"}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {r.policy?.name || "-"} · {r.startDate} to{" "}
-                        {r.endDate} · {r.hours}h
-                      </p>
-                      {r.reason && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">
-                          {r.reason}
+            ) : (
+              <ContentReveal key={`leave-${leaveFetchKey}-${leaveSearchKey}`}>
+                <div className="rounded-xl border bg-card divide-y">
+                  {sortedLeave.map((r) => (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {r.employee?.name || "-"}
                         </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px]",
-                          leaveStatusColors[r.status] || "",
+                        <p className="text-[11px] text-muted-foreground">
+                          {r.policy?.name || "-"} · {r.startDate} to{" "}
+                          {r.endDate} · {r.hours}h
+                        </p>
+                        {r.reason && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">
+                            {r.reason}
+                          </p>
                         )}
-                      >
-                        {r.status}
-                      </Badge>
-                      {r.status === "pending" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-[10px] px-2"
-                            onClick={() => handleApprove(r.id)}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-[10px] px-2 text-red-600"
-                            onClick={() => handleReject(r.id)}
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px]",
+                            leaveStatusColors[r.status] || "",
+                          )}
+                        >
+                          {r.status}
+                        </Badge>
+                        {r.status === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[10px] px-2"
+                              onClick={() => handleApprove(r.id)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[10px] px-2 text-red-600"
+                              onClick={() => handleReject(r.id)}
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </ContentReveal>
+            )}
+
+            {/* Infinite scroll sentinel & count */}
+            {!leaveRefetching && !pendingLeaveSearch && sortedLeave.length > 0 && (
+              <>
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {leaveRequests.length} of {leaveTotalCount} request
+                    {leaveTotalCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                {leaveHasMore && (
+                  <div
+                    ref={leaveSentinelRef}
+                    className="flex justify-center py-4"
+                  >
+                    {leaveLoadingMore && (
+                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    )}
                   </div>
-                ))}
-              </motion.div>
-            </MotionConfig>
-          )}
-        </motion.div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+        </AnimatePresence>
+        </div>
       </div>
 
       {/* ============================================================ */}

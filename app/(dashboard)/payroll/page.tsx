@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Plus, Users, DollarSign, FileText, CalendarDays, Clock, Briefcase, BarChart3 } from "lucide-react";
+import { Plus, Users, DollarSign, FileText, CalendarDays, BarChart3, ArrowRight } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -113,13 +113,8 @@ export default function PayrollPage() {
         {/* Main hero empty state */}
         <motion.div
           {...anim(0.2)}
-          className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/20 dark:to-transparent"
+          className="relative overflow-hidden rounded-2xl border-2 border-dashed"
         >
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-
           <div className="relative flex flex-col items-center justify-center py-20 px-6 text-center">
             {/* Animated circles */}
             <div className="relative mb-6">
@@ -127,9 +122,9 @@ export default function PayrollPage() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="flex size-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+                className="flex size-16 items-center justify-center rounded-2xl bg-muted ring-4 ring-muted/50"
               >
-                <DollarSign className="size-8 text-emerald-600 dark:text-emerald-400" />
+                <DollarSign className="size-8 text-foreground" />
               </motion.div>
               <motion.div
                 initial={{ scale: 0 }}
@@ -218,10 +213,20 @@ export default function PayrollPage() {
     );
   }
 
+  const breakdownRun = completedRuns.length > 0 ? completedRuns[0] : lastRun;
+  const breakdownTotal = breakdownRun ? breakdownRun.totalGross : 0;
+  const grossPct = breakdownTotal > 0 ? 100 : 0;
+  const deductionsPct = breakdownTotal > 0 ? (breakdownRun!.totalDeductions / breakdownTotal) * 100 : 0;
+  const netPct = breakdownTotal > 0 ? (breakdownRun!.totalNet / breakdownTotal) * 100 : 0;
+
   return (
     <ContentReveal className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <motion.div {...anim(0)}>
+        <PageHeader title="Overview" />
+      </motion.div>
+
+      {/* Stat cards - 4 columns */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Users className="size-4" />
@@ -235,24 +240,14 @@ export default function PayrollPage() {
         <motion.div {...anim(0.05)} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <DollarSign className="size-4" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Monthly Cost</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Monthly Payroll Cost</span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
             {formatMoney(Math.round(totalAnnualSalary / 12))}
           </p>
         </motion.div>
 
-        <motion.div {...anim(0.09)} className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <FileText className="size-4" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Last Run Net</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
-            {lastRun ? formatMoney(lastRun.totalNet) : "-"}
-          </p>
-        </motion.div>
-
-        <motion.div {...anim(0.13)} className="rounded-xl border bg-card p-4">
+        <motion.div {...anim(0.1)} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <CalendarDays className="size-4" />
             <span className="text-[11px] font-medium uppercase tracking-wide">YTD Paid</span>
@@ -262,116 +257,164 @@ export default function PayrollPage() {
           </p>
         </motion.div>
 
-        <motion.div {...anim(0.17)} className="rounded-xl border bg-card p-4">
+        <motion.div {...anim(0.15)} className={`rounded-xl border bg-card p-4 ${draftRuns.length > 0 ? "border-amber-300/50 dark:border-amber-700/50" : ""}`}>
           <div className="flex items-center gap-2 text-muted-foreground">
             <FileText className="size-4" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Draft Runs</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
+          <p className={`mt-2 text-2xl font-bold font-mono tabular-nums truncate ${draftRuns.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
             {draftRuns.length}
           </p>
         </motion.div>
-
-        <motion.div {...anim(0.21)} className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <BarChart3 className="size-4" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Total Runs</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
-            {runs.length}
-          </p>
-        </motion.div>
       </div>
 
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-          onClick={() => openDrawer("employee")}
-        >
-          <Plus className="mr-1.5 size-3" />
-          Add Employee
-        </Button>
-        <Button
-          size="sm"
-          className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
-          onClick={() => router.push("/payroll/runs")}
-        >
-          <FileText className="mr-1.5 size-3" />
-          New Payroll Run
-        </Button>
-      </div>
-
-      {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { icon: Clock, label: "Time & Leave", href: "/payroll/time-leave" },
-          { icon: Briefcase, label: "Contractors", href: "/payroll/contractors" },
-          { icon: BarChart3, label: "Analytics", href: "/payroll/analytics" },
-          { icon: DollarSign, label: "Compensation", href: "/payroll/compensation" },
-        ].map((link, i) => (
-          <motion.div
-            key={link.label}
-            {...anim(0.25 + i * 0.05)}
-            onClick={() => router.push(link.href)}
-            className="flex cursor-pointer items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50"
-          >
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-              <link.icon className="size-4 text-muted-foreground" />
-            </div>
-            <span className="text-sm font-medium">{link.label}</span>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Recent Runs */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Recent Runs</h3>
-        {recentRuns.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-              <FileText className="size-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium">No runs yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Create a payroll run to pay your employees
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-xl border bg-card divide-y">
-            {recentRuns.map((run) => (
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Left column - Recent Runs (~60%) */}
+        <motion.div {...anim(0.2)} className="lg:col-span-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Recent Runs</h3>
+            {runs.length > 0 && (
               <button
-                key={run.id}
-                onClick={() => router.push(`/payroll/runs/${run.id}`)}
-                className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                onClick={() => router.push("/payroll/runs")}
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <FileText className="size-4 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {run.payPeriodStart} to {run.payPeriodEnd}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <Badge variant="outline" className={statusColors[run.status] || ""}>
-                        {run.status}
-                      </Badge>
+                View all
+                <ArrowRight className="size-3" />
+              </button>
+            )}
+          </div>
+          {recentRuns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-12 text-center">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+                <FileText className="size-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium">No runs yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Create a payroll run to pay your employees
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border bg-card divide-y">
+              {recentRuns.map((run) => (
+                <button
+                  key={run.id}
+                  onClick={() => router.push(`/payroll/runs/${run.id}`)}
+                  className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <FileText className="size-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {run.payPeriodStart} to {run.payPeriodEnd}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="outline" className={statusColors[run.status] || ""}>
+                          {run.status}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs text-muted-foreground">Gross / Net</p>
-                  <p className="text-sm font-mono tabular-nums">
-                    {formatMoney(run.totalGross)} / {formatMoney(run.totalNet)}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">Gross / Net</p>
+                    <p className="text-sm font-mono tabular-nums">
+                      {formatMoney(run.totalGross)} / {formatMoney(run.totalNet)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Right column (~40%) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Payroll Breakdown */}
+          <motion.div {...anim(0.25)} className="space-y-3">
+            <h3 className="text-sm font-semibold">Payroll Breakdown</h3>
+            <div className="rounded-xl border bg-card p-4 space-y-4">
+              {breakdownRun ? (
+                <>
+                  {/* Stacked horizontal bar */}
+                  <div className="h-3 w-full rounded-full overflow-hidden bg-muted flex">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${netPct}%` }}
+                      transition={{ duration: 0.6, delay: 0.35 }}
+                      className="h-full bg-emerald-500 dark:bg-emerald-400"
+                    />
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${deductionsPct}%` }}
+                      transition={{ duration: 0.6, delay: 0.45 }}
+                      className="h-full bg-amber-500 dark:bg-amber-400"
+                    />
+                  </div>
+
+                  {/* Legend */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                        <span className="text-muted-foreground">Net Pay</span>
+                      </div>
+                      <span className="font-mono tabular-nums font-medium">
+                        {formatMoney(breakdownRun.totalNet)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                        <span className="text-muted-foreground">Deductions</span>
+                      </div>
+                      <span className="font-mono tabular-nums font-medium">
+                        {formatMoney(breakdownRun.totalDeductions)}
+                      </span>
+                    </div>
+                    <div className="h-px bg-border" />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground font-medium">Total Gross</span>
+                      <span className="font-mono tabular-nums font-semibold">
+                        {formatMoney(breakdownRun.totalGross)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center py-6 text-center">
+                  <BarChart3 className="size-5 text-muted-foreground/50 mb-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Run your first payroll to see a breakdown
                   </p>
                 </div>
-              </button>
-            ))}
-          </div>
-        )}
+              )}
+            </div>
+          </motion.div>
+
+          {/* Quick Actions */}
+          <motion.div {...anim(0.3)} className="space-y-3">
+            <h3 className="text-sm font-semibold">Quick Actions</h3>
+            <div className="rounded-xl border bg-card p-4 flex flex-col gap-2">
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+                onClick={() => router.push("/payroll/runs")}
+              >
+                <Plus className="mr-2 size-4" />
+                New Run
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => openDrawer("employee")}
+              >
+                <Users className="mr-2 size-4" />
+                Add Employee
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </ContentReveal>
   );

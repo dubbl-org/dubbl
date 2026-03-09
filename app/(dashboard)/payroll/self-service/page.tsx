@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { User, FileText, CalendarDays, Clock, Send, Save } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,7 +114,6 @@ export default function SelfServicePage() {
   if (!profile) {
     return (
       <ContentReveal className="space-y-6">
-        <PageHeader title="Self-Service" description="View your payroll information." />
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
             <User className="size-5 text-muted-foreground" />
@@ -129,8 +127,6 @@ export default function SelfServicePage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader title="Self-Service Portal" description={`Welcome, ${profile.name}`} />
-
       {/* Quick stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">

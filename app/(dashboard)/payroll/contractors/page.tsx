@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, MotionConfig } from "motion/react";
-import { Briefcase, DollarSign, FileText, Plus, Search, Users, ArrowUpDown, X } from "lucide-react";
+import { Briefcase, DollarSign, FileText, Plus, Search, Users, Loader2, X } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,16 +30,12 @@ interface Contractor {
   hourlyRate: number | null;
   currency: string;
   isActive: boolean;
+  createdAt?: string;
 }
 
 type StatusFilter = "all" | "active" | "inactive";
-type SortKey = "name" | "company" | "rate";
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "name", label: "Name" },
-  { value: "company", label: "Company" },
-  { value: "rate", label: "Rate" },
-];
+const PAGE_SIZE = 50;
 
 const anim = (delay: number) => ({
   initial: { opacity: 0, y: 12 } as const,
@@ -48,66 +43,152 @@ const anim = (delay: number) => ({
   transition: { duration: 0.3, delay } as const,
 });
 
+function sortContractors(list: Contractor[], sortBy: string, sortOrder: "asc" | "desc"): Contractor[] {
+  const dir = sortOrder === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    switch (sortBy) {
+      case "name":
+        return dir * a.name.localeCompare(b.name);
+      case "rate":
+        return dir * ((a.hourlyRate ?? 0) - (b.hourlyRate ?? 0));
+      case "created":
+      default:
+        return dir * ((a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+    }
+  });
+}
+
 export default function ContractorsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
+
   const [contractors, setContractors] = useState<Contractor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [refetching, setRefetching] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [fetchKey, setFetchKey] = useState(0);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortValue, setSortValue] = useState("created:desc");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const pendingSearch = search !== debouncedSearch;
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortBy, setSortBy] = useState<SortKey>("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [fetchKey, setFetchKey] = useState(0);
+
+  const [searchKey, setSearchKey] = useState(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const fetchData = useCallback(() => {
+  const [sortBy, sortOrder] = useMemo(() => {
+    const [key, order] = sortValue.split(":");
+    return [key, order as "asc" | "desc"] as const;
+  }, [sortValue]);
+
+  const hasMore = contractors.length < totalCount;
+
+  const buildParams = useCallback((p: number) => {
+    const params = new URLSearchParams();
+    if (statusFilter !== "all") params.set("isActive", statusFilter === "active" ? "true" : "false");
+    params.set("page", String(p));
+    params.set("limit", String(PAGE_SIZE));
+    return params;
+  }, [statusFilter]);
+
+  // Fetch first page when filter changes
+  useEffect(() => {
     if (!orgId) return;
-    fetch("/api/v1/payroll/contractors", {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRefetching(true);
+    setPage(1);
+
+    fetch(`/api/v1/payroll/contractors?${buildParams(1)}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then((data) => { if (data.data) setContractors(data.data); })
-      .finally(() => setLoading(false));
-  }, [orgId]);
+      .then((data) => {
+        if (cancelled) return;
+        setContractors(data.data || []);
+        setTotalCount(data.pagination?.total || 0);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInitialLoad(false);
+          setRefetching(false);
+          setFetchKey((k) => k + 1);
+        }
+      });
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+    return () => { cancelled = true; };
+  }, [orgId, buildParams]);
 
-  /* Re-animate on filter changes */
-  useEffect(() => {
-    if (!loading) setFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, sortBy, sortOrder, debouncedSearch]);
+  // Load more
+  const loadMore = useCallback(() => {
+    if (!orgId || loadingMore) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
 
-  const filtered = contractors
-    .filter((c) => {
-      if (statusFilter === "active" && !c.isActive) return false;
-      if (statusFilter === "inactive" && c.isActive) return false;
-      if (!debouncedSearch) return true;
-      const q = debouncedSearch.toLowerCase();
-      return c.name.toLowerCase().includes(q) || c.company?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+    fetch(`/api/v1/payroll/contractors?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
     })
-    .sort((a, b) => {
-      const dir = sortOrder === "asc" ? 1 : -1;
-      switch (sortBy) {
-        case "company": return dir * (a.company ?? "").localeCompare(b.company ?? "");
-        case "rate": return dir * ((a.hourlyRate ?? 0) - (b.hourlyRate ?? 0));
-        case "name": default: return dir * a.name.localeCompare(b.name);
-      }
-    });
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) {
+          setContractors((prev) => [...prev, ...data.data]);
+          setPage(nextPage);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [orgId, page, buildParams, loadingMore]);
 
-  if (loading) return <BrandLoader />;
+  // Infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !refetching) loadMore();
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore, refetching]);
+
+  // Client-side search filtering
+  const filteredContractors = useMemo(() => {
+    let list = contractors;
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.company ?? "").toLowerCase().includes(q) ||
+          (c.email ?? "").toLowerCase().includes(q)
+      );
+    }
+    return sortContractors(list, sortBy, sortOrder);
+  }, [contractors, debouncedSearch, sortBy, sortOrder]);
+
+  // Bump searchKey when debounced search changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchKey((k) => k + 1);
+  }, [debouncedSearch]);
+
+  if (initialLoad) return <BrandLoader />;
 
   const activeCount = contractors.filter((c) => c.isActive).length;
   const inactiveCount = contractors.filter((c) => !c.isActive).length;
-  const hasContractors = contractors.length > 0;
 
-  if (!hasContractors) {
+  // Empty state: no contractors at all and no filters applied
+  if (!refetching && contractors.length === 0 && statusFilter === "all" && !search) {
     return (
       <ContentReveal className="space-y-6">
-        <PageHeader title="Contractors" description="Manage contractors and their payments.">
+        {/* Actions */}
+        <div className="flex justify-end">
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
@@ -115,18 +196,13 @@ export default function ContractorsPage() {
           >
             <Plus className="size-3" /> Add Contractor
           </Button>
-        </PageHeader>
+        </div>
 
         {/* Main hero empty state */}
         <motion.div
           {...anim(0.2)}
-          className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/20 dark:to-transparent"
+          className="relative overflow-hidden rounded-2xl border-2 border-dashed"
         >
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-
           <div className="relative flex flex-col items-center justify-center py-20 px-6 text-center">
             {/* Animated icons */}
             <div className="relative mb-6">
@@ -134,9 +210,9 @@ export default function ContractorsPage() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="flex size-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+                className="flex size-16 items-center justify-center rounded-2xl bg-muted ring-4 ring-muted/50"
               >
-                <Briefcase className="size-8 text-emerald-600 dark:text-emerald-400" />
+                <Briefcase className="size-8 text-foreground" />
               </motion.div>
               <motion.div
                 initial={{ scale: 0 }}
@@ -203,7 +279,8 @@ export default function ContractorsPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader title="Contractors" description="Manage contractors and their payments.">
+      {/* Actions */}
+      <div className="flex justify-end">
         <Button
           size="sm"
           className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
@@ -211,7 +288,7 @@ export default function ContractorsPage() {
         >
           <Plus className="size-3" /> Add Contractor
         </Button>
-      </PageHeader>
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -241,7 +318,7 @@ export default function ContractorsPage() {
             <span className="text-[11px] font-medium uppercase tracking-wide">Total Contractors</span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
-            {contractors.length}
+            {totalCount}
           </p>
         </motion.div>
       </div>
@@ -269,34 +346,27 @@ export default function ContractorsPage() {
             )}
           </div>
 
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-            <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs">
-              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
-              <SelectValue />
+          <Select value={sortValue} onValueChange={setSortValue}>
+            <SelectTrigger className="h-8 w-full sm:w-[160px] text-xs">
+              <SelectValue placeholder="Sort by..." />
             </SelectTrigger>
             <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
+              <SelectItem value="created:desc">Newest first</SelectItem>
+              <SelectItem value="created:asc">Oldest first</SelectItem>
+              <SelectItem value="name:asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name:desc">Name (Z-A)</SelectItem>
+              <SelectItem value="rate:desc">Highest rate</SelectItem>
+              <SelectItem value="rate:asc">Lowest rate</SelectItem>
             </SelectContent>
           </Select>
-
-          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => setSortOrder((p) => (p === "asc" ? "desc" : "asc"))}>
-            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
-          </Button>
         </div>
       </div>
 
       {/* List */}
-      {pendingSearch ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="brand-loader" aria-label="Loading">
-            <div className="brand-loader-circle brand-loader-circle-1" />
-            <div className="brand-loader-circle brand-loader-circle-2" />
-          </div>
-        </div>
-      ) : filtered.length === 0 ? (
-        <ContentReveal key={fetchKey}>
+      {refetching || pendingSearch ? (
+        <BrandLoader className="h-48" />
+      ) : filteredContractors.length === 0 ? (
+        <ContentReveal key={`${fetchKey}-${searchKey}`}>
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
               <Briefcase className="size-5 text-muted-foreground" />
@@ -306,41 +376,58 @@ export default function ContractorsPage() {
           </div>
         </ContentReveal>
       ) : (
-        <MotionConfig reducedMotion="never">
-          <motion.div
-            key={fetchKey}
-            initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-            style={{ willChange: "opacity, transform, filter" }}
-          >
-            <div className="rounded-xl border bg-card divide-y">
-              {filtered.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => router.push(`/payroll/contractors/${c.id}`)}
-                  className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <Briefcase className="size-4 text-muted-foreground" />
+        <ContentReveal key={`${fetchKey}-${searchKey}`}>
+          <MotionConfig reducedMotion="never">
+            <motion.div
+              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+              style={{ willChange: "opacity, transform, filter" }}
+            >
+              <div className="rounded-xl border bg-card divide-y">
+                {filteredContractors.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => router.push(`/payroll/contractors/${c.id}`)}
+                    className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Briefcase className="size-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.company || c.email || "-"}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">{c.company || c.email || "-"}</p>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {c.hourlyRate && <span className="text-sm font-mono tabular-nums">{formatMoney(c.hourlyRate)}/hr</span>}
+                      <Badge variant="outline" className={cn("text-[11px]", c.isActive ? "text-emerald-600" : "text-muted-foreground")}>
+                        {c.isActive ? "Active" : "Inactive"}
+                      </Badge>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {c.hourlyRate && <span className="text-sm font-mono tabular-nums">{formatMoney(c.hourlyRate)}/hr</span>}
-                    <Badge variant="outline" className={cn("text-[11px]", c.isActive ? "text-emerald-600" : "text-muted-foreground")}>
-                      {c.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </MotionConfig>
+        </ContentReveal>
+      )}
+
+      {/* Infinite scroll sentinel & count */}
+      {!refetching && !pendingSearch && filteredContractors.length > 0 && (
+        <>
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-xs text-muted-foreground">
+              Showing {contractors.length} of {totalCount} contractor{totalCount !== 1 ? "s" : ""}
+            </p>
+          </div>
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-4">
+              {loadingMore && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
             </div>
-          </motion.div>
-        </MotionConfig>
+          )}
+        </>
       )}
     </ContentReveal>
   );

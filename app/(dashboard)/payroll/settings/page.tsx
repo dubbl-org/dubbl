@@ -5,7 +5,6 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Save, Plus, Trash2, Settings, Shield, Clock, CalendarDays, DollarSign, Layers, ExternalLink } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -341,11 +340,6 @@ export default function PayrollSettingsPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader
-        title="Payroll Settings"
-        description="Configure payroll defaults, deductions, tax brackets, and more."
-      />
-
       <div className="max-w-4xl space-y-8">
         {/* General Settings */}
         <motion.div {...anim(0)}>

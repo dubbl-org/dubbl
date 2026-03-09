@@ -11,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,11 +150,6 @@ export default function EmployeesPage() {
   if (employees.length === 0) {
     return (
       <ContentReveal className="space-y-6">
-        <PageHeader
-          title="Employees"
-          description="Manage your payroll employees."
-        />
-
         {/* Visual empty state */}
         <div className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50">
           <div className="relative flex flex-col items-center py-16 px-6">
@@ -256,11 +250,6 @@ export default function EmployeesPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader
-        title="Employees"
-        description="Manage your payroll employees."
-      />
-
       {/* Toolbar */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

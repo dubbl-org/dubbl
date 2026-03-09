@@ -27,10 +27,15 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const { page, limit, offset } = parsePagination(url);
 
+    const isActive = url.searchParams.get("isActive");
+
     const conditions = [
       eq(contractor.organizationId, ctx.organizationId),
       notDeleted(contractor.deletedAt),
     ];
+
+    if (isActive === "true") conditions.push(eq(contractor.isActive, true));
+    if (isActive === "false") conditions.push(eq(contractor.isActive, false));
 
     const contractors = await db.query.contractor.findMany({
       where: and(...conditions),

@@ -14,7 +14,6 @@ import {
   BarChart3,
   Crown,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,11 +166,6 @@ export default function TeamsPage() {
   if (teams.length === 0) {
     return (
       <ContentReveal className="space-y-6">
-        <PageHeader
-          title="Teams"
-          description="Organize members into collaborative teams"
-        />
-
         {/* Ghost stat cards */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -197,13 +191,8 @@ export default function TeamsPage() {
         {/* Main hero empty state */}
         <motion.div
           {...anim(0.2)}
-          className="relative overflow-hidden rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-transparent dark:from-emerald-950/20 dark:to-transparent"
+          className="relative overflow-hidden rounded-2xl border-2 border-dashed"
         >
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-
           <div className="relative flex flex-col items-center justify-center py-20 px-6 text-center">
             {/* Animated icon cluster */}
             <div className="relative mb-6">
@@ -211,9 +200,9 @@ export default function TeamsPage() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="flex size-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 ring-4 ring-emerald-100/50 dark:ring-emerald-900/30"
+                className="flex size-16 items-center justify-center rounded-2xl bg-muted ring-4 ring-muted/50"
               >
-                <FolderKanban className="size-8 text-emerald-600 dark:text-emerald-400" />
+                <FolderKanban className="size-8 text-foreground" />
               </motion.div>
               <motion.div
                 initial={{ scale: 0 }}
@@ -318,10 +307,8 @@ export default function TeamsPage() {
   /* ── Data state ── */
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader
-        title="Teams"
-        description="Organize members into collaborative teams"
-      >
+      {/* Actions */}
+      <div className="flex justify-end">
         <Button
           onClick={handleCreateTeam}
           size="sm"
@@ -330,7 +317,7 @@ export default function TeamsPage() {
           <Plus className="mr-1.5 size-3.5" />
           New Team
         </Button>
-      </PageHeader>
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
