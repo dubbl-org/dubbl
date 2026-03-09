@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { motion, MotionConfig } from "motion/react";
 import {
   Warehouse,
   Pencil,
@@ -13,6 +14,9 @@ import {
   Plus,
   Package,
   ArrowRight,
+  Search,
+  ArrowUpDown,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -21,6 +25,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -31,8 +47,8 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
 
 interface WarehouseItem {
   id: string;
@@ -43,14 +59,33 @@ interface WarehouseItem {
   isActive: boolean;
 }
 
+type StatusFilter = "all" | "active" | "inactive";
+type SortKey = "name" | "code" | "default";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "name", label: "Name" },
+  { value: "code", label: "Code" },
+  { value: "default", label: "Default first" },
+];
+
 export default function WarehousesPage() {
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
+  const [fetchKey, setFetchKey] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<WarehouseItem | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Search, filter, sort
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
+  const pendingSearch = search !== debouncedSearch;
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Form fields
   const [formName, setFormName] = useState("");
@@ -62,9 +97,12 @@ export default function WarehousesPage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  function fetchWarehouses() {
+  const fetchWarehouses = useCallback(() => {
     const id = localStorage.getItem("activeOrgId");
     if (!id) return;
+    const isRefetch = !loading;
+    if (isRefetch) setRefetching(true);
+
     fetch("/api/v1/warehouses", {
       headers: { "x-organization-id": id },
     })
@@ -72,15 +110,60 @@ export default function WarehousesPage() {
       .then((data) => {
         setWarehouses(data.data || []);
       })
-      .finally(() => setLoading(false));
-  }
+      .finally(() => {
+        setLoading(false);
+        setRefetching(false);
+        setFetchKey((k) => k + 1);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId]);
 
   useEffect(() => {
     fetchWarehouses();
     const handler = () => fetchWarehouses();
     window.addEventListener("refetch-warehouses", handler);
     return () => window.removeEventListener("refetch-warehouses", handler);
-  }, []);
+  }, [fetchWarehouses]);
+
+  // Re-fetch on filter/sort/search changes
+  useEffect(() => {
+    if (!loading) fetchWarehouses();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, sortBy, sortOrder, debouncedSearch]);
+
+  // Client-side filtering + sorting
+  const filtered = warehouses
+    .filter((w) => {
+      if (statusFilter === "active" && !w.isActive) return false;
+      if (statusFilter === "inactive" && w.isActive) return false;
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        const nameMatch = w.name.toLowerCase().includes(q);
+        const codeMatch = w.code.toLowerCase().includes(q);
+        const addrMatch = w.address?.toLowerCase().includes(q);
+        if (!nameMatch && !codeMatch && !addrMatch) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const dir = sortOrder === "asc" ? 1 : -1;
+      switch (sortBy) {
+        case "code":
+          return dir * a.code.localeCompare(b.code);
+        case "default":
+          return (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0) || dir * a.name.localeCompare(b.name);
+        case "name":
+        default:
+          return dir * a.name.localeCompare(b.name);
+      }
+    });
+
+  // Stats (unfiltered)
+  const totalWarehouses = warehouses.length;
+  const activeCount = warehouses.filter((w) => w.isActive).length;
+  const inactiveCount = warehouses.filter((w) => !w.isActive).length;
+  const defaultWarehouse = warehouses.find((w) => w.isDefault);
+  const withAddress = warehouses.filter((w) => w.address).length;
 
   function openEdit(warehouse: WarehouseItem) {
     setEditing(warehouse);
@@ -190,13 +273,11 @@ export default function WarehousesPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  function toggleSortOrder() {
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+  }
 
-  const totalWarehouses = warehouses.length;
-  const activeCount = warehouses.filter((w) => w.isActive).length;
-  const inactiveCount = warehouses.filter((w) => !w.isActive).length;
-  const defaultWarehouse = warehouses.find((w) => w.isDefault);
-  const withAddress = warehouses.filter((w) => w.address).length;
+  if (loading) return <BrandLoader />;
 
   if (warehouses.length === 0) {
     return (
@@ -330,15 +411,15 @@ export default function WarehousesPage() {
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-3xl font-bold font-mono tabular-nums">{totalWarehouses}</p>
+              <p className="text-3xl font-bold font-mono tabular-nums truncate">{totalWarehouses}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Total</p>
             </div>
             <div>
-              <p className="text-3xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{activeCount}</p>
+              <p className="text-3xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{activeCount}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Active</p>
             </div>
             <div>
-              <p className="text-3xl font-bold font-mono tabular-nums text-zinc-500">{inactiveCount}</p>
+              <p className="text-3xl font-bold font-mono tabular-nums truncate text-zinc-500">{inactiveCount}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Inactive</p>
             </div>
           </div>
@@ -378,7 +459,7 @@ export default function WarehousesPage() {
               <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{activeCount}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{activeCount}</p>
               <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">Active</p>
             </div>
           </motion.div>
@@ -393,7 +474,7 @@ export default function WarehousesPage() {
               <XCircle className="size-4 text-zinc-500" />
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold font-mono tabular-nums text-zinc-500">{inactiveCount}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate text-zinc-500">{inactiveCount}</p>
               <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">Inactive</p>
             </div>
           </motion.div>
@@ -403,7 +484,7 @@ export default function WarehousesPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.13 }}
-            className="col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-4 flex items-center gap-3"
+            className="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-4 flex items-center gap-3"
           >
             <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
               <Star className="size-4 text-emerald-600 dark:text-emerald-400" />
@@ -422,105 +503,192 @@ export default function WarehousesPage() {
         </div>
       </div>
 
-      {/* Warehouse cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {warehouses.map((warehouse, i) => (
-          <motion.div
-            key={warehouse.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 + i * 0.04 }}
-            className="rounded-xl border bg-card p-4 space-y-3"
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="inactive">Inactive</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Button
+            size="sm"
+            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => openDrawer("warehouse")}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                    warehouse.isActive
-                      ? "bg-emerald-50 dark:bg-emerald-950/40"
-                      : "bg-muted"
-                  )}
-                >
-                  <Warehouse
-                    className={cn(
-                      "size-4",
-                      warehouse.isActive
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-muted-foreground"
-                    )}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {warehouse.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {warehouse.code}
-                  </p>
-                </div>
-              </div>
+            <Plus className="size-3" />
+            New Warehouse
+          </Button>
+        </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                {warehouse.isDefault && (
-                  <Badge
-                    variant="outline"
-                    className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 text-[11px]"
-                  >
-                    Default
-                  </Badge>
-                )}
-                {!warehouse.isActive && (
-                  <Badge variant="outline" className="text-[11px]">
-                    Inactive
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {warehouse.address && (
-              <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                <MapPin className="size-3 mt-0.5 shrink-0" />
-                <span className="line-clamp-2">{warehouse.address}</span>
-              </div>
-            )}
-
-            <div className="flex items-center gap-1.5 pt-1 border-t">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => openEdit(warehouse)}
+        {/* Search + Sort */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, code, or address..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                <Pencil className="size-3 mr-1" />
-                Edit
-              </Button>
-              {!warehouse.isDefault && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => handleSetDefault(warehouse)}
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+            <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
+              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
+            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Warehouse cards */}
+      {refetching || pendingSearch ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="brand-loader" aria-label="Loading">
+            <div className="brand-loader-circle brand-loader-circle-1" />
+            <div className="brand-loader-circle brand-loader-circle-2" />
+          </div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <ContentReveal key={fetchKey}>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+              <Warehouse className="size-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium">No warehouses found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {search ? "Try a different search term" : "No warehouses match this filter"}
+            </p>
+          </div>
+        </ContentReveal>
+      ) : (
+        <MotionConfig reducedMotion="never">
+          <motion.div
+            key={fetchKey}
+            initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            style={{ willChange: "opacity, transform, filter" }}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((warehouse) => (
+                <div
+                  key={warehouse.id}
+                  className="rounded-xl border bg-card p-4 space-y-3"
                 >
-                  <Star className="size-3 mr-1" />
-                  Set Default
-                </Button>
-              )}
-              {!warehouse.isDefault && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
-                  onClick={() => handleDelete(warehouse)}
-                >
-                  <Trash2 className="size-3 mr-1" />
-                  Delete
-                </Button>
-              )}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                          warehouse.isActive
+                            ? "bg-emerald-50 dark:bg-emerald-950/40"
+                            : "bg-muted"
+                        )}
+                      >
+                        <Warehouse
+                          className={cn(
+                            "size-4",
+                            warehouse.isActive
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-muted-foreground"
+                          )}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {warehouse.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {warehouse.code}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {warehouse.isDefault && (
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 text-[11px]"
+                        >
+                          Default
+                        </Badge>
+                      )}
+                      {!warehouse.isActive && (
+                        <Badge variant="outline" className="text-[11px]">
+                          Inactive
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {warehouse.address && (
+                    <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <MapPin className="size-3 mt-0.5 shrink-0" />
+                      <span className="line-clamp-2">{warehouse.address}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1.5 pt-1 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => openEdit(warehouse)}
+                    >
+                      <Pencil className="size-3 mr-1" />
+                      Edit
+                    </Button>
+                    {!warehouse.isDefault && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleSetDefault(warehouse)}
+                      >
+                        <Star className="size-3 mr-1" />
+                        Set Default
+                      </Button>
+                    )}
+                    {!warehouse.isDefault && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+                        onClick={() => handleDelete(warehouse)}
+                      >
+                        <Trash2 className="size-3 mr-1" />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
-        ))}
-      </div>
+        </MotionConfig>
+      )}
 
       {/* Edit Sheet */}
       <Sheet
