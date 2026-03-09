@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -160,7 +160,7 @@ function CounterCell({
       </button>
 
       {/* Value display */}
-      <div className="flex h-7 items-center justify-center border-y w-10 bg-background">
+      <div className="flex h-7 items-center justify-center border-y w-16 bg-background">
         {isSaving ? (
           <Loader2 className="size-3 animate-spin text-muted-foreground" />
         ) : (
@@ -209,7 +209,7 @@ export default function StockTakeDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [blindMode, setBlindMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearch = useDebounce(searchQuery);
+  const debouncedSearch = useDebounce(searchQuery, 150);
   const [lineFilter, setLineFilter] = useState<LineFilter>("all");
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [savingLines, setSavingLines] = useState<Set<string>>(new Set());
@@ -845,9 +845,18 @@ export default function StockTakeDetailPage() {
                 </div>
               </div>
             ) : (
+            <>
+            <MotionConfig reducedMotion="never">
+            <motion.div
+              key={debouncedSearch + lineFilter}
+              initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.8, delay: 0.12, ease: EASE_OUT }}
+              style={{ willChange: "opacity, transform, filter" }}
+            >
             <div className="rounded-xl border bg-card overflow-hidden">
               {/* Table header */}
-              <div className="grid grid-cols-[1fr_70px_96px_70px_50px] sm:grid-cols-[1fr_90px_110px_90px_70px] gap-2 px-4 py-2.5 border-b bg-muted/50">
+              <div className="grid grid-cols-[1fr_70px_130px_70px_50px] sm:grid-cols-[1fr_90px_150px_90px_70px] gap-4 px-5 py-2.5 border-b bg-muted/50">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Item
                 </p>
@@ -893,7 +902,7 @@ export default function StockTakeDetailPage() {
                           exit={{ opacity: 0, y: -8 }}
                           transition={{ duration: 0.2, ease: "easeOut" }}
                           className={cn(
-                            "grid grid-cols-[1fr_70px_96px_70px_50px] sm:grid-cols-[1fr_90px_110px_90px_70px] gap-2 px-4 py-3 items-center transition-colors duration-300",
+                            "grid grid-cols-[1fr_70px_130px_70px_50px] sm:grid-cols-[1fr_90px_150px_90px_70px] gap-4 px-5 py-3 items-center transition-colors duration-300",
                             getRowVarianceClass(line)
                           )}
                         >
@@ -976,21 +985,18 @@ export default function StockTakeDetailPage() {
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* Showing X of Y - only when filtering */}
+            {(debouncedSearch || lineFilter !== "all") && (
+              <p className="text-xs text-muted-foreground text-center pt-3">
+                Showing {filteredLines.length} of {totalLines} items
+              </p>
             )}
 
-            {/* Showing X of Y */}
-            <AnimatePresence>
-              {(debouncedSearch || lineFilter !== "all") && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-xs text-muted-foreground text-center"
-                >
-                  Showing {filteredLines.length} of {totalLines} items
-                </motion.p>
-              )}
-            </AnimatePresence>
+            </motion.div>
+            </MotionConfig>
+            </>
+            )}
           </div>
         )}
       </ContentReveal>

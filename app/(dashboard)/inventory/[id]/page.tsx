@@ -259,6 +259,7 @@ export default function InventoryItemDetailsPage() {
       {warehouseStocks.length > 0 && (
         <>
           <div className="h-px bg-border mt-10" />
+          <div className="mt-10">
           <Section title="Stock by Warehouse" description="Quantity breakdown across warehouses.">
             <div className="rounded-lg border divide-y">
               {warehouseStocks.map((ws) => (
@@ -280,26 +281,29 @@ export default function InventoryItemDetailsPage() {
               ))}
             </div>
           </Section>
+          </div>
         </>
       )}
 
       {/* Barcode */}
       <div className="h-px bg-border mt-10" />
-      <Section title="Barcode" description="Generated from SKU or item code.">
-        <div className="flex flex-col items-start gap-3">
-          <div className="rounded-lg border bg-white p-3">
-            <canvas ref={barcodeRef} />
+      <div className="mt-10">
+        <Section title="Barcode" description="Generated from SKU or item code.">
+          <div className="flex flex-col items-start gap-3">
+            <div className="rounded-lg border bg-white p-3">
+              <canvas ref={barcodeRef} />
+            </div>
+            <Button type="button" size="sm" variant="outline" onClick={printBarcode}>
+              <Printer className="mr-1.5 size-3.5" />
+              Print Barcode
+            </Button>
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={printBarcode}>
-            <Printer className="mr-1.5 size-3.5" />
-            Print Barcode
-          </Button>
-        </div>
-      </Section>
+        </Section>
+      </div>
 
-      <div className="h-px bg-border" />
-
-      <Section title="Danger zone" description="Irreversible actions for this item.">
+      <div className="h-px bg-border mt-10" />
+      <div className="mt-10">
+        <Section title="Danger zone" description="Irreversible actions for this item.">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
           <div>
             <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete this item</p>
@@ -317,6 +321,7 @@ export default function InventoryItemDetailsPage() {
           </Button>
         </div>
       </Section>
+      </div>
 
       {confirmDialog}
     </>
