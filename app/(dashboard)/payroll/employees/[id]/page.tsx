@@ -36,6 +36,10 @@ interface EmployeeDetail {
   startDate: string;
   endDate: string | null;
   isActive: boolean;
+  compensationType: string;
+  hourlyRate: number | null;
+  memberId: string | null;
+  member: { user: { name: string | null; email: string } } | null;
 }
 
 const anim = (delay: number) => ({
@@ -73,6 +77,8 @@ export default function EmployeeDetailPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [compensationType, setCompensationType] = useState("salary");
+  const [hourlyRate, setHourlyRate] = useState("");
 
   const orgId =
     typeof window !== "undefined"
@@ -100,6 +106,8 @@ export default function EmployeeDetailPage() {
           setStartDate(e.startDate || "");
           setEndDate(e.endDate || "");
           setIsActive(e.isActive);
+          setCompensationType(e.compensationType || "salary");
+          setHourlyRate(e.hourlyRate ? (e.hourlyRate / 100).toFixed(2) : "");
         }
       })
       .finally(() => setLoading(false));
@@ -124,6 +132,8 @@ export default function EmployeeDetailPage() {
           taxRate: Math.round(parseFloat(taxRate) * 100),
           bankAccountNumber: bankAccountNumber || null,
           isActive,
+          compensationType,
+          hourlyRate: hourlyRate ? Math.round(parseFloat(hourlyRate) * 100) : null,
         }),
       });
 
@@ -224,6 +234,11 @@ export default function EmployeeDetailPage() {
             <p className="text-sm text-muted-foreground">
               {emp.employeeNumber}{emp.position ? ` · ${emp.position}` : ""}
             </p>
+            {emp.member && (
+              <p className="text-xs text-muted-foreground">
+                Linked to {emp.member.user.name || emp.member.user.email}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -238,10 +253,18 @@ export default function EmployeeDetailPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Annual Salary</p>
-          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(salaryInCents)}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {compensationType === "salary" ? "Annual Salary" : compensationType === "hourly" ? "Hourly Rate" : "Compensation"}
+          </p>
+          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">
+            {compensationType === "salary"
+              ? formatMoney(salaryInCents)
+              : compensationType === "hourly"
+                ? formatMoney(Math.round(parseFloat(hourlyRate || "0") * 100))
+                : "-"}
+          </p>
         </motion.div>
         <motion.div {...anim(0.05)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Per-Period Pay</p>
@@ -250,6 +273,10 @@ export default function EmployeeDetailPage() {
         <motion.div {...anim(0.09)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tax Rate</p>
           <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">{taxRateNum}%</p>
+        </motion.div>
+        <motion.div {...anim(0.12)} className="rounded-xl border bg-card p-4">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Compensation Type</p>
+          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">{compensationType.charAt(0).toUpperCase() + compensationType.slice(1)}</p>
         </motion.div>
       </div>
 
@@ -292,7 +319,19 @@ export default function EmployeeDetailPage() {
 
         {/* Compensation */}
         <Section title="Compensation" description="Salary, pay frequency, and tax configuration.">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Compensation Type</Label>
+              <Select value={compensationType} onValueChange={setCompensationType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="salary">Salary</SelectItem>
+                  <SelectItem value="hourly">Hourly</SelectItem>
+                  <SelectItem value="milestone">Milestone</SelectItem>
+                  <SelectItem value="commission">Commission</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Annual Salary</Label>
               <Input
@@ -324,6 +363,12 @@ export default function EmployeeDetailPage() {
                 onChange={(e) => setTaxRate(e.target.value)}
               />
             </div>
+            {compensationType === "hourly" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Hourly Rate</Label>
+                <Input type="number" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+              </div>
+            )}
           </div>
         </Section>
 

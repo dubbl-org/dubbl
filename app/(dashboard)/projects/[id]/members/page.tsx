@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,6 +22,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/money";
 import { useProject } from "../project-context";
 
 const roleColors: Record<string, string> = {
@@ -37,6 +39,7 @@ export default function MembersPage() {
   const [selectedMemberId, setSelectedMemberId] = useState("none");
   const [selectedRole, setSelectedRole] = useState("contributor");
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [hourlyRate, setHourlyRate] = useState("");
 
   useEffect(() => {
     if (!orgId || !addOpen) return;
@@ -66,12 +69,12 @@ export default function MembersPage() {
       const res = await fetch(`/api/v1/projects/${projectId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ memberId: selectedMemberId, role: selectedRole }),
+        body: JSON.stringify({ memberId: selectedMemberId, role: selectedRole, hourlyRate: hourlyRate ? Math.round(parseFloat(hourlyRate) * 100) : undefined }),
       });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed"); }
       toast.success("Member added");
       setAddOpen(false);
-      setSelectedMemberId("none"); setSelectedRole("contributor");
+      setSelectedMemberId("none"); setSelectedRole("contributor"); setHourlyRate("");
       refresh();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
     finally { setSaving(false); }
@@ -163,6 +166,17 @@ export default function MembersPage() {
                 </div>
               </div>
             </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Compensation</p>
+              <div className="space-y-2">
+                <Label>Hourly Rate (optional)</Label>
+                <Input type="number" step="0.01" min={0} value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} placeholder="0.00" />
+                <p className="text-[11px] text-muted-foreground">Override the project-level hourly rate for this member.</p>
+              </div>
+            </div>
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -192,6 +206,9 @@ export default function MembersPage() {
                   <Badge variant="outline" className={cn("text-[9px] h-4 mt-1.5 capitalize", roleColors[m.role])}>
                     {m.role}
                   </Badge>
+                  {m.hourlyRate && (
+                    <span className="text-[10px] font-mono text-muted-foreground mt-0.5 block">{formatMoney(m.hourlyRate)}/hr</span>
+                  )}
                 </div>
                 <button onClick={() => removeMember(m.member.id)} disabled={removingId === m.member.id} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity absolute top-3 right-3", removingId === m.member.id && "opacity-100 pointer-events-none")}>
                   {removingId === m.member.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}

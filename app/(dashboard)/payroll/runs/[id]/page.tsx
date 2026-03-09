@@ -33,6 +33,8 @@ interface PayrollItemRow {
   taxAmount: number;
   deductions: number;
   netAmount: number;
+  type: string | null;
+  description: string | null;
   employee: { name: string; employeeNumber: string } | null;
 }
 
@@ -242,6 +244,16 @@ export default function PayrollRunDetailPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{item.employee?.name || "-"}</p>
                   <p className="text-xs text-muted-foreground font-mono">{item.employee?.employeeNumber}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {item.type && (
+                      <Badge variant="outline" className="text-[9px] h-4 capitalize">
+                        {item.type.replace(/_/g, " ")}
+                      </Badge>
+                    )}
+                    {item.description && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{item.description}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="hidden sm:block text-right">

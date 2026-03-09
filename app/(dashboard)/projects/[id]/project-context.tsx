@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 export interface ProjectMemberData {
   id: string;
   role: string;
+  hourlyRate: number | null;
   member: {
     id: string;
     role: string;
