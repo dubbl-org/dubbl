@@ -20,12 +20,14 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 export default function InventoryItemSuppliersPage() {
   const { id } = useParams<{ id: string }>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [linkOpen, setLinkOpen] = useState(false);
   const [contactId, setContactId] = useState("");
@@ -90,6 +92,14 @@ export default function InventoryItemSuppliersPage() {
   }
 
   async function handleUnlink(supplierId: string) {
+    const confirmed = await confirm({
+      title: "Unlink this supplier?",
+      description: "This will remove the supplier link from this item.",
+      confirmLabel: "Unlink",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -228,6 +238,7 @@ export default function InventoryItemSuppliersPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      {confirmDialog}
     </>
   );
 }
