@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
+import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { useInventoryItem } from "./layout";
 import JsBarcode from "jsbarcode";
 
@@ -29,6 +30,7 @@ export default function InventoryItemDetailsPage() {
   const router = useRouter();
   const { item, setItem } = useInventoryItem();
   const [saving, setSaving] = useState(false);
+  const [categoryId, setCategoryId] = useState(item.categoryId || "");
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -61,7 +63,7 @@ export default function InventoryItemDetailsPage() {
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
-          category: form.get("category") || null,
+          categoryId: categoryId || null,
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
@@ -164,8 +166,8 @@ export default function InventoryItemDetailsPage() {
                 <Input id="name" name="name" required defaultValue={item.name} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs" htmlFor="category">Category</Label>
-                <Input id="category" name="category" defaultValue={item.category || ""} placeholder="e.g. Electronics" />
+                <Label className="text-xs">Category</Label>
+                <CategoryPicker value={categoryId} onChange={setCategoryId} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs" htmlFor="sku">SKU</Label>

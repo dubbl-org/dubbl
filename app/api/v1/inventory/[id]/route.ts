@@ -13,6 +13,7 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
+  categoryId: z.string().uuid().nullable().optional(),
   sku: z.string().nullable().optional(),
   purchasePrice: z.number().int().min(0).optional(),
   salePrice: z.number().int().min(0).optional(),

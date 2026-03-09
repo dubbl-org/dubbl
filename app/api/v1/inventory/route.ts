@@ -14,6 +14,7 @@ const createSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
+  categoryId: z.string().uuid().nullable().optional(),
   sku: z.string().nullable().optional(),
   purchasePrice: z.number().int().min(0).default(0),
   salePrice: z.number().int().min(0).default(0),

@@ -28,6 +28,7 @@ export interface InventoryItemDetail {
   name: string;
   description: string | null;
   category: string | null;
+  categoryId: string | null;
   sku: string | null;
   imageUrl: string | null;
   purchasePrice: number;

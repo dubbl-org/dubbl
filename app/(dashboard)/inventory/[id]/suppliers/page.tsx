@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ContactPicker } from "@/components/dashboard/contact-picker";
 import {
   Sheet,
   SheetContent,
@@ -169,11 +170,12 @@ export default function InventoryItemSuppliersPage() {
           </SheetHeader>
           <div className="space-y-4 px-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">Contact ID *</Label>
-              <Input
+              <Label className="text-xs">Supplier *</Label>
+              <ContactPicker
                 value={contactId}
-                onChange={(e) => setContactId(e.target.value)}
-                placeholder="Paste supplier contact UUID"
+                onChange={setContactId}
+                type="supplier"
+                placeholder="Select supplier..."
               />
             </div>
             <div className="space-y-1.5">

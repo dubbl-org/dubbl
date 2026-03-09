@@ -49,6 +49,7 @@ import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
 import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
+import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
@@ -822,6 +823,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
 function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [categoryId, setCategoryId] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -838,7 +840,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
-          category: form.get("category") || null,
+          categoryId: categoryId || null,
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
@@ -889,8 +891,8 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="drawer-inv-category">Category</Label>
-                  <Input id="drawer-inv-category" name="category" placeholder="e.g. Electronics" />
+                  <Label>Category</Label>
+                  <CategoryPicker value={categoryId} onChange={setCategoryId} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-sku">SKU</Label>
@@ -2744,8 +2746,14 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
 // ---------------------------------------------------------------------------
 // Category Drawer
 // ---------------------------------------------------------------------------
+const CATEGORY_COLORS = [
+  "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+];
+
 function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
+  const [color, setColor] = useState(CATEGORY_COLORS[0]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2760,7 +2768,7 @@ function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void 
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           name: form.get("name"),
-          color: form.get("color") || null,
+          color: color || null,
           description: form.get("description") || null,
         }),
       });
@@ -2805,8 +2813,15 @@ function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             <div className="space-y-4">
               <SectionLabel>Details</SectionLabel>
               <div className="space-y-2">
-                <Label htmlFor="drawer-cat-color">Color</Label>
-                <Input id="drawer-cat-color" name="color" placeholder="#10b981" />
+                <Label>Color</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {CATEGORY_COLORS.map((c) => (
+                    <label key={c} className="cursor-pointer">
+                      <input type="radio" name="color" value={c} checked={color === c} onChange={() => setColor(c)} className="sr-only peer" />
+                      <div className="size-6 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-gray-400 transition-all" style={{ backgroundColor: c }} />
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="drawer-cat-desc">Description</Label>
