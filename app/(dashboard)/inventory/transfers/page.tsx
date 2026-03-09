@@ -6,12 +6,12 @@ import {
   Plus,
   Loader2,
   ArrowRight,
-  ArrowDown,
+
   Check,
   X,
   Warehouse,
   Package,
-  ClipboardCheck,
+
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -161,107 +161,109 @@ export default function TransfersPage() {
   if (transfers.length === 0) {
     return (
       <ContentReveal>
-        <div className="pt-12 pb-12 space-y-10">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Stock Transfers</h2>
-              <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                Move inventory between warehouses. Track shipments from draft to delivery.
-              </p>
+        <div className="pt-8 pb-12 space-y-8">
+          {/* Header */}
+          <div className="text-center max-w-lg mx-auto">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <span className="text-xs font-medium text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full uppercase tracking-wide">
+                Stock Transfers
+              </span>
             </div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Move inventory between locations
+            </h2>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Create transfers to track stock as it moves from one warehouse to another.
+            </p>
+          </div>
+
+          {/* Visual: Two warehouses with flow between them */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-0 max-w-2xl mx-auto">
+            {/* Source warehouse */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/40">
+                  <Warehouse className="size-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Main Warehouse</p>
+                  <p className="text-[11px] text-muted-foreground">WH-001</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {[
+                  { name: "Widget A", qty: 120, send: 30 },
+                  { name: "Sensor B", qty: 85, send: 15 },
+                  { name: "Cable C", qty: 200, send: 50 },
+                ].map((item) => (
+                  <div key={item.name} className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
+                    <span className="text-xs">{item.name}</span>
+                    <span className="text-xs font-mono text-red-500 dark:text-red-400">-{item.send}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Arrow flow */}
+            <div className="flex flex-col items-center gap-1 px-3">
+              <div className="w-8 h-px bg-border" />
+              <div className="flex size-7 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
+                <ArrowRight className="size-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="w-8 h-px bg-border" />
+              <span className="text-[10px] text-muted-foreground font-medium">95 units</span>
+            </div>
+
+            {/* Destination warehouse */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                  <Warehouse className="size-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">East DC</p>
+                  <p className="text-[11px] text-muted-foreground">WH-002</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {[
+                  { name: "Widget A", qty: 30 },
+                  { name: "Sensor B", qty: 15 },
+                  { name: "Cable C", qty: 50 },
+                ].map((item) => (
+                  <div key={item.name} className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
+                    <span className="text-xs">{item.name}</span>
+                    <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400">+{item.qty}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="flex justify-center">
             <Button
               onClick={() => openDrawer("transfer")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
               New Transfer
             </Button>
           </div>
 
-          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
-            {/* Left: mock transfer card */}
-            <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-              <div className="bg-muted/30 px-5 py-3 border-b">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Example transfer
-                </p>
+          {/* Status legend - compact horizontal */}
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {[
+              { label: "Draft", color: "bg-slate-400" },
+              { label: "In Transit", color: "bg-blue-400" },
+              { label: "Completed", color: "bg-emerald-400" },
+              { label: "Cancelled", color: "bg-red-400" },
+            ].map(({ label, color }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div className={`size-2 rounded-full ${color}`} />
+                <span className="text-[11px] text-muted-foreground">{label}</span>
               </div>
-              <div className="p-5 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40">
-                    <ArrowLeftRight className="size-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">Main Warehouse</p>
-                      <ArrowRight className="size-3 text-muted-foreground" />
-                      <p className="text-sm font-medium">East DC</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">3 items · Mar 8, 2026</p>
-                  </div>
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 text-[11px]">
-                    in transit
-                  </Badge>
-                </div>
-                <div className="h-px bg-border" />
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  {[
-                    { label: "Items", value: "3" },
-                    { label: "Total Qty", value: "45" },
-                    { label: "Status", value: "In Transit" },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="rounded-lg bg-muted/50 px-2 py-2">
-                      <p className="text-sm font-bold font-mono tabular-nums">{value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Right: lifecycle + benefits */}
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Transfer lifecycle
-                </p>
-                {[
-                  {
-                    title: "Draft",
-                    desc: "Select warehouses and items to transfer.",
-                    icon: Package,
-                    color: "border-l-slate-400",
-                  },
-                  {
-                    title: "In Transit",
-                    desc: "Goods are on their way between locations.",
-                    icon: Warehouse,
-                    color: "border-l-blue-400",
-                  },
-                  {
-                    title: "Completed",
-                    desc: "Stock levels update automatically on both sides.",
-                    icon: ClipboardCheck,
-                    color: "border-l-emerald-400",
-                  },
-                ].map(({ title, desc, icon: Icon, color }, idx) => (
-                  <div key={title}>
-                    <div className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
-                      <div className="flex items-center gap-2">
-                        <Icon className="size-3.5 text-muted-foreground" />
-                        <p className="text-sm font-medium">{title}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 ml-[22px]">{desc}</p>
-                    </div>
-                    {idx < 2 && (
-                      <div className="flex justify-center py-1">
-                        <ArrowDown className="size-3 text-muted-foreground/40" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
