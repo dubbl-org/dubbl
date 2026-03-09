@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { ArrowLeft, Save, Trash2, Users, Power, PowerOff } from "lucide-react";
+import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
-import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface EmployeeDetail {
   id: string;
@@ -167,14 +167,15 @@ export default function EmployeeDetailPage() {
 
   if (!emp) {
     return (
-      <ContentReveal className="space-y-6">
-        <PageHeader title="Employee not found" />
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/payroll/employees">
-            <ArrowLeft className="mr-2 size-4" />
-            Back to Employees
-          </Link>
-        </Button>
+      <ContentReveal>
+        <button
+          onClick={() => router.push("/payroll/employees")}
+          className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to employees
+        </button>
+        <p className="text-sm text-muted-foreground">Employee not found</p>
       </ContentReveal>
     );
   }
@@ -184,55 +185,56 @@ export default function EmployeeDetailPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader
-        title={`${emp.employeeNumber} · ${emp.name}`}
-        description={emp.position || undefined}
+      {/* Back link */}
+      <button
+        onClick={() => router.push("/payroll/employees")}
+        className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
       >
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/payroll/employees">
-            <ArrowLeft className="mr-2 size-4" />
-            Back
-          </Link>
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Save className="mr-2 size-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDelete}
-          className="text-red-600"
-        >
-          <Trash2 className="mr-2 size-4" />
-          Delete
-        </Button>
-      </PageHeader>
+        <ArrowLeft className="size-3.5" />
+        Back to employees
+      </button>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge
-          variant="outline"
-          className={
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "flex size-10 items-center justify-center rounded-xl",
             isActive
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-              : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
-          }
-        >
-          {isActive ? "Active" : "Inactive"}
-        </Badge>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => setIsActive(!isActive)}
-        >
-          {isActive ? "Set Inactive" : "Set Active"}
-        </Button>
+              ? "bg-emerald-50 dark:bg-emerald-950/40"
+              : "bg-muted"
+          )}>
+            <Users className={cn(
+              "size-5",
+              isActive
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-muted-foreground"
+            )} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">{emp.name}</h1>
+              <Badge variant="outline" className={
+                isActive
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  : ""
+              }>
+                {isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {emp.employeeNumber}{emp.position ? ` · ${emp.position}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setIsActive(!isActive)}>
+            {isActive ? (
+              <><PowerOff className="mr-1.5 size-3.5" />Deactivate</>
+            ) : (
+              <><Power className="mr-1.5 size-3.5" />Activate</>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Stat cards */}
@@ -254,45 +256,45 @@ export default function EmployeeDetailPage() {
       {/* Edit form */}
       <div className="max-w-4xl space-y-6">
         {/* Personal Info */}
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
-          <h3 className="text-sm font-semibold">Personal Info</h3>
+        <Section title="Personal Info" description="Basic employee information.">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Full Name</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Full Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email</Label>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Employee #</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Employee #</Label>
               <Input
                 value={employeeNumber}
                 onChange={(e) => setEmployeeNumber(e.target.value)}
                 disabled
               />
             </div>
-            <div className="space-y-2">
-              <Label>Position</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Position</Label>
               <Input
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
               />
             </div>
           </div>
-        </div>
+        </Section>
+
+        <div className="h-px bg-border" />
 
         {/* Compensation */}
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
-          <h3 className="text-sm font-semibold">Compensation</h3>
+        <Section title="Compensation" description="Salary, pay frequency, and tax configuration.">
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Annual Salary</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Annual Salary</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -300,8 +302,8 @@ export default function EmployeeDetailPage() {
                 onChange={(e) => setSalary(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Pay Frequency</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Pay Frequency</Label>
               <Select value={payFrequency} onValueChange={setPayFrequency}>
                 <SelectTrigger>
                   <SelectValue />
@@ -313,8 +315,8 @@ export default function EmployeeDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Tax Rate (%)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tax Rate (%)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -323,21 +325,22 @@ export default function EmployeeDetailPage() {
               />
             </div>
           </div>
-        </div>
+        </Section>
+
+        <div className="h-px bg-border" />
 
         {/* Details */}
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
-          <h3 className="text-sm font-semibold">Details</h3>
+        <Section title="Details" description="Banking and employment dates.">
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Bank Account Number</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bank Account Number</Label>
               <Input
                 value={bankAccountNumber}
                 onChange={(e) => setBankAccountNumber(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Start Date</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Start Date</Label>
               <Input
                 type="date"
                 value={startDate}
@@ -345,8 +348,8 @@ export default function EmployeeDetailPage() {
                 disabled
               />
             </div>
-            <div className="space-y-2">
-              <Label>End Date</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">End Date</Label>
               <Input
                 type="date"
                 value={endDate}
@@ -355,7 +358,44 @@ export default function EmployeeDetailPage() {
               />
             </div>
           </div>
+        </Section>
+
+        <div className="h-px bg-border" />
+
+        {/* Save */}
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Save className="mr-1.5 size-3.5" />
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
         </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Danger zone */}
+        <Section title="Danger zone" description="Irreversible actions for this employee.">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+            <div>
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete employee</p>
+              <p className="text-[12px] text-muted-foreground">
+                Permanently delete this employee and all associated data.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+            >
+              <Trash2 className="mr-1.5 size-3.5" />
+              Delete
+            </Button>
+          </div>
+        </Section>
       </div>
 
       {confirmDialog}

@@ -1,20 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { ArrowLeft, Play, Search, X, FileText } from "lucide-react";
-import Link from "next/link";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 interface PayrollRunDetail {
   id: string;
@@ -52,6 +51,7 @@ const anim = (delay: number) => ({
 
 export default function PayrollRunDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [run, setRun] = useState<PayrollRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -107,14 +107,15 @@ export default function PayrollRunDetailPage() {
 
   if (!run) {
     return (
-      <ContentReveal className="space-y-6">
-        <PageHeader title="Payroll run not found" />
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/payroll/runs">
-            <ArrowLeft className="mr-2 size-4" />
-            Back to Runs
-          </Link>
-        </Button>
+      <ContentReveal>
+        <button
+          onClick={() => router.push("/payroll/runs")}
+          className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to runs
+        </button>
+        <p className="text-sm text-muted-foreground">Payroll run not found</p>
       </ContentReveal>
     );
   }
@@ -129,32 +130,59 @@ export default function PayrollRunDetailPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <PageHeader
-        title={`${run.payPeriodStart} to ${run.payPeriodEnd}`}
-        description={run.processedAt ? `Processed ${run.processedAt}` : "Draft payroll run"}
+      {/* Back link */}
+      <button
+        onClick={() => router.push("/payroll/runs")}
+        className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
       >
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/payroll/runs">
-            <ArrowLeft className="mr-2 size-4" />
-            Back
-          </Link>
-        </Button>
-        {run.status === "draft" && (
-          <Button
-            size="sm"
-            onClick={handleProcess}
-            disabled={processing}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Play className="mr-2 size-4" />
-            {processing ? "Processing..." : "Process Payroll"}
-          </Button>
-        )}
-      </PageHeader>
+        <ArrowLeft className="size-3.5" />
+        Back to runs
+      </button>
 
-      <Badge variant="outline" className={statusColors[run.status] || ""}>
-        {run.status}
-      </Badge>
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "flex size-10 items-center justify-center rounded-xl",
+            run.status === "completed"
+              ? "bg-emerald-50 dark:bg-emerald-950/40"
+              : "bg-muted"
+          )}>
+            <FileText className={cn(
+              "size-5",
+              run.status === "completed"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-muted-foreground"
+            )} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">
+                {run.payPeriodStart} to {run.payPeriodEnd}
+              </h1>
+              <Badge variant="outline" className={statusColors[run.status] || ""}>
+                {run.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {run.processedAt ? `Processed ${run.processedAt}` : "Draft payroll run"}
+            </p>
+          </div>
+        </div>
+        {run.status === "draft" && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleProcess}
+              disabled={processing}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Play className="mr-1.5 size-3.5" />
+              {processing ? "Processing..." : "Process Payroll"}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
