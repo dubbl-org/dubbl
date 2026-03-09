@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { recurringTemplate, recurringTemplateLine } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -31,6 +31,15 @@ const createSchema = z.object({
   lines: z.array(lineSchema).min(1),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SORT_COLUMNS: Record<string, any> = {
+  created: recurringTemplate.createdAt,
+  name: recurringTemplate.name,
+  frequency: recurringTemplate.frequency,
+  nextRun: recurringTemplate.nextRunDate,
+  startDate: recurringTemplate.startDate,
+};
+
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
@@ -38,6 +47,9 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const type = url.searchParams.get("type");
     const status = url.searchParams.get("status");
+    const frequency = url.searchParams.get("frequency");
+    const sortBy = url.searchParams.get("sortBy") || "created";
+    const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
     // Process any due templates before listing
     await processRecurringTemplates(ctx.organizationId);
@@ -53,10 +65,16 @@ export async function GET(request: Request) {
     if (status && ["active", "paused", "completed"].includes(status)) {
       conditions.push(eq(recurringTemplate.status, status as "active" | "paused" | "completed"));
     }
+    if (frequency && ["weekly", "fortnightly", "monthly", "quarterly", "semi_annual", "annual"].includes(frequency)) {
+      conditions.push(eq(recurringTemplate.frequency, frequency as typeof recurringTemplate.frequency.enumValues[number]));
+    }
+
+    const sortCol = SORT_COLUMNS[sortBy] || recurringTemplate.createdAt;
+    const orderFn = sortOrder === "asc" ? asc : desc;
 
     const templates = await db.query.recurringTemplate.findMany({
       where: and(...conditions),
-      orderBy: desc(recurringTemplate.createdAt),
+      orderBy: orderFn(sortCol),
       limit,
       offset,
       with: { contact: true },

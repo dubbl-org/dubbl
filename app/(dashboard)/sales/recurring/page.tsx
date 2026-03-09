@@ -1,15 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, Calendar } from "lucide-react";
-import { Section } from "@/components/dashboard/section";
+import { Plus, RefreshCw, Calendar, X, Search, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { devDelay } from "@/lib/dev-delay";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
+import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -47,83 +56,134 @@ const frequencyLabels: Record<string, string> = {
   annual: "Annual",
 };
 
-const columns: Column<RecurringTemplate>[] = [
-  {
-    key: "name",
-    header: "Name",
-    render: (r) => <span className="text-sm font-medium">{r.name}</span>,
-  },
-  {
-    key: "contact",
-    header: "Customer",
-    render: (r) => (
-      <span className="text-sm font-medium">{r.contact?.name || "-"}</span>
-    ),
-  },
-  {
-    key: "frequency",
-    header: "Frequency",
-    className: "w-32",
-    render: (r) => (
-      <span className="text-sm">
-        {frequencyLabels[r.frequency] || r.frequency}
-      </span>
-    ),
-  },
-  {
-    key: "status",
-    header: "Status",
-    className: "w-28",
-    render: (r) => (
-      <Badge variant="outline" className={statusColors[r.status] || ""}>
-        {r.status}
-      </Badge>
-    ),
-  },
-  {
-    key: "nextRun",
-    header: "Next Run",
-    className: "w-28",
-    render: (r) => <span className="text-sm">{r.nextRunDate || "-"}</span>,
-  },
-  {
-    key: "occurrences",
-    header: "Occurrences",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">
-        {r.occurrencesGenerated} / {r.maxOccurrences ?? "\u221E"}
-      </span>
-    ),
-  },
-];
+function buildColumns(): Column<RecurringTemplate>[] {
+  return [
+    {
+      key: "name",
+      header: "Name",
+      sortKey: "name",
+      render: (r) => <span className="text-sm font-medium">{r.name}</span>,
+    },
+    {
+      key: "contact",
+      header: "Customer",
+      render: (r) => (
+        <span className="text-sm font-medium">{r.contact?.name || "-"}</span>
+      ),
+    },
+    {
+      key: "frequency",
+      header: "Frequency",
+      sortKey: "frequency",
+      className: "w-32",
+      render: (r) => (
+        <span className="text-sm">
+          {frequencyLabels[r.frequency] || r.frequency}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      className: "w-28",
+      render: (r) => (
+        <Badge variant="outline" className={statusColors[r.status] || ""}>
+          {r.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "nextRun",
+      header: "Next Run",
+      sortKey: "nextRun",
+      className: "w-28",
+      render: (r) => <span className="text-sm">{r.nextRunDate || "-"}</span>,
+    },
+    {
+      key: "startDate",
+      header: "Start Date",
+      sortKey: "startDate",
+      className: "w-28",
+      render: (r) => <span className="text-sm">{r.startDate}</span>,
+    },
+    {
+      key: "occurrences",
+      header: "Occurrences",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="font-mono text-sm tabular-nums">
+          {r.occurrencesGenerated} / {r.maxOccurrences ?? "\u221E"}
+        </span>
+      ),
+    },
+  ];
+}
 
 export default function RecurringInvoicesPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [refetching, setRefetching] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [fetchKey, setFetchKey] = useState(0);
+  const [summary, setSummary] = useState<{
+    totalCount: number;
+    activeCount: number;
+    pausedCount: number;
+    completedCount: number;
+    totalGenerated: number;
+  } | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [frequencyFilter, setFrequencyFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("created");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
   const [upcoming, setUpcoming] = useState<
     { templateName: string; contactName: string; lineTotal: number; dates: { date: string; occurrence: number }[] }[]
   >([]);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+  const PAGE_SIZE = 50;
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-    const params = new URLSearchParams({ type: "invoice" });
+  const columns = useMemo(() => buildColumns(), []);
+
+  const buildParams = useCallback((p: number) => {
+    const params = new URLSearchParams();
+    params.set("type", "invoice");
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (frequencyFilter !== "all") params.set("frequency", frequencyFilter);
+    if (sortBy !== "created") params.set("sortBy", sortBy);
+    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
+    params.set("page", String(p));
+    params.set("limit", String(PAGE_SIZE));
+    return params;
+  }, [statusFilter, frequencyFilter, sortBy, sortOrder]);
 
-    fetch(`/api/v1/recurring?${params}`, {
+  // Fetch first page when filters change
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRefetching(true);
+    setPage(1);
+
+    fetch(`/api/v1/recurring?${buildParams(1)}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) {
-          setTemplates(data.data);
-          // Load previews for active templates
-          const active = (data.data as RecurringTemplate[]).filter((t) => t.status === "active");
+        if (cancelled) return;
+        const items = data.data || [];
+        setTemplates(items);
+        setTotalCount(data.pagination?.total || 0);
+
+        // Load previews for active templates
+        const active = (items as RecurringTemplate[]).filter((t) => t.status === "active");
+        if (active.length > 0) {
           Promise.all(
             active.slice(0, 5).map((t) =>
               fetch(`/api/v1/recurring/${t.id}/preview?count=3`, {
@@ -139,17 +199,104 @@ export default function RecurringInvoicesPage() {
                 .catch(() => null)
             )
           ).then((results) => {
-            setUpcoming(results.filter((r): r is NonNullable<typeof r> => r !== null && r.dates.length > 0));
+            if (!cancelled) {
+              setUpcoming(results.filter((r): r is NonNullable<typeof r> => r !== null && r.dates.length > 0));
+            }
           });
+        } else {
+          setUpcoming([]);
         }
       })
       .then(() => devDelay())
-      .finally(() => setLoading(false));
-  }, [statusFilter]);
+      .finally(() => { if (!cancelled) { setInitialLoad(false); setRefetching(false); setFetchKey((k) => k + 1); } });
 
-  if (loading) return <BrandLoader />;
+    return () => { cancelled = true; };
+  }, [orgId, buildParams]);
 
-  if (!loading && templates.length === 0 && statusFilter === "all") {
+  // Load more
+  const loadMore = useCallback(() => {
+    if (!orgId || loadingMore) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+
+    fetch(`/api/v1/recurring?${buildParams(nextPage)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) {
+          setTemplates((prev) => [...prev, ...data.data]);
+          setPage(nextPage);
+        }
+      })
+      .finally(() => setLoadingMore(false));
+  }, [orgId, page, buildParams, loadingMore]);
+
+  const hasMore = templates.length < totalCount;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !refetching) loadMore();
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore, refetching]);
+
+  // Fetch summary stats (independent of filters)
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/v1/recurring/summary`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => setSummary(data));
+  }, [orgId]);
+
+  const handleSort = useCallback((key: string) => {
+    setSortBy((prev) => {
+      if (prev === key) {
+        setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
+        return key;
+      }
+      setSortOrder("desc");
+      return key;
+    });
+  }, []);
+
+  const hasFilters = search || frequencyFilter !== "all";
+  const pendingSearch = search !== debouncedSearch;
+
+  const [searchKey, setSearchKey] = useState(0);
+  const filteredTemplates = useMemo(() => {
+    if (!debouncedSearch) return templates;
+    const q = debouncedSearch.toLowerCase();
+    return templates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        (t.contact?.name || "").toLowerCase().includes(q)
+    );
+  }, [templates, debouncedSearch]);
+
+  // Bump searchKey when debounced search changes to trigger ContentReveal
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchKey((k) => k + 1);
+  }, [debouncedSearch]);
+
+  const activeCount = summary?.activeCount || 0;
+  const pausedCount = summary?.pausedCount || 0;
+  const totalGenerated = summary?.totalGenerated || 0;
+
+  if (initialLoad) return <BrandLoader />;
+
+  if (!initialLoad && !refetching && templates.length === 0 && statusFilter === "all" && !hasFilters) {
     // Generate a sample month grid
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -274,58 +421,33 @@ export default function RecurringInvoicesPage() {
   }
 
   return (
-    <ContentReveal className="space-y-10">
-      <Section
-        title="Recurring Invoices"
-        description="Manage recurring templates that automatically generate invoices."
-      >
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList className="overflow-x-auto">
-                <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
-                <TabsTrigger value="active" className="whitespace-nowrap">Active</TabsTrigger>
-                <TabsTrigger value="paused" className="whitespace-nowrap">Paused</TabsTrigger>
-                <TabsTrigger value="completed" className="whitespace-nowrap">Completed</TabsTrigger>
-              </TabsList>
-            </Tabs>
+    <ContentReveal className="space-y-6">
+      {/* Top: Stats */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard title="Active Templates" value={activeCount.toString()} icon={RefreshCw} />
+        <StatCard title="Paused" value={pausedCount.toString()} icon={RefreshCw} changeType="negative" />
+        <StatCard title="Total Generated" value={totalGenerated.toString()} icon={RefreshCw} />
+      </div>
 
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => openDrawer("recurring")}>
-              <Plus className="mr-2 size-4" />
-              New Recurring
-            </Button>
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={templates}
-            loading={loading}
-            emptyMessage="No recurring invoices found."
-            onRowClick={(r) => router.push(`/sales/recurring/${r.id}`)}
-          />
-        </div>
-      </Section>
-
+      {/* Upcoming Generations */}
       {upcoming.length > 0 && (
-        <Section
-          title="Upcoming Generations"
-          description="Next scheduled invoice generations from active templates."
-        >
-          <div className="space-y-3">
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Upcoming Generations</p>
+          <div className="flex gap-3 overflow-x-auto pb-1">
             {upcoming.map((u) => (
-              <div key={u.templateName} className="rounded-lg border px-4 py-3">
+              <div key={u.templateName} className="rounded-lg border px-4 py-3 min-w-[220px] shrink-0">
                 <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-sm font-medium">{u.templateName}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{u.templateName}</p>
                     {u.contactName && (
-                      <p className="text-xs text-muted-foreground">{u.contactName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{u.contactName}</p>
                     )}
                   </div>
-                  <p className="text-sm font-mono font-semibold tabular-nums">{formatMoney(u.lineTotal)}</p>
+                  <p className="text-sm font-mono font-semibold tabular-nums shrink-0 ml-2">{formatMoney(u.lineTotal)}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   {u.dates.map((d) => (
-                    <div key={d.date} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <div key={d.date} className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="size-3" />
                       <span>{d.date}</span>
                     </div>
@@ -334,8 +456,125 @@ export default function RecurringInvoicesPage() {
               </div>
             ))}
           </div>
-        </Section>
+        </div>
       )}
+
+      <div className="h-px bg-border" />
+
+      {/* Template table */}
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+            <TabsList className="overflow-x-auto">
+              <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
+              <TabsTrigger value="active" className="whitespace-nowrap">Active</TabsTrigger>
+              <TabsTrigger value="paused" className="whitespace-nowrap">Paused</TabsTrigger>
+              <TabsTrigger value="completed" className="whitespace-nowrap">Completed</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Button
+            onClick={() => openDrawer("recurring")}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Plus className="mr-2 size-4" />
+            New Recurring
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search templates..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 w-56 pl-8 text-xs"
+            />
+          </div>
+          <Select
+            value={frequencyFilter}
+            onValueChange={setFrequencyFilter}
+          >
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue placeholder="Frequency..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Frequencies</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="fortnightly">Fortnightly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+              <SelectItem value="annual">Annual</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={`${sortBy}:${sortOrder}`}
+            onValueChange={(v) => {
+              const [key, order] = v.split(":");
+              setSortBy(key);
+              setSortOrder(order as "asc" | "desc");
+            }}
+          >
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created:desc">Newest</SelectItem>
+              <SelectItem value="created:asc">Oldest</SelectItem>
+              <SelectItem value="name:asc">Name A-Z</SelectItem>
+              <SelectItem value="name:desc">Name Z-A</SelectItem>
+              <SelectItem value="nextRun:asc">Next run soonest</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => { setSearch(""); setFrequencyFilter("all"); }}
+            >
+              <X className="mr-1 size-3" />
+              Clear filters
+            </Button>
+          )}
+        </div>
+
+        {refetching || pendingSearch ? (
+          <BrandLoader className="h-48" />
+        ) : (
+          <ContentReveal key={`${fetchKey}-${searchKey}`}>
+            <DataTable
+              columns={columns}
+              data={filteredTemplates}
+              loading={false}
+              emptyMessage="No recurring invoices match your filters."
+              onRowClick={(r) => router.push(`/sales/recurring/${r.id}`)}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={handleSort}
+            />
+          </ContentReveal>
+        )}
+
+        {/* Infinite scroll sentinel & count */}
+        {!refetching && !pendingSearch && filteredTemplates.length > 0 && (
+          <>
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-muted-foreground">
+                Showing {templates.length} of {totalCount} template{totalCount !== 1 ? "s" : ""}
+              </p>
+            </div>
+            {hasMore && (
+              <div ref={sentinelRef} className="flex justify-center py-4">
+                {loadingMore && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </ContentReveal>
   );
 }
