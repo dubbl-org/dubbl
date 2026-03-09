@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectMember, member } from "@/lib/db/schema";
+import { project, projectTeamAssignment } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -8,10 +8,9 @@ import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
-const addMemberSchema = z.object({
-  memberId: z.string().min(1),
-  role: z.enum(["manager", "contributor", "viewer"]).default("contributor"),
-  hourlyRate: z.number().int().min(0).optional(),
+const assignTeamSchema = z.object({
+  teamId: z.string().min(1),
+  defaultRole: z.enum(["manager", "contributor", "viewer"]).default("contributor"),
 });
 
 export async function GET(
@@ -32,16 +31,24 @@ export async function GET(
 
     if (!proj) return notFound("Project");
 
-    const members = await db.query.projectMember.findMany({
-      where: eq(projectMember.projectId, id),
+    const assignments = await db.query.projectTeamAssignment.findMany({
+      where: eq(projectTeamAssignment.projectId, id),
       with: {
-        member: {
-          with: { user: true },
+        team: {
+          with: {
+            members: {
+              with: {
+                member: {
+                  with: { user: true },
+                },
+              },
+            },
+          },
         },
       },
     });
 
-    return NextResponse.json({ members });
+    return NextResponse.json({ assignments });
   } catch (err) {
     return handleError(err);
   }
@@ -57,7 +64,7 @@ export async function POST(
     requireRole(ctx, "manage:projects");
 
     const body = await request.json();
-    const parsed = addMemberSchema.parse(body);
+    const parsed = assignTeamSchema.parse(body);
 
     const proj = await db.query.project.findFirst({
       where: and(
@@ -69,37 +76,26 @@ export async function POST(
 
     if (!proj) return notFound("Project");
 
-    // Verify the member belongs to this org
-    const orgMember = await db.query.member.findFirst({
+    // Check for duplicate assignment
+    const existing = await db.query.projectTeamAssignment.findFirst({
       where: and(
-        eq(member.id, parsed.memberId),
-        eq(member.organizationId, ctx.organizationId)
+        eq(projectTeamAssignment.projectId, id),
+        eq(projectTeamAssignment.teamId, parsed.teamId)
       ),
     });
 
-    if (!orgMember) return validationError("Member not found in this organization");
-
-    // Check if already added
-    const existing = await db.query.projectMember.findFirst({
-      where: and(
-        eq(projectMember.projectId, id),
-        eq(projectMember.memberId, parsed.memberId)
-      ),
-    });
-
-    if (existing) return validationError("Member already added to this project");
+    if (existing) return validationError("Team already assigned to this project");
 
     const [created] = await db
-      .insert(projectMember)
+      .insert(projectTeamAssignment)
       .values({
         projectId: id,
-        memberId: parsed.memberId,
-        role: parsed.role,
-        hourlyRate: parsed.hourlyRate ?? null,
+        teamId: parsed.teamId,
+        defaultRole: parsed.defaultRole,
       })
       .returning();
 
-    return NextResponse.json({ projectMember: created }, { status: 201 });
+    return NextResponse.json({ assignment: created }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }
@@ -115,8 +111,8 @@ export async function DELETE(
     requireRole(ctx, "manage:projects");
 
     const url = new URL(request.url);
-    const memberId = url.searchParams.get("memberId");
-    if (!memberId) return validationError("memberId is required");
+    const teamId = url.searchParams.get("teamId");
+    if (!teamId) return validationError("teamId is required");
 
     const proj = await db.query.project.findFirst({
       where: and(
@@ -129,11 +125,11 @@ export async function DELETE(
     if (!proj) return notFound("Project");
 
     await db
-      .delete(projectMember)
+      .delete(projectTeamAssignment)
       .where(
         and(
-          eq(projectMember.projectId, id),
-          eq(projectMember.memberId, memberId)
+          eq(projectTeamAssignment.projectId, id),
+          eq(projectTeamAssignment.teamId, teamId)
         )
       );
 

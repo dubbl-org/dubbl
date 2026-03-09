@@ -18,6 +18,9 @@ const updateSchema = z.object({
   bankAccountNumber: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+  memberId: z.string().uuid().nullable().optional(),
+  compensationType: z.enum(["salary", "hourly", "milestone", "commission"]).optional(),
+  hourlyRate: z.number().int().min(0).nullable().optional(),
 });
 
 export async function GET(
@@ -35,6 +38,7 @@ export async function GET(
         eq(payrollEmployee.organizationId, ctx.organizationId),
         notDeleted(payrollEmployee.deletedAt)
       ),
+      with: { member: { with: { user: true } } },
     });
 
     if (!employee) return notFound("Employee");

@@ -8,11 +8,13 @@ import {
   date,
   pgEnum,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { organization, users, member } from "./auth";
+import { organization, users, member, team } from "./auth";
 import { contact } from "./contacts";
 import { invoice } from "./invoicing";
+import { payrollEmployee } from "./payroll";
 
 export const projectStatusEnum = pgEnum("project_status", [
   "active",
@@ -117,6 +119,8 @@ export const projectMember = pgTable("project_member", {
     .notNull()
     .references(() => member.id, { onDelete: "cascade" }),
   role: projectMemberRoleEnum("role").notNull().default("contributor"),
+  hourlyRate: integer("hourly_rate"), // cents, null = use project default
+  teamAssignmentId: uuid("team_assignment_id"), // tracks which team assignment added this member
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -142,6 +146,40 @@ export const projectTeamMember = pgTable("project_team_member", {
   memberId: uuid("member_id")
     .notNull()
     .references(() => member.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Assign org-level teams to projects
+export const projectTeamAssignment = pgTable(
+  "project_team_assignment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => team.id, { onDelete: "cascade" }),
+    defaultRole: projectMemberRoleEnum("default_role").notNull().default("contributor"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("project_team_assignment_unique_idx").on(table.projectId, table.teamId),
+  ]
+);
+
+// Milestone payment assignments
+export const milestoneAssignment = pgTable("milestone_assignment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  milestoneId: uuid("milestone_id")
+    .notNull()
+    .references(() => projectMilestone.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").references(() => payrollEmployee.id, { onDelete: "cascade" }),
+  memberId: uuid("member_id").references(() => member.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull(), // cents
+  description: text("description"),
+  isPaid: boolean("is_paid").notNull().default(false),
+  payrollItemId: uuid("payroll_item_id"), // set when paid via payroll run
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -301,6 +339,7 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   notes: many(projectNote),
   teams: many(projectTeam),
   labels: many(projectLabel),
+  teamAssignments: many(projectTeamAssignment),
 }));
 
 export const projectMemberRelations = relations(projectMember, ({ one }) => ({
@@ -379,10 +418,37 @@ export const taskCommentRelations = relations(taskComment, ({ one }) => ({
   }),
 }));
 
-export const projectMilestoneRelations = relations(projectMilestone, ({ one }) => ({
+export const projectMilestoneRelations = relations(projectMilestone, ({ one, many }) => ({
   project: one(project, {
     fields: [projectMilestone.projectId],
     references: [project.id],
+  }),
+  assignments: many(milestoneAssignment),
+}));
+
+export const projectTeamAssignmentRelations = relations(projectTeamAssignment, ({ one }) => ({
+  project: one(project, {
+    fields: [projectTeamAssignment.projectId],
+    references: [project.id],
+  }),
+  team: one(team, {
+    fields: [projectTeamAssignment.teamId],
+    references: [team.id],
+  }),
+}));
+
+export const milestoneAssignmentRelations = relations(milestoneAssignment, ({ one }) => ({
+  milestone: one(projectMilestone, {
+    fields: [milestoneAssignment.milestoneId],
+    references: [projectMilestone.id],
+  }),
+  employee: one(payrollEmployee, {
+    fields: [milestoneAssignment.employeeId],
+    references: [payrollEmployee.id],
+  }),
+  member: one(member, {
+    fields: [milestoneAssignment.memberId],
+    references: [member.id],
   }),
 }));
 

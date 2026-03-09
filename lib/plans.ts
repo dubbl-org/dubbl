@@ -96,6 +96,7 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
   "manage:inventory": "admin",
   "manage:payroll": "admin",
   "manage:projects": "member",
+  "manage:teams": "admin",
   "manage:assets": "admin",
   "manage:budgets": "admin",
   "manage:credit-notes": "member",

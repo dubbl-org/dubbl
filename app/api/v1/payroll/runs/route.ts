@@ -58,6 +58,7 @@ export async function GET(request: Request) {
     const runs = await db.query.payrollRun.findMany({
       where: and(...conditions),
       orderBy: desc(payrollRun.createdAt),
+      with: { items: { with: { employee: true } } },
       limit,
       offset,
     });
@@ -104,9 +105,49 @@ export async function POST(request: Request) {
     let totalDeductions = 0;
     let totalNet = 0;
 
-    const items = employees.map((emp) => {
-      const grossAmount = calculateGrossPay(emp.salary, emp.payFrequency);
-      // Tax amount: taxRate is in basis points (2000 = 20.00%)
+    type PayrollItemType = "regular_salary" | "hourly_pay" | "overtime" | "milestone_bonus" | "project_bonus" | "commission" | "deduction" | "reimbursement";
+    const items: Array<{
+      employeeId: string;
+      type: PayrollItemType;
+      description: string | null;
+      grossAmount: number;
+      taxAmount: number;
+      deductions: number;
+      netAmount: number;
+      projectId: string | null;
+      milestoneId: string | null;
+    }> = [];
+
+    for (const emp of employees) {
+      let grossAmount = 0;
+      let itemType: PayrollItemType = "regular_salary";
+      let description: string | null = null;
+
+      switch (emp.compensationType) {
+        case "hourly": {
+          // For hourly employees, we need time entries for the period
+          // Calculate from time entries if available, otherwise skip
+          if (!emp.hourlyRate) continue;
+          // Default to standard hours if no time tracking
+          const hoursPerPeriod = emp.payFrequency === "weekly" ? 40 : emp.payFrequency === "biweekly" ? 80 : 173;
+          grossAmount = Math.round((emp.hourlyRate * hoursPerPeriod));
+          itemType = "hourly_pay";
+          description = `${hoursPerPeriod}h @ ${(emp.hourlyRate / 100).toFixed(2)}/hr`;
+          break;
+        }
+        case "milestone":
+        case "commission":
+          // Milestone and commission employees get paid when milestones/commissions are recorded
+          // Skip automatic payroll generation for these types
+          continue;
+        case "salary":
+        default: {
+          grossAmount = calculateGrossPay(emp.salary, emp.payFrequency);
+          itemType = "regular_salary";
+          break;
+        }
+      }
+
       const taxAmount = Math.round((grossAmount * emp.taxRate) / 10000);
       const deductions = taxAmount;
       const netAmount = grossAmount - deductions;
@@ -115,14 +156,25 @@ export async function POST(request: Request) {
       totalDeductions += deductions;
       totalNet += netAmount;
 
-      return {
+      items.push({
         employeeId: emp.id,
+        type: itemType,
+        description,
         grossAmount,
         taxAmount,
         deductions,
         netAmount,
-      };
-    });
+        projectId: null,
+        milestoneId: null,
+      });
+    }
+
+    if (items.length === 0) {
+      return NextResponse.json(
+        { error: "No payable employees found for this period" },
+        { status: 400 }
+      );
+    }
 
     const [run] = await db
       .insert(payrollRun)
@@ -143,6 +195,7 @@ export async function POST(request: Request) {
         ...item,
       }))
     );
+
 
     return NextResponse.json({ run }, { status: 201 });
   } catch (err) {

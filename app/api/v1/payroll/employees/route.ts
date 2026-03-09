@@ -20,6 +20,9 @@ const createSchema = z.object({
   bankAccountNumber: z.string().nullable().optional(),
   startDate: z.string().min(1),
   endDate: z.string().nullable().optional(),
+  memberId: z.string().uuid().nullable().optional(),
+  compensationType: z.enum(["salary", "hourly", "milestone", "commission"]).default("salary"),
+  hourlyRate: z.number().int().min(0).nullable().optional(),
 });
 
 export async function GET(request: Request) {
@@ -45,6 +48,7 @@ export async function GET(request: Request) {
     const employees = await db.query.payrollEmployee.findMany({
       where: and(...conditions),
       orderBy: desc(payrollEmployee.createdAt),
+      with: { member: { with: { user: true } } },
       limit,
       offset,
     });
@@ -89,6 +93,9 @@ export async function POST(request: Request) {
         bankAccountNumber: parsed.bankAccountNumber || null,
         startDate: parsed.startDate,
         endDate: parsed.endDate || null,
+        memberId: parsed.memberId || null,
+        compensationType: parsed.compensationType,
+        hourlyRate: parsed.hourlyRate ?? null,
       })
       .returning();
 
