@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { stockTake, stockTakeLine, inventoryItem } from "@/lib/db/schema";
+import { stockTake, stockTakeLine, inventoryItem, warehouseStock } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const result = stockTakes.map((st) => ({
       ...st,
-      lineCount: st.lines.length,
+      itemCount: st.lines.length,
       lines: undefined,
     }));
 
@@ -59,22 +59,49 @@ export async function POST(request: Request) {
       .returning();
 
     // Auto-populate lines for all active non-deleted inventory items
-    const items = await db.query.inventoryItem.findMany({
-      where: and(
-        eq(inventoryItem.organizationId, ctx.organizationId),
-        eq(inventoryItem.isActive, true),
-        notDeleted(inventoryItem.deletedAt)
-      ),
-    });
+    if (parsed.warehouseId) {
+      // Use per-warehouse stock levels
+      const items = await db.query.inventoryItem.findMany({
+        where: and(
+          eq(inventoryItem.organizationId, ctx.organizationId),
+          eq(inventoryItem.isActive, true),
+          notDeleted(inventoryItem.deletedAt)
+        ),
+        with: {
+          warehouseStocks: {
+            where: eq(warehouseStock.warehouseId, parsed.warehouseId),
+          },
+        },
+      });
 
-    if (items.length > 0) {
-      await db.insert(stockTakeLine).values(
-        items.map((item) => ({
-          stockTakeId: created.id,
-          inventoryItemId: item.id,
-          expectedQuantity: item.quantityOnHand,
-        }))
-      );
+      if (items.length > 0) {
+        await db.insert(stockTakeLine).values(
+          items.map((item) => ({
+            stockTakeId: created.id,
+            inventoryItemId: item.id,
+            expectedQuantity: item.warehouseStocks?.[0]?.quantity ?? 0,
+          }))
+        );
+      }
+    } else {
+      // Use global quantityOnHand
+      const items = await db.query.inventoryItem.findMany({
+        where: and(
+          eq(inventoryItem.organizationId, ctx.organizationId),
+          eq(inventoryItem.isActive, true),
+          notDeleted(inventoryItem.deletedAt)
+        ),
+      });
+
+      if (items.length > 0) {
+        await db.insert(stockTakeLine).values(
+          items.map((item) => ({
+            stockTakeId: created.id,
+            inventoryItemId: item.id,
+            expectedQuantity: item.quantityOnHand,
+          }))
+        );
+      }
     }
 
     return NextResponse.json({ stockTake: created }, { status: 201 });

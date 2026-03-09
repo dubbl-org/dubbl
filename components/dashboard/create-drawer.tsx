@@ -2667,6 +2667,7 @@ function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () => void
 // ---------------------------------------------------------------------------
 function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
+  const [warehouseId, setWarehouseId] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2681,6 +2682,7 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           name: form.get("name"),
+          warehouseId: warehouseId || null,
           notes: form.get("notes") || null,
         }),
       });
@@ -2699,7 +2701,7 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+    <Sheet open={open} onOpenChange={(v) => { if (!v) { onClose(); setWarehouseId(""); } }}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
@@ -2717,6 +2719,11 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
               <div className="space-y-2">
                 <Label htmlFor="drawer-st-name">Name *</Label>
                 <Input id="drawer-st-name" name="name" required placeholder="e.g. Q1 2026 Full Count" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Warehouse (optional)</Label>
+                <WarehousePicker value={warehouseId} onChange={setWarehouseId} placeholder="All warehouses" />
+                <p className="text-xs text-muted-foreground">Leave empty to count all items across all warehouses.</p>
               </div>
             </div>
 

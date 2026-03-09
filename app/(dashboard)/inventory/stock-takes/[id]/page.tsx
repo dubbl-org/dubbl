@@ -11,6 +11,7 @@ import {
   Trash2,
   XCircle,
   Loader2,
+  EyeOff,
 } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -22,8 +23,7 @@ import { cn } from "@/lib/utils";
 
 interface StockTakeLine {
   id: string;
-  itemName: string;
-  itemCode: string;
+  inventoryItem: { id: string; name: string; code: string };
   expectedQuantity: number;
   countedQuantity: number | null;
   discrepancy: number | null;
@@ -38,6 +38,7 @@ interface StockTakeDetail {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  warehouse?: { id: string; name: string; code: string } | null;
   lines: StockTakeLine[];
 }
 
@@ -73,6 +74,7 @@ export default function StockTakeDetailPage() {
   const [stockTake, setStockTake] = useState<StockTakeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [blindMode, setBlindMode] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const orgId =
@@ -269,6 +271,34 @@ export default function StockTakeDetailPage() {
   const statusCfg = STATUS_CONFIG[stockTake.status];
   const isEditable = stockTake.status === "in_progress";
 
+  // Progress calculations
+  const totalLines = stockTake.lines.length;
+  const countedLines = stockTake.lines.filter(
+    (l) => l.countedQuantity !== null
+  ).length;
+  const progressPct =
+    totalLines > 0 ? Math.round((countedLines / totalLines) * 100) : 0;
+  const matchCount = stockTake.lines.filter(
+    (l) => l.countedQuantity !== null && l.discrepancy === 0
+  ).length;
+  const discrepancyCount = stockTake.lines.filter(
+    (l) =>
+      l.countedQuantity !== null &&
+      l.discrepancy !== null &&
+      l.discrepancy !== 0
+  ).length;
+  const uncountedCount = totalLines - countedLines;
+  const accuracyPct =
+    totalLines > 0 ? Math.round((matchCount / totalLines) * 100) : 100;
+
+  function getRowVarianceClass(line: StockTakeLine) {
+    if (line.countedQuantity === null) return "";
+    const disc = line.discrepancy ?? line.countedQuantity - line.expectedQuantity;
+    if (disc === 0) return "bg-emerald-50/50 dark:bg-emerald-950/10";
+    if (Math.abs(disc) <= 5) return "bg-amber-50/50 dark:bg-amber-950/10";
+    return "bg-red-50/50 dark:bg-red-950/10";
+  }
+
   return (
     <div>
       {/* Back link */}
@@ -299,12 +329,25 @@ export default function StockTakeDetailPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 Created{" "}
-                {new Date(stockTake.createdAt).toLocaleDateString()}
+                {new Date(stockTake.createdAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+                {stockTake.warehouse && (
+                  <>
+                    {" · "}
+                    {stockTake.warehouse.name} ({stockTake.warehouse.code})
+                  </>
+                )}
                 {stockTake.completedAt && (
                   <>
-                    {" "}
-                    · Completed{" "}
-                    {new Date(stockTake.completedAt).toLocaleDateString()}
+                    {" · Completed "}
+                    {new Date(stockTake.completedAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
                   </>
                 )}
               </p>
@@ -344,6 +387,14 @@ export default function StockTakeDetailPage() {
               <>
                 <Button
                   size="sm"
+                  variant={blindMode ? "default" : "outline"}
+                  onClick={() => setBlindMode(!blindMode)}
+                >
+                  <EyeOff className="mr-1.5 size-3.5" />
+                  Blind Count
+                </Button>
+                <Button
+                  size="sm"
                   onClick={handleApplyAdjustments}
                   disabled={actionLoading}
                   className="bg-emerald-600 hover:bg-emerald-700"
@@ -369,6 +420,49 @@ export default function StockTakeDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Progress bar */}
+        {stockTake.status !== "draft" && (
+          <div className="rounded-xl border bg-card p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground font-medium">Counting progress</span>
+              <span className="font-mono font-medium">{countedLines}/{totalLines} items</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <div className="flex gap-4 text-xs text-muted-foreground pt-1">
+              <span>Matches: <span className="font-medium text-emerald-600">{matchCount}</span></span>
+              <span>Discrepancies: <span className="font-medium text-red-600">{discrepancyCount}</span></span>
+              <span>Uncounted: <span className="font-medium">{uncountedCount}</span></span>
+            </div>
+          </div>
+        )}
+
+        {/* Variance summary (completed only) */}
+        {stockTake.status === "completed" && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xl font-bold font-mono">{totalLines}</p>
+              <p className="text-[11px] text-muted-foreground">Total Items</p>
+            </div>
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xl font-bold font-mono text-emerald-600">{matchCount}</p>
+              <p className="text-[11px] text-muted-foreground">Accurate</p>
+            </div>
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xl font-bold font-mono text-red-600">{discrepancyCount}</p>
+              <p className="text-[11px] text-muted-foreground">Discrepancies</p>
+            </div>
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xl font-bold font-mono">{accuracyPct}%</p>
+              <p className="text-[11px] text-muted-foreground">Accuracy</p>
+            </div>
+          </div>
+        )}
 
         {/* Notes */}
         {stockTake.notes && (
@@ -422,21 +516,24 @@ export default function StockTakeDetailPage() {
                 return (
                   <div
                     key={line.id}
-                    className="grid grid-cols-[1fr_80px_100px_80px_60px] sm:grid-cols-[1fr_100px_120px_100px_80px] gap-2 px-4 py-3 items-center"
+                    className={cn(
+                      "grid grid-cols-[1fr_80px_100px_80px_60px] sm:grid-cols-[1fr_100px_120px_100px_80px] gap-2 px-4 py-3 items-center",
+                      getRowVarianceClass(line)
+                    )}
                   >
                     {/* Item info */}
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {line.itemName}
+                        {line.inventoryItem.name}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {line.itemCode}
+                        {line.inventoryItem.code}
                       </p>
                     </div>
 
                     {/* Expected */}
                     <p className="text-sm font-mono tabular-nums text-right">
-                      {line.expectedQuantity}
+                      {blindMode && isEditable ? "***" : line.expectedQuantity}
                     </p>
 
                     {/* Counted */}

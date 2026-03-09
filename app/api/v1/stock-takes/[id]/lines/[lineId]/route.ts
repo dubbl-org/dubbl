@@ -71,7 +71,7 @@ export async function PATCH(
       )
       .returning();
 
-    return NextResponse.json({ stockTakeLine: updated });
+    return NextResponse.json({ line: updated });
   } catch (err) {
     return handleError(err);
   }
