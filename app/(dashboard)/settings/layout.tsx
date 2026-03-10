@@ -1,12 +1,13 @@
 "use client";
 
-import { Settings, Users, CreditCard, Key, Percent, Coins, ScrollText } from "lucide-react";
+import { Settings, Users, CreditCard, Key, Percent, Coins, ScrollText, Target } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
 const TABS = [
   { href: "/settings", label: "General", icon: Settings, exact: true },
   { href: "/settings/members", label: "Members", icon: Users },
   { href: "/settings/billing", label: "Billing", icon: CreditCard },
+  { href: "/settings/pipelines", label: "Pipelines", icon: Target },
   { href: "/settings/api-keys", label: "API Keys", icon: Key },
   { href: "/settings/tax-rates", label: "Tax Rates", icon: Percent },
   { href: "/settings/currencies", label: "Currencies", icon: Coins },

@@ -128,7 +128,7 @@ export default function TimesheetDetailPage() {
       fetchTimesheet();
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to submit");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to submit");
     }
   }
 

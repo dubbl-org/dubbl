@@ -239,7 +239,7 @@ export default function EmployeeDetailPage() {
         toast.success("Tax configuration updated");
       } else {
         const data = await res.json();
-        toast.error(data.error || "Failed to update tax config");
+        toast.error(typeof data.error === "string" ? data.error : "Failed to update tax config");
       }
     } catch {
       toast.error("Failed to update tax configuration");
@@ -279,7 +279,7 @@ export default function EmployeeDetailPage() {
         toast.success("Employee updated");
       } else {
         const data = await res.json();
-        toast.error(data.error || "Failed to update");
+        toast.error(typeof data.error === "string" ? data.error : "Failed to update");
       }
     } catch {
       toast.error("Failed to update employee");

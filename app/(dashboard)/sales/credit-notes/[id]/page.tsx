@@ -156,7 +156,7 @@ export default function CreditNoteDetailPage() {
         toast.success("Credit note applied to invoice");
       } else {
         const data = await res.json();
-        toast.error(data.error || "Failed to apply credit note");
+        toast.error(typeof data.error === "string" ? data.error : "Failed to apply credit note");
       }
     } finally {
       setApplyLoading(false);

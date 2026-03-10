@@ -110,7 +110,7 @@ export default function FixedAssetDetailPage() {
       if (data.asset) setAsset(data.asset);
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to record depreciation");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to record depreciation");
     }
   }
 
@@ -134,7 +134,7 @@ export default function FixedAssetDetailPage() {
       toast.success("Asset disposed");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to dispose asset");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to dispose asset");
     }
   }
 

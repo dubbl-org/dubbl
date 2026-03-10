@@ -106,7 +106,7 @@ export default function BillingPage() {
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
-      else throw new Error(data.error);
+      else throw new Error(typeof data.error === "string" ? data.error : "Failed to start checkout");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to start checkout");
       setCheckoutLoading(null);

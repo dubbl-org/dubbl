@@ -82,7 +82,7 @@ export function EditProfileDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) { const d = await res.json(); throw new Error(typeof d.error === "string" ? d.error : "Failed to update profile"); }
       toast.success("Profile updated");
       onOpenChange(false);
       window.location.reload();
@@ -101,7 +101,7 @@ export function EditProfileDialog({
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error);
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to unlink account");
       }
       toast.success("Account unlinked");
       fetchAccounts();

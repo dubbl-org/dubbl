@@ -33,7 +33,8 @@ export function handleError(err: unknown) {
     return NextResponse.json({ error: err.message }, { status: err.status });
   }
   if (err instanceof z.ZodError) {
-    return NextResponse.json({ error: err.issues }, { status: 400 });
+    const message = err.issues.map((i) => i.message).join(", ");
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   console.error(err);
   return NextResponse.json({ error: "Internal error" }, { status: 500 });

@@ -482,7 +482,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim submitted for approval");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to submit");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to submit");
     }
   }
 
@@ -498,7 +498,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim approved");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to approve");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
     }
   }
 
@@ -520,7 +520,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim rejected");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to reject");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
     }
   }
 
@@ -538,7 +538,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim marked as paid");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to mark as paid");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to mark as paid");
     }
   }
 
@@ -560,7 +560,7 @@ export default function ExpenseDetailPage() {
       router.push("/purchases/expenses");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to delete");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to delete");
     }
   }
 

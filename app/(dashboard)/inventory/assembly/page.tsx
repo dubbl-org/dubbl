@@ -63,7 +63,7 @@ export default function AssemblyOrdersPage() {
         });
         const data = await res.json();
         if (data.error) {
-          toast.error(data.error);
+          toast.error(typeof data.error === "string" ? data.error : "Something went wrong");
         } else {
           await fetchOrders();
           toast.success("Assembly completed");

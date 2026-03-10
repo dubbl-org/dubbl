@@ -230,7 +230,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         body: JSON.stringify({ mode: "preview", content, fileName, format: format === "auto" ? null : format }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Request failed");
       setPreview(data.preview);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to preview");
@@ -250,7 +250,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         body: JSON.stringify({ mode: "commit", content, fileName, format: format === "auto" ? null : format }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Request failed");
       toast.success(`Imported ${data.import.imported} transactions`);
       setImportOpen(false);
       setSelectedFile(null);

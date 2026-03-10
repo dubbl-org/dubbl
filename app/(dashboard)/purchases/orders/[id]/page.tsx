@@ -368,7 +368,7 @@ export default function PODetailPage() {
       router.push("/purchases/orders");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to delete");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to delete");
     }
   }
 

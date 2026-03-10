@@ -45,7 +45,7 @@ export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to create organization");
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to create organization");
       }
       const data = await res.json();
       localStorage.setItem("activeOrgId", data.organization.id);
