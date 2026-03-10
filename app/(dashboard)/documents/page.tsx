@@ -13,7 +13,6 @@ import {
   File,
   Image,
   FileSpreadsheet,
-  Shield,
   Search,
   FolderOpen,
   Lock,
@@ -238,6 +237,21 @@ export default function DocumentsPage() {
     currentFolder ? f.parentId === currentFolder : !f.parentId
   );
 
+  function getBreadcrumb(): { id: string | null; name: string }[] {
+    const crumbs: { id: string | null; name: string }[] = [{ id: null, name: "Documents" }];
+    if (!currentFolder) return crumbs;
+    const path: DocFolder[] = [];
+    let current = folders.find((f) => f.id === currentFolder);
+    while (current) {
+      path.unshift(current);
+      current = current.parentId ? folders.find((f) => f.id === current!.parentId) : undefined;
+    }
+    for (const f of path) {
+      crumbs.push({ id: f.id, name: f.name });
+    }
+    return crumbs;
+  }
+
   if (loading) return <BrandLoader />;
 
   // Empty state when no folders and no documents at root level
@@ -379,32 +393,58 @@ export default function DocumentsPage() {
     );
   }
 
+  const breadcrumb = getBreadcrumb();
+  const totalSize = documents.reduce((s, d) => s + d.fileSize, 0);
+
   return (
     <ContentReveal>
-      <div className="space-y-4">
+      {/* Back link - same pattern as inventory/contacts */}
+      {currentFolder && (
+        <button
+          onClick={() => setCurrentFolder(currentFolderObj?.parentId || null)}
+          className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="size-3.5" />
+          {currentFolderObj?.parentId
+            ? `Back to ${folders.find((f) => f.id === currentFolderObj.parentId)?.name || "parent"}`
+            : "Back to documents"}
+        </button>
+      )}
+
+      <div className="space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {currentFolder && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => setCurrentFolder(currentFolderObj?.parentId || null)}
-              >
-                <ArrowLeft className="size-3" />
-                Back
-              </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            {/* Breadcrumb */}
+            {breadcrumb.length > 1 && (
+              <nav className="flex items-center gap-1 mb-1">
+                {breadcrumb.map((crumb, i) => (
+                  <div key={crumb.id ?? "root"} className="flex items-center gap-1">
+                    {i > 0 && <ArrowRight className="size-3 text-muted-foreground/40" />}
+                    {i < breadcrumb.length - 1 ? (
+                      <button
+                        onClick={() => setCurrentFolder(crumb.id)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {crumb.name}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-medium text-foreground">{crumb.name}</span>
+                    )}
+                  </div>
+                ))}
+              </nav>
             )}
-            <div>
-              <h2 className="text-lg font-semibold">
-                {currentFolderObj ? currentFolderObj.name : "Documents"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {documents.length} file{documents.length !== 1 ? "s" : ""}
-                {childFolders.length > 0 && ` · ${childFolders.length} folder${childFolders.length !== 1 ? "s" : ""}`}
-              </p>
-            </div>
+            <h2 className="text-lg font-semibold">
+              {currentFolderObj ? currentFolderObj.name : "Documents"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {childFolders.length > 0 && `${childFolders.length} folder${childFolders.length !== 1 ? "s" : ""}`}
+              {childFolders.length > 0 && documents.length > 0 && " · "}
+              {documents.length > 0 && `${documents.length} file${documents.length !== 1 ? "s" : ""}`}
+              {documents.length > 0 && ` · ${formatFileSize(totalSize)}`}
+              {childFolders.length === 0 && documents.length === 0 && "Empty folder"}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setNewFolderOpen(true)}>
@@ -418,13 +458,23 @@ export default function DocumentsPage() {
           </div>
         </div>
 
-        {/* File browser */}
+        {/* File browser card */}
         <div
-          className={`rounded-lg border ${dragOver ? "border-primary bg-primary/5" : "bg-card"} transition-colors`}
+          className={`rounded-xl border overflow-hidden transition-colors ${dragOver ? "border-primary ring-2 ring-primary/20" : "bg-card"}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
+          {/* Column header */}
+          {(childFolders.length > 0 || documents.length > 0) && (
+            <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide flex-1">Name</span>
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-20 text-right hidden sm:block">Size</span>
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-24 text-right hidden sm:block">Date</span>
+              <span className="w-16 shrink-0" />
+            </div>
+          )}
+
           {/* Folder rows */}
           {childFolders.map((folder) => (
             <div
@@ -441,25 +491,29 @@ export default function DocumentsPage() {
                 <Folder className="size-5 text-amber-500 shrink-0" />
                 <span className="text-sm font-medium truncate">{folder.name}</span>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="size-6 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <MoreHorizontal className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => handleDeleteFolder(folder)}
-                  >
-                    <Trash2 className="size-4" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <span className="text-[11px] text-muted-foreground w-20 text-right hidden sm:block">-</span>
+              <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">-</span>
+              <div className="w-16 shrink-0 flex justify-end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="size-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => handleDeleteFolder(folder)}
+                    >
+                      <Trash2 className="size-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           ))}
 
@@ -472,13 +526,14 @@ export default function DocumentsPage() {
                 className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
               >
                 <FileIcon className="size-5 text-muted-foreground shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{doc.fileName}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formatFileSize(doc.fileSize)} · {new Date(doc.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-sm font-medium truncate min-w-0 flex-1">{doc.fileName}</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums w-20 text-right hidden sm:block">
+                  {formatFileSize(doc.fileSize)}
+                </span>
+                <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">
+                  {new Date(doc.createdAt).toLocaleDateString()}
+                </span>
+                <div className="w-16 shrink-0 flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => handleDownload(doc)}>
                     <Download className="size-3.5" />
                   </Button>
@@ -490,7 +545,7 @@ export default function DocumentsPage() {
             );
           })}
 
-          {/* Empty folder state / drop zone */}
+          {/* Empty / drop zone */}
           {documents.length === 0 && childFolders.length === 0 && (
             <div
               className="flex flex-col items-center justify-center py-16 text-center cursor-pointer"
