@@ -28,3 +28,5 @@ export * from "./reports";
 export * from "./bom";
 export * from "./crm";
 export * from "./workflows";
+export * from "./scheduled-payments";
+export * from "./consolidation";

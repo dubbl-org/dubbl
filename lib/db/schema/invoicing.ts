@@ -60,6 +60,7 @@ export const invoice = pgTable("invoice", {
   amountPaid: integer("amount_paid").notNull().default(0),
   amountDue: integer("amount_due").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
+  paymentLinkToken: text("payment_link_token").unique(),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   sentAt: timestamp("sent_at", { mode: "date" }),
   paidAt: timestamp("paid_at", { mode: "date" }),

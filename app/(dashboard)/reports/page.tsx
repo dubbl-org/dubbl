@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   Timer,
   Copy,
+  Building2,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -91,6 +92,12 @@ const reportCategories = [
         description: "Upcoming invoice due dates, bill payments, and recurring events.",
         href: "/reports/financial-calendar",
         icon: CalendarDays,
+      },
+      {
+        title: "Consolidation",
+        description: "Combined financial statements across multiple entities.",
+        href: "/reports/consolidation",
+        icon: Building2,
       },
     ],
   },

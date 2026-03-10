@@ -54,6 +54,8 @@ import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
+import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
+import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
 
@@ -633,6 +635,22 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     }
   }, [open]);
 
+  const handleReceiptExtracted = useCallback((data: ReceiptData) => {
+    if (data.date) {
+      setIssueDate(data.date);
+      const d = new Date(data.date);
+      d.setDate(d.getDate() + 30);
+      setDueDate(d.toISOString().split("T")[0]);
+    }
+    if (data.total !== null) {
+      const totalStr = (data.total / 100).toFixed(2);
+      setLines([{ description: data.vendor || "Receipt item", quantity: "1", unitPrice: totalStr, accountId: "", taxRateId: "" }]);
+    }
+    if (data.vendor) {
+      setReference(data.vendor);
+    }
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!contactId) { toast.error("Please select a supplier"); return; }
@@ -686,6 +704,10 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <ReceiptOcr onExtracted={handleReceiptExtracted} />
+
+            <div className="h-px bg-border" />
+
             <div className="space-y-4">
               <SectionLabel>Bill Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">

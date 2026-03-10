@@ -47,6 +47,7 @@ export const payment = pgTable("payment", {
   bankAccountId: uuid("bank_account_id").references(() => bankAccount.id),
   bankTransactionId: uuid("bank_transaction_id").references(() => bankTransaction.id),
   currencyCode: text("currency_code").notNull().default("USD"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

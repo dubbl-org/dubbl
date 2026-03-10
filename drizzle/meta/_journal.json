@@ -78,6 +78,13 @@
       "when": 1773063864903,
       "tag": "0010_gray_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773154435472,
+      "tag": "0011_cool_paladin",
+      "breakpoints": true
     }
   ]
 }

@@ -82,6 +82,8 @@ export interface MilestoneData {
   status: string;
   dueDate: string | null;
   amount: number;
+  invoicedAmountCents: number;
+  progressPercent: number;
   completedAt: string | null;
 }
 

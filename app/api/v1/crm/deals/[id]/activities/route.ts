@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { dealActivity, deal } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, sql, count } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, notFound, handleError } from "@/lib/api/response";
 import { z } from "zod";
 
@@ -20,13 +19,67 @@ export async function GET(
     });
     if (!d) return notFound("Deal");
 
+    const url = new URL(request.url);
+    const search = url.searchParams.get("search") || "";
+    const type = url.searchParams.get("type") || "";
+    const sortBy = url.searchParams.get("sortBy") || "date";
+    const sortOrder = url.searchParams.get("sortOrder") || "desc";
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "30")));
+    const offset = (page - 1) * limit;
+
+    // Build where conditions
+    const conditions = [eq(dealActivity.dealId, id)];
+    if (type && ["note", "email", "call", "meeting", "task"].includes(type)) {
+      conditions.push(eq(dealActivity.type, type as "note" | "email" | "call" | "meeting" | "task"));
+    }
+    if (search) {
+      conditions.push(ilike(dealActivity.content, `%${search}%`));
+    }
+
+    const where = and(...conditions);
+
+    // Sorting
+    const orderFn = sortOrder === "asc" ? asc : desc;
+    const orderCol =
+      sortBy === "type" ? dealActivity.type : dealActivity.createdAt;
+
+    // Count total (filtered)
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(dealActivity)
+      .where(where);
+
+    // Count by type (unfiltered - always for this deal)
+    const typeCounts = await db
+      .select({ type: dealActivity.type, count: count() })
+      .from(dealActivity)
+      .where(eq(dealActivity.dealId, id))
+      .groupBy(dealActivity.type);
+
+    const counts: Record<string, number> = {};
+    for (const row of typeCounts) {
+      counts[row.type] = row.count;
+    }
+
+    // Fetch page
     const activities = await db.query.dealActivity.findMany({
-      where: eq(dealActivity.dealId, id),
+      where,
       with: { user: true },
-      orderBy: desc(dealActivity.createdAt),
+      orderBy: orderFn(orderCol),
+      limit,
+      offset,
     });
 
-    return ok({ activities });
+    const totalPages = Math.ceil(total / limit);
+    const totalAll = typeCounts.reduce((sum, r) => sum + r.count, 0);
+
+    return ok({
+      activities,
+      pagination: { page, limit, total, totalPages },
+      typeCounts: counts,
+      totalAll,
+    });
   } catch (err) {
     return handleError(err);
   }

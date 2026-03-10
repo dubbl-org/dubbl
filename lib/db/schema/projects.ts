@@ -262,6 +262,8 @@ export const projectMilestone = pgTable("project_milestone", {
   status: milestoneStatusEnum("status").notNull().default("upcoming"),
   dueDate: date("due_date"),
   amount: integer("amount").notNull().default(0), // cents (for milestone billing)
+  invoicedAmountCents: integer("invoiced_amount_cents").notNull().default(0), // cents - how much has been invoiced
+  progressPercent: integer("progress_percent").notNull().default(0), // 0-100
   completedAt: timestamp("completed_at", { mode: "date" }),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
