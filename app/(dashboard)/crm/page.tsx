@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Target, TrendingUp, Users, Handshake, BarChart3 } from "lucide-react";
+import { Target, TrendingUp, Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -76,93 +76,115 @@ export default function CRMPage() {
   if (pipelines.length === 0 && deals.length === 0) {
     return (
       <ContentReveal>
-        <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
-          {/* Ghost kanban columns */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center gap-3 pt-6 px-4 overflow-hidden">
-            {DEFAULT_STAGES.slice(0, 5).map((stage) => (
-              <div key={stage.id} className="w-48 shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="size-2 rounded-full" style={{ backgroundColor: stage.color, opacity: 0.4 }} />
-                  <div className="h-2 w-16 rounded bg-muted" />
-                  <div className="ml-auto h-4 w-5 rounded-full border border-muted-foreground/10" />
+        <div className="pt-12 pb-12 space-y-10">
+          {/* Top: title + CTA */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Sales Pipeline</h2>
+              <p className="mt-1 text-sm text-muted-foreground max-w-md">
+                Track every deal from first contact to closed won. Visualize your pipeline, forecast revenue, and never let an opportunity slip through.
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push("/crm/analytics")}
+              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+            >
+              <Plus className="mr-2 size-4" />
+              Get Started
+            </Button>
+          </div>
+
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
+            {/* Left: mock kanban pipeline */}
+            <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+              <div className="bg-muted/30 px-5 py-3 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Example pipeline
+                </p>
+              </div>
+              <div className="p-5">
+                {/* Stage flow visualization */}
+                <div className="flex items-center gap-2 mb-5 overflow-hidden">
+                  {DEFAULT_STAGES.slice(0, 5).map((stage, i) => (
+                    <div key={stage.id} className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="size-2 rounded-full" style={{ backgroundColor: stage.color, opacity: 0.7 }} />
+                        <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">{stage.name}</span>
+                      </div>
+                      {i < 4 && <ArrowRight className="size-3 text-muted-foreground/30 shrink-0" />}
+                    </div>
+                  ))}
                 </div>
-                <div className="h-2 w-12 rounded bg-muted/50 mb-3" />
+                {/* Mock deal cards */}
                 <div className="space-y-2">
-                  {Array.from({ length: stage.id === "lead" ? 3 : stage.id === "qualified" ? 2 : 1 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border border-muted/60 bg-card/50 p-3 space-y-2">
-                      <div className="h-2.5 w-24 rounded bg-muted" />
-                      <div className="h-2 w-16 rounded bg-muted/40" />
-                      <div className="flex justify-between">
-                        <div className="h-2 w-14 rounded bg-muted/50" />
-                        <div className="h-2 w-8 rounded bg-muted/30" />
+                  {[
+                    { title: "Acme Corp - Enterprise Plan", contact: "Sarah Johnson", value: "$48,000", prob: "75%", stage: DEFAULT_STAGES[2] },
+                    { title: "TechStart SaaS Migration", contact: "Mike Chen", value: "$24,500", prob: "60%", stage: DEFAULT_STAGES[1] },
+                    { title: "GlobalRetail POS System", contact: "Lisa Park", value: "$120,000", prob: "30%", stage: DEFAULT_STAGES[0] },
+                  ].map((deal) => (
+                    <div key={deal.title} className="flex items-center gap-3 rounded-lg border p-3">
+                      <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: deal.stage.color }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{deal.title}</p>
+                        <p className="text-[11px] text-muted-foreground">{deal.contact}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-mono font-medium tabular-nums">{deal.value}</p>
+                        <p className="text-[10px] text-muted-foreground">{deal.prob}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
-            <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
-          </div>
-
-          {/* Centered content */}
-          <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
-            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-              <Target className="size-6 sm:size-7 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Sales Pipeline</h2>
-            <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Track every deal from first contact to closed won. Visualize your pipeline, forecast revenue, and never let an opportunity slip through.
-            </p>
-            <Button
-              size="lg"
-              className="mt-6 bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => router.push("/crm/analytics")}
-            >
-              <Target className="mr-2 size-4" />
-              Get started with CRM
-            </Button>
-          </div>
-
-          {/* Feature cards */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-4 px-4 sm:px-0 pb-6 sm:pb-8">
-            {[
-              {
-                icon: Handshake,
-                title: "Deal tracking",
-                description: "Create deals, assign contacts, and move them through customizable pipeline stages.",
-                color: "text-blue-600 dark:text-blue-400",
-                bg: "bg-blue-50 dark:bg-blue-950/40",
-              },
-              {
-                icon: TrendingUp,
-                title: "Revenue forecasting",
-                description: "Set deal values and win probabilities to forecast your expected revenue.",
-                color: "text-emerald-600 dark:text-emerald-400",
-                bg: "bg-emerald-50 dark:bg-emerald-950/40",
-              },
-              {
-                icon: Users,
-                title: "Activity logging",
-                description: "Log calls, emails, meetings, and notes to keep a full history on every deal.",
-                color: "text-orange-600 dark:text-orange-400",
-                bg: "bg-orange-50 dark:bg-orange-950/40",
-              },
-              {
-                icon: BarChart3,
-                title: "Pipeline analytics",
-                description: "Track conversion rates, average deal size, and stage distribution at a glance.",
-                color: "text-purple-600 dark:text-purple-400",
-                bg: "bg-purple-50 dark:bg-purple-950/40",
-              },
-            ].map(({ icon: Icon, title, description, color, bg }) => (
-              <div key={title} className="rounded-xl p-4 sm:p-5">
-                <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
-                  <Icon className={`size-4.5 ${color}`} />
+                <div className="mt-4 h-px bg-border" />
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-[11px] text-muted-foreground font-mono tabular-nums">3 deals · $192,500 in pipeline</p>
+                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                    55% avg. probability
+                  </Badge>
                 </div>
-                <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
-                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
               </div>
-            ))}
+            </div>
+
+            {/* Right: benefits */}
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                What you can do
+              </p>
+              {[
+                {
+                  title: "Track deals through stages",
+                  desc: "Create deals, assign contacts, and drag them through your customizable pipeline stages.",
+                  icon: Handshake,
+                  color: "border-l-blue-400",
+                },
+                {
+                  title: "Forecast revenue",
+                  desc: "Set deal values and win probabilities to project expected revenue across your pipeline.",
+                  icon: DollarSign,
+                  color: "border-l-emerald-400",
+                },
+                {
+                  title: "Log every interaction",
+                  desc: "Record calls, emails, meetings, and notes so you never lose context on a deal.",
+                  icon: Users,
+                  color: "border-l-orange-400",
+                },
+                {
+                  title: "Analyze performance",
+                  desc: "Track conversion rates, deal velocity, and stage distribution at a glance.",
+                  icon: BarChart3,
+                  color: "border-l-violet-400",
+                },
+              ].map(({ title, desc, icon: Icon, color }) => (
+                <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-3.5 text-muted-foreground" />
+                    <p className="text-sm font-medium">{title}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 ml-[22px]">{desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </ContentReveal>

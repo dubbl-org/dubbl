@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Cog, Play, CheckCircle2, XCircle, ClipboardList, ArrowRightLeft, BarChart3 } from "lucide-react";
+import { Cog, Play, CheckCircle2, XCircle, ClipboardList, ArrowRightLeft, BarChart3, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,66 +95,96 @@ export default function AssemblyOrdersPage() {
         </div>
 
         {orders.length === 0 ? (
-          <div className="relative flex min-h-[calc(100vh-14rem)] flex-col">
-            {/* Ghost order rows */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-2">
-              <div className="w-full max-w-2xl space-y-2">
-                {["draft", "in_progress", "completed", "draft"].map((status, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-4">
-                    <div className={`size-5 rounded ${status === "completed" ? "bg-emerald-200/30 dark:bg-emerald-800/20" : status === "in_progress" ? "bg-blue-200/30 dark:bg-blue-800/20" : "bg-muted/40"}`} />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-2.5 rounded bg-muted" style={{ width: `${(i + 5) * 16}px` }} />
-                      <div className="h-2 w-20 rounded bg-muted/30" />
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start pt-4">
+            {/* Left: mock assembly lifecycle */}
+            <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+              <div className="bg-muted/30 px-5 py-3 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Example assembly workflow
+                </p>
+              </div>
+              <div className="p-5 space-y-3">
+                {/* Draft */}
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-md bg-zinc-100 dark:bg-zinc-800">
+                        <ClipboardList className="size-3 text-zinc-500" />
+                      </div>
+                      <p className="text-sm font-medium">Standing Desk x10</p>
                     </div>
-                    <div className="h-5 w-16 rounded-full border border-muted/40" />
+                    <Badge variant="outline" className={STATUS_BADGE.draft + " text-[10px]"}>draft</Badge>
                   </div>
-                ))}
+                  <p className="text-[11px] text-muted-foreground">BOM: Standing Desk Frame</p>
+                </div>
+                <div className="flex justify-center"><ArrowRight className="size-3.5 text-muted-foreground/30 rotate-90" /></div>
+                {/* In progress */}
+                <div className="rounded-lg border border-blue-200 dark:border-blue-900/50 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40">
+                        <Play className="size-3 text-blue-500" />
+                      </div>
+                      <p className="text-sm font-medium">Assembling...</p>
+                    </div>
+                    <Badge variant="outline" className={STATUS_BADGE.in_progress + " text-[10px]"}>in progress</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Components reserved from inventory</p>
+                </div>
+                <div className="flex justify-center"><ArrowRight className="size-3.5 text-muted-foreground/30 rotate-90" /></div>
+                {/* Completed */}
+                <div className="rounded-lg border border-dashed border-emerald-200 dark:border-emerald-900/40 p-3 opacity-60">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/40">
+                        <CheckCircle2 className="size-3 text-emerald-500" />
+                      </div>
+                      <p className="text-sm font-medium">Complete</p>
+                    </div>
+                    <Badge variant="outline" className={STATUS_BADGE.completed + " text-[10px]"}>completed</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">10 finished items added to stock</p>
+                </div>
               </div>
-              <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
             </div>
 
-            {/* Centered content */}
-            <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
-              <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950/50">
-                <Cog className="size-6 sm:size-7 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Assembly Orders</h2>
-              <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                Transform raw materials into finished products. Track work orders from creation through completion with automatic inventory updates.
+            {/* Right: benefits */}
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                How assembly orders work
               </p>
-            </div>
-
-            {/* Feature cards */}
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
               {[
                 {
+                  title: "Create from BOMs",
+                  desc: "Select a bill of materials and specify quantity to create an assembly work order.",
                   icon: ClipboardList,
-                  title: "Work orders",
-                  description: "Create assembly orders from your bills of materials and track progress through each stage.",
-                  color: "text-blue-600 dark:text-blue-400",
-                  bg: "bg-blue-50 dark:bg-blue-950/40",
+                  color: "border-l-blue-400",
                 },
                 {
+                  title: "Track progress",
+                  desc: "Move orders from draft to in-progress to completed as your team works through them.",
+                  icon: Play,
+                  color: "border-l-amber-400",
+                },
+                {
+                  title: "Auto inventory updates",
+                  desc: "Components are deducted and finished goods are added to stock when an order completes.",
                   icon: ArrowRightLeft,
-                  title: "Auto inventory",
-                  description: "Components are automatically deducted and finished goods added when an order completes.",
-                  color: "text-purple-600 dark:text-purple-400",
-                  bg: "bg-purple-50 dark:bg-purple-950/40",
+                  color: "border-l-emerald-400",
                 },
                 {
+                  title: "Full audit trail",
+                  desc: "Every status change and inventory movement is recorded for complete traceability.",
                   icon: BarChart3,
-                  title: "Status tracking",
-                  description: "Monitor orders from draft to in-progress to completed with full audit trail.",
-                  color: "text-emerald-600 dark:text-emerald-400",
-                  bg: "bg-emerald-50 dark:bg-emerald-950/40",
+                  color: "border-l-violet-400",
                 },
-              ].map(({ icon: Icon, title, description, color, bg }) => (
-                <div key={title} className="rounded-xl p-4 sm:p-5">
-                  <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
-                    <Icon className={`size-4.5 ${color}`} />
+              ].map(({ title, desc, icon: Icon, color }) => (
+                <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-3.5 text-muted-foreground" />
+                    <p className="text-sm font-medium">{title}</p>
                   </div>
-                  <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 ml-[22px]">{desc}</p>
                 </div>
               ))}
             </div>
