@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -173,6 +174,31 @@ export default function TimeLeavePage() {
   /* ---- shared data ---- */
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
+
+  /* ---- header action ---- */
+  useTopbarAction(
+    useMemo(
+      (): ReactNode =>
+        view === "timesheets" ? (
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => setTsDrawerOpen(true)}
+          >
+            <Plus className="size-3" /> New Timesheet
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => setLeaveDrawerOpen(true)}
+          >
+            <Plus className="size-3" /> New Request
+          </Button>
+        ),
+      [view]
+    )
+  );
 
   /* ---- drawers ---- */
   const [tsDrawerOpen, setTsDrawerOpen] = useState(false);
@@ -650,26 +676,6 @@ export default function TimeLeavePage() {
 
   return (
     <ContentReveal className="space-y-6">
-      {/* Actions */}
-      <div className="flex justify-end gap-2">
-        <Button
-          size="sm"
-          className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-          onClick={() => setTsDrawerOpen(true)}
-        >
-          <Plus className="size-3" />
-          New Timesheet
-        </Button>
-        <Button
-          size="sm"
-          className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-          onClick={() => setLeaveDrawerOpen(true)}
-        >
-          <Plus className="size-3" />
-          New Request
-        </Button>
-      </div>
-
       {/* Stat cards - always visible */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[

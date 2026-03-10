@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion, MotionConfig } from "motion/react";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -242,6 +243,22 @@ export default function CompensationPage() {
     }
   }
 
+  useTopbarAction(
+    useMemo(
+      (): ReactNode => (
+        <>
+          <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setBandSheet(true)}>
+            <Plus className="size-3" /> Add Band
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setReviewSheet(true)}>
+            <Plus className="size-3" /> New Review
+          </Button>
+        </>
+      ),
+      []
+    )
+  );
+
   if (loading) return <BrandLoader />;
 
   const hasData = bands.length > 0 || reviews.length > 0;
@@ -254,15 +271,6 @@ export default function CompensationPage() {
   if (!hasData) {
     return (
       <ContentReveal className="space-y-6">
-        {/* Actions */}
-        <div className="flex justify-end gap-2">
-          <Button size="sm" onClick={() => setBandSheet(true)}>
-            <Plus className="mr-1.5 size-3.5" /> Add Band
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setReviewSheet(true)}>
-            <Plus className="mr-1.5 size-3.5" /> New Review
-          </Button>
-        </div>
 
         {/* Ghost stat cards */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Menu } from "lucide-react";
@@ -10,6 +17,23 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+
+/* ------------------------------------------------------------------ */
+/*  Custom topbar action slot                                          */
+/* ------------------------------------------------------------------ */
+
+const TopbarActionCtx = createContext<{
+  setAction: (node: ReactNode) => void;
+}>({ setAction: () => {} });
+
+/** Render a custom action in the topbar from any page. */
+export function useTopbarAction(node: ReactNode) {
+  const { setAction } = useContext(TopbarActionCtx);
+  useLayoutEffect(() => {
+    setAction(node);
+    return () => setAction(null);
+  }, [node, setAction]);
+}
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -79,7 +103,7 @@ const LABELS: Record<string, string> = {
   team: "Team",
 };
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
 
 const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
@@ -102,9 +126,25 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   "inventory/transfers": { label: "New Transfer", drawer: "transfer" },
   "inventory/valuation": null,
   "payroll/employees": { label: "New Employee", drawer: "employee" },
+  "payroll/contractors": { label: "Add Contractor", drawer: "contractor" },
+  "payroll/time-leave": null,
+  "payroll/compensation": null,
+  "payroll/analytics": null,
+  teams: null,
 };
 
 export function Topbar() {
+  const [customAction, setCustomAction] = useState<ReactNode>(null);
+  const stableSetAction = useCallback((n: ReactNode) => setCustomAction(n), []);
+
+  return (
+    <TopbarActionCtx.Provider value={{ setAction: stableSetAction }}>
+      <TopbarInner customAction={customAction} />
+    </TopbarActionCtx.Provider>
+  );
+}
+
+function TopbarInner({ customAction }: { customAction: ReactNode }) {
   const pathname = usePathname();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
@@ -216,6 +256,12 @@ export function Topbar() {
                 <Plus className="size-3" />
                 <span className="hidden sm:inline">{cta.label}</span>
               </Button>
+            </>
+          )}
+          {customAction && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              {customAction}
             </>
           )}
         </div>

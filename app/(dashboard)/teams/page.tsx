@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, MotionConfig } from "motion/react";
 import {
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -156,9 +157,24 @@ export default function TeamsPage() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
-  function handleCreateTeam() {
+  const handleCreateTeam = useCallback(() => {
     window.dispatchEvent(new CustomEvent("create-team"));
-  }
+  }, []);
+
+  useTopbarAction(
+    useMemo(
+      () => (
+        <Button
+          onClick={handleCreateTeam}
+          size="sm"
+          className="h-7 text-xs gap-1"
+        >
+          <Plus className="size-3" /> New Team
+        </Button>
+      ),
+      [handleCreateTeam]
+    )
+  );
 
   if (loading) return <BrandLoader />;
 
@@ -307,18 +323,6 @@ export default function TeamsPage() {
   /* ── Data state ── */
   return (
     <ContentReveal className="space-y-6">
-      {/* Actions */}
-      <div className="flex justify-end">
-        <Button
-          onClick={handleCreateTeam}
-          size="sm"
-          className="h-8 bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="mr-1.5 size-3.5" />
-          New Team
-        </Button>
-      </div>
-
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">

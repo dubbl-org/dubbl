@@ -187,17 +187,6 @@ export default function ContractorsPage() {
   if (!refetching && contractors.length === 0 && statusFilter === "all" && !search) {
     return (
       <ContentReveal className="space-y-6">
-        {/* Actions */}
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => openDrawer("contractor")}
-          >
-            <Plus className="size-3" /> Add Contractor
-          </Button>
-        </div>
-
         {/* Main hero empty state */}
         <motion.div
           {...anim(0.2)}
@@ -279,17 +268,6 @@ export default function ContractorsPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      {/* Actions */}
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-          onClick={() => openDrawer("contractor")}
-        >
-          <Plus className="size-3" /> Add Contractor
-        </Button>
-      </div>
-
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">

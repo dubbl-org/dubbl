@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   Calculator,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
+import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,10 +107,10 @@ export default function AnalyticsPage() {
       .finally(() => setLoading(false));
   }, [orgId]);
 
-  function handleExport() {
+  const handleExport = useCallback(() => {
     if (!orgId) return;
     window.open(`/api/v1/payroll/reports/export?x-organization-id=${orgId}`, "_blank");
-  }
+  }, [orgId]);
 
   async function handleWhatIf() {
     if (!orgId) return;
@@ -139,19 +140,23 @@ export default function AnalyticsPage() {
     }
   }
 
+  useTopbarAction(
+    useMemo(
+      () => (
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={handleExport}>
+          <Download className="size-3" /> Export CSV
+        </Button>
+      ),
+      [handleExport]
+    )
+  );
+
   if (loading) return <BrandLoader />;
 
   const hasData = summary && summary.totalRuns > 0;
 
   return (
     <ContentReveal className="space-y-8">
-      {/* Actions */}
-      <div className="flex justify-end">
-        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleExport}>
-          <Download className="mr-1.5 size-3" /> Export CSV
-        </Button>
-      </div>
-
       {/* Empty state */}
       {!hasData && (
         <>
