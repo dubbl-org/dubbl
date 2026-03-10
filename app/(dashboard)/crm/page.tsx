@@ -427,7 +427,14 @@ export default function CRMPage() {
       </div>
 
       {/* Deal list */}
-      {filteredDeals.length === 0 ? (
+      {pendingSearch ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="brand-loader" aria-label="Loading">
+            <div className="brand-loader-circle brand-loader-circle-1" />
+            <div className="brand-loader-circle brand-loader-circle-2" />
+          </div>
+        </div>
+      ) : filteredDeals.length === 0 ? (
         <ContentReveal>
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
@@ -442,10 +449,10 @@ export default function CRMPage() {
       ) : (
         <MotionConfig reducedMotion="never">
           <motion.div
-            key={`${stageFilter}-${debouncedSearch}-${sortBy}-${sortOrder}`}
+            key={`${debouncedSearch}-${sortBy}-${sortOrder}`}
             initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.8, delay: 0.12, ease: EASE }}
+            transition={{ duration: 0.5, ease: EASE }}
             style={{ willChange: "opacity, transform, filter" }}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
