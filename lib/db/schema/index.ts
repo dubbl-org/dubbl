@@ -20,3 +20,4 @@ export * from "./accruals";
 export * from "./revenue-recognition";
 export * from "./loans";
 export * from "./notifications";
+export * from "./document-templates";

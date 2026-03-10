@@ -69,6 +69,7 @@ const LABELS: Record<string, string> = {
   currencies: "Currencies",
   "tax-rates": "Tax Rates",
   "audit-log": "Audit Log",
+  "document-templates": "Document Templates",
   // Payroll sub-pages
   employees: "Employees",
   runs: "Pay Runs",
