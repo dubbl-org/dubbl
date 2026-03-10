@@ -27,3 +27,4 @@ export * from "./documents";
 export * from "./reports";
 export * from "./bom";
 export * from "./crm";
+export * from "./workflows";

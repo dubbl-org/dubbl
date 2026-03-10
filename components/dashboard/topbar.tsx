@@ -103,6 +103,8 @@ const LABELS: Record<string, string> = {
   deals: "Deals",
   analytics: "Analytics",
   pipelines: "Pipelines",
+  // Workflow subtabs
+  workflows: "Workflows",
   variants: "Variants",
   // Sales subtabs
   "credit-notes": "Credit Notes",
