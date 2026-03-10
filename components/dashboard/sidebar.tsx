@@ -41,6 +41,8 @@ import { CircleHelpIcon } from "@/components/ui/circle-help";
 import { ReceiptAnimatedIcon } from "@/components/ui/receipt-animated";
 import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
 import { UsersAnimatedIcon } from "@/components/ui/users-animated";
+import { TargetIcon } from "@/components/ui/target";
+import { FolderOpenIcon } from "@/components/ui/folder-open";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnimatedIcon = React.ForwardRefExoticComponent<any>;
@@ -88,8 +90,8 @@ const sections: NavSection[] = [
   {
     label: "",
     items: [
-      { label: "CRM", href: "/crm", icon: ChartLineIcon },
-      { label: "Documents", href: "/documents", icon: FileTextIcon },
+      { label: "CRM", href: "/crm", icon: TargetIcon },
+      { label: "Documents", href: "/documents", icon: FolderOpenIcon },
       { label: "Reports", href: "/reports", icon: ChartLineIcon },
     ],
   },

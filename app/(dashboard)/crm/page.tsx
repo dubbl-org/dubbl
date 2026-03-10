@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { Target, TrendingUp, Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 
@@ -54,6 +56,26 @@ const DEFAULT_STAGES = [
   { id: "closed_won", name: "Won", color: "#10b981" },
   { id: "closed_lost", name: "Lost", color: "#ef4444" },
 ];
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const COLUMN_VARIANTS = {
+  hidden: { opacity: 0, y: 16 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.06, duration: 0.4, ease: EASE },
+  }),
+};
+
+const CARD_VARIANTS = {
+  hidden: { opacity: 0, scale: 0.96 },
+  visible: (i: number) => ({
+    opacity: 1,
+    scale: 1,
+    transition: { delay: i * 0.04, duration: 0.3, ease: EASE },
+  }),
+};
 
 export default function CRMPage() {
   const router = useRouter();
@@ -282,66 +304,74 @@ export default function CRMPage() {
     );
   }
 
+  const activeDeals = pipelineDeals.filter((d) => !d.wonAt && !d.lostAt);
+  const pipelineValue = activeDeals.reduce((s, d) => s + d.valueCents, 0);
+
   return (
-    <ContentReveal>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Sales Pipeline</h2>
-            <p className="text-sm text-muted-foreground">
-              {pipelineDeals.length} deal{pipelineDeals.length !== 1 ? "s" : ""}
-              {" "}· {formatMoney(pipelineDeals.filter((d) => !d.wonAt && !d.lostAt).reduce((s, d) => s + d.valueCents, 0))} in pipeline
-            </p>
-          </div>
-          <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setNewDealOpen(true)}>
-            <Plus className="size-3" /> New Deal
-          </Button>
-        </div>
+    <ContentReveal className="space-y-6">
+      <PageHeader
+        title="Sales Pipeline"
+        description={`${pipelineDeals.length} deal${pipelineDeals.length !== 1 ? "s" : ""} · ${formatMoney(pipelineValue)} in pipeline`}
+      >
+        <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setNewDealOpen(true)}>
+          <Plus className="size-3" /> New Deal
+        </Button>
+      </PageHeader>
 
-        {/* Kanban Board */}
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {stages.filter((s) => s.id !== "closed_lost").map((stage) => {
-            const stageDeals = pipelineDeals.filter((d) => d.stageId === stage.id);
-            const stageValue = stageDeals.reduce((s, d) => s + d.valueCents, 0);
+      {/* Kanban Board */}
+      <div className="flex gap-3 overflow-x-auto pb-4">
+        {stages.filter((s) => s.id !== "closed_lost").map((stage, colIdx) => {
+          const stageDeals = pipelineDeals.filter((d) => d.stageId === stage.id);
+          const stageValue = stageDeals.reduce((s, d) => s + d.valueCents, 0);
 
-            return (
-              <div key={stage.id} className="w-64 shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="size-2 rounded-full" style={{ backgroundColor: stage.color }} />
-                  <span className="text-xs font-medium">{stage.name}</span>
-                  <Badge variant="outline" className="text-[10px] ml-auto">{stageDeals.length}</Badge>
-                </div>
-                <div className="text-[10px] text-muted-foreground mb-2 font-mono tabular-nums">
-                  {formatMoney(stageValue)}
-                </div>
-                <div className="space-y-1.5 min-h-[100px]">
-                  {stageDeals.map((d) => (
-                    <button
-                      key={d.id}
-                      onClick={() => router.push(`/crm/deals/${d.id}`)}
-                      className="w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50"
-                    >
-                      <p className="text-sm font-medium truncate">{d.title}</p>
-                      {d.contact && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                          {d.contact.name}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs font-mono tabular-nums font-medium">
-                          {formatMoney(d.valueCents, d.currency)}
-                        </span>
-                        {d.probability !== null && (
-                          <span className="text-[10px] text-muted-foreground">{d.probability}%</span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+          return (
+            <motion.div
+              key={stage.id}
+              custom={colIdx}
+              variants={COLUMN_VARIANTS}
+              initial="hidden"
+              animate="visible"
+              className="w-64 shrink-0"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="size-2 rounded-full" style={{ backgroundColor: stage.color }} />
+                <span className="text-xs font-medium">{stage.name}</span>
+                <Badge variant="outline" className="text-[10px] ml-auto">{stageDeals.length}</Badge>
               </div>
-            );
-          })}
-        </div>
+              <div className="text-[10px] text-muted-foreground mb-2 font-mono tabular-nums">
+                {formatMoney(stageValue)}
+              </div>
+              <div className="space-y-1.5 min-h-[100px]">
+                {stageDeals.map((d, cardIdx) => (
+                  <motion.button
+                    key={d.id}
+                    custom={cardIdx}
+                    variants={CARD_VARIANTS}
+                    initial="hidden"
+                    animate="visible"
+                    onClick={() => router.push(`/crm/deals/${d.id}`)}
+                    className="w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50"
+                  >
+                    <p className="text-sm font-medium truncate">{d.title}</p>
+                    {d.contact && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                        {d.contact.name}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs font-mono tabular-nums font-medium">
+                        {formatMoney(d.valueCents, d.currency)}
+                      </span>
+                      {d.probability !== null && (
+                        <span className="text-[10px] text-muted-foreground">{d.probability}%</span>
+                      )}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       <Dialog open={newDealOpen} onOpenChange={setNewDealOpen}>
