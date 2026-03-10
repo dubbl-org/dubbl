@@ -26,6 +26,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
 import { COUNTRIES as ALL_COUNTRIES } from "@/lib/countries";
 import { PAYMENT_TERMS } from "@/lib/payment-terms";
@@ -434,12 +435,11 @@ export default function SettingsPage() {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Default currency</Label>
-            <Input
+            <CurrencySelect
               value={form.defaultCurrency}
-              onChange={(e) =>
-                setForm({ ...form, defaultCurrency: e.target.value })
+              onValueChange={(v) =>
+                setForm({ ...form, defaultCurrency: v })
               }
-              placeholder="USD"
             />
           </div>
           <div className="space-y-1.5">

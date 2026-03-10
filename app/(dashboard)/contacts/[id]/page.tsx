@@ -39,6 +39,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { centsToDecimal, decimalToCents } from "@/lib/money";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
@@ -176,6 +177,7 @@ export default function ContactDetailPage() {
   const [formTaxRateId, setFormTaxRateId] = useState<string>("none");
   const [formTaxExempt, setFormTaxExempt] = useState(false);
   const [formCreditLimit, setFormCreditLimit] = useState("");
+  const [formCurrencyCode, setFormCurrencyCode] = useState("");
 
   useEntityTitle(contact?.name ?? undefined);
 
@@ -218,6 +220,7 @@ export default function ContactDetailPage() {
         setFormTaxRateId(c.defaultTaxRateId || "none");
         setFormTaxExempt(c.isTaxExempt);
         setFormCreditLimit(c.creditLimit != null ? centsToDecimal(c.creditLimit) : "");
+        setFormCurrencyCode(c.currencyCode || "");
       }
     } catch {
       toast.error("Failed to load contact");
@@ -344,7 +347,7 @@ export default function ContactDetailPage() {
             ? decimalToCents(creditLimitValue)
             : null,
           isTaxExempt: formTaxExempt,
-          currencyCode: form.get("currencyCode") || null,
+          currencyCode: formCurrencyCode || null,
           defaultRevenueAccountId: formRevenueAccountId !== "none" ? formRevenueAccountId : null,
           defaultExpenseAccountId: formExpenseAccountId !== "none" ? formExpenseAccountId : null,
           defaultTaxRateId: formTaxRateId !== "none" ? formTaxRateId : null,
@@ -362,6 +365,7 @@ export default function ContactDetailPage() {
       setFormTaxRateId(c.defaultTaxRateId || "none");
       setFormTaxExempt(c.isTaxExempt);
       setFormCreditLimit(c.creditLimit != null ? centsToDecimal(c.creditLimit) : "");
+      setFormCurrencyCode(c.currencyCode || "");
       toast.success("Contact updated");
     } catch {
       toast.error("Failed to update contact");
@@ -537,10 +541,9 @@ export default function ContactDetailPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Currency code</Label>
-                    <Input
-                      name="currencyCode"
-                      placeholder="e.g. USD, EUR"
-                      defaultValue={contact.currencyCode || ""}
+                    <CurrencySelect
+                      value={formCurrencyCode}
+                      onValueChange={setFormCurrencyCode}
                     />
                   </div>
                 </div>

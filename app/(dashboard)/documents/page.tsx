@@ -13,6 +13,9 @@ import {
   File,
   Image,
   FileSpreadsheet,
+  Shield,
+  Search,
+  FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -34,7 +37,6 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
-import { cn } from "@/lib/utils";
 
 interface DocFolder {
   id: string;
@@ -166,6 +168,122 @@ export default function DocumentsPage() {
   );
 
   if (loading) return <BrandLoader />;
+
+  // Empty state when no folders and no documents at root level
+  const isRootEmpty = !currentFolder && folders.length === 0 && documents.length === 0;
+
+  if (isRootEmpty) {
+    return (
+      <ContentReveal>
+        <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
+          {/* Ghost file browser */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-6">
+            <div className="w-full max-w-2xl space-y-2">
+              {/* Ghost folder row */}
+              <div className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-3">
+                <div className="size-5 rounded bg-amber-200/30 dark:bg-amber-800/20" />
+                <div className="h-2.5 w-28 rounded bg-muted" />
+                <div className="ml-auto h-2 w-12 rounded bg-muted/40" />
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-3">
+                <div className="size-5 rounded bg-amber-200/30 dark:bg-amber-800/20" />
+                <div className="h-2.5 w-20 rounded bg-muted" />
+                <div className="ml-auto h-2 w-12 rounded bg-muted/40" />
+              </div>
+              {/* Ghost file rows */}
+              {[32, 24, 36, 20, 28].map((w, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-3">
+                  <div className="size-5 rounded bg-muted/40" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className={`h-2.5 rounded bg-muted`} style={{ width: `${w * 4}px` }} />
+                    <div className="h-2 w-20 rounded bg-muted/30" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
+          </div>
+
+          {/* Centered content */}
+          <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
+            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
+              <FolderOpen className="size-6 sm:size-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Document Hub</h2>
+            <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              Organize your business files in one place. Create folders, upload documents, and keep everything accessible to your team.
+            </p>
+            <div className="mt-6 flex items-center gap-3">
+              <Button
+                size="lg"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setNewFolderOpen(true)}
+              >
+                <FolderPlus className="mr-2 size-4" />
+                Create your first folder
+              </Button>
+            </div>
+          </div>
+
+          {/* Feature cards */}
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
+            {[
+              {
+                icon: Folder,
+                title: "Organized folders",
+                description: "Create nested folders to structure your documents by project, client, or category.",
+                color: "text-amber-600 dark:text-amber-400",
+                bg: "bg-amber-50 dark:bg-amber-950/40",
+              },
+              {
+                icon: Search,
+                title: "Quick access",
+                description: "Find any file instantly. Every document is linked to the entity it belongs to.",
+                color: "text-blue-600 dark:text-blue-400",
+                bg: "bg-blue-50 dark:bg-blue-950/40",
+              },
+              {
+                icon: Shield,
+                title: "Secure storage",
+                description: "Files are stored securely and scoped to your organization. Only your team can access them.",
+                color: "text-emerald-600 dark:text-emerald-400",
+                bg: "bg-emerald-50 dark:bg-emerald-950/40",
+              },
+            ].map(({ icon: Icon, title, description, color, bg }) => (
+              <div key={title} className="rounded-xl p-4 sm:p-5">
+                <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
+                  <Icon className={`size-4.5 ${color}`} />
+                </div>
+                <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* New Folder Dialog */}
+        <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>New Folder</DialogTitle>
+            </DialogHeader>
+            <Input
+              placeholder="Folder name"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && newFolderName.trim() && handleCreateFolder()}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {confirmDialog}
+      </ContentReveal>
+    );
+  }
 
   return (
     <ContentReveal>

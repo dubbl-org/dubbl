@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Cog, Play, CheckCircle2, XCircle } from "lucide-react";
+import { Cog, Play, CheckCircle2, XCircle, ClipboardList, ArrowRightLeft, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,14 +92,69 @@ export default function AssemblyOrdersPage() {
         </div>
 
         {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
-              <Cog className="size-6 text-muted-foreground" />
+          <div className="relative flex min-h-[calc(100vh-14rem)] flex-col">
+            {/* Ghost order rows */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-2">
+              <div className="w-full max-w-2xl space-y-2">
+                {["draft", "in_progress", "completed", "draft"].map((status, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-4">
+                    <div className={`size-5 rounded ${status === "completed" ? "bg-emerald-200/30 dark:bg-emerald-800/20" : status === "in_progress" ? "bg-blue-200/30 dark:bg-blue-800/20" : "bg-muted/40"}`} />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-2.5 rounded bg-muted" style={{ width: `${(i + 5) * 16}px` }} />
+                      <div className="h-2 w-20 rounded bg-muted/30" />
+                    </div>
+                    <div className="h-5 w-16 rounded-full border border-muted/40" />
+                  </div>
+                ))}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
             </div>
-            <h3 className="mt-4 text-sm font-medium">No assembly orders</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Create assembly orders from your bills of materials.
-            </p>
+
+            {/* Centered content */}
+            <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
+              <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950/50">
+                <Cog className="size-6 sm:size-7 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Assembly Orders</h2>
+              <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                Transform raw materials into finished products. Track work orders from creation through completion with automatic inventory updates.
+              </p>
+            </div>
+
+            {/* Feature cards */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
+              {[
+                {
+                  icon: ClipboardList,
+                  title: "Work orders",
+                  description: "Create assembly orders from your bills of materials and track progress through each stage.",
+                  color: "text-blue-600 dark:text-blue-400",
+                  bg: "bg-blue-50 dark:bg-blue-950/40",
+                },
+                {
+                  icon: ArrowRightLeft,
+                  title: "Auto inventory",
+                  description: "Components are automatically deducted and finished goods added when an order completes.",
+                  color: "text-purple-600 dark:text-purple-400",
+                  bg: "bg-purple-50 dark:bg-purple-950/40",
+                },
+                {
+                  icon: BarChart3,
+                  title: "Status tracking",
+                  description: "Monitor orders from draft to in-progress to completed with full audit trail.",
+                  color: "text-emerald-600 dark:text-emerald-400",
+                  bg: "bg-emerald-50 dark:bg-emerald-950/40",
+                },
+              ].map(({ icon: Icon, title, description, color, bg }) => (
+                <div key={title} className="rounded-xl p-4 sm:p-5">
+                  <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`size-4.5 ${color}`} />
+                  </div>
+                  <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="space-y-2">

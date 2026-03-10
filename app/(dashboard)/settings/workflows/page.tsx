@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
+import { Zap, Plus, ToggleLeft, ToggleRight, Trash2, Bell, GitBranch, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -133,14 +133,78 @@ export default function WorkflowsPage() {
         </div>
 
         {workflows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
-              <Zap className="size-6 text-muted-foreground" />
+          <div className="relative flex min-h-[calc(100vh-14rem)] flex-col">
+            {/* Ghost workflow rows */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-2">
+              <div className="w-full max-w-2xl space-y-2">
+                {[true, false, true, false, true].map((active, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-4">
+                    <div className={`size-5 rounded-full ${active ? "bg-emerald-200/30 dark:bg-emerald-800/20" : "bg-muted/40"}`} />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-2.5 rounded bg-muted" style={{ width: `${(i + 4) * 20}px` }} />
+                      <div className="h-2 w-16 rounded bg-muted/30" />
+                    </div>
+                    <div className="h-4 w-12 rounded border border-muted/40" />
+                    <div className="h-2 w-10 rounded bg-muted/20" />
+                  </div>
+                ))}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
             </div>
-            <h3 className="mt-4 text-base font-semibold">No workflows yet</h3>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              Create workflows to automate repetitive tasks like sending notifications or updating records.
-            </p>
+
+            {/* Centered content */}
+            <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
+              <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-violet-100 dark:bg-violet-950/50">
+                <Zap className="size-6 sm:size-7 text-violet-600 dark:text-violet-400" />
+              </div>
+              <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Workflow Automation</h2>
+              <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                Automate repetitive tasks by connecting triggers to actions. Get notified, update records, and keep your team in sync without manual work.
+              </p>
+              <Button
+                size="lg"
+                className="mt-6 bg-violet-600 hover:bg-violet-700"
+                onClick={() => setShowCreate(true)}
+              >
+                <Plus className="mr-2 size-4" />
+                Create your first workflow
+              </Button>
+            </div>
+
+            {/* Feature cards */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
+              {[
+                {
+                  icon: GitBranch,
+                  title: "Event triggers",
+                  description: "React to invoices, payments, inventory changes, deal updates, and more automatically.",
+                  color: "text-violet-600 dark:text-violet-400",
+                  bg: "bg-violet-50 dark:bg-violet-950/40",
+                },
+                {
+                  icon: Bell,
+                  title: "Smart notifications",
+                  description: "Send alerts to the right people when conditions are met. Never miss an overdue invoice again.",
+                  color: "text-amber-600 dark:text-amber-400",
+                  bg: "bg-amber-50 dark:bg-amber-950/40",
+                },
+                {
+                  icon: Repeat,
+                  title: "Conditional logic",
+                  description: "Set conditions to control when workflows fire. Filter by amount, status, type, and more.",
+                  color: "text-emerald-600 dark:text-emerald-400",
+                  bg: "bg-emerald-50 dark:bg-emerald-950/40",
+                },
+              ].map(({ icon: Icon, title, description, color, bg }) => (
+                <div key={title} className="rounded-xl p-4 sm:p-5">
+                  <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`size-4.5 ${color}`} />
+                  </div>
+                  <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="space-y-2">
