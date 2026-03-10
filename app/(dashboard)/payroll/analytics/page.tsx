@@ -18,6 +18,7 @@ import { Section } from "@/components/dashboard/section";
 import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -367,12 +368,12 @@ export default function AnalyticsPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Avg New Hire Salary ($)</Label>
-                <Input
-                  type="number"
+                <Label className="text-xs">Avg New Hire Salary</Label>
+                <CurrencyInput
+                  prefix="$"
+                  size="sm"
                   value={avgHireSalary}
-                  onChange={(e) => setAvgHireSalary(e.target.value)}
-                  className="h-8 text-sm"
+                  onChange={setAvgHireSalary}
                 />
               </div>
               <div className="space-y-1">

@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
@@ -212,13 +213,10 @@ export default function InventoryItemSuppliersPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Purchase Price</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
+              <CurrencyInput
+                prefix="$"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
+                onChange={setPrice}
               />
             </div>
             <div className="flex items-center gap-2">

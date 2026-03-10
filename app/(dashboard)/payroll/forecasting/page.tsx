@@ -7,6 +7,7 @@ import { TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -141,8 +142,8 @@ export default function ForecastingPage() {
               <Input type="number" value={newHires} onChange={(e) => setNewHires(e.target.value)} className="h-8 text-sm" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Avg New Hire Salary ($)</Label>
-              <Input type="number" value={avgHireSalary} onChange={(e) => setAvgHireSalary(e.target.value)} className="h-8 text-sm" />
+              <Label className="text-xs">Avg New Hire Salary</Label>
+              <CurrencyInput prefix="$" size="sm" value={avgHireSalary} onChange={setAvgHireSalary} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Terminations</Label>

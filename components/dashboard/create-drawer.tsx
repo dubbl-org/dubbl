@@ -273,6 +273,9 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   const [contactId, setContactId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [projectBudget, setProjectBudget] = useState("0.00");
+  const [projectHourlyRate, setProjectHourlyRate] = useState("0.00");
+  const [projectFixedPrice, setProjectFixedPrice] = useState("0.00");
 
   const PROJECT_COLORS = [
     "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
@@ -428,17 +431,17 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-budget">Budget</Label>
-                  <Input id="drawer-project-budget" name="budget" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-project-budget" name="budget" prefix="$" value={projectBudget} onChange={setProjectBudget} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-rate">Hourly Rate</Label>
-                  <Input id="drawer-project-rate" name="hourlyRate" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-project-rate" name="hourlyRate" prefix="$" value={projectHourlyRate} onChange={setProjectHourlyRate} />
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Fixed Price</Label>
-                  <Input name="fixedPrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput name="fixedPrice" prefix="$" value={projectFixedPrice} onChange={setProjectFixedPrice} />
                 </div>
                 <div className="space-y-2">
                   <Label>Estimated Hours</Label>
@@ -827,6 +830,8 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [categoryId, setCategoryId] = useState("");
+  const [invPurchasePrice, setInvPurchasePrice] = useState("0.00");
+  const [invSalePrice, setInvSalePrice] = useState("0.00");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -911,11 +916,11 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-purchase">Purchase Price</Label>
-                  <Input id="drawer-inv-purchase" name="purchasePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-inv-purchase" name="purchasePrice" prefix="$" value={invPurchasePrice} onChange={setInvPurchasePrice} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-sale">Sale Price</Label>
-                  <Input id="drawer-inv-sale" name="salePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-inv-sale" name="salePrice" prefix="$" value={invSalePrice} onChange={setInvSalePrice} />
                 </div>
               </div>
             </div>
@@ -1340,7 +1345,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                       </div>
                       <div className="space-y-2">
                         <Label>Amount *</Label>
-                        <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateItem(index, { amount: e.target.value })} placeholder="0.00" />
+                        <CurrencyInput prefix="$" value={item.amount} onChange={(v) => updateItem(index, { amount: v })} />
                       </div>
                       <div className="space-y-2">
                         <Label>Category</Label>
@@ -1502,7 +1507,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                 </div>
                 <div className="space-y-2">
                   <Label>Purchase Price *</Label>
-                  <Input type="number" step="0.01" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="10000.00" />
+                  <CurrencyInput prefix="$" value={purchasePrice} onChange={setPurchasePrice} placeholder="10000.00" />
                 </div>
               </div>
             </div>
@@ -1514,7 +1519,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Residual Value</Label>
-                  <Input type="number" step="0.01" value={residualValue} onChange={(e) => setResidualValue(e.target.value)} placeholder="500.00" />
+                  <CurrencyInput prefix="$" value={residualValue} onChange={setResidualValue} placeholder="500.00" />
                 </div>
                 <div className="space-y-2">
                   <Label>Useful Life (months)</Label>
@@ -2028,7 +2033,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Annual Salary *</Label>
-                  <Input type="number" step="0.01" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="75000.00" />
+                  <CurrencyInput prefix="$" value={salary} onChange={setSalary} placeholder="75000.00" />
                 </div>
                 <div className="space-y-2">
                   <Label>Pay Frequency</Label>
@@ -3079,8 +3084,8 @@ function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                   <Input value={cCompany} onChange={(e) => setCCompany(e.target.value)} placeholder="Acme LLC" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Default Rate ($)</Label>
-                  <Input type="number" step="0.01" value={cRate} onChange={(e) => setCRate(e.target.value)} placeholder="150.00" />
+                  <Label>Default Rate</Label>
+                  <CurrencyInput prefix="$" value={cRate} onChange={setCRate} placeholder="150.00" />
                 </div>
                 <div className="space-y-2">
                   <Label>Currency</Label>

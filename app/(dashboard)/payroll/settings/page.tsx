@@ -8,6 +8,7 @@ import { Save, Plus, Trash2, Settings, Shield, Clock, CalendarDays, DollarSign, 
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -684,7 +685,7 @@ export default function PayrollSettingsPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Default Amount ($)</Label>
-                  <Input type="number" step="0.01" value={newDeduction.defaultAmount} onChange={(e) => setNewDeduction({ ...newDeduction, defaultAmount: e.target.value })} />
+                  <CurrencyInput prefix="$" value={newDeduction.defaultAmount} onChange={(v) => setNewDeduction({ ...newDeduction, defaultAmount: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Default Percent (%)</Label>
@@ -737,12 +738,12 @@ export default function PayrollSettingsPage() {
                   <Input type="number" step="0.01" value={newBracket.rate} onChange={(e) => setNewBracket({ ...newBracket, rate: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Min Income ($)</Label>
-                  <Input type="number" value={newBracket.minIncome} onChange={(e) => setNewBracket({ ...newBracket, minIncome: e.target.value })} />
+                  <Label>Min Income</Label>
+                  <CurrencyInput prefix="$" value={newBracket.minIncome} onChange={(v) => setNewBracket({ ...newBracket, minIncome: v })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Max Income ($)</Label>
-                  <Input type="number" value={newBracket.maxIncome} onChange={(e) => setNewBracket({ ...newBracket, maxIncome: e.target.value })} placeholder="Unlimited" />
+                  <Label>Max Income</Label>
+                  <CurrencyInput prefix="$" value={newBracket.maxIncome} onChange={(v) => setNewBracket({ ...newBracket, maxIncome: v })} placeholder="Unlimited" />
                 </div>
               </div>
             </div>
@@ -904,16 +905,16 @@ export default function PayrollSettingsPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Min Salary ($)</Label>
-                  <Input type="number" step="0.01" value={newBand.minSalary} onChange={(e) => setNewBand({ ...newBand, minSalary: e.target.value })} />
+                  <Label>Min Salary</Label>
+                  <CurrencyInput prefix="$" value={newBand.minSalary} onChange={(v) => setNewBand({ ...newBand, minSalary: v })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Mid Salary ($)</Label>
-                  <Input type="number" step="0.01" value={newBand.midSalary} onChange={(e) => setNewBand({ ...newBand, midSalary: e.target.value })} />
+                  <Label>Mid Salary</Label>
+                  <CurrencyInput prefix="$" value={newBand.midSalary} onChange={(v) => setNewBand({ ...newBand, midSalary: v })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Max Salary ($)</Label>
-                  <Input type="number" step="0.01" value={newBand.maxSalary} onChange={(e) => setNewBand({ ...newBand, maxSalary: e.target.value })} />
+                  <Label>Max Salary</Label>
+                  <CurrencyInput prefix="$" value={newBand.maxSalary} onChange={(v) => setNewBand({ ...newBand, maxSalary: v })} />
                 </div>
               </div>
             </div>

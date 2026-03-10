@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -168,23 +169,15 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
                 onChange={(e) => updateLine(i, "description", e.target.value)}
                 placeholder="Line memo"
               />
-              <Input
-                className="h-8 text-right text-sm font-mono tabular-nums"
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
+                size="sm"
                 value={line.debit}
-                onChange={(e) => updateLine(i, "debit", e.target.value)}
-                placeholder="0.00"
+                onChange={(v) => updateLine(i, "debit", v)}
               />
-              <Input
-                className="h-8 text-right text-sm font-mono tabular-nums"
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
+                size="sm"
                 value={line.credit}
-                onChange={(e) => updateLine(i, "credit", e.target.value)}
-                placeholder="0.00"
+                onChange={(v) => updateLine(i, "credit", v)}
               />
               <Button
                 type="button"

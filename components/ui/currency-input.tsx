@@ -11,6 +11,8 @@ interface CurrencyInputProps {
   prefix?: string;
   size?: "sm" | "default";
   disabled?: boolean;
+  name?: string;
+  id?: string;
 }
 
 export function CurrencyInput({
@@ -21,6 +23,8 @@ export function CurrencyInput({
   prefix,
   size = "default",
   disabled,
+  name,
+  id,
 }: CurrencyInputProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -43,8 +47,10 @@ export function CurrencyInput({
           {prefix}
         </span>
       )}
+      {name && <input type="hidden" name={name} value={value} />}
       <input
         ref={inputRef}
+        id={id}
         type="text"
         inputMode="decimal"
         value={value}

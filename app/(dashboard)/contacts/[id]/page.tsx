@@ -38,6 +38,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { centsToDecimal, decimalToCents } from "@/lib/money";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
@@ -174,6 +175,7 @@ export default function ContactDetailPage() {
   const [formExpenseAccountId, setFormExpenseAccountId] = useState<string>("none");
   const [formTaxRateId, setFormTaxRateId] = useState<string>("none");
   const [formTaxExempt, setFormTaxExempt] = useState(false);
+  const [formCreditLimit, setFormCreditLimit] = useState("");
 
   useEntityTitle(contact?.name ?? undefined);
 
@@ -215,6 +217,7 @@ export default function ContactDetailPage() {
         setFormExpenseAccountId(c.defaultExpenseAccountId || "none");
         setFormTaxRateId(c.defaultTaxRateId || "none");
         setFormTaxExempt(c.isTaxExempt);
+        setFormCreditLimit(c.creditLimit != null ? centsToDecimal(c.creditLimit) : "");
       }
     } catch {
       toast.error("Failed to load contact");
@@ -320,7 +323,7 @@ export default function ContactDetailPage() {
     const orgId = getOrgId();
     if (!orgId) return;
 
-    const creditLimitValue = form.get("creditLimit") as string;
+    const creditLimitValue = formCreditLimit;
 
     try {
       const res = await fetch(`/api/v1/contacts/${id}`, {
@@ -358,6 +361,7 @@ export default function ContactDetailPage() {
       setFormExpenseAccountId(c.defaultExpenseAccountId || "none");
       setFormTaxRateId(c.defaultTaxRateId || "none");
       setFormTaxExempt(c.isTaxExempt);
+      setFormCreditLimit(c.creditLimit != null ? centsToDecimal(c.creditLimit) : "");
       toast.success("Contact updated");
     } catch {
       toast.error("Failed to update contact");
@@ -543,17 +547,11 @@ export default function ContactDetailPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Credit limit</Label>
-                    <Input
-                      name="creditLimit"
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      placeholder="Leave empty for no limit"
-                      defaultValue={
-                        contact.creditLimit != null
-                          ? centsToDecimal(contact.creditLimit)
-                          : ""
-                      }
+                    <CurrencyInput
+                      prefix="$"
+                      value={formCreditLimit}
+                      onChange={setFormCreditLimit}
+                      placeholder="No limit"
                     />
                   </div>
                   <div className="space-y-1.5">

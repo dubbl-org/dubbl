@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -175,24 +176,18 @@ export default function InventoryItemVariantsPage() {
             <div className="grid gap-4 grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Purchase Price</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
+                <CurrencyInput
+                  prefix="$"
                   value={purchasePrice}
-                  onChange={(e) => setPurchasePrice(e.target.value)}
-                  placeholder="0.00"
+                  onChange={setPurchasePrice}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Sale Price</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
+                <CurrencyInput
+                  prefix="$"
                   value={salePrice}
-                  onChange={(e) => setSalePrice(e.target.value)}
-                  placeholder="0.00"
+                  onChange={setSalePrice}
                 />
               </div>
             </div>

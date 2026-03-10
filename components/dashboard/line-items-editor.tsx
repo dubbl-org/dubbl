@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { AccountPicker } from "./account-picker";
 
 export interface LineItem {
@@ -84,14 +85,10 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter }: LineItem
               value={line.quantity}
               onChange={(e) => updateLine(i, "quantity", e.target.value)}
             />
-            <Input
-              className="h-8 text-right text-sm font-mono tabular-nums"
-              type="number"
-              step="0.01"
-              min="0"
+            <CurrencyInput
+              size="sm"
               value={line.unitPrice}
-              onChange={(e) => updateLine(i, "unitPrice", e.target.value)}
-              placeholder="0.00"
+              onChange={(v) => updateLine(i, "unitPrice", v)}
             />
             <span className="flex h-8 items-center justify-end text-sm font-mono font-medium tabular-nums">
               {lineAmount(line).toFixed(2)}

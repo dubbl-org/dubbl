@@ -9,6 +9,7 @@ import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -469,11 +470,10 @@ export default function EmployeeDetailPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Annual Salary</Label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
+                prefix="$"
                 value={salary}
-                onChange={(e) => setSalary(e.target.value)}
+                onChange={setSalary}
               />
             </div>
             <div className="space-y-1.5">
@@ -501,7 +501,7 @@ export default function EmployeeDetailPage() {
             {compensationType === "hourly" && (
               <div className="space-y-1.5">
                 <Label className="text-xs">Hourly Rate</Label>
-                <Input type="number" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+                <CurrencyInput prefix="$" value={hourlyRate} onChange={setHourlyRate} />
               </div>
             )}
             <div className="space-y-1.5">
@@ -639,20 +639,18 @@ export default function EmployeeDetailPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Additional Federal Withholding</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
+                    prefix="$"
                     value={tcAddlFederal}
-                    onChange={(e) => setTcAddlFederal(e.target.value)}
+                    onChange={setTcAddlFederal}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Additional State Withholding</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
+                    prefix="$"
                     value={tcAddlState}
-                    onChange={(e) => setTcAddlState(e.target.value)}
+                    onChange={setTcAddlState}
                   />
                 </div>
               </div>

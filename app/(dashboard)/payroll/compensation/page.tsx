@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -663,16 +664,16 @@ function BandSheet({
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Min Salary ($)</Label>
-                  <Input type="number" value={newBand.minSalary} onChange={(e) => setNewBand({ ...newBand, minSalary: e.target.value })} />
+                  <Label>Min Salary</Label>
+                  <CurrencyInput prefix="$" value={newBand.minSalary} onChange={(v) => setNewBand({ ...newBand, minSalary: v })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Mid Salary ($)</Label>
-                  <Input type="number" value={newBand.midSalary} onChange={(e) => setNewBand({ ...newBand, midSalary: e.target.value })} />
+                  <Label>Mid Salary</Label>
+                  <CurrencyInput prefix="$" value={newBand.midSalary} onChange={(v) => setNewBand({ ...newBand, midSalary: v })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Max Salary ($)</Label>
-                  <Input type="number" value={newBand.maxSalary} onChange={(e) => setNewBand({ ...newBand, maxSalary: e.target.value })} />
+                  <Label>Max Salary</Label>
+                  <CurrencyInput prefix="$" value={newBand.maxSalary} onChange={(v) => setNewBand({ ...newBand, maxSalary: v })} />
                 </div>
               </div>
             </div>
@@ -735,8 +736,8 @@ function ReviewSheet({
                 <Input type="date" name="effectiveDate" value={newReview.effectiveDate} onChange={(e) => setNewReview({ ...newReview, effectiveDate: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Budget ($)</Label>
-                <Input type="number" name="totalBudget" value={newReview.totalBudget} onChange={(e) => setNewReview({ ...newReview, totalBudget: e.target.value })} placeholder="Optional" />
+                <Label>Budget</Label>
+                <CurrencyInput prefix="$" value={newReview.totalBudget} onChange={(v) => setNewReview({ ...newReview, totalBudget: v })} placeholder="Optional" />
               </div>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -234,8 +235,8 @@ export default function ContractorDetailPage() {
               <Input value={company} onChange={(e) => setCompany(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Hourly Rate ({contractor.currency || "USD"})</Label>
-              <Input type="number" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+              <Label className="text-xs">Hourly Rate</Label>
+              <CurrencyInput prefix="$" value={hourlyRate} onChange={setHourlyRate} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Bank Account</Label>
@@ -260,7 +261,7 @@ export default function ContractorDetailPage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Amount</Label>
-                  <Input type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="h-8 text-sm" />
+                  <CurrencyInput prefix="$" size="sm" value={paymentAmount} onChange={setPaymentAmount} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Currency</Label>

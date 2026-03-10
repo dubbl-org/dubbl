@@ -8,6 +8,7 @@ import { ArrowLeft, Play, Search, X, FileText, CheckCircle2, XCircle, Gift, Scro
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -610,11 +611,10 @@ export default function PayrollRunDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Amount</Label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
+                  <CurrencyInput
+                    prefix="$"
                     value={bonusForm.amount}
-                    onChange={(e) => setBonusForm((f) => ({ ...f, amount: e.target.value }))}
+                    onChange={(v) => setBonusForm((f) => ({ ...f, amount: v }))}
                   />
                 </div>
                 <div className="space-y-2">

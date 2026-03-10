@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -389,7 +390,7 @@ function EditExpenseDrawer({
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Amount *</Label>
-                        <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateEditItem(index, { amount: e.target.value })} />
+                        <CurrencyInput prefix="$" value={item.amount} onChange={(v) => updateEditItem(index, { amount: v })} />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Category</Label>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -173,7 +174,7 @@ export default function MembersPage() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Compensation</p>
               <div className="space-y-2">
                 <Label>Hourly Rate (optional)</Label>
-                <Input type="number" step="0.01" min={0} value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} placeholder="0.00" />
+                <CurrencyInput prefix="$" value={hourlyRate} onChange={setHourlyRate} />
                 <p className="text-[11px] text-muted-foreground">Override the project-level hourly rate for this member.</p>
               </div>
             </div>

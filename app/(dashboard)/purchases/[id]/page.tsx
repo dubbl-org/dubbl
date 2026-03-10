@@ -7,6 +7,7 @@ import { ArrowLeft, Check, DollarSign, Ban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -140,7 +141,7 @@ export default function BillDetailPage() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Amount</Label>
-                      <Input type="number" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={centsToDecimal(b.amountDue)} />
+                      <CurrencyInput prefix="$" value={payAmount} onChange={setPayAmount} placeholder={centsToDecimal(b.amountDue)} />
                     </div>
                     <div className="space-y-2">
                       <Label>Date</Label>

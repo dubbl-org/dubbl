@@ -7,6 +7,7 @@ import { Trash2, Save, Loader2, Warehouse, Printer } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { centsToDecimal } from "@/lib/money";
@@ -31,6 +32,8 @@ export default function InventoryItemDetailsPage() {
   const { item, setItem } = useInventoryItem();
   const [saving, setSaving] = useState(false);
   const [categoryId, setCategoryId] = useState(item.categoryId || "");
+  const [invPurchasePrice, setInvPurchasePrice] = useState(centsToDecimal(item.purchasePrice));
+  const [invSalePrice, setInvSalePrice] = useState(centsToDecimal(item.salePrice));
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -65,8 +68,8 @@ export default function InventoryItemDetailsPage() {
           description: form.get("description") || null,
           categoryId: categoryId || null,
           sku: form.get("sku") || null,
-          purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
-          salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
+          purchasePrice: Math.round(parseFloat(invPurchasePrice || "0") * 100),
+          salePrice: Math.round(parseFloat(invSalePrice || "0") * 100),
           reorderPoint: parseInt(form.get("reorderPoint") as string) || 0,
         }),
       });
@@ -183,24 +186,20 @@ export default function InventoryItemDetailsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="purchasePrice">Purchase Price</Label>
-              <Input
+              <CurrencyInput
                 id="purchasePrice"
-                name="purchasePrice"
-                type="number"
-                step="0.01"
-                min={0}
-                defaultValue={centsToDecimal(item.purchasePrice)}
+                prefix="$"
+                value={invPurchasePrice}
+                onChange={setInvPurchasePrice}
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="salePrice">Sale Price</Label>
-              <Input
+              <CurrencyInput
                 id="salePrice"
-                name="salePrice"
-                type="number"
-                step="0.01"
-                min={0}
-                defaultValue={centsToDecimal(item.salePrice)}
+                prefix="$"
+                value={invSalePrice}
+                onChange={setInvSalePrice}
               />
             </div>
           </div>

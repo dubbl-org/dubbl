@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, CheckCircle2, Flag, Target, Loader2, Users, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -217,7 +218,7 @@ export default function MilestonesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Amount</Label>
-                  <Input type="number" step="0.01" min={0} value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                  <CurrencyInput prefix="$" value={amount} onChange={setAmount} />
                 </div>
               </div>
             </div>
@@ -337,7 +338,7 @@ export default function MilestonesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Amount</Label>
-                  <Input type="number" step="0.01" min={0} value={assignAmount} onChange={e => setAssignAmount(e.target.value)} placeholder="0.00" />
+                  <CurrencyInput prefix="$" value={assignAmount} onChange={setAssignAmount} />
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
