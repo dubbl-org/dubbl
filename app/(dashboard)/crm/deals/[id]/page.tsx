@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   MessageSquare,
   Mail,
   Phone,
@@ -11,12 +12,21 @@ import {
   Trophy,
   XCircle,
   Send,
+  FileText,
+  Activity,
+  Settings2,
+  User,
+  DollarSign,
+  Target,
+  Briefcase,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,8 +36,10 @@ import {
 } from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { Section } from "@/components/dashboard/section";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { cn } from "@/lib/utils";
 
 interface DealDetail {
   id: string;
@@ -42,6 +54,7 @@ interface DealDetail {
   wonAt: string | null;
   lostAt: string | null;
   lostReason: string | null;
+  createdAt: string;
   contact: { id: string; name: string; email: string | null } | null;
   assignedUser: { id: string; name: string | null } | null;
   pipeline: { name: string; stages: { id: string; name: string; color: string }[] } | null;
@@ -62,13 +75,57 @@ const ACTIVITY_ICONS: Record<string, typeof MessageSquare> = {
   task: ClipboardList,
 };
 
+const ACTIVITY_COLORS: Record<string, string> = {
+  note: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  email: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
+  call: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
+  meeting: "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400",
+  task: "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  website: "Website",
+  referral: "Referral",
+  cold_outreach: "Cold Outreach",
+  event: "Event",
+  other: "Other",
+};
+
+const TABS = [
+  { value: "overview", label: "Overview", icon: FileText },
+  { value: "activity", label: "Activity", icon: Activity },
+  { value: "settings", label: "Settings", icon: Settings2 },
+] as const;
+
+type Tab = (typeof TABS)[number]["value"];
+
+function timeAgo(dateStr: string) {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export default function DealDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [deal, setDeal] = useState<DealDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("overview");
   const [activityType, setActivityType] = useState("note");
   const [activityContent, setActivityContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [stageChanging, setStageChanging] = useState(false);
+
+  const [saving, setSaving] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
@@ -85,18 +142,88 @@ export default function DealDetailPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchDeal(); }, [id]);
+
+  async function handleSettingsSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!deal) return;
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    try {
+      const res = await fetch(`/api/v1/crm/deals/${id}`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          title: form.get("title") as string,
+          notes: (form.get("notes") as string) || null,
+          probability: form.get("probability") ? parseInt(form.get("probability") as string) : null,
+          expectedCloseDate: (form.get("expectedCloseDate") as string) || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update deal");
+      await fetchDeal();
+      toast.success("Deal updated");
+    } catch {
+      toast.error("Failed to update deal");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    const confirmed = await confirm({
+      title: `Delete "${deal?.title}"?`,
+      description: "This deal and all its activities will be permanently removed. This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/api/v1/crm/deals/${id}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete deal");
+      toast.success("Deal deleted");
+      router.push("/crm");
+    } catch {
+      toast.error("Failed to delete deal");
+    }
+  }
 
   async function addActivity() {
     if (!activityContent.trim()) return;
-    await fetch(`/api/v1/crm/deals/${id}/activities`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({ type: activityType, content: activityContent }),
-    });
-    setActivityContent("");
-    await fetchDeal();
-    toast.success("Activity added");
+    setSubmitting(true);
+    try {
+      await fetch(`/api/v1/crm/deals/${id}/activities`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ type: activityType, content: activityContent }),
+      });
+      setActivityContent("");
+      await fetchDeal();
+      toast.success("Activity added");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function changeStage(stageId: string) {
+    setStageChanging(true);
+    try {
+      await fetch(`/api/v1/crm/deals/${id}/stage`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ stageId }),
+      });
+      await fetchDeal();
+      toast.success("Stage updated");
+    } catch {
+      toast.error("Failed to update stage");
+    } finally {
+      setStageChanging(false);
+    }
   }
 
   async function markWon() {
@@ -128,148 +255,542 @@ export default function DealDetailPage() {
 
   const stages = deal.pipeline?.stages || [];
   const currentStage = stages.find((s) => s.id === deal.stageId);
+  const currentStageIdx = stages.findIndex((s) => s.id === deal.stageId);
+  const isWon = !!deal.wonAt;
+  const isLost = !!deal.lostAt;
+  const isClosed = isWon || isLost;
 
   return (
     <ContentReveal>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">{deal.title}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              {currentStage && (
-                <Badge variant="outline" style={{ borderColor: currentStage.color, color: currentStage.color }}>
-                  {currentStage.name}
-                </Badge>
-              )}
-              <span className="text-sm font-mono font-medium tabular-nums">
-                {formatMoney(deal.valueCents, deal.currency)}
-              </span>
-              {deal.probability !== null && (
-                <span className="text-xs text-muted-foreground">{deal.probability}% probability</span>
-              )}
-            </div>
-          </div>
-          {!deal.wonAt && !deal.lostAt && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1 text-red-600" onClick={markLost}>
-                <XCircle className="size-3" /> Lost
-              </Button>
-              <Button size="sm" className="h-7 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700" onClick={markWon}>
-                <Trophy className="size-3" /> Won
-              </Button>
-            </div>
-          )}
-          {deal.wonAt && <Badge className="bg-emerald-100 text-emerald-700">Won</Badge>}
-          {deal.lostAt && <Badge className="bg-red-100 text-red-700">Lost</Badge>}
-        </div>
+      {/* Back button */}
+      <button
+        onClick={() => router.push("/crm")}
+        className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ArrowLeft className="size-3.5" />
+        Back to pipeline
+      </button>
 
-        {/* Details */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border bg-card p-4 space-y-3">
-            <h3 className="text-sm font-medium">Details</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Contact</span>
-                <span>{deal.contact?.name || "-"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Assigned to</span>
-                <span>{deal.assignedUser?.name || "-"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Source</span>
-                <span>{deal.source || "-"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Expected close</span>
-                <span>{deal.expectedCloseDate || "-"}</span>
-              </div>
-            </div>
-            {deal.notes && (
-              <p className="text-xs text-muted-foreground border-t pt-2">{deal.notes}</p>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-2">
+        <div className="space-y-2 min-w-0">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">{deal.title}</h1>
+            {isWon && (
+              <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-400 shrink-0">
+                <Trophy className="size-3 mr-1" /> Won
+              </Badge>
+            )}
+            {isLost && (
+              <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/60 dark:text-red-400 shrink-0">
+                <XCircle className="size-3 mr-1" /> Lost
+              </Badge>
             )}
           </div>
-
-          {/* Stage Progress */}
-          <div className="rounded-lg border bg-card p-4 space-y-3">
-            <h3 className="text-sm font-medium">Pipeline Progress</h3>
-            <div className="space-y-1">
-              {stages.map((stage) => {
-                const isCurrent = stage.id === deal.stageId;
-                const stageIdx = stages.findIndex((s) => s.id === stage.id);
-                const currentIdx = stages.findIndex((s) => s.id === deal.stageId);
-                const isPast = stageIdx < currentIdx;
-                return (
-                  <div key={stage.id} className="flex items-center gap-2">
-                    <div
-                      className="size-2 rounded-full shrink-0"
-                      style={{ backgroundColor: isCurrent || isPast ? stage.color : "#e5e7eb" }}
-                    />
-                    <span className={`text-xs ${isCurrent ? "font-medium" : "text-muted-foreground"}`}>
-                      {stage.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <span className="font-mono font-semibold tabular-nums text-foreground text-base">
+              {formatMoney(deal.valueCents, deal.currency)}
+            </span>
+            {deal.probability !== null && (
+              <span className="flex items-center gap-1">
+                <Target className="size-3" />
+                {deal.probability}%
+              </span>
+            )}
+            {deal.contact && (
+              <span className="flex items-center gap-1">
+                <User className="size-3" />
+                {deal.contact.name}
+              </span>
+            )}
+            {deal.pipeline && (
+              <span className="flex items-center gap-1">
+                <Briefcase className="size-3" />
+                {deal.pipeline.name}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Activity Timeline */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium">Activity ({deal.activities.length})</h3>
-
-          {/* Add activity */}
-          <div className="flex gap-2">
-            <Select value={activityType} onValueChange={setActivityType}>
-              <SelectTrigger className="w-28 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="note">Note</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="call">Call</SelectItem>
-                <SelectItem value="meeting">Meeting</SelectItem>
-                <SelectItem value="task">Task</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder="Add activity..."
-              value={activityContent}
-              onChange={(e) => setActivityContent(e.target.value)}
-              className="flex-1 h-8 text-xs"
-              onKeyDown={(e) => e.key === "Enter" && addActivity()}
-            />
-            <Button size="sm" className="h-8 text-xs gap-1" onClick={addActivity} disabled={!activityContent.trim()}>
-              <Send className="size-3" />
+        {!isClosed && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={markLost}>
+              <XCircle className="size-3" /> Mark Lost
+            </Button>
+            <Button size="sm" className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={markWon}>
+              <Trophy className="size-3" /> Mark Won
             </Button>
           </div>
+        )}
+      </div>
 
-          <div className="space-y-2">
-            {deal.activities.map((activity) => {
-              const Icon = ACTIVITY_ICONS[activity.type] || MessageSquare;
-              return (
-                <div key={activity.id} className="flex items-start gap-3 rounded-lg border bg-card p-3">
-                  <Icon className="size-4 text-muted-foreground mt-0.5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium">{activity.user?.name || "System"}</span>
-                      <Badge variant="outline" className="text-[9px]">{activity.type}</Badge>
-                      <span className="text-[10px] text-muted-foreground ml-auto">
-                        {new Date(activity.createdAt).toLocaleDateString()}
-                      </span>
+      {/* Stage progress bar */}
+      {stages.length > 0 && (
+        <div className="flex items-center gap-1 mb-6 mt-4">
+          {stages.filter((s) => s.id !== "closed_lost").map((stage, idx) => {
+            const stageIdx = stages.findIndex((s) => s.id === stage.id);
+            const isCurrent = stage.id === deal.stageId;
+            const isPast = stageIdx < currentStageIdx;
+            const isActive = isCurrent || isPast || isWon;
+
+            return (
+              <button
+                key={stage.id}
+                disabled={isClosed || stageChanging}
+                onClick={() => !isClosed && changeStage(stage.id)}
+                className={cn(
+                  "relative flex-1 h-2 rounded-full transition-all",
+                  isActive ? "opacity-100" : "opacity-30",
+                  !isClosed && "hover:opacity-80 cursor-pointer",
+                  isClosed && "cursor-default"
+                )}
+                style={{ backgroundColor: stage.color }}
+                title={stage.name}
+              >
+                {isCurrent && (
+                  <div
+                    className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium px-1.5 py-0.5 rounded"
+                    style={{ color: stage.color }}
+                  >
+                    {stage.name}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="h-px bg-gradient-to-r from-emerald-500/20 via-border to-transparent mb-2" />
+
+      {/* Tabs */}
+      <nav className="-mt-0 mb-8 flex items-center gap-1 overflow-x-auto border-b border-border">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 pt-3 text-[13px] font-medium transition-colors",
+                tab === t.value
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="size-3.5" />
+              {t.label}
+              {t.value === "activity" && deal.activities.length > 0 && (
+                <span className="ml-1 text-[11px] tabular-nums text-muted-foreground">
+                  {deal.activities.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Tab content */}
+      <ContentReveal key={tab}>
+        {tab === "overview" && (
+          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+            {/* Main content */}
+            <div className="space-y-4">
+              {/* Deal info card */}
+              <div className="rounded-xl border bg-card p-5 space-y-4">
+                <h3 className="text-sm font-semibold">Deal Information</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Contact</p>
+                      {deal.contact ? (
+                        <div>
+                          <p className="text-sm font-medium">{deal.contact.name}</p>
+                          {deal.contact.email && (
+                            <p className="text-xs text-muted-foreground">{deal.contact.email}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">-</p>
+                      )}
                     </div>
-                    {activity.content && (
-                      <p className="text-xs text-muted-foreground mt-1">{activity.content}</p>
-                    )}
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Assigned To</p>
+                      <p className="text-sm">{deal.assignedUser?.name || "-"}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Source</p>
+                      <p className="text-sm">{deal.source ? (SOURCE_LABELS[deal.source] || deal.source) : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Expected Close</p>
+                      <p className="text-sm">
+                        {deal.expectedCloseDate
+                          ? new Date(deal.expectedCloseDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+                          : "-"}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+                {deal.notes && (
+                  <>
+                    <div className="h-px bg-border" />
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Notes</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{deal.notes}</p>
+                    </div>
+                  </>
+                )}
+                {deal.lostReason && (
+                  <>
+                    <div className="h-px bg-border" />
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Lost Reason</p>
+                      <p className="text-sm text-red-600 dark:text-red-400">{deal.lostReason}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Recent activity preview */}
+              {deal.activities.length > 0 && (
+                <div className="rounded-xl border bg-card p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Recent Activity</h3>
+                    <button
+                      onClick={() => setTab("activity")}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      View all
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {deal.activities.slice(0, 3).map((activity) => {
+                      const Icon = ACTIVITY_ICONS[activity.type] || MessageSquare;
+                      return (
+                        <div key={activity.id} className="flex items-start gap-3 py-2">
+                          <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg", ACTIVITY_COLORS[activity.type] || ACTIVITY_COLORS.note)}>
+                            <Icon className="size-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium">{activity.user?.name || "System"}</span>
+                              <span className="text-[10px] text-muted-foreground">{timeAgo(activity.createdAt)}</span>
+                            </div>
+                            {activity.content && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{activity.content}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-4">
+              {/* Key metrics */}
+              <div className="rounded-xl border bg-card p-4 space-y-3">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Key Metrics</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                      <DollarSign className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold font-mono tabular-nums">{formatMoney(deal.valueCents, deal.currency)}</p>
+                      <p className="text-[10px] text-muted-foreground">Deal Value</p>
+                    </div>
+                  </div>
+                  {deal.probability !== null && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-8 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40">
+                        <Target className="size-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold tabular-nums">{deal.probability}%</p>
+                          <p className="text-[10px] text-muted-foreground font-mono tabular-nums">
+                            {formatMoney(Math.round(deal.valueCents * (deal.probability / 100)), deal.currency)}
+                          </p>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-1">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${deal.probability}%`,
+                              backgroundColor: deal.probability >= 70 ? "#10b981" : deal.probability >= 40 ? "#f59e0b" : "#94a3b8",
+                            }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Weighted Value</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pipeline stages */}
+              {stages.length > 0 && (
+                <div className="rounded-xl border bg-card p-4 space-y-3">
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pipeline Stage</h3>
+                  <div className="space-y-1">
+                    {stages.map((stage, idx) => {
+                      const isCurrent = stage.id === deal.stageId;
+                      const isPast = idx < currentStageIdx;
+                      return (
+                        <button
+                          key={stage.id}
+                          disabled={isClosed || stageChanging}
+                          onClick={() => !isClosed && changeStage(stage.id)}
+                          className={cn(
+                            "flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-left transition-colors",
+                            isCurrent && "bg-muted",
+                            !isClosed && !isCurrent && "hover:bg-muted/50 cursor-pointer",
+                            isClosed && "cursor-default"
+                          )}
+                        >
+                          <div className="relative flex items-center justify-center size-4 shrink-0">
+                            {isPast || (isWon && stage.id !== "closed_lost") ? (
+                              <div className="size-4 rounded-full flex items-center justify-center" style={{ backgroundColor: stage.color }}>
+                                <Check className="size-2.5 text-white" />
+                              </div>
+                            ) : (
+                              <div
+                                className={cn("size-3 rounded-full border-2", isCurrent ? "border-0" : "")}
+                                style={{
+                                  backgroundColor: isCurrent ? stage.color : "transparent",
+                                  borderColor: isCurrent ? stage.color : "#d1d5db",
+                                }}
+                              />
+                            )}
+                          </div>
+                          <span className={cn("text-xs", isCurrent ? "font-medium" : "text-muted-foreground")}>
+                            {stage.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Created date */}
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-[11px] text-muted-foreground">
+                  Created {new Date(deal.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                </p>
+                {deal.wonAt && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+                    Won {new Date(deal.wonAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                  </p>
+                )}
+                {deal.lostAt && (
+                  <p className="text-[11px] text-red-600 dark:text-red-400 mt-1">
+                    Lost {new Date(deal.lostAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        )}
+
+        {tab === "activity" && (
+          <div className="space-y-6">
+            {/* Add activity form */}
+            <div className="rounded-xl border bg-card p-5 space-y-3">
+              <h3 className="text-sm font-semibold">Log Activity</h3>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(ACTIVITY_ICONS).map(([type, Icon]) => (
+                  <button
+                    key={type}
+                    onClick={() => setActivityType(type)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                      activityType === type
+                        ? ACTIVITY_COLORS[type]
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="size-3" />
+                    <span className="capitalize">{type}</span>
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                placeholder={`Add a ${activityType}...`}
+                value={activityContent}
+                onChange={(e) => setActivityContent(e.target.value)}
+                className="min-h-[80px] text-sm resize-none"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={addActivity}
+                  disabled={!activityContent.trim() || submitting}
+                >
+                  <Send className="size-3" />
+                  {submitting ? "Adding..." : "Add Activity"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Activity timeline */}
+            {deal.activities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+                  <Activity className="size-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium">No activity yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Log your first activity above</p>
+              </div>
+            ) : (
+              <div className="relative">
+                {/* Timeline line */}
+                <div className="absolute left-[15px] top-4 bottom-4 w-px bg-border" />
+
+                <div className="space-y-1">
+                  {deal.activities.map((activity) => {
+                    const Icon = ACTIVITY_ICONS[activity.type] || MessageSquare;
+                    return (
+                      <div key={activity.id} className="relative flex items-start gap-4 py-3">
+                        <div className={cn(
+                          "relative z-10 flex size-8 shrink-0 items-center justify-center rounded-lg",
+                          ACTIVITY_COLORS[activity.type] || ACTIVITY_COLORS.note
+                        )}>
+                          <Icon className="size-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium">{activity.user?.name || "System"}</span>
+                            <span className="text-xs text-muted-foreground capitalize">logged a {activity.type}</span>
+                            <span className="text-[11px] text-muted-foreground ml-auto shrink-0">
+                              {timeAgo(activity.createdAt)}
+                            </span>
+                          </div>
+                          {activity.content && (
+                            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{activity.content}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "settings" && (
+          <form onSubmit={handleSettingsSubmit} className="space-y-10">
+            <Section title="General" description="Basic deal information and identification.">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Deal Title</Label>
+                  <Input name="title" required defaultValue={deal.title} />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Probability (%)</Label>
+                    <Input
+                      name="probability"
+                      type="number"
+                      min={0}
+                      max={100}
+                      defaultValue={deal.probability ?? ""}
+                      placeholder="0-100"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Expected Close Date</Label>
+                    <Input
+                      name="expectedCloseDate"
+                      type="date"
+                      defaultValue={deal.expectedCloseDate || ""}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            <div className="h-px bg-border" />
+
+            <Section title="Details" description="Source, contact, and assignment info.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Source</Label>
+                  <Input
+                    value={deal.source ? (SOURCE_LABELS[deal.source] || deal.source) : "-"}
+                    disabled
+                    className="bg-muted/50"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Contact</Label>
+                  <Input
+                    value={deal.contact?.name || "-"}
+                    disabled
+                    className="bg-muted/50"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Assigned To</Label>
+                  <Input
+                    value={deal.assignedUser?.name || "-"}
+                    disabled
+                    className="bg-muted/50"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Value</Label>
+                  <Input
+                    value={formatMoney(deal.valueCents, deal.currency)}
+                    disabled
+                    className="bg-muted/50 font-mono tabular-nums"
+                  />
+                </div>
+              </div>
+            </Section>
+
+            <div className="h-px bg-border" />
+
+            <Section title="Notes" description="Internal notes about this deal.">
+              <Textarea
+                name="notes"
+                defaultValue={deal.notes || ""}
+                rows={3}
+                placeholder="Add notes about this deal..."
+              />
+            </Section>
+
+            <div className="flex justify-end">
+              <Button type="submit" size="sm" disabled={saving}>
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <Section title="Danger zone" description="Irreversible actions for this deal.">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete this deal</p>
+                  <p className="text-xs text-red-600/70 dark:text-red-400/60">Once deleted, this cannot be undone.</p>
+                </div>
+                <Button type="button" size="sm" variant="destructive" onClick={handleDelete}>
+                  Delete Deal
+                </Button>
+              </div>
+            </Section>
+          </form>
+        )}
+      </ContentReveal>
+
       {confirmDialog}
     </ContentReveal>
   );

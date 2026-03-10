@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
-import { Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign } from "lucide-react";
+import { motion, MotionConfig } from "motion/react";
+import { Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign, ArrowUpDown, Calendar, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { SearchInput } from "@/components/ui/search-input";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { formatMoney } from "@/lib/money";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface Deal {
   id: string;
@@ -21,9 +26,23 @@ interface Deal {
   currency: string;
   probability: number | null;
   contact: { name: string } | null;
+  assignedUser: { name: string } | null;
+  expectedCloseDate: string | null;
+  source: string | null;
+  createdAt: string;
   wonAt: string | null;
   lostAt: string | null;
 }
+
+type StageFilter = "all" | string;
+type SortKey = "value" | "name" | "date" | "probability";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "value", label: "Value" },
+  { value: "name", label: "Name" },
+  { value: "date", label: "Date" },
+  { value: "probability", label: "Probability" },
+];
 
 interface Pipeline {
   id: string;
@@ -43,23 +62,6 @@ const DEFAULT_STAGES = [
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const COLUMN_VARIANTS = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.06, duration: 0.4, ease: EASE },
-  }),
-};
-
-const CARD_VARIANTS = {
-  hidden: { opacity: 0, scale: 0.96 },
-  visible: (i: number) => ({
-    opacity: 1,
-    scale: 1,
-    transition: { delay: i * 0.04, duration: 0.3, ease: EASE },
-  }),
-};
 
 export default function CRMPage() {
   const router = useRouter();
@@ -69,6 +71,14 @@ export default function CRMPage() {
   const [loading, setLoading] = useState(true);
   const [activePipeline, setActivePipeline] = useState<Pipeline | null>(null);
   const [setupLoading, setSetupLoading] = useState(false);
+
+  // Search, filter, sort state
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search);
+  const pendingSearch = search !== debouncedSearch;
+  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("value");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
@@ -133,6 +143,62 @@ export default function CRMPage() {
   const pipelineDeals = activePipeline
     ? deals.filter(() => true)
     : deals;
+
+  const activeDeals = pipelineDeals.filter((d) => !d.wonAt && !d.lostAt);
+  const pipelineValue = activeDeals.reduce((s, d) => s + d.valueCents, 0);
+  const wonDeals = pipelineDeals.filter((d) => d.wonAt);
+  const wonValue = wonDeals.reduce((s, d) => s + d.valueCents, 0);
+
+  // Stage distribution for the funnel bar
+  const stageDistribution = useMemo(() => {
+    return stages.map((stage) => {
+      const count = activeDeals.filter((d) => d.stageId === stage.id).length;
+      const value = activeDeals.filter((d) => d.stageId === stage.id).reduce((s, d) => s + d.valueCents, 0);
+      return { ...stage, count, value };
+    });
+  }, [stages, activeDeals]);
+
+  // Filter + sort
+  const filteredDeals = useMemo(() => {
+    let result = [...pipelineDeals];
+
+    if (stageFilter !== "all") {
+      result = result.filter((d) => d.stageId === stageFilter);
+    }
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter((d) => {
+        return (
+          d.title.toLowerCase().includes(q) ||
+          d.contact?.name.toLowerCase().includes(q) ||
+          d.assignedUser?.name.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    const dir = sortOrder === "asc" ? 1 : -1;
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case "value":
+          return dir * (a.valueCents - b.valueCents);
+        case "name":
+          return dir * a.title.localeCompare(b.title);
+        case "date":
+          return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        case "probability":
+          return dir * ((a.probability || 0) - (b.probability || 0));
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [pipelineDeals, stageFilter, debouncedSearch, sortBy, sortOrder]);
+
+  function getStageInfo(stageId: string) {
+    return stages.find((s) => s.id === stageId) || { name: stageId, color: "#94a3b8" };
+  }
 
   if (loading) return <BrandLoader />;
 
@@ -250,9 +316,6 @@ export default function CRMPage() {
     );
   }
 
-  const activeDeals = pipelineDeals.filter((d) => !d.wonAt && !d.lostAt);
-  const pipelineValue = activeDeals.reduce((s, d) => s + d.valueCents, 0);
-
   return (
     <ContentReveal className="space-y-6">
       <PageHeader
@@ -264,61 +327,207 @@ export default function CRMPage() {
         </Button>
       </PageHeader>
 
-      {/* Kanban Board */}
-      <div className="flex gap-3 overflow-x-auto pb-4">
-        {stages.filter((s) => s.id !== "closed_lost").map((stage, colIdx) => {
-          const stageDeals = pipelineDeals.filter((d) => d.stageId === stage.id);
-          const stageValue = stageDeals.reduce((s, d) => s + d.valueCents, 0);
+      {/* Pipeline funnel bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="rounded-xl border bg-card p-5"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <BarChart3 className="size-4" />
+            <span className="text-xs font-medium uppercase tracking-wide">Stage Distribution</span>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="font-mono tabular-nums">{activeDeals.length} active</span>
+            {wonDeals.length > 0 && (
+              <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{wonDeals.length} won · {formatMoney(wonValue)}</span>
+            )}
+          </div>
+        </div>
 
-          return (
-            <motion.div
-              key={stage.id}
-              custom={colIdx}
-              variants={COLUMN_VARIANTS}
-              initial="hidden"
-              animate="visible"
-              className="w-64 shrink-0"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="size-2 rounded-full" style={{ backgroundColor: stage.color }} />
-                <span className="text-xs font-medium">{stage.name}</span>
-                <Badge variant="outline" className="text-[10px] ml-auto">{stageDeals.length}</Badge>
-              </div>
-              <div className="text-[10px] text-muted-foreground mb-2 font-mono tabular-nums">
-                {formatMoney(stageValue)}
-              </div>
-              <div className="space-y-1.5 min-h-[100px]">
-                {stageDeals.map((d, cardIdx) => (
-                  <motion.button
-                    key={d.id}
-                    custom={cardIdx}
-                    variants={CARD_VARIANTS}
-                    initial="hidden"
-                    animate="visible"
-                    onClick={() => router.push(`/crm/deals/${d.id}`)}
-                    className="w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50"
+        {/* Segmented bar */}
+        {activeDeals.length > 0 ? (
+          <>
+            <div className="flex h-3 rounded-full overflow-hidden bg-muted">
+              {stageDistribution.filter((s) => s.count > 0).map((stage) => (
+                <div
+                  key={stage.id}
+                  className="transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                  style={{
+                    width: `${(stage.count / activeDeals.length) * 100}%`,
+                    backgroundColor: stage.color,
+                    opacity: 0.8,
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
+              {stageDistribution.filter((s) => s.count > 0).map((stage) => (
+                <button
+                  key={stage.id}
+                  onClick={() => setStageFilter(stageFilter === stage.id ? "all" : stage.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 text-[11px] transition-colors",
+                    stageFilter === stage.id ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                  {stage.name} ({stage.count}) · {formatMoney(stage.value)}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">No active deals yet</p>
+        )}
+      </motion.div>
+
+      {/* Toolbar: tabs + search + sort */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={stageFilter} onValueChange={(v) => setStageFilter(v as StageFilter)}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              {stages.filter((s) => s.id !== "closed_lost").map((s) => (
+                <TabsTrigger key={s.id} value={s.id} className="gap-1.5">
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                  {s.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search deals, contacts..."
+            loading={pendingSearch}
+          />
+
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+            <SelectTrigger className="h-8 w-full sm:w-[150px] text-xs">
+              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => setSortOrder((p) => p === "asc" ? "desc" : "asc")}>
+            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Deal list */}
+      {filteredDeals.length === 0 ? (
+        <ContentReveal>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+              <Handshake className="size-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium">No deals found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {search ? "Try a different search term" : "No deals match this filter"}
+            </p>
+          </div>
+        </ContentReveal>
+      ) : (
+        <MotionConfig reducedMotion="never">
+          <motion.div
+            key={`${stageFilter}-${debouncedSearch}-${sortBy}-${sortOrder}`}
+            initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.12, ease: EASE }}
+            style={{ willChange: "opacity, transform, filter" }}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredDeals.map((deal) => {
+                const stage = getStageInfo(deal.stageId);
+                const isWon = !!deal.wonAt;
+                const isLost = !!deal.lostAt;
+
+                return (
+                  <button
+                    key={deal.id}
+                    onClick={() => router.push(`/crm/deals/${deal.id}`)}
+                    className="w-full rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/50 space-y-3"
                   >
-                    <p className="text-sm font-medium truncate">{d.title}</p>
-                    {d.contact && (
-                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                        {d.contact.name}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs font-mono tabular-nums font-medium">
-                        {formatMoney(d.valueCents, d.currency)}
+                    {/* Header: stage + badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{deal.title}</p>
+                        {deal.contact && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <User className="size-3 text-muted-foreground shrink-0" />
+                            <p className="text-[11px] text-muted-foreground truncate">{deal.contact.name}</p>
+                          </div>
+                        )}
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[10px] gap-1"
+                        style={{
+                          borderColor: stage.color + "40",
+                          backgroundColor: stage.color + "10",
+                          color: stage.color,
+                        }}
+                      >
+                        <span className="size-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                        {isWon ? "Won" : isLost ? "Lost" : stage.name}
+                      </Badge>
+                    </div>
+
+                    {/* Value + probability */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold font-mono tabular-nums tracking-tight">
+                        {formatMoney(deal.valueCents, deal.currency)}
                       </span>
-                      {d.probability !== null && (
-                        <span className="text-[10px] text-muted-foreground">{d.probability}%</span>
+                      {deal.probability !== null && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${deal.probability}%`,
+                                backgroundColor: deal.probability >= 70 ? "#10b981" : deal.probability >= 40 ? "#f59e0b" : "#94a3b8",
+                              }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-mono tabular-nums">{deal.probability}%</span>
+                        </div>
                       )}
                     </div>
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+
+                    {/* Meta row */}
+                    <div className="flex items-center gap-3 pt-2 border-t text-[11px] text-muted-foreground">
+                      {deal.expectedCloseDate && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="size-3" />
+                          {new Date(deal.expectedCloseDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                      {deal.source && (
+                        <span className="capitalize">{deal.source.replace("_", " ")}</span>
+                      )}
+                      {deal.assignedUser && (
+                        <span className="ml-auto truncate max-w-[100px]">{deal.assignedUser.name}</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </MotionConfig>
+      )}
     </ContentReveal>
   );
 }
