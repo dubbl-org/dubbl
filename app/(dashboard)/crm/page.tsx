@@ -3,8 +3,26 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Target, TrendingUp, Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
@@ -43,25 +61,97 @@ export default function CRMPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePipeline, setActivePipeline] = useState<Pipeline | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [newDealOpen, setNewDealOpen] = useState(false);
+  const [newDealTitle, setNewDealTitle] = useState("");
+  const [newDealValue, setNewDealValue] = useState("");
+  const [newDealStage, setNewDealStage] = useState("");
+  const [newDealProbability, setNewDealProbability] = useState("");
+  const [creatingDeal, setCreatingDeal] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
 
+  async function fetchCRM() {
+    try {
+      const [pData, dData] = await Promise.all([
+        fetch("/api/v1/crm/pipelines", { headers: getHeaders() }).then((r) => r.json()),
+        fetch("/api/v1/crm/deals", { headers: getHeaders() }).then((r) => r.json()),
+      ]);
+      const pipes = pData.pipelines || [];
+      setPipelines(pipes);
+      setDeals(dData.data || []);
+      setActivePipeline(pipes.find((p: Pipeline) => p.isDefault) || pipes[0] || null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    Promise.all([
-      fetch("/api/v1/crm/pipelines", { headers: getHeaders() }).then((r) => r.json()),
-      fetch("/api/v1/crm/deals", { headers: getHeaders() }).then((r) => r.json()),
-    ])
-      .then(([pData, dData]) => {
-        const pipes = pData.pipelines || [];
-        setPipelines(pipes);
-        setDeals(dData.data || []);
-        setActivePipeline(pipes.find((p: Pipeline) => p.isDefault) || pipes[0] || null);
-      })
-      .finally(() => setLoading(false));
+    fetchCRM();
   }, []);
+
+  async function handleSetupPipeline() {
+    setSetupLoading(true);
+    try {
+      const res = await fetch("/api/v1/crm/pipelines", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: "Sales Pipeline",
+          stages: DEFAULT_STAGES.map((s) => ({ id: s.id, name: s.name, color: s.color })),
+          isDefault: true,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to create pipeline");
+      }
+      await fetchCRM();
+      toast.success("Pipeline created");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to set up pipeline");
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  async function handleCreateDeal() {
+    if (!newDealTitle.trim() || !activePipeline || creatingDeal) return;
+    setCreatingDeal(true);
+    try {
+      const stageId = newDealStage || stages[0]?.id || "lead";
+      const res = await fetch("/api/v1/crm/deals", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          pipelineId: activePipeline.id,
+          stageId,
+          title: newDealTitle,
+          valueCents: newDealValue ? Math.round(parseFloat(newDealValue) * 100) : 0,
+          currency: "USD",
+          probability: newDealProbability ? parseInt(newDealProbability) : null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to create deal");
+      }
+      setNewDealOpen(false);
+      setNewDealTitle("");
+      setNewDealValue("");
+      setNewDealStage("");
+      setNewDealProbability("");
+      await fetchCRM();
+      toast.success("Deal created");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create deal");
+    } finally {
+      setCreatingDeal(false);
+    }
+  }
 
   const stages = activePipeline?.stages?.length
     ? activePipeline.stages
@@ -86,11 +176,12 @@ export default function CRMPage() {
               </p>
             </div>
             <Button
-              onClick={() => router.push("/crm/analytics")}
+              onClick={handleSetupPipeline}
+              disabled={setupLoading}
               className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
             >
               <Plus className="mr-2 size-4" />
-              Get Started
+              {setupLoading ? "Setting up..." : "Create Pipeline"}
             </Button>
           </div>
 
@@ -202,6 +293,9 @@ export default function CRMPage() {
               {" "}· {formatMoney(pipelineDeals.filter((d) => !d.wonAt && !d.lostAt).reduce((s, d) => s + d.valueCents, 0))} in pipeline
             </p>
           </div>
+          <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setNewDealOpen(true)}>
+            <Plus className="size-3" /> New Deal
+          </Button>
         </div>
 
         {/* Kanban Board */}
@@ -249,6 +343,72 @@ export default function CRMPage() {
           })}
         </div>
       </div>
+
+      <Dialog open={newDealOpen} onOpenChange={setNewDealOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Deal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Title</Label>
+              <Input
+                placeholder="e.g. Acme Corp - Enterprise Plan"
+                value={newDealTitle}
+                onChange={(e) => setNewDealTitle(e.target.value)}
+                className="h-8 text-sm"
+                disabled={creatingDeal}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Stage</Label>
+              <Select value={newDealStage || stages[0]?.id} onValueChange={setNewDealStage}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {stages.filter((s) => s.id !== "closed_lost" && s.id !== "closed_won").map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Value</Label>
+                <CurrencyInput
+                  value={newDealValue}
+                  onChange={setNewDealValue}
+                  placeholder="0.00"
+                  className="h-8 text-sm"
+                  disabled={creatingDeal}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Probability %</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="50"
+                  value={newDealProbability}
+                  onChange={(e) => setNewDealProbability(e.target.value)}
+                  className="h-8 text-sm"
+                  disabled={creatingDeal}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setNewDealOpen(false)} disabled={creatingDeal}>
+                Cancel
+              </Button>
+              <Button size="sm" className="h-7 text-xs" onClick={handleCreateDeal} disabled={!newDealTitle.trim() || creatingDeal}>
+                {creatingDeal ? "Creating..." : "Create Deal"}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ContentReveal>
   );
 }
