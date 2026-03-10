@@ -84,6 +84,7 @@ const LABELS: Record<string, string> = {
   "aged-receivables": "Aged Receivables",
   "aged-payables": "Aged Payables",
   "budget-vs-actual": "Budget vs Actual",
+  custom: "Custom Reports",
   general: "General",
   time: "Time Tracking",
   // Inventory subtabs

@@ -24,3 +24,4 @@ export * from "./document-templates";
 export * from "./portal";
 export * from "./dashboard";
 export * from "./documents";
+export * from "./reports";
