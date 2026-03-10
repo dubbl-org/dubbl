@@ -2340,6 +2340,9 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
 // ---------------------------------------------------------------------------
 function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
+  const [acctCurrency, setAcctCurrency] = useState("USD");
+
+  useEffect(() => { if (!open) setAcctCurrency("USD"); }, [open]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2358,7 +2361,7 @@ function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           type: form.get("type") || "asset",
           subType: form.get("subType") || null,
           description: form.get("description") || null,
-          currencyCode: form.get("currencyCode") || "USD",
+          currencyCode: acctCurrency,
         }),
       });
       if (!res.ok) {
@@ -2419,7 +2422,7 @@ function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-account-currency">Currency</Label>
-                  <Input id="drawer-account-currency" name="currencyCode" defaultValue="USD" placeholder="USD" maxLength={3} />
+                  <CurrencySelect value={acctCurrency} onValueChange={setAcctCurrency} />
                 </div>
               </div>
             </div>
@@ -2559,7 +2562,7 @@ function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => vo
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Currency</Label>
-                  <Input value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value.toUpperCase())} placeholder="USD" maxLength={3} />
+                  <CurrencySelect value={currencyCode} onValueChange={setCurrencyCode} />
                 </div>
                 <div className="space-y-2">
                   <Label>Country</Label>

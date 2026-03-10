@@ -103,6 +103,13 @@ export default function TimesheetDetailPage() {
 
   async function handleDeleteEntry(entryId: string) {
     if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete timesheet entry?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     await fetch(`/api/v1/payroll/timesheets/${id}/entries?entryId=${entryId}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -139,6 +146,13 @@ export default function TimesheetDetailPage() {
 
   async function handleReject() {
     if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Reject timesheet?",
+      description: "The employee will need to resubmit.",
+      confirmLabel: "Reject",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/v1/payroll/timesheets/${id}/reject`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-organization-id": orgId },

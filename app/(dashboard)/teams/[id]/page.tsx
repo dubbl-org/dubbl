@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 interface TeamMember {
   id: string;
@@ -71,6 +72,7 @@ export default function TeamDetailPage() {
   const [addingMemberId, setAddingMemberId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const fetchTeam = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -150,6 +152,14 @@ export default function TeamDetailPage() {
   }
 
   async function handleRemoveMember(memberId: string) {
+    const confirmed = await confirm({
+      title: "Remove team member?",
+      description: "They will lose access to this team's resources.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     setRemovingMemberId(memberId);
@@ -329,6 +339,7 @@ export default function TeamDetailPage() {
           </div>
         )}
       </div>
+      {confirmDialog}
     </ContentReveal>
   );
 }

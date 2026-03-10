@@ -38,6 +38,7 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -125,6 +126,7 @@ type LeaveFilter = "all" | "pending" | "approved" | "rejected";
 
 export default function TimeLeavePage() {
   const router = useRouter();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const orgId =
     typeof window !== "undefined"
@@ -636,6 +638,13 @@ export default function TimeLeavePage() {
 
   async function handleReject(id: string) {
     if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Reject leave request?",
+      description: "The employee will be notified of the rejection.",
+      confirmLabel: "Reject",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/v1/payroll/leave/requests/${id}/reject`, {
       method: "POST",
       headers: {
@@ -1346,6 +1355,8 @@ export default function TimeLeavePage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {confirmDialog}
     </ContentReveal>
   );
 }

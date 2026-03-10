@@ -29,6 +29,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { Switch } from "@/components/ui/switch";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 interface PayrollSettingsData {
   defaultTaxRate: number;
@@ -105,6 +106,7 @@ const anim = (delay: number) => ({
 });
 
 export default function PayrollSettingsPage() {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -221,6 +223,13 @@ export default function PayrollSettingsPage() {
 
   async function handleDeleteDeduction(id: string) {
     if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete deduction type?",
+      description: "This will remove the deduction type. Existing employee deductions using it won't be affected.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     await fetch(`/api/v1/payroll/deductions/types/${id}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -330,6 +339,13 @@ export default function PayrollSettingsPage() {
 
   async function handleDeleteBand(id: string) {
     if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Delete compensation band?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     await fetch(`/api/v1/payroll/compensation/bands/${id}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
@@ -908,6 +924,7 @@ export default function PayrollSettingsPage() {
           </form>
         </SheetContent>
       </Sheet>
+      {confirmDialog}
     </ContentReveal>
   );
 }

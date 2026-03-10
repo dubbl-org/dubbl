@@ -39,6 +39,7 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { formatMoney } from "@/lib/money";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,7 @@ const REVIEW_SORT_OPTIONS = [
 
 export default function CompensationPage() {
   const router = useRouter();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [bands, setBands] = useState<Band[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,6 +396,7 @@ export default function CompensationPage() {
         {/* Sheets */}
         <BandSheet open={bandSheet} onOpenChange={setBandSheet} saving={bandSaving} newBand={newBand} setNewBand={setNewBand} onSubmit={handleAddBand} />
         <ReviewSheet open={reviewSheet} onOpenChange={setReviewSheet} saving={reviewSaving} newReview={newReview} setNewReview={setNewReview} onSubmit={handleAddReview} />
+        {confirmDialog}
       </ContentReveal>
     );
   }
@@ -606,6 +609,7 @@ export default function CompensationPage() {
       {/* Sheets */}
       <BandSheet open={bandSheet} onOpenChange={setBandSheet} saving={bandSaving} newBand={newBand} setNewBand={setNewBand} onSubmit={handleAddBand} />
       <ReviewSheet open={reviewSheet} onOpenChange={setReviewSheet} saving={reviewSaving} newReview={newReview} setNewReview={setNewReview} onSubmit={handleAddReview} />
+      {confirmDialog}
     </ContentReveal>
   );
 }
