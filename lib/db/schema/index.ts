@@ -19,3 +19,4 @@ export * from "./email";
 export * from "./accruals";
 export * from "./revenue-recognition";
 export * from "./loans";
+export * from "./notifications";

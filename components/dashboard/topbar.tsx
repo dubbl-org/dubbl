@@ -4,17 +4,18 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useState,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Menu } from "lucide-react";
+import { Search, Plus, Menu, Bell } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useSidebar } from "@/components/ui/sidebar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 
@@ -45,6 +46,7 @@ const LABELS: Record<string, string> = {
   inventory: "Inventory",
   payroll: "Payroll",
   reports: "Reports",
+  notifications: "Notifications",
   settings: "Settings",
   // Sales subtabs
   invoices: "Invoices",
@@ -144,12 +146,29 @@ export function Topbar() {
   );
 }
 
+function useUnreadCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+    if (!orgId) return;
+    fetch("/api/v1/notifications?unread=true&limit=1", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.unreadCount !== undefined) setCount(data.unreadCount); })
+      .catch(() => {});
+  }, []);
+  return count;
+}
+
 function TopbarInner({ customAction }: { customAction: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
   const { toggleSidebar, isMobile } = useSidebar();
   const segments = pathname.split("/").filter(Boolean);
+  const unreadCount = useUnreadCount();
 
   // For group roots, show the default subtab in the breadcrumb
   const DEFAULT_SUBTABS: Record<string, string> = {
@@ -231,6 +250,19 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
           <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative size-7"
+            onClick={() => router.push("/notifications")}
+          >
+            <Bell className="size-3.5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-medium text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Button>
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
           <div className="h-4 w-px bg-border" />
           <Button
