@@ -22,3 +22,4 @@ export * from "./loans";
 export * from "./notifications";
 export * from "./document-templates";
 export * from "./portal";
+export * from "./dashboard";
