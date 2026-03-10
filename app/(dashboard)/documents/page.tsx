@@ -78,6 +78,8 @@ export default function DocumentsPage() {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
@@ -177,6 +179,58 @@ export default function DocumentsPage() {
     if (data.downloadUrl) {
       window.open(data.downloadUrl, "_blank");
     }
+  }
+
+  async function handleUpload(files: FileList | File[]) {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of fileArray) {
+        const res = await fetch("/api/v1/documents", {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify({
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type || "application/octet-stream",
+            folderId: currentFolder,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Failed to upload ${file.name}`);
+        }
+        const { uploadUrl } = await res.json();
+        await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+      }
+      await fetchData();
+      toast.success(fileArray.length === 1 ? "File uploaded" : `${fileArray.length} files uploaded`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleFileInput() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.onchange = () => {
+      if (input.files?.length) handleUpload(input.files);
+    };
+    input.click();
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length) handleUpload(e.dataTransfer.files);
   }
 
   const currentFolderObj = folders.find((f) => f.id === currentFolder);
@@ -327,7 +381,8 @@ export default function DocumentsPage() {
 
   return (
     <ContentReveal>
-      <div className="space-y-6">
+      <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {currentFolder && (
@@ -356,89 +411,107 @@ export default function DocumentsPage() {
               <FolderPlus className="size-3" />
               New Folder
             </Button>
+            <Button size="sm" className="h-7 text-xs gap-1" onClick={handleFileInput} disabled={uploading}>
+              <Upload className="size-3" />
+              {uploading ? "Uploading..." : "Upload"}
+            </Button>
           </div>
         </div>
 
-        {/* Folders */}
-        {childFolders.length > 0 && (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {childFolders.map((folder) => (
-              <button
-                key={folder.id}
+        {/* File browser */}
+        <div
+          className={`rounded-lg border ${dragOver ? "border-primary bg-primary/5" : "bg-card"} transition-colors`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+        >
+          {/* Folder rows */}
+          {childFolders.map((folder) => (
+            <div
+              key={folder.id}
+              className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
+            >
+              <div
+                className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                role="button"
+                tabIndex={0}
                 onClick={() => setCurrentFolder(folder.id)}
-                className="flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50"
+                onKeyDown={(e) => e.key === "Enter" && setCurrentFolder(folder.id)}
               >
                 <Folder className="size-5 text-amber-500 shrink-0" />
                 <span className="text-sm font-medium truncate">{folder.name}</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-auto size-6 p-0 shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
-                    >
-                      <Trash2 className="size-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Files */}
-        {documents.length === 0 && childFolders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
-              <FileText className="size-6 text-muted-foreground" />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="size-6 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => handleDeleteFolder(folder)}
+                  >
+                    <Trash2 className="size-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <h3 className="mt-4 text-sm font-medium">No documents</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Upload files or create folders to organize your documents.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {documents.map((doc) => {
-              const FileIcon = getFileIcon(doc.mimeType);
-              return (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-3 rounded-lg border bg-card p-3"
-                >
-                  <FileIcon className="size-5 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{doc.fileName}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatFileSize(doc.fileSize)} · {new Date(doc.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => handleDownload(doc)}>
-                      <Download className="size-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="size-7 p-0 text-destructive" onClick={() => handleDeleteDoc(doc)}>
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          ))}
 
-        {folderDialog}
-        {confirmDialog}
+          {/* File rows */}
+          {documents.map((doc) => {
+            const FileIcon = getFileIcon(doc.mimeType);
+            return (
+              <div
+                key={doc.id}
+                className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
+              >
+                <FileIcon className="size-5 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{doc.fileName}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatFileSize(doc.fileSize)} · {new Date(doc.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => handleDownload(doc)}>
+                    <Download className="size-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="size-7 p-0 text-destructive" onClick={() => handleDeleteDoc(doc)}>
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Empty folder state / drop zone */}
+          {documents.length === 0 && childFolders.length === 0 && (
+            <div
+              className="flex flex-col items-center justify-center py-16 text-center cursor-pointer"
+              onClick={handleFileInput}
+            >
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
+                <Upload className="size-5 text-muted-foreground" />
+              </div>
+              <h3 className="mt-4 text-sm font-medium">
+                {dragOver ? "Drop files here" : "Drop files or click to upload"}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground max-w-xs">
+                Drag and drop files into this folder, or click to browse your computer.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {folderDialog}
+      {confirmDialog}
     </ContentReveal>
   );
 }
