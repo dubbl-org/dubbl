@@ -16,7 +16,22 @@ interface BillingInfo {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   storagePlan: "free" | "starter" | "growth" | "scale";
+  storageUsedBytes: number;
 }
+
+function formatStorageSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+const STORAGE_LIMITS: Record<string, number> = {
+  free: 5 * 1024 * 1024 * 1024,
+  starter: 25 * 1024 * 1024 * 1024,
+  growth: 100 * 1024 * 1024 * 1024,
+  scale: 500 * 1024 * 1024 * 1024,
+};
 
 const SEAT_PRICE = 12;
 
@@ -258,6 +273,42 @@ export default function BillingPage() {
         <p className="text-xs text-muted-foreground mb-4">
           Storage covers all your organization data: transactions, documents, attachments, and more. 5 GB is included free.
         </p>
+
+        {/* Storage usage bar */}
+        {(() => {
+          const usedBytes = billing?.storageUsedBytes || 0;
+          const limitBytes = STORAGE_LIMITS[currentStorage] || STORAGE_LIMITS.free;
+          const pct = Math.min((usedBytes / limitBytes) * 100, 100);
+          const isHigh = pct > 80;
+          const isCritical = pct > 95;
+          return (
+            <div className="rounded-lg border bg-card p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium">Storage used</span>
+                <span className={cn(
+                  "text-xs font-mono tabular-nums",
+                  isCritical ? "text-red-600 dark:text-red-400" : isHigh ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+                )}>
+                  {formatStorageSize(usedBytes)} / {storagePlans.find((p) => p.id === currentStorage)?.storage || "5 GB"}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500",
+                    isCritical ? "bg-red-500" : isHigh ? "bg-amber-500" : "bg-emerald-500"
+                  )}
+                  style={{ width: `${Math.max(pct, 0.5)}%` }}
+                />
+              </div>
+              {isCritical && (
+                <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">
+                  Storage almost full. Consider upgrading your plan.
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {storagePlans.map((plan) => {

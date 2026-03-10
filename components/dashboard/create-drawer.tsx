@@ -55,7 +55,7 @@ import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -100,6 +100,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <CategoryDrawer open={activeType === "category"} onClose={close} />
       <TransferDrawer open={activeType === "transfer"} onClose={close} />
       <ContractorDrawer open={activeType === "contractor"} onClose={close} />
+      <DealDrawer open={activeType === "deal"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -3095,6 +3096,234 @@ function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Add Contractor" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Deal Drawer
+// ---------------------------------------------------------------------------
+interface DealPipeline {
+  id: string;
+  name: string;
+  stages: { id: string; name: string; color: string }[];
+  isDefault: boolean;
+}
+
+function DealDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [pipelines, setPipelines] = useState<DealPipeline[]>([]);
+  const [pipelineId, setPipelineId] = useState("");
+  const [stageId, setStageId] = useState("");
+  const [contactId, setContactId] = useState("");
+  const [value, setValue] = useState("");
+  const [probability, setProbability] = useState("");
+  const [expectedClose, setExpectedClose] = useState<string | undefined>();
+  const [source, setSource] = useState<string>("");
+  const [dirty, setDirty] = useState(false);
+
+  // Fetch pipelines when drawer opens
+  useEffect(() => {
+    if (!open) return;
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/crm/pipelines", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const pipes = data.pipelines || [];
+        setPipelines(pipes);
+        const def = pipes.find((p: DealPipeline) => p.isDefault) || pipes[0];
+        if (def) {
+          setPipelineId(def.id);
+          if (def.stages?.length) setStageId(def.stages[0].id);
+        }
+      })
+      .catch(() => {});
+  }, [open]);
+
+  const activePipeline = pipelines.find((p) => p.id === pipelineId);
+  const stages = activePipeline?.stages || [];
+
+  function reset() {
+    setValue("");
+    setProbability("");
+    setExpectedClose(undefined);
+    setSource("");
+    setContactId("");
+    setDirty(false);
+  }
+
+  function handleClose() {
+    if (dirty && !window.confirm("You have unsaved changes. Discard?")) return;
+    reset();
+    onClose();
+  }
+
+  function markDirty() {
+    if (!dirty) setDirty(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const title = (form.get("title") as string)?.trim();
+    if (!title || !pipelineId || saving) return;
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/crm/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          pipelineId,
+          stageId: stageId || stages[0]?.id || "lead",
+          contactId: contactId || undefined,
+          title,
+          valueCents: value ? Math.round(parseFloat(value) * 100) : 0,
+          currency: "USD",
+          probability: probability ? parseInt(probability) : null,
+          expectedCloseDate: expectedClose || null,
+          source: source || null,
+          notes: (form.get("notes") as string) || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create deal");
+      }
+      const data = await res.json();
+      toast.success("Deal created");
+      reset();
+      onClose();
+      window.dispatchEvent(new CustomEvent("deals-changed"));
+      router.push(`/crm/deals/${data.deal.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create deal");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && handleClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Target className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Deal</SheetTitle>
+              <SheetDescription>Add a deal to your sales pipeline.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Deal Info</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-deal-title">Title *</Label>
+                <Input
+                  id="drawer-deal-title"
+                  name="title"
+                  required
+                  placeholder="e.g. Acme Corp - Enterprise Plan"
+                  onChange={markDirty}
+                />
+              </div>
+              {pipelines.length > 1 && (
+                <div className="space-y-2">
+                  <Label>Pipeline</Label>
+                  <Select value={pipelineId} onValueChange={(v) => { setPipelineId(v); markDirty(); const p = pipelines.find((pp) => pp.id === v); if (p?.stages?.length) setStageId(p.stages[0].id); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {pipelines.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>Stage</Label>
+                <Select value={stageId} onValueChange={(v) => { setStageId(v); markDirty(); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {stages.filter((s) => s.id !== "closed_lost" && s.id !== "closed_won").map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
+                          {s.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Contact</SectionLabel>
+              <div className="space-y-2">
+                <Label>Associated Contact</Label>
+                <ContactPicker value={contactId} onChange={(v) => { setContactId(v); markDirty(); }} placeholder="Select a contact..." />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Value &amp; Probability</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Deal Value</Label>
+                  <CurrencyInput value={value} onChange={(v) => { setValue(v); markDirty(); }} placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-deal-prob">Win Probability %</Label>
+                  <Input id="drawer-deal-prob" type="number" min={0} max={100} placeholder="50" value={probability} onChange={(e) => { setProbability(e.target.value); markDirty(); }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Expected Close</Label>
+                  <DatePicker value={expectedClose} onChange={(v) => { setExpectedClose(v); markDirty(); }} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Source</Label>
+                  <Select value={source} onValueChange={(v) => { setSource(v); markDirty(); }}>
+                    <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="website">Website</SelectItem>
+                      <SelectItem value="referral">Referral</SelectItem>
+                      <SelectItem value="cold_outreach">Cold Outreach</SelectItem>
+                      <SelectItem value="event">Event</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-deal-notes">Notes</Label>
+                <Textarea id="drawer-deal-notes" name="notes" placeholder="Additional context about this deal..." rows={3} onChange={markDirty} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={handleClose} saving={saving} label="Create Deal" />
         </form>
       </SheetContent>
     </Sheet>

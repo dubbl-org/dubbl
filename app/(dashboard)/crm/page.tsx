@@ -1,32 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Target, TrendingUp, Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign } from "lucide-react";
+import { Users, Handshake, BarChart3, ArrowRight, Plus, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { formatMoney } from "@/lib/money";
 
 interface Deal {
@@ -79,24 +63,19 @@ const CARD_VARIANTS = {
 
 export default function CRMPage() {
   const router = useRouter();
+  const { open: openDrawer } = useCreateDrawer();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePipeline, setActivePipeline] = useState<Pipeline | null>(null);
   const [setupLoading, setSetupLoading] = useState(false);
-  const [newDealOpen, setNewDealOpen] = useState(false);
-  const [newDealTitle, setNewDealTitle] = useState("");
-  const [newDealValue, setNewDealValue] = useState("");
-  const [newDealStage, setNewDealStage] = useState("");
-  const [newDealProbability, setNewDealProbability] = useState("");
-  const [creatingDeal, setCreatingDeal] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
 
-  async function fetchCRM() {
+  const fetchCRM = useCallback(async () => {
     try {
       const [pData, dData] = await Promise.all([
         fetch("/api/v1/crm/pipelines", { headers: getHeaders() }).then((r) => r.json()),
@@ -109,11 +88,18 @@ export default function CRMPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchCRM();
-  }, []);
+  }, [fetchCRM]);
+
+  // Re-fetch when a deal is created from the drawer
+  useEffect(() => {
+    const handler = () => fetchCRM();
+    window.addEventListener("deals-changed", handler);
+    return () => window.removeEventListener("deals-changed", handler);
+  }, [fetchCRM]);
 
   async function handleSetupPipeline() {
     setSetupLoading(true);
@@ -140,41 +126,6 @@ export default function CRMPage() {
     }
   }
 
-  async function handleCreateDeal() {
-    if (!newDealTitle.trim() || !activePipeline || creatingDeal) return;
-    setCreatingDeal(true);
-    try {
-      const stageId = newDealStage || stages[0]?.id || "lead";
-      const res = await fetch("/api/v1/crm/deals", {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({
-          pipelineId: activePipeline.id,
-          stageId,
-          title: newDealTitle,
-          valueCents: newDealValue ? Math.round(parseFloat(newDealValue) * 100) : 0,
-          currency: "USD",
-          probability: newDealProbability ? parseInt(newDealProbability) : null,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to create deal");
-      }
-      setNewDealOpen(false);
-      setNewDealTitle("");
-      setNewDealValue("");
-      setNewDealStage("");
-      setNewDealProbability("");
-      await fetchCRM();
-      toast.success("Deal created");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create deal");
-    } finally {
-      setCreatingDeal(false);
-    }
-  }
-
   const stages = activePipeline?.stages?.length
     ? activePipeline.stages
     : DEFAULT_STAGES;
@@ -189,7 +140,6 @@ export default function CRMPage() {
     return (
       <ContentReveal>
         <div className="pt-12 pb-12 space-y-10">
-          {/* Top: title + CTA */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">Sales Pipeline</h2>
@@ -208,7 +158,6 @@ export default function CRMPage() {
           </div>
 
           <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
-            {/* Left: mock kanban pipeline */}
             <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
               <div className="bg-muted/30 px-5 py-3 border-b">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -216,7 +165,6 @@ export default function CRMPage() {
                 </p>
               </div>
               <div className="p-5">
-                {/* Stage flow visualization */}
                 <div className="flex items-center gap-2 mb-5 overflow-hidden">
                   {DEFAULT_STAGES.slice(0, 5).map((stage, i) => (
                     <div key={stage.id} className="flex items-center gap-2">
@@ -228,7 +176,6 @@ export default function CRMPage() {
                     </div>
                   ))}
                 </div>
-                {/* Mock deal cards */}
                 <div className="space-y-2">
                   {[
                     { title: "Acme Corp - Enterprise Plan", contact: "Sarah Johnson", value: "$48,000", prob: "75%", stage: DEFAULT_STAGES[2] },
@@ -258,7 +205,6 @@ export default function CRMPage() {
               </div>
             </div>
 
-            {/* Right: benefits */}
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 What you can do
@@ -313,7 +259,7 @@ export default function CRMPage() {
         title="Sales Pipeline"
         description={`${pipelineDeals.length} deal${pipelineDeals.length !== 1 ? "s" : ""} · ${formatMoney(pipelineValue)} in pipeline`}
       >
-        <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setNewDealOpen(true)}>
+        <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => openDrawer("deal")}>
           <Plus className="size-3" /> New Deal
         </Button>
       </PageHeader>
@@ -373,72 +319,6 @@ export default function CRMPage() {
           );
         })}
       </div>
-
-      <Dialog open={newDealOpen} onOpenChange={setNewDealOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New Deal</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Title</Label>
-              <Input
-                placeholder="e.g. Acme Corp - Enterprise Plan"
-                value={newDealTitle}
-                onChange={(e) => setNewDealTitle(e.target.value)}
-                className="h-8 text-sm"
-                disabled={creatingDeal}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Stage</Label>
-              <Select value={newDealStage || stages[0]?.id} onValueChange={setNewDealStage}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {stages.filter((s) => s.id !== "closed_lost" && s.id !== "closed_won").map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Value</Label>
-                <CurrencyInput
-                  value={newDealValue}
-                  onChange={setNewDealValue}
-                  placeholder="0.00"
-                  className="h-8 text-sm"
-                  disabled={creatingDeal}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Probability %</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="50"
-                  value={newDealProbability}
-                  onChange={(e) => setNewDealProbability(e.target.value)}
-                  className="h-8 text-sm"
-                  disabled={creatingDeal}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setNewDealOpen(false)} disabled={creatingDeal}>
-                Cancel
-              </Button>
-              <Button size="sm" className="h-7 text-xs" onClick={handleCreateDeal} disabled={!newDealTitle.trim() || creatingDeal}>
-                {creatingDeal ? "Creating..." : "Create Deal"}
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
     </ContentReveal>
   );
 }

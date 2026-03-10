@@ -10,7 +10,6 @@ import {
   Download,
   Trash2,
   MoreHorizontal,
-  ArrowLeft,
   File,
   Image,
   FileSpreadsheet,
@@ -500,17 +499,6 @@ export default function DocumentsPage() {
             : `${folders.length} folder${folders.length !== 1 ? "s" : ""} · ${totalFiles} file${totalFiles !== 1 ? "s" : ""}${totalSize > 0 ? ` · ${formatFileSize(totalSize)}` : ""}`
         }
       >
-        {currentFolder && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => navigateToFolder(currentFolderObj?.parentId || null)}
-          >
-            <ArrowLeft className="size-3" />
-            Back
-          </Button>
-        )}
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setNewFolderOpen(true)}>
           <FolderPlus className="size-3" />
           New Folder
