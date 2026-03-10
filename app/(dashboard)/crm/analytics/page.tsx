@@ -96,7 +96,7 @@ export default function CRMAnalyticsPage() {
           <div className="rounded-lg border bg-card p-5">
             <h3 className="text-sm font-medium mb-4">Stage Distribution</h3>
             <div className="space-y-2">
-              {Object.entries(data.stageDistribution).map(([stage, info]) => (
+              {Object.entries(data.stageDistribution || {}).map(([stage, info]) => (
                 <div key={stage} className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground capitalize">{stage.replace("_", " ")}</span>
                   <div className="flex items-center gap-3">

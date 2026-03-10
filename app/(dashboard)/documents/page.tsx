@@ -77,6 +77,7 @@ export default function DocumentsPage() {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
@@ -109,15 +110,27 @@ export default function DocumentsPage() {
   }, [fetchData]);
 
   async function handleCreateFolder() {
-    await fetch("/api/v1/documents/folders", {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({ name: newFolderName, parentId: currentFolder }),
-    });
-    setNewFolderOpen(false);
-    setNewFolderName("");
-    await fetchData();
-    toast.success("Folder created");
+    if (!newFolderName.trim() || creating) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/v1/documents/folders", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ name: newFolderName, parentId: currentFolder }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to create folder");
+      }
+      setNewFolderOpen(false);
+      setNewFolderName("");
+      await fetchData();
+      toast.success("Folder created");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create folder");
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleDeleteDoc(doc: Doc) {
@@ -187,10 +200,13 @@ export default function DocumentsPage() {
           value={newFolderName}
           onChange={(e) => setNewFolderName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && newFolderName.trim() && handleCreateFolder()}
+          disabled={creating}
         />
         <DialogFooter>
-          <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Cancel</Button>
-          <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</Button>
+          <Button variant="outline" onClick={() => setNewFolderOpen(false)} disabled={creating}>Cancel</Button>
+          <Button onClick={handleCreateFolder} disabled={!newFolderName.trim() || creating}>
+            {creating ? "Creating..." : "Create"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
