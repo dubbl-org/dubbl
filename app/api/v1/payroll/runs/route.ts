@@ -16,6 +16,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -117,6 +118,24 @@ export async function POST(request: Request) {
 
     const overtimeThreshold = settings?.overtimeThresholdHours ?? 40;
     const overtimeMultiplier = settings?.overtimeMultiplier ?? 1.5;
+    const defaultCurrency = settings?.defaultCurrency ?? "USD";
+
+    // Pre-fetch exchange rates for employees with non-default currencies
+    const fxRateCache = new Map<string, number>();
+    for (const emp of employees) {
+      const empCurrency = emp.currency ?? defaultCurrency;
+      if (empCurrency !== defaultCurrency && !fxRateCache.has(empCurrency)) {
+        const rate = await getExchangeRate(
+          ctx.organizationId,
+          empCurrency,
+          defaultCurrency,
+          parsed.payPeriodEnd
+        );
+        if (rate != null) {
+          fxRateCache.set(empCurrency, rate);
+        }
+      }
+    }
 
     // Create the payroll run
     let totalGross = 0;
@@ -139,6 +158,8 @@ export async function POST(request: Request) {
       preTaxDeductions: number;
       postTaxDeductions: number;
       timesheetId: string | null;
+      currency: string;
+      fxRate: number;
     }> = [];
 
     for (const emp of employees) {
@@ -263,9 +284,27 @@ export async function POST(request: Request) {
       const totalItemDeductions = taxAmount + preTaxDeductionTotal + postTaxDeductionTotal;
       const netAmount = grossAmount - totalItemDeductions;
 
-      totalGross += grossAmount;
-      totalDeductions += totalItemDeductions;
-      totalNet += netAmount;
+      // Determine employee currency and FX rate
+      const empCurrency = emp.currency ?? defaultCurrency;
+      let fxRate = 1;
+      if (empCurrency !== defaultCurrency) {
+        const rateInt = fxRateCache.get(empCurrency);
+        if (rateInt != null) {
+          fxRate = rateInt / 1_000_000;
+        }
+      }
+
+      // Run totals are in org default currency - convert if needed
+      if (empCurrency === defaultCurrency) {
+        totalGross += grossAmount;
+        totalDeductions += totalItemDeductions;
+        totalNet += netAmount;
+      } else {
+        const rateInt = fxRateCache.get(empCurrency) ?? 1_000_000;
+        totalGross += convertAmount(grossAmount, rateInt);
+        totalDeductions += convertAmount(totalItemDeductions, rateInt);
+        totalNet += convertAmount(netAmount, rateInt);
+      }
 
       items.push({
         employeeId: emp.id,
@@ -282,6 +321,8 @@ export async function POST(request: Request) {
         preTaxDeductions: preTaxDeductionTotal,
         postTaxDeductions: postTaxDeductionTotal,
         timesheetId: linkedTimesheetId,
+        currency: empCurrency,
+        fxRate,
       });
     }
 

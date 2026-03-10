@@ -55,6 +55,8 @@ interface PayrollItemRow {
   netAmount: number;
   type: string | null;
   description: string | null;
+  currency: string | null;
+  fxRate: number | null;
   employee: { name: string; employeeNumber: string } | null;
 }
 
@@ -515,21 +517,29 @@ export default function PayrollRunDetailPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
+                  {item.currency && item.currency !== "USD" && (
+                    <Badge variant="outline" className="text-[9px] h-4 font-mono shrink-0">
+                      {item.currency}
+                      {item.fxRate && item.fxRate !== 1 && (
+                        <span className="ml-0.5 text-muted-foreground">@ {item.fxRate.toFixed(4)}</span>
+                      )}
+                    </Badge>
+                  )}
                   <div className="hidden sm:block text-right">
                     <p className="text-xs text-muted-foreground">Gross</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.grossAmount)}</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.grossAmount, item.currency ?? "USD")}</p>
                   </div>
                   <div className="hidden sm:block text-right">
                     <p className="text-xs text-muted-foreground">Tax</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.taxAmount)}</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.taxAmount, item.currency ?? "USD")}</p>
                   </div>
                   <div className="hidden sm:block text-right">
                     <p className="text-xs text-muted-foreground">Deductions</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.deductions)}</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.deductions, item.currency ?? "USD")}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Net</p>
-                    <p className="text-sm font-mono tabular-nums font-medium">{formatMoney(item.netAmount)}</p>
+                    <p className="text-sm font-mono tabular-nums font-medium">{formatMoney(item.netAmount, item.currency ?? "USD")}</p>
                   </div>
                 </div>
               </div>

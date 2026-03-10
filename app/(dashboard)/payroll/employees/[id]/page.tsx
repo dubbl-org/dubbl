@@ -21,6 +21,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
 
 interface EmployeeDetail {
@@ -129,6 +130,7 @@ export default function EmployeeDetailPage() {
   const [isActive, setIsActive] = useState(true);
   const [compensationType, setCompensationType] = useState("salary");
   const [hourlyRate, setHourlyRate] = useState("");
+  const [currency, setCurrency] = useState("USD");
 
   const orgId =
     typeof window !== "undefined"
@@ -158,6 +160,7 @@ export default function EmployeeDetailPage() {
           setIsActive(e.isActive);
           setCompensationType(e.compensationType || "salary");
           setHourlyRate(e.hourlyRate ? (e.hourlyRate / 100).toFixed(2) : "");
+          setCurrency(e.currency || "USD");
         }
       })
       .finally(() => setLoading(false));
@@ -265,6 +268,7 @@ export default function EmployeeDetailPage() {
           isActive,
           compensationType,
           hourlyRate: hourlyRate ? Math.round(parseFloat(hourlyRate) * 100) : null,
+          currency,
         }),
       });
 
@@ -500,6 +504,10 @@ export default function EmployeeDetailPage() {
                 <Input type="number" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Currency</Label>
+              <CurrencySelect value={currency} onValueChange={setCurrency} />
+            </div>
           </div>
         </Section>
 

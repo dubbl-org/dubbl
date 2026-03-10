@@ -40,6 +40,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { formatMoney } from "@/lib/money";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
 
 interface Band {
@@ -112,7 +113,7 @@ export default function CompensationPage() {
 
   const [bandSheet, setBandSheet] = useState(false);
   const [bandSaving, setBandSaving] = useState(false);
-  const [newBand, setNewBand] = useState({ name: "", level: "", minSalary: "", midSalary: "", maxSalary: "" });
+  const [newBand, setNewBand] = useState({ name: "", level: "", minSalary: "", midSalary: "", maxSalary: "", currency: "USD" });
 
   const [reviewSheet, setReviewSheet] = useState(false);
   const [reviewSaving, setReviewSaving] = useState(false);
@@ -201,12 +202,13 @@ export default function CompensationPage() {
           minSalary: Math.round(parseFloat(newBand.minSalary || "0") * 100),
           midSalary: Math.round(parseFloat(newBand.midSalary || "0") * 100),
           maxSalary: Math.round(parseFloat(newBand.maxSalary || "0") * 100),
+          currency: newBand.currency,
         }),
       });
       if (res.ok) {
         toast.success("Band added");
         setBandSheet(false);
-        setNewBand({ name: "", level: "", minSalary: "", midSalary: "", maxSalary: "" });
+        setNewBand({ name: "", level: "", minSalary: "", midSalary: "", maxSalary: "", currency: "USD" });
         fetchData();
       }
     } catch {
@@ -622,8 +624,8 @@ function BandSheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   saving: boolean;
-  newBand: { name: string; level: string; minSalary: string; midSalary: string; maxSalary: string };
-  setNewBand: (v: { name: string; level: string; minSalary: string; midSalary: string; maxSalary: string }) => void;
+  newBand: { name: string; level: string; minSalary: string; midSalary: string; maxSalary: string; currency: string };
+  setNewBand: (v: { name: string; level: string; minSalary: string; midSalary: string; maxSalary: string; currency: string }) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -650,6 +652,10 @@ function BandSheet({
               <div className="space-y-2">
                 <Label>Level</Label>
                 <Input name="level" value={newBand.level} onChange={(e) => setNewBand({ ...newBand, level: e.target.value })} placeholder="e.g. L3, Senior" />
+              </div>
+              <div className="space-y-2">
+                <Label>Currency</Label>
+                <CurrencySelect value={newBand.currency} onValueChange={(v) => setNewBand({ ...newBand, currency: v })} />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">

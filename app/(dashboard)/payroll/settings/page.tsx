@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { Switch } from "@/components/ui/switch";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
 
 interface PayrollSettingsData {
@@ -373,10 +374,9 @@ export default function PayrollSettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Default Currency</Label>
-                <Input
+                <CurrencySelect
                   value={settings.defaultCurrency}
-                  onChange={(e) => setSettings({ ...settings, defaultCurrency: e.target.value })}
-                  maxLength={3}
+                  onValueChange={(v) => setSettings({ ...settings, defaultCurrency: v })}
                 />
               </div>
               <div className="space-y-1.5">

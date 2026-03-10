@@ -39,6 +39,7 @@ interface Employee {
   position: string | null;
   salary: number;
   payFrequency: string;
+  currency: string | null;
   isActive: boolean;
 }
 
@@ -363,7 +364,7 @@ export default function EmployeesPage() {
                       <p className="text-xs text-muted-foreground capitalize">{emp.payFrequency}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-mono tabular-nums">{formatMoney(emp.salary)}</p>
+                      <p className="text-sm font-mono tabular-nums">{formatMoney(emp.salary, emp.currency ?? "USD")}</p>
                     </div>
                     <Badge
                       variant="outline"

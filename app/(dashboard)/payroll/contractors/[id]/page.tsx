@@ -10,6 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
@@ -69,6 +76,7 @@ export default function ContractorDetailPage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDesc, setPaymentDesc] = useState("");
   const [paymentInvoice, setPaymentInvoice] = useState("");
+  const [paymentCurrency, setPaymentCurrency] = useState("");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -87,6 +95,7 @@ export default function ContractorDetailPage() {
           setCompany(c.company || "");
           setHourlyRate(c.hourlyRate ? (c.hourlyRate / 100).toFixed(2) : "");
           setBankAccount(c.bankAccountNumber || "");
+          setPaymentCurrency(c.currency || "USD");
         }
       })
       .finally(() => setLoading(false));
@@ -123,6 +132,7 @@ export default function ContractorDetailPage() {
       headers: { "Content-Type": "application/json", "x-organization-id": orgId },
       body: JSON.stringify({
         amount: Math.round(parseFloat(paymentAmount) * 100),
+        currency: paymentCurrency || contractor?.currency || "USD",
         description: paymentDesc || undefined,
         invoiceNumber: paymentInvoice || undefined,
       }),
@@ -197,7 +207,12 @@ export default function ContractorDetailPage() {
           <Briefcase className="size-5 text-muted-foreground" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold">{contractor.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">{contractor.name}</h1>
+            {contractor.currency && contractor.currency !== "USD" && (
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{contractor.currency}</code>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">{contractor.company || contractor.email || "-"}</p>
         </div>
       </div>
@@ -218,7 +233,7 @@ export default function ContractorDetailPage() {
               <Input value={company} onChange={(e) => setCompany(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Hourly Rate ($)</Label>
+              <Label className="text-xs">Hourly Rate ({contractor.currency || "USD"})</Label>
               <Input type="number" step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -241,10 +256,28 @@ export default function ContractorDetailPage() {
         <Section title="Payments" description="Payment history and new payments.">
           <div className="space-y-4">
             <div className="rounded-lg border p-4 space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div className="space-y-1">
-                  <Label className="text-xs">Amount ($)</Label>
+                  <Label className="text-xs">Amount</Label>
                   <Input type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Currency</Label>
+                  <Select value={paymentCurrency} onValueChange={setPaymentCurrency}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="CAD">CAD</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="JPY">JPY</SelectItem>
+                      <SelectItem value="CHF">CHF</SelectItem>
+                      <SelectItem value="HUF">HUF</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Description</Label>
@@ -267,7 +300,7 @@ export default function ContractorDetailPage() {
                 {(contractor.payments || []).map((p) => (
                   <div key={p.id} className="flex items-center justify-between px-4 py-2.5">
                     <div>
-                      <p className="text-sm font-medium font-mono tabular-nums">{formatMoney(p.amount)}</p>
+                      <p className="text-sm font-medium font-mono tabular-nums">{formatMoney(p.amount, contractor.currency || "USD")}</p>
                       <p className="text-xs text-muted-foreground">{p.description || p.invoiceNumber || "-"}</p>
                     </div>
                     <div className="flex items-center gap-2">

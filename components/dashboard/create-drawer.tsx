@@ -48,6 +48,7 @@ import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-item
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
 import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
@@ -1932,12 +1933,14 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
   const [taxRate, setTaxRate] = useState("20");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [empStartDate, setEmpStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [empCurrency, setEmpCurrency] = useState("USD");
 
   useEffect(() => {
     if (!open) {
       setEmpName(""); setEmail(""); setEmployeeNumber(""); setPosition("");
       setSalary(""); setPayFrequency("monthly"); setTaxRate("20");
       setBankAccountNumber(""); setEmpStartDate(new Date().toISOString().split("T")[0]);
+      setEmpCurrency("USD");
     }
   }, [open]);
 
@@ -1962,6 +1965,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
           taxRate: Math.round(parseFloat(taxRate) * 100),
           bankAccountNumber: bankAccountNumber || null,
           startDate: empStartDate,
+          currency: empCurrency,
         }),
       });
       if (!res.ok) {
@@ -2021,7 +2025,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
 
             <div className="space-y-4">
               <SectionLabel>Compensation</SectionLabel>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Annual Salary *</Label>
                   <Input type="number" step="0.01" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="75000.00" />
@@ -2040,6 +2044,10 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                 <div className="space-y-2">
                   <Label>Tax Rate (%)</Label>
                   <Input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="20.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <CurrencySelect value={empCurrency} onValueChange={setEmpCurrency} />
                 </div>
               </div>
             </div>
@@ -3073,15 +3081,7 @@ function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                 </div>
                 <div className="space-y-2">
                   <Label>Currency</Label>
-                  <Select value={cCurrency} onValueChange={setCCurrency}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="CAD">CAD</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <CurrencySelect value={cCurrency} onValueChange={setCCurrency} />
                 </div>
               </div>
             </div>
