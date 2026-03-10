@@ -39,11 +39,14 @@ export default function AssemblyOrdersPage() {
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
 
-  function fetchOrders() {
-    fetch("/api/v1/inventory/assembly-orders", { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setOrders(data.data); })
-      .finally(() => setLoading(false));
+  async function fetchOrders() {
+    try {
+      const res = await fetch("/api/v1/inventory/assembly-orders", { headers: getHeaders() });
+      const data = await res.json();
+      if (data.data) setOrders(data.data);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { fetchOrders(); }, []);
@@ -62,8 +65,8 @@ export default function AssemblyOrdersPage() {
         if (data.error) {
           toast.error(data.error);
         } else {
+          await fetchOrders();
           toast.success("Assembly completed");
-          fetchOrders();
         }
       },
     });
@@ -75,8 +78,8 @@ export default function AssemblyOrdersPage() {
       headers: getHeaders(),
       body: JSON.stringify({ status: "in_progress" }),
     });
+    await fetchOrders();
     toast.success("Assembly started");
-    fetchOrders();
   }
 
   if (loading) return <BrandLoader />;

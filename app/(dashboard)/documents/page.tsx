@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FileText,
   Folder,
@@ -16,6 +16,9 @@ import {
   Shield,
   Search,
   FolderOpen,
+  Lock,
+  Users,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -80,7 +83,7 @@ export default function DocumentsPage() {
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
 
-  function fetchData() {
+  const fetchData = useCallback(async () => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     const headers = { "x-organization-id": orgId };
@@ -89,20 +92,21 @@ export default function DocumentsPage() {
     if (currentFolder) docParams.set("folderId", currentFolder);
     docParams.set("limit", "100");
 
-    Promise.all([
-      fetch("/api/v1/documents/folders", { headers }).then((r) => r.json()),
-      fetch(`/api/v1/documents?${docParams}`, { headers }).then((r) => r.json()),
-    ])
-      .then(([foldersData, docsData]) => {
-        if (foldersData.folders) setFolders(foldersData.folders);
-        if (docsData.data) setDocuments(docsData.data);
-      })
-      .finally(() => setLoading(false));
-  }
+    try {
+      const [foldersData, docsData] = await Promise.all([
+        fetch("/api/v1/documents/folders", { headers }).then((r) => r.json()),
+        fetch(`/api/v1/documents?${docParams}`, { headers }).then((r) => r.json()),
+      ]);
+      if (foldersData.folders) setFolders(foldersData.folders);
+      if (docsData.data) setDocuments(docsData.data);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentFolder]);
 
   useEffect(() => {
     fetchData();
-  }, [currentFolder]);
+  }, [fetchData]);
 
   async function handleCreateFolder() {
     await fetch("/api/v1/documents/folders", {
@@ -110,10 +114,10 @@ export default function DocumentsPage() {
       headers: getHeaders(),
       body: JSON.stringify({ name: newFolderName, parentId: currentFolder }),
     });
-    toast.success("Folder created");
     setNewFolderOpen(false);
     setNewFolderName("");
-    fetchData();
+    await fetchData();
+    toast.success("Folder created");
   }
 
   async function handleDeleteDoc(doc: Doc) {
@@ -127,8 +131,8 @@ export default function DocumentsPage() {
           method: "DELETE",
           headers: getHeaders(),
         });
+        await fetchData();
         toast.success("File deleted");
-        fetchData();
       },
     });
   }
@@ -144,9 +148,9 @@ export default function DocumentsPage() {
           method: "DELETE",
           headers: getHeaders(),
         });
-        toast.success("Folder deleted");
         if (currentFolder === folder.id) setCurrentFolder(null);
-        fetchData();
+        await fetchData();
+        toast.success("Folder deleted");
       },
     });
   }
@@ -172,114 +176,134 @@ export default function DocumentsPage() {
   // Empty state when no folders and no documents at root level
   const isRootEmpty = !currentFolder && folders.length === 0 && documents.length === 0;
 
+  const folderDialog = (
+    <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>New Folder</DialogTitle>
+        </DialogHeader>
+        <Input
+          placeholder="Folder name"
+          value={newFolderName}
+          onChange={(e) => setNewFolderName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && newFolderName.trim() && handleCreateFolder()}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (isRootEmpty) {
     return (
       <ContentReveal>
-        <div className="relative flex min-h-[calc(100vh-8rem)] flex-col">
-          {/* Ghost file browser */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-6">
-            <div className="w-full max-w-2xl space-y-2">
-              {/* Ghost folder row */}
-              <div className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-3">
-                <div className="size-5 rounded bg-amber-200/30 dark:bg-amber-800/20" />
-                <div className="h-2.5 w-28 rounded bg-muted" />
-                <div className="ml-auto h-2 w-12 rounded bg-muted/40" />
+        <div className="pt-12 pb-12 space-y-10">
+          {/* Top: title + CTA */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Document Hub</h2>
+              <p className="mt-1 text-sm text-muted-foreground max-w-md">
+                Organize your business files in one place. Create folders, upload documents, and keep everything accessible to your team.
+              </p>
+            </div>
+            <Button
+              onClick={() => setNewFolderOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+            >
+              <FolderPlus className="mr-2 size-4" />
+              Create Folder
+            </Button>
+          </div>
+
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
+            {/* Left: mock file browser */}
+            <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+              <div className="bg-muted/30 px-5 py-3 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Example file browser
+                </p>
               </div>
-              <div className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-3">
-                <div className="size-5 rounded bg-amber-200/30 dark:bg-amber-800/20" />
-                <div className="h-2.5 w-20 rounded bg-muted" />
-                <div className="ml-auto h-2 w-12 rounded bg-muted/40" />
-              </div>
-              {/* Ghost file rows */}
-              {[32, 24, 36, 20, 28].map((w, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg border border-muted/60 bg-card/40 p-3">
-                  <div className="size-5 rounded bg-muted/40" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className={`h-2.5 rounded bg-muted`} style={{ width: `${w * 4}px` }} />
-                    <div className="h-2 w-20 rounded bg-muted/30" />
+              <div className="divide-y">
+                {/* Mock folders */}
+                {[
+                  { name: "Contracts", icon: Folder, color: "text-amber-500" },
+                  { name: "Invoices", icon: Folder, color: "text-amber-500" },
+                ].map(({ name, icon: Icon, color }) => (
+                  <div key={name} className="flex items-center gap-3 px-5 py-3">
+                    <Icon className={`size-5 ${color} shrink-0`} />
+                    <span className="text-sm font-medium">{name}</span>
+                    <Badge variant="outline" className="ml-auto text-[10px]">Folder</Badge>
                   </div>
+                ))}
+                {/* Mock files */}
+                {[
+                  { name: "Q1-Report.pdf", size: "2.4 MB", icon: FileText, color: "text-red-500" },
+                  { name: "Team-Photo.jpg", size: "1.8 MB", icon: Image, color: "text-blue-500" },
+                  { name: "Budget-2026.xlsx", size: "340 KB", icon: FileSpreadsheet, color: "text-emerald-600" },
+                ].map(({ name, size, icon: Icon, color }) => (
+                  <div key={name} className="flex items-center gap-3 px-5 py-3">
+                    <Icon className={`size-5 ${color} shrink-0`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{name}</p>
+                      <p className="text-[11px] text-muted-foreground">{size}</p>
+                    </div>
+                    <Download className="size-3.5 text-muted-foreground/40" />
+                  </div>
+                ))}
+              </div>
+              <div className="border-t bg-muted/20 px-5 py-2.5">
+                <p className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                  2 folders · 3 files · 4.5 MB total
+                </p>
+              </div>
+            </div>
+
+            {/* Right: benefits */}
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Why use Document Hub
+              </p>
+              {[
+                {
+                  title: "Nested folder structure",
+                  desc: "Create folders and subfolders to organize documents by project, client, or department.",
+                  icon: FolderOpen,
+                  color: "border-l-amber-400",
+                },
+                {
+                  title: "Quick file access",
+                  desc: "Browse, download, and manage files from a single place. No more digging through emails.",
+                  icon: Search,
+                  color: "border-l-blue-400",
+                },
+                {
+                  title: "Secure and scoped",
+                  desc: "All files are encrypted and scoped to your organization. Only your team has access.",
+                  icon: Lock,
+                  color: "border-l-emerald-400",
+                },
+                {
+                  title: "Team-wide visibility",
+                  desc: "Every team member can access shared documents, keeping everyone on the same page.",
+                  icon: Users,
+                  color: "border-l-violet-400",
+                },
+              ].map(({ title, desc, icon: Icon, color }) => (
+                <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-3.5 text-muted-foreground" />
+                    <p className="text-sm font-medium">{title}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 ml-[22px]">{desc}</p>
                 </div>
               ))}
             </div>
-            <div className="absolute inset-0 bg-gradient-to-b from-content-bg/20 via-content-bg/70 to-content-bg" />
-          </div>
-
-          {/* Centered content */}
-          <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
-            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-              <FolderOpen className="size-6 sm:size-7 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Document Hub</h2>
-            <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Organize your business files in one place. Create folders, upload documents, and keep everything accessible to your team.
-            </p>
-            <div className="mt-6 flex items-center gap-3">
-              <Button
-                size="lg"
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setNewFolderOpen(true)}
-              >
-                <FolderPlus className="mr-2 size-4" />
-                Create your first folder
-              </Button>
-            </div>
-          </div>
-
-          {/* Feature cards */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3 px-4 sm:px-0 pb-6 sm:pb-8">
-            {[
-              {
-                icon: Folder,
-                title: "Organized folders",
-                description: "Create nested folders to structure your documents by project, client, or category.",
-                color: "text-amber-600 dark:text-amber-400",
-                bg: "bg-amber-50 dark:bg-amber-950/40",
-              },
-              {
-                icon: Search,
-                title: "Quick access",
-                description: "Find any file instantly. Every document is linked to the entity it belongs to.",
-                color: "text-blue-600 dark:text-blue-400",
-                bg: "bg-blue-50 dark:bg-blue-950/40",
-              },
-              {
-                icon: Shield,
-                title: "Secure storage",
-                description: "Files are stored securely and scoped to your organization. Only your team can access them.",
-                color: "text-emerald-600 dark:text-emerald-400",
-                bg: "bg-emerald-50 dark:bg-emerald-950/40",
-              },
-            ].map(({ icon: Icon, title, description, color, bg }) => (
-              <div key={title} className="rounded-xl p-4 sm:p-5">
-                <div className={`flex size-9 items-center justify-center rounded-lg ${bg}`}>
-                  <Icon className={`size-4.5 ${color}`} />
-                </div>
-                <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
-                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
-              </div>
-            ))}
           </div>
         </div>
 
-        {/* New Folder Dialog */}
-        <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>New Folder</DialogTitle>
-            </DialogHeader>
-            <Input
-              placeholder="Folder name"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && newFolderName.trim() && handleCreateFolder()}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
+        {folderDialog}
         {confirmDialog}
       </ContentReveal>
     );
@@ -396,25 +420,7 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        {/* New Folder Dialog */}
-        <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>New Folder</DialogTitle>
-            </DialogHeader>
-            <Input
-              placeholder="Folder name"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && newFolderName.trim() && handleCreateFolder()}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
+        {folderDialog}
         {confirmDialog}
       </div>
     </ContentReveal>

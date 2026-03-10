@@ -146,12 +146,15 @@ export default function TaxRatesPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  function fetchRates() {
+  async function fetchRates() {
     if (!orgId) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setRates(data.taxRates); })
-      .finally(() => setLoading(false));
+    try {
+      const res = await fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } });
+      const data = await res.json();
+      if (data.taxRates) setRates(data.taxRates);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,9 +181,9 @@ export default function TaxRatesPage() {
         body: JSON.stringify({ name: editName, rate: Math.round(parseFloat(editRate) * 100), type: editType }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success("Tax rate updated");
       setEditing(null);
-      fetchRates();
+      await fetchRates();
+      toast.success("Tax rate updated");
     } catch { toast.error("Failed to update tax rate"); }
     finally { setEditSaving(false); }
   }

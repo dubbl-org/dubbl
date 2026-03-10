@@ -75,11 +75,14 @@ export default function DealDetailPage() {
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
 
-  function fetchDeal() {
-    fetch(`/api/v1/crm/deals/${id}`, { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => { if (data.deal) setDeal(data.deal); })
-      .finally(() => setLoading(false));
+  async function fetchDeal() {
+    try {
+      const res = await fetch(`/api/v1/crm/deals/${id}`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.deal) setDeal(data.deal);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { fetchDeal(); }, [id]);
@@ -91,15 +94,15 @@ export default function DealDetailPage() {
       headers: getHeaders(),
       body: JSON.stringify({ type: activityType, content: activityContent }),
     });
-    toast.success("Activity added");
     setActivityContent("");
-    fetchDeal();
+    await fetchDeal();
+    toast.success("Activity added");
   }
 
   async function markWon() {
     await fetch(`/api/v1/crm/deals/${id}/won`, { method: "POST", headers: getHeaders() });
+    await fetchDeal();
     toast.success("Deal marked as won");
-    fetchDeal();
   }
 
   async function markLost() {
@@ -114,8 +117,8 @@ export default function DealDetailPage() {
           headers: getHeaders(),
           body: JSON.stringify({ reason: null }),
         });
+        await fetchDeal();
         toast.success("Deal marked as lost");
-        fetchDeal();
       },
     });
   }

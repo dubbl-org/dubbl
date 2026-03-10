@@ -60,11 +60,14 @@ export default function WorkflowsPage() {
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
 
-  function fetchWorkflows() {
-    fetch("/api/v1/workflows", { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => setWorkflows(data.workflows || []))
-      .finally(() => setLoading(false));
+  async function fetchWorkflows() {
+    try {
+      const res = await fetch("/api/v1/workflows", { headers: getHeaders() });
+      const data = await res.json();
+      setWorkflows(data.workflows || []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -82,10 +85,10 @@ export default function WorkflowsPage() {
         trigger: form.trigger,
       }),
     });
-    toast.success("Workflow created");
     setShowCreate(false);
     setForm({ name: "", description: "", trigger: "invoice_created" });
-    fetchWorkflows();
+    await fetchWorkflows();
+    toast.success("Workflow created");
   }
 
   async function toggleWorkflow(id: string) {
@@ -109,8 +112,8 @@ export default function WorkflowsPage() {
           method: "DELETE",
           headers: getHeaders(),
         });
+        await fetchWorkflows();
         toast.success("Workflow deleted");
-        fetchWorkflows();
       },
     });
   }

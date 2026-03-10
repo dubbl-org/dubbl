@@ -97,24 +97,23 @@ export default function WarehousesPage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  const fetchWarehouses = useCallback(() => {
+  const fetchWarehouses = useCallback(async () => {
     const id = localStorage.getItem("activeOrgId");
     if (!id) return;
     const isRefetch = !loading;
     if (isRefetch) setRefetching(true);
 
-    fetch("/api/v1/warehouses", {
-      headers: { "x-organization-id": id },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setWarehouses(data.data || []);
-      })
-      .finally(() => {
-        setLoading(false);
-        setRefetching(false);
-        setFetchKey((k) => k + 1);
+    try {
+      const res = await fetch("/api/v1/warehouses", {
+        headers: { "x-organization-id": id },
       });
+      const data = await res.json();
+      setWarehouses(data.data || []);
+    } finally {
+      setLoading(false);
+      setRefetching(false);
+      setFetchKey((k) => k + 1);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
 
@@ -213,7 +212,7 @@ export default function WarehousesPage() {
 
       setSheetOpen(false);
       setEditing(null);
-      fetchWarehouses();
+      await fetchWarehouses();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -243,8 +242,8 @@ export default function WarehousesPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed to delete warehouse");
       }
+      await fetchWarehouses();
       toast.success("Warehouse deleted");
-      fetchWarehouses();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete");
     }
@@ -266,8 +265,8 @@ export default function WarehousesPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed to set default");
       }
+      await fetchWarehouses();
       toast.success(`"${warehouse.name}" set as default`);
-      fetchWarehouses();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to set default");
     }
