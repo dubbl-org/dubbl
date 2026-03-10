@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Check, Users, HardDrive, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +57,7 @@ const storagePlans = [
 
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -119,6 +120,8 @@ export default function BillingPage() {
   const seatCount = billing?.seatCount || 1;
   const currentStorage = billing?.storagePlan || "free";
   const isPro = currentPlan === "pro";
+
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-10">

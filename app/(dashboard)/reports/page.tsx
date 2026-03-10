@@ -25,6 +25,7 @@ import {
   Copy,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
+import { ContentReveal } from "@/components/ui/content-reveal";
 
 const reportCategories = [
   {
@@ -181,31 +182,33 @@ const reportCategories = [
 
 export default function ReportsPage() {
   return (
-    <div className="space-y-6 sm:space-y-10">
-      {reportCategories.map((category, i) => (
-        <div key={category.title}>
-          {i > 0 && <div className="mb-6 sm:mb-10 h-px bg-border" />}
-          <Section title={category.title} description={category.description}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-              {category.reports.map((report) => (
-                <Link
-                  key={report.href}
-                  href={report.href}
-                  className="group rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 sm:p-6 shadow-sm transition-all duration-150 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5"
-                >
-                  <div className="flex size-9 sm:size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                    <report.icon className="size-4 sm:size-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <h3 className="mt-3 sm:mt-4 text-sm font-semibold">{report.title}</h3>
-                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-                    {report.description}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </Section>
-        </div>
-      ))}
-    </div>
+    <ContentReveal>
+      <div className="space-y-6 sm:space-y-10">
+        {reportCategories.map((category, i) => (
+          <div key={category.title}>
+            {i > 0 && <div className="mb-6 sm:mb-10 h-px bg-border" />}
+            <Section title={category.title} description={category.description}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                {category.reports.map((report) => (
+                  <Link
+                    key={report.href}
+                    href={report.href}
+                    className="group rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 sm:p-6 shadow-sm transition-all duration-150 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5"
+                  >
+                    <div className="flex size-9 sm:size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                      <report.icon className="size-4 sm:size-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <h3 className="mt-3 sm:mt-4 text-sm font-semibold">{report.title}</h3>
+                    <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                      {report.description}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </Section>
+          </div>
+        ))}
+      </div>
+    </ContentReveal>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion } from "motion/react";
+import { motion, MotionConfig } from "motion/react";
 import {
   FileText,
   Folder,
@@ -19,13 +19,25 @@ import {
   Lock,
   Users,
   ArrowRight,
-  HardDrive,
+  ArrowUpDown,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +56,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 interface DocFolder {
   id: string;
@@ -86,6 +99,10 @@ export default function DocumentsPage() {
   const [dragOver, setDragOver] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
+  const [typeFilter, setTypeFilter] = useState<"all" | "documents" | "images" | "spreadsheets">("all");
+  const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [fetchKey, setFetchKey] = useState(0);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
@@ -110,6 +127,7 @@ export default function DocumentsPage() {
       if (docsData.data) setDocuments(docsData.data);
     } finally {
       setLoading(false);
+      setFetchKey((k) => k + 1);
     }
   }, [currentFolder]);
 
@@ -405,14 +423,37 @@ export default function DocumentsPage() {
   const totalFiles = documents.length;
   const totalFolders = childFolders.length;
 
-  // Filter files/folders by search
+  // Filter by type
+  const typeFiltered = typeFilter === "all"
+    ? documents
+    : documents.filter((d) => {
+        if (typeFilter === "images") return d.mimeType.startsWith("image/");
+        if (typeFilter === "spreadsheets") return d.mimeType.includes("spreadsheet") || d.mimeType.includes("csv");
+        if (typeFilter === "documents") return d.mimeType.includes("pdf") || d.mimeType.includes("document") || d.mimeType.includes("text");
+        return true;
+      });
+
+  // Filter by search
   const q = debouncedSearch.toLowerCase();
   const filteredFolders = q ? childFolders.filter((f) => f.name.toLowerCase().includes(q)) : childFolders;
-  const filteredDocs = q ? documents.filter((d) => d.fileName.toLowerCase().includes(q)) : documents;
+  const searchedDocs = q ? typeFiltered.filter((d) => d.fileName.toLowerCase().includes(q)) : typeFiltered;
+
+  // Sort
+  const filteredDocs = [...searchedDocs].sort((a, b) => {
+    const dir = sortOrder === "asc" ? 1 : -1;
+    switch (sortBy) {
+      case "date": return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case "size": return dir * (a.fileSize - b.fileSize);
+      case "name":
+      default: return dir * a.fileName.localeCompare(b.fileName);
+    }
+  });
+
+  const hasResults = filteredFolders.length > 0 || filteredDocs.length > 0;
 
   return (
     <ContentReveal className="space-y-6">
-      {/* Back link - same pattern as inventory/contacts */}
+      {/* Back link */}
       {currentFolder && (
         <button
           onClick={() => setCurrentFolder(currentFolderObj?.parentId || null)}
@@ -430,7 +471,7 @@ export default function DocumentsPage() {
         description={
           currentFolder
             ? `${totalFolders > 0 ? `${totalFolders} folder${totalFolders !== 1 ? "s" : ""}` : ""}${totalFolders > 0 && totalFiles > 0 ? " · " : ""}${totalFiles > 0 ? `${totalFiles} file${totalFiles !== 1 ? "s" : ""} · ${formatFileSize(totalSize)}` : ""}${totalFolders === 0 && totalFiles === 0 ? "Empty folder" : ""}`
-            : "Organize your files and folders in one place."
+            : `${folders.length} folder${folders.length !== 1 ? "s" : ""} · ${totalFiles} file${totalFiles !== 1 ? "s" : ""}${totalSize > 0 ? ` · ${formatFileSize(totalSize)}` : ""}`
         }
       >
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setNewFolderOpen(true)}>
@@ -450,7 +491,7 @@ export default function DocumentsPage() {
 
       {/* Breadcrumb */}
       {breadcrumb.length > 1 && (
-        <nav className="flex items-center gap-1.5 flex-wrap">
+        <nav className="flex items-center gap-1.5 flex-wrap -mt-2">
           {breadcrumb.map((crumb, i) => (
             <div key={crumb.id ?? "root"} className="flex items-center gap-1.5">
               {i > 0 && <ArrowRight className="size-3 text-muted-foreground/40" />}
@@ -469,197 +510,191 @@ export default function DocumentsPage() {
         </nav>
       )}
 
-      {/* Stats */}
-      {!currentFolder && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="rounded-xl border bg-card p-4 flex items-center gap-3"
-          >
-            <div className="flex size-9 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/40">
-              <Folder className="size-4 text-amber-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-mono tabular-nums">{folders.length}</p>
-              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Folders</p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.05 }}
-            className="rounded-xl border bg-card p-4 flex items-center gap-3"
-          >
-            <div className="flex size-9 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40">
-              <FileText className="size-4 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-mono tabular-nums">{totalFiles}</p>
-              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Files</p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className="rounded-xl border bg-card p-4 flex items-center gap-3"
-          >
-            <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-              <HardDrive className="size-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-mono tabular-nums">{formatFileSize(totalSize)}</p>
-              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Storage Used</p>
-            </div>
-          </motion.div>
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="images">Images</TabsTrigger>
+              <TabsTrigger value="spreadsheets">Spreadsheets</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
-      )}
 
-      {/* Search */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search files and folders..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-8 h-8 text-sm"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search files and folders..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="size">Size</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={() => setSortOrder((prev) => prev === "asc" ? "desc" : "asc")}
+          >
+            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
+          </Button>
         </div>
       </div>
 
-      {/* File browser card */}
-      <motion.div
-        initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-        style={{ willChange: "opacity, transform, filter" }}
-        className={`rounded-xl border overflow-hidden transition-colors ${dragOver ? "border-primary ring-2 ring-primary/20" : "bg-card"}`}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-      >
-        {/* Column header */}
-        {(filteredFolders.length > 0 || filteredDocs.length > 0) && (
-          <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide flex-1">Name</span>
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-20 text-right hidden sm:block">Size</span>
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-24 text-right hidden sm:block">Date</span>
-            <span className="w-16 shrink-0" />
-          </div>
-        )}
-
-        {/* Folder rows */}
-        {filteredFolders.map((folder) => (
-          <div
-            key={folder.id}
-            className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
-          >
-            <div
-              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
-              role="button"
-              tabIndex={0}
-              onClick={() => { setCurrentFolder(folder.id); setSearch(""); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { setCurrentFolder(folder.id); setSearch(""); } }}
-            >
-              <Folder className="size-5 text-amber-500 shrink-0" />
-              <span className="text-sm font-medium truncate">{folder.name}</span>
-            </div>
-            <span className="text-[11px] text-muted-foreground w-20 text-right hidden sm:block">-</span>
-            <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">-</span>
-            <div className="w-16 shrink-0 flex justify-end">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="size-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <MoreHorizontal className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => handleDeleteFolder(folder)}
-                  >
-                    <Trash2 className="size-4" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        ))}
-
-        {/* File rows */}
-        {filteredDocs.map((doc) => {
-          const FileIcon = getFileIcon(doc.mimeType);
-          return (
-            <div
-              key={doc.id}
-              className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
-            >
-              <FileIcon className="size-5 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium truncate min-w-0 flex-1">{doc.fileName}</span>
-              <span className="text-[11px] text-muted-foreground tabular-nums w-20 text-right hidden sm:block">
-                {formatFileSize(doc.fileSize)}
-              </span>
-              <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">
-                {new Date(doc.createdAt).toLocaleDateString()}
-              </span>
-              <div className="w-16 shrink-0 flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => handleDownload(doc)}>
-                  <Download className="size-3.5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="size-7 p-0 text-destructive" onClick={() => handleDeleteDoc(doc)}>
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* No results from search */}
-        {filteredFolders.length === 0 && filteredDocs.length === 0 && q && (
+      {/* File browser */}
+      {!hasResults && (q || typeFilter !== "all") ? (
+        <ContentReveal key={fetchKey}>
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
+            <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
               <Search className="size-5 text-muted-foreground" />
             </div>
-            <p className="mt-3 text-sm font-medium">No results</p>
-            <p className="text-xs text-muted-foreground mt-1">Try a different search term.</p>
-          </div>
-        )}
-
-        {/* Empty folder / drop zone */}
-        {filteredFolders.length === 0 && filteredDocs.length === 0 && !q && (
-          <div
-            className="flex flex-col items-center justify-center py-16 text-center cursor-pointer"
-            onClick={handleFileInput}
-          >
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
-              <Upload className="size-5 text-muted-foreground" />
-            </div>
-            <h3 className="mt-4 text-sm font-medium">
-              {dragOver ? "Drop files here" : "Drop files or click to upload"}
-            </h3>
-            <p className="mt-1 text-xs text-muted-foreground max-w-xs">
-              Drag and drop files into this folder, or click to browse your computer.
+            <p className="text-sm font-medium">No results</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {q ? "Try a different search term" : "No files match this filter"}
             </p>
           </div>
-        )}
-      </motion.div>
+        </ContentReveal>
+      ) : !hasResults ? (
+        <div
+          className={cn(
+            "flex flex-col items-center justify-center py-16 text-center rounded-xl border cursor-pointer transition-colors",
+            dragOver ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "bg-card"
+          )}
+          onClick={handleFileInput}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+        >
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
+            <Upload className="size-5 text-muted-foreground" />
+          </div>
+          <h3 className="mt-4 text-sm font-medium">
+            {dragOver ? "Drop files here" : "Drop files or click to upload"}
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground max-w-xs">
+            Drag and drop files into this folder, or click to browse your computer.
+          </p>
+        </div>
+      ) : (
+        <MotionConfig reducedMotion="never">
+          <motion.div
+            key={fetchKey}
+            initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            style={{ willChange: "opacity, transform, filter" }}
+            className={cn(
+              "rounded-xl border overflow-hidden transition-colors",
+              dragOver ? "border-primary ring-2 ring-primary/20" : "bg-card"
+            )}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+          >
+            {/* Column header */}
+            <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide flex-1">Name</span>
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-20 text-right hidden sm:block">Size</span>
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-24 text-right hidden sm:block">Date</span>
+              <span className="w-16 shrink-0" />
+            </div>
+
+            {/* Folder rows */}
+            {filteredFolders.map((folder) => (
+              <div
+                key={folder.id}
+                className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
+              >
+                <div
+                  className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { setCurrentFolder(folder.id); setSearch(""); setTypeFilter("all"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { setCurrentFolder(folder.id); setSearch(""); setTypeFilter("all"); } }}
+                >
+                  <Folder className="size-5 text-amber-500 shrink-0" />
+                  <span className="text-sm font-medium truncate">{folder.name}</span>
+                </div>
+                <span className="text-[11px] text-muted-foreground w-20 text-right hidden sm:block">-</span>
+                <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">-</span>
+                <div className="w-16 shrink-0 flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="size-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => handleDeleteFolder(folder)}
+                      >
+                        <Trash2 className="size-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+
+            {/* File rows */}
+            {filteredDocs.map((doc) => {
+              const FileIcon = getFileIcon(doc.mimeType);
+              return (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
+                >
+                  <FileIcon className="size-5 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate min-w-0 flex-1">{doc.fileName}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums w-20 text-right hidden sm:block">
+                    {formatFileSize(doc.fileSize)}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">
+                    {new Date(doc.createdAt).toLocaleDateString()}
+                  </span>
+                  <div className="w-16 shrink-0 flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => handleDownload(doc)}>
+                      <Download className="size-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="size-7 p-0 text-destructive" onClick={() => handleDeleteDoc(doc)}>
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </motion.div>
+        </MotionConfig>
+      )}
 
       {folderDialog}
       {confirmDialog}
