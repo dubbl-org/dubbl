@@ -96,6 +96,8 @@ const LABELS: Record<string, string> = {
   alerts: "Alerts",
   history: "History",
   suppliers: "Suppliers",
+  bom: "Bill of Materials",
+  assembly: "Assembly Orders",
   variants: "Variants",
   // Sales subtabs
   "credit-notes": "Credit Notes",
