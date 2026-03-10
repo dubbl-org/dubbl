@@ -47,6 +47,7 @@ const LABELS: Record<string, string> = {
   payroll: "Payroll",
   reports: "Reports",
   notifications: "Notifications",
+  documents: "Documents",
   settings: "Settings",
   // Sales subtabs
   invoices: "Invoices",
