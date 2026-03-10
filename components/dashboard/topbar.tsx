@@ -98,6 +98,11 @@ const LABELS: Record<string, string> = {
   suppliers: "Suppliers",
   bom: "Bill of Materials",
   assembly: "Assembly Orders",
+  // CRM subtabs
+  crm: "CRM",
+  deals: "Deals",
+  analytics: "Analytics",
+  pipelines: "Pipelines",
   variants: "Variants",
   // Sales subtabs
   "credit-notes": "Credit Notes",

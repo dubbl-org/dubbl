@@ -26,3 +26,4 @@ export * from "./dashboard";
 export * from "./documents";
 export * from "./reports";
 export * from "./bom";
+export * from "./crm";
