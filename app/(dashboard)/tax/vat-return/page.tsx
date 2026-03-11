@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Globe, ArrowUpRight, ArrowDownLeft, Receipt, Printer, FileText, Send, CheckCircle } from "lucide-react";
+import { Globe, ArrowUpRight, ArrowDownLeft, Receipt, Printer } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -59,34 +59,56 @@ export default function VatReturnPage() {
   if (boxes.length === 0) {
     return (
       <ContentReveal>
-        <div className="flex flex-col items-center gap-10 pt-16 pb-12">
-          <div className="w-full max-w-xl">
-            <div className="grid grid-cols-3 gap-0">
-              {[
-                { step: "1", label: "Create", sub: "Add invoices and bills with VAT tax rates applied", icon: FileText, color: "bg-blue-500", ring: "ring-blue-200 dark:ring-blue-900" },
-                { step: "2", label: "Record", sub: "Track your sales and purchase transactions", icon: Send, color: "bg-amber-500", ring: "ring-amber-200 dark:ring-amber-900" },
-                { step: "3", label: "Calculate", sub: "VAT boxes auto-populate from your data", icon: CheckCircle, color: "bg-emerald-500", ring: "ring-emerald-200 dark:ring-emerald-900" },
-              ].map(({ step, label, sub, color, ring }, i) => (
-                <div key={step} className="flex flex-col items-center text-center relative">
-                  {i < 2 && (
-                    <div className="absolute top-4 left-[calc(50%+16px)] w-[calc(100%-32px)] h-px bg-border" />
-                  )}
-                  <div className={`relative z-10 flex size-8 items-center justify-center rounded-full ${color} ring-4 ${ring} text-white text-xs font-bold`}>
-                    {step}
-                  </div>
-                  <p className="mt-3 text-sm font-medium">{label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground max-w-[150px] leading-relaxed">{sub}</p>
+        <div className="relative">
+          {/* Ghost preview of what the VAT return looks like */}
+          <div className="pointer-events-none w-full space-y-4">
+            {/* Ghost stat cards */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-2">
+                  <div className="h-2 w-20 rounded bg-muted" />
+                  <div className="h-4 w-24 rounded bg-muted/70" />
                 </div>
               ))}
             </div>
+            {/* Ghost table */}
+            <div className="rounded-lg border overflow-hidden">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-12">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-md bg-muted" />
+                    <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-40" : "w-32"}`} />
+                  </div>
+                  <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-16" : "w-20"}`} />
+                </div>
+              ))}
+            </div>
+            {/* Ghost net box */}
+            <div className="rounded-lg border p-5">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <div className="h-3 w-28 rounded bg-muted" />
+                  <div className="h-2 w-36 rounded bg-muted/50" />
+                </div>
+                <div className="h-5 w-24 rounded bg-muted/70" />
+              </div>
+            </div>
           </div>
+          <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
 
-          <div className="text-center">
-            <h2 className="text-lg font-semibold tracking-tight">No VAT data yet</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground max-w-md">
-              VAT boxes are calculated from your invoices and bills with VAT-type tax rates applied. Start by creating transactions.
+          {/* CTA overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950/50">
+              <Globe className="size-7 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h2 className="mt-5 text-xl font-semibold tracking-tight">
+              No VAT data yet
+            </h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+              VAT boxes are calculated from your invoices and bills with VAT-type
+              tax rates applied. Start by creating transactions.
             </p>
-            <div className="flex items-center justify-center gap-2 mt-5">
+            <div className="flex items-center gap-2 mt-6">
               <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
                 <Link href="/tax">Manage Tax Rates</Link>
               </Button>
@@ -94,19 +116,6 @@ export default function VatReturnPage() {
                 <Link href="/sales">Go to Sales</Link>
               </Button>
             </div>
-          </div>
-
-          <div className="w-full max-w-lg grid grid-cols-3 gap-3 opacity-40">
-            {[
-              { label: "Output VAT", value: "$0.00" },
-              { label: "Input VAT", value: "$0.00" },
-              { label: "Net VAT", value: "$0.00" },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-lg border border-dashed p-3 text-center">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-1 text-sm font-mono font-medium text-muted-foreground">{value}</p>
-              </div>
-            ))}
           </div>
         </div>
       </ContentReveal>
