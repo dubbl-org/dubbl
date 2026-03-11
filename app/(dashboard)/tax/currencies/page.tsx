@@ -68,8 +68,9 @@ function AddCurrencySheet({
   const [decimalPlaces, setDecimalPlaces] = useState("2");
   const [saving, setSaving] = useState(false);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(e?: React.FormEvent | React.MouseEvent) {
+    e?.preventDefault?.();
+    if (!code || !name || !symbol) return;
     setSaving(true);
     try {
       const res = await fetch("/api/currencies", {
@@ -82,7 +83,10 @@ function AddCurrencySheet({
           decimalPlaces: parseInt(decimalPlaces),
         }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
       toast.success("Currency added");
       setOpen(false);
       setCode("");
@@ -90,8 +94,8 @@ function AddCurrencySheet({
       setSymbol("");
       setDecimalPlaces("2");
       onCreated();
-    } catch {
-      toast.error("Failed to add currency");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add currency");
     } finally {
       setSaving(false);
     }
@@ -176,12 +180,16 @@ function AddRateSheet({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!orgId || !baseCurrency || !targetCurrency) return;
+  async function handleCreate(e?: React.FormEvent | React.MouseEvent) {
+    e?.preventDefault?.();
+    if (!orgId || !baseCurrency || !targetCurrency || !rate || !date) return;
     setSaving(true);
     try {
       const rateInt = Math.round(parseFloat(rate) * 1_000_000);
+      if (!rateInt || isNaN(rateInt)) {
+        toast.error("Please enter a valid rate");
+        return;
+      }
       const res = await fetch("/api/v1/exchange-rates", {
         method: "POST",
         headers: {
@@ -200,7 +208,10 @@ function AddRateSheet({
           ],
         }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
       toast.success("Exchange rate created");
       setOpen(false);
       setBaseCurrency("");
@@ -208,8 +219,8 @@ function AddRateSheet({
       setRate("");
       setDate(new Date().toISOString().slice(0, 10));
       onCreated();
-    } catch {
-      toast.error("Failed to create exchange rate");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create exchange rate");
     } finally {
       setSaving(false);
     }
