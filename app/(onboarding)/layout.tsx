@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 
 export default function OnboardingLayout({
   children,
@@ -12,13 +13,14 @@ export default function OnboardingLayout({
       <div className="pointer-events-none fixed inset-0 z-0 gradient-mesh" />
 
       <header className="relative z-20">
-        <div className="flex items-center justify-center py-6">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-6">
           <Link href="/" className="inline-flex items-center gap-2">
             <Logo />
             <span className="text-lg font-bold tracking-tight text-foreground">
               dubbl
             </span>
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 
