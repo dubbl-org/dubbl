@@ -27,6 +27,16 @@ import {
 } from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { toast } from "sonner";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +93,85 @@ const ACCENT_COLORS = [
 
 function getTeamColor(team: Team, index: number): string {
   return team.color || ACCENT_COLORS[index % ACCENT_COLORS.length];
+}
+
+function CreateTeamSheet({
+  open,
+  setOpen,
+  name,
+  setName,
+  desc,
+  setDesc,
+  color,
+  setColor,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  name: string;
+  setName: (v: string) => void;
+  desc: string;
+  setDesc: (v: string) => void;
+  color: string;
+  setColor: (v: string) => void;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>New Team</SheetTitle>
+        </SheetHeader>
+        <div className="space-y-4 px-4">
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Engineering, Marketing"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="Optional description"
+              rows={3}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <div className="flex flex-wrap gap-2">
+              {ACCENT_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`size-7 rounded-full transition-all ${
+                    color === c ? "ring-2 ring-offset-2 ring-primary" : "hover:scale-110"
+                  }`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setColor(c)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={onSave}
+            disabled={saving || !name.trim()}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {saving ? "Creating..." : "Create Team"}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 export default function TeamsPage() {
@@ -147,6 +236,44 @@ export default function TeamsPage() {
       return dir * a.name.localeCompare(b.name);
     });
 
+  // Create team sheet
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createDesc, setCreateDesc] = useState("");
+  const [createColor, setCreateColor] = useState("#3b82f6");
+  const [createSaving, setCreateSaving] = useState(false);
+
+  async function handleCreateTeam() {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId || !createName.trim()) return;
+    setCreateSaving(true);
+    try {
+      const res = await fetch("/api/v1/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: createName.trim(),
+          description: createDesc.trim() || null,
+          color: createColor,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
+      toast.success("Team created");
+      setCreateOpen(false);
+      setCreateName("");
+      setCreateDesc("");
+      setCreateColor("#3b82f6");
+      fetchTeams();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create team");
+    } finally {
+      setCreateSaving(false);
+    }
+  }
+
   const totalMembers = teams.reduce((sum, t) => sum + getMemberCount(t), 0);
   const avgTeamSize = teams.length > 0 ? Math.round((totalMembers / teams.length) * 10) / 10 : 0;
   const largestTeam = teams.length > 0
@@ -157,22 +284,20 @@ export default function TeamsPage() {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
-  const handleCreateTeam = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("create-team"));
-  }, []);
+  const openCreateSheet = useCallback(() => setCreateOpen(true), []);
 
   useTopbarAction(
     useMemo(
       () => (
         <Button
-          onClick={handleCreateTeam}
+          onClick={openCreateSheet}
           size="sm"
           className="h-7 text-xs gap-1"
         >
           <Plus className="size-3" /> New Team
         </Button>
       ),
-      [handleCreateTeam]
+      [openCreateSheet]
     )
   );
 
@@ -276,7 +401,7 @@ export default function TeamsPage() {
 
             <motion.div {...anim(0.55)} className="mt-8">
               <Button
-                onClick={handleCreateTeam}
+                onClick={openCreateSheet}
                 size="lg"
                 className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
               >
@@ -316,6 +441,19 @@ export default function TeamsPage() {
             ))}
           </div>
         </motion.div>
+
+        <CreateTeamSheet
+          open={createOpen}
+          setOpen={setCreateOpen}
+          name={createName}
+          setName={setCreateName}
+          desc={createDesc}
+          setDesc={setCreateDesc}
+          color={createColor}
+          setColor={setCreateColor}
+          saving={createSaving}
+          onSave={handleCreateTeam}
+        />
       </ContentReveal>
     );
   }
@@ -536,6 +674,19 @@ export default function TeamsPage() {
           </motion.div>
         </MotionConfig>
       )}
+
+      <CreateTeamSheet
+        open={createOpen}
+        setOpen={setCreateOpen}
+        name={createName}
+        setName={setCreateName}
+        desc={createDesc}
+        setDesc={setCreateDesc}
+        color={createColor}
+        setColor={setCreateColor}
+        saving={createSaving}
+        onSave={handleCreateTeam}
+      />
     </ContentReveal>
   );
 }
