@@ -101,7 +101,7 @@ const sections: NavSection[] = [
 
 const footerItems: NavItem[] = [
   { label: "Settings", href: "/settings", icon: SettingsIcon },
-  { label: "Help", href: "/help", icon: CircleHelpIcon },
+  { label: "Help", href: "/docs", icon: CircleHelpIcon },
 ];
 
 function isActive(pathname: string, href: string) {

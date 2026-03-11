@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "index",
+    "organization",
+    "cost-centers",
+    "tags",
+    "reminders",
+    "workflows",
+    "document-templates",
+    "api-keys",
+    "audit-log"
+  ]
+}

@@ -1,0 +1,66 @@
+---
+title: Assembly and Bill of Materials
+description: Define product compositions and process assembly orders.
+---
+
+The Bill of Materials (BOM) feature lets you define how finished products are assembled from component items. Navigate to **Inventory > BOM** for definitions and **Inventory > Assembly** for assembly orders.
+
+## Bill of Materials
+
+A BOM defines the components needed to build a finished product.
+
+### Creating a BOM
+
+1. Navigate to **Inventory > BOM**
+2. Click **New BOM**
+3. Select the finished product (must be an existing inventory item)
+4. Add component items with required quantities
+5. Save the BOM
+
+### BOM Fields
+
+| Field | Description |
+|---|---|
+| Finished Product | The item being assembled |
+| Components | List of required items and quantities |
+| Assembly Cost | Optional labor or overhead cost per assembly |
+
+## Assembly Orders
+
+Assembly orders consume component items and produce finished goods.
+
+### Processing an Assembly
+
+1. Navigate to **Inventory > Assembly**
+2. Create a new assembly order
+3. Select the BOM
+4. Enter the quantity to assemble
+5. The system checks component availability
+6. Complete the order to update stock levels
+
+### Stock Impact
+
+When an assembly is completed:
+
+- Component item quantities are **decreased**
+- Finished product quantity is **increased**
+- Inventory value is recalculated based on component costs plus assembly costs
+
+## Example
+
+A BOM for "Desktop Computer" might include:
+
+| Component | Quantity |
+|---|---|
+| CPU | 1 |
+| RAM Module | 2 |
+| Hard Drive | 1 |
+| Case | 1 |
+| Power Supply | 1 |
+
+Assembling 10 desktop computers would consume 10 CPUs, 20 RAM modules, etc.
+
+## Related
+
+- [Inventory](/docs/modules/inventory) - General inventory management
+- [Landed Costs](/docs/modules/landed-costs) - Allocating additional costs to inventory

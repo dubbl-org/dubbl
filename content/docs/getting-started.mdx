@@ -1,0 +1,84 @@
+---
+title: Getting Started
+description: Set up Dubbl and start managing your finances in minutes.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Tabs, Tab } from "fumadocs-ui/components/tabs";
+
+## Prerequisites
+
+- **Node.js** 20+ and npm
+- **PostgreSQL** 15+ (or use Docker)
+- **S3-compatible storage** (optional, for file uploads)
+
+## Installation
+
+```bash
+git clone https://github.com/dubbl-org/dubbl.git
+cd dubbl
+pnpm install
+```
+
+## Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your configuration:
+
+```bash title=".env"
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/dubbl
+
+# Auth
+AUTH_SECRET=your-random-secret-here
+AUTH_URL=http://localhost:3000
+
+# Stripe (optional)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# S3 Storage (optional)
+S3_BUCKET=dubbl-uploads
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_ENDPOINT=https://s3.amazonaws.com
+```
+
+## Database Setup
+
+<Tabs items={["Fresh Database", "With Demo Data"]}>
+  <Tab value="Fresh Database">
+    ```bash
+    pnpm db:push
+    ```
+  </Tab>
+  <Tab value="With Demo Data">
+    ```bash
+    pnpm db:push
+    pnpm db:seed
+    ```
+  </Tab>
+</Tabs>
+
+## Start Development
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+<Callout type="info">
+  If you ran the seed script, log in with **demo@dubbl.app** / **password123**. This gives you a fully populated demo organization with chart of accounts, contacts, invoices, bills, bank accounts, projects, and more.
+</Callout>
+
+## Next Steps
+
+- [Self-Hosting Guide](/docs/self-hosting) - Deploy to production with Docker
+- [Chart of Accounts](/docs/modules/chart-of-accounts) - Set up your accounts
+- [Invoicing](/docs/modules/invoicing) - Create and send invoices
+- [Accounting Concepts](/docs/concepts) - Learn double-entry basics

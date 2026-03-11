@@ -1,15 +1,14 @@
 {
   "root": true,
   "pages": [
-    "---Getting Started---",
     "getting-started",
-    "---Self-Hosting---",
     "self-hosting",
-    "---Modules---",
     "modules",
-    "---API Reference---",
+    "tax",
+    "settings",
+    "concepts",
     "api-reference",
-    "---Guides---",
-    "guides"
+    "guides",
+    "contributing"
   ]
 }

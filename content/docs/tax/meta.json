@@ -1,0 +1,11 @@
+{
+  "pages": [
+    "index",
+    "currencies",
+    "tax-periods",
+    "vat-return",
+    "bas",
+    "sales-tax",
+    "schedule-c"
+  ]
+}

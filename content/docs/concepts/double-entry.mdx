@@ -1,0 +1,48 @@
+---
+title: Double-Entry Bookkeeping
+description: How debits, credits, and journal entries work in dubbl.
+---
+
+Double-entry bookkeeping is the foundation of modern accounting. Every transaction records at least two entries: a debit and a credit. The total debits must always equal the total credits, keeping your books balanced.
+
+## Debits and Credits
+
+| Account Type | Debit | Credit |
+|---|---|---|
+| Assets | Increase | Decrease |
+| Liabilities | Decrease | Increase |
+| Equity | Decrease | Increase |
+| Revenue | Decrease | Increase |
+| Expenses | Increase | Decrease |
+
+## Journal Entries
+
+A journal entry is the record of a single transaction. In dubbl, every financial action (invoice, bill, payment, expense) creates a journal entry automatically.
+
+### Example: Recording a Sale
+
+When you issue a $1,000 invoice:
+
+| Account | Debit | Credit |
+|---|---|---|
+| Accounts Receivable | $1,000 | |
+| Sales Revenue | | $1,000 |
+
+When the customer pays:
+
+| Account | Debit | Credit |
+|---|---|---|
+| Bank Account | $1,000 | |
+| Accounts Receivable | | $1,000 |
+
+## The Accounting Equation
+
+**Assets = Liabilities + Equity**
+
+Every transaction maintains this equation. dubbl enforces balance by requiring total debits to equal total credits on every journal entry.
+
+## Manual Journal Entries
+
+For transactions that are not covered by invoices, bills, or expenses, you can create manual journal entries in **Accounting > Transactions**.
+
+See [Journal Entries](/docs/modules/journal-entries) for details on creating and managing entries in dubbl.

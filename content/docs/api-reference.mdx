@@ -1,25 +1,29 @@
 ---
 title: API Reference
-description: REST API documentation for dubbl.
+description: REST API documentation for Dubbl.
 ---
 
-dubbl provides a full REST API for programmatic access to all features.
+import { Callout } from "fumadocs-ui/components/callout";
+import { Tabs, Tab } from "fumadocs-ui/components/tabs";
+
+Dubbl provides a full REST API for programmatic access to all features.
 
 ## Authentication
 
-All API requests require authentication via one of:
+<Tabs items={["API Key (Recommended)", "Session Cookie"]}>
+  <Tab value="API Key (Recommended)">
+    Create API keys in **Settings > API Keys**, then include in requests:
 
-### Session Cookie
-Automatically included when making requests from the dubbl web app.
-
-### API Key (Bearer Token)
-Create API keys in **Settings → API Keys**, then include in requests:
-
-```bash
-curl -H "Authorization: Bearer your-api-key" \
-     -H "x-organization-id: org-id" \
-     https://your-instance.com/api/v1/contacts
-```
+    ```bash
+    curl -H "Authorization: Bearer your-api-key" \
+         -H "x-organization-id: org-id" \
+         https://your-instance.com/api/v1/contacts
+    ```
+  </Tab>
+  <Tab value="Session Cookie">
+    Automatically included when making requests from the Dubbl web app. No additional setup needed.
+  </Tab>
+</Tabs>
 
 ### Organization Context
 
@@ -37,27 +41,28 @@ x-organization-id: your-org-id
 
 ## Response Format
 
-Successful responses return JSON:
-
-```json
-{
-  "data": [...],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "totalPages": 5
-  }
-}
-```
-
-Error responses:
-
-```json
-{
-  "error": "Description of the error"
-}
-```
+<Tabs items={["Success", "Error"]}>
+  <Tab value="Success">
+    ```json
+    {
+      "data": [...],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 100,
+        "totalPages": 5
+      }
+    }
+    ```
+  </Tab>
+  <Tab value="Error">
+    ```json
+    {
+      "error": "Description of the error"
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ## Endpoints
 
@@ -180,3 +185,7 @@ Error responses:
 | POST | `/api/v1/payroll/runs/:id/process` | Process payroll |
 | GET/POST | `/api/v1/budgets` | Budgets CRUD |
 | GET | `/api/v1/audit-log` | Audit log |
+
+<Callout type="info">
+  See the [API Integration Guide](/docs/guides/api-integration) for detailed examples and authentication setup.
+</Callout>

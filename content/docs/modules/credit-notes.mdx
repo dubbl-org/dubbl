@@ -1,0 +1,44 @@
+---
+title: Credit Notes
+description: Issue credit notes to adjust or reverse invoiced amounts.
+---
+
+Credit notes reduce the amount a customer owes, either partially or fully. Navigate to **Sales > Credit Notes**.
+
+## When to Use Credit Notes
+
+- **Returns** - Customer returns goods
+- **Overcharges** - Invoice amount was too high
+- **Discounts** - Applying a post-sale discount
+- **Corrections** - Fixing errors on a previous invoice
+
+## Creating a Credit Note
+
+1. Click **New Credit Note**
+2. Select the customer
+3. Optionally link to the original invoice
+4. Add line items for the credited amounts
+5. Apply tax rates as on the original invoice
+
+## Applying Credit Notes
+
+A credit note can be:
+
+- **Applied to an invoice** - Reduces the outstanding balance
+- **Refunded** - Record a payment back to the customer
+- **Left as credit** - Available to apply to future invoices
+
+## Journal Entry
+
+When a credit note is created, dubbl records:
+
+| Account | Debit | Credit |
+|---|---|---|
+| Sales Revenue | Amount | |
+| Accounts Receivable | | Amount |
+
+This reverses the original invoice entry proportionally.
+
+## Viewing Credit Notes
+
+The credit notes list shows all issued credits with status (Draft, Issued, Applied, Refunded) and remaining balance.

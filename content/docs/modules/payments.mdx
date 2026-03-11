@@ -1,0 +1,44 @@
+---
+title: Payments
+description: Track and manage incoming and outgoing payments.
+---
+
+The Payments page provides a consolidated view of all payment activity. Navigate to **Sales > Payments** for customer payments.
+
+## Recording Payments
+
+Payments can be recorded in several ways:
+
+- **From an invoice** - Mark an invoice as paid, partially or fully
+- **From a bill** - Record payment against a supplier bill
+- **Batch payments** - Process multiple payments at once
+
+## Payment Fields
+
+| Field | Description |
+|---|---|
+| Date | Payment date |
+| Contact | Customer or supplier |
+| Amount | Payment amount |
+| Method | Bank transfer, cash, card, etc. |
+| Reference | Payment reference or check number |
+| Account | Bank account used |
+
+## Partial Payments
+
+Invoices and bills support partial payments. The outstanding balance is updated automatically, and the document status changes to "Partially Paid."
+
+## Overpayments
+
+If a payment exceeds the invoice amount, the excess is recorded as a credit that can be applied to future invoices.
+
+## Journal Entry
+
+When a customer payment is recorded:
+
+| Account | Debit | Credit |
+|---|---|---|
+| Bank Account | Amount | |
+| Accounts Receivable | | Amount |
+
+For supplier payments, the entry is reversed (debit Accounts Payable, credit Bank).

@@ -1,0 +1,42 @@
+---
+title: Approval Workflows
+description: Configure approval rules for expenses, purchase requisitions, and more.
+---
+
+Approval workflows route documents through one or more approvers before they can be finalized. Navigate to **Settings > Workflows**.
+
+## Supported Workflow Types
+
+- **Expense claims** - Require manager approval before reimbursement
+- **Purchase requisitions** - Approve purchase requests before creating POs
+- **Bills** - Approve bills above a certain threshold
+
+## Creating a Workflow
+
+1. Click **New Workflow**
+2. Select the workflow type
+3. Define approval steps (single approver, sequential, or parallel)
+4. Set conditions (e.g., amount thresholds)
+5. Assign approvers
+
+## Workflow Configuration
+
+| Field | Description |
+|---|---|
+| Name | Workflow name |
+| Type | Expense, Requisition, or Bill |
+| Conditions | When this workflow applies (e.g., amount > $500) |
+| Steps | Ordered list of approval steps |
+| Approvers | Who can approve at each step |
+
+## Approval Process
+
+1. A document is submitted for approval
+2. The first approver is notified
+3. They can approve, reject, or request changes
+4. If approved, the document moves to the next step (if any)
+5. Once all steps are approved, the document is finalized
+
+## Notifications
+
+Approvers receive notifications when a document is waiting for their review. Submitters are notified of approval or rejection.

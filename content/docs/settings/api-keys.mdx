@@ -1,0 +1,41 @@
+---
+title: API Keys
+description: Create and manage API keys for programmatic access.
+---
+
+API keys allow external applications to interact with your dubbl organization through the REST API. Navigate to **Settings > API Keys**.
+
+## Creating an API Key
+
+1. Click **New API Key**
+2. Enter a descriptive name (e.g., "Zapier Integration")
+3. The key is displayed once - copy and store it securely
+4. The key cannot be viewed again after creation
+
+## Managing Keys
+
+| Field | Description |
+|---|---|
+| Name | Descriptive label for the key |
+| Created | When the key was created |
+| Last Used | When the key was last used |
+| Status | Active or Revoked |
+
+## Revoking a Key
+
+If a key is compromised or no longer needed:
+
+1. Find the key in the list
+2. Click **Revoke**
+3. The key is immediately deactivated
+
+## Security Best Practices
+
+- Use separate keys for separate integrations
+- Revoke keys that are no longer in use
+- Never share keys in public repositories or logs
+- Rotate keys periodically
+
+## Using the API
+
+See the [API Reference](/docs/api-reference) for documentation on available endpoints and authentication.
