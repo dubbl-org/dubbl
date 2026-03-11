@@ -242,7 +242,7 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
               <Menu className="size-4" />
             </Button>
           )}
-          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
             <Logo className="h-5 w-auto" />
             <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">dubbl</span>
           </Link>
