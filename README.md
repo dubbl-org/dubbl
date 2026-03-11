@@ -1,11 +1,8 @@
 <p align="center">
-  <svg viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="80" height="64">
-    <path d="M18 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10h-8V4z" fill="#34d399"/>
-    <path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#059669"/>
-  </svg>
-  <h1 align="center">dubbl</h1>
-  <p align="center">Open source, double-entry bookkeeping for modern teams.</p>
+  <img src="public/logo.svg" alt="dubbl logo" width="80" height="64" />
 </p>
+<h1 align="center">dubbl</h1>
+<p align="center">Open source, double-entry bookkeeping for modern teams.</p>
 
 <p align="center">
   <a href="/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
