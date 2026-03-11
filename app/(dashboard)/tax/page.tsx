@@ -52,11 +52,11 @@ const TYPE_COLORS = {
     icon: "bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400",
   },
   both: {
-    bg: "bg-violet-50 dark:bg-violet-950/40",
-    border: "border-violet-200 dark:border-violet-800",
-    text: "text-violet-700 dark:text-violet-400",
-    bar: "bg-violet-500",
-    icon: "bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950/40",
+    border: "border-emerald-200 dark:border-emerald-800",
+    text: "text-emerald-700 dark:text-emerald-400",
+    bar: "bg-emerald-500",
+    icon: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400",
   },
 } as const;
 
