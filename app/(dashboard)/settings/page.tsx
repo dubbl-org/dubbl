@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +90,10 @@ export default function SettingsPage() {
   });
   const [saving, setSaving] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
+  const [lockDate, setLockDate] = useState("");
+  const [lockSaving, setLockSaving] = useState(false);
+  const [peppolId, setPeppolId] = useState("");
+  const [peppolScheme, setPeppolScheme] = useState("");
 
   const businessTypes = useMemo(
     () => (form.country ? getBusinessTypesForCountry(form.country) : []),
@@ -100,6 +104,16 @@ export default function SettingsPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
+    // Fetch period lock
+    fetch("/api/v1/period-lock", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.lock?.lockDate) setLockDate(data.lock.lockDate);
+      })
+      .catch(() => {});
+
     fetch("/api/v1/organization", {
       headers: { "x-organization-id": orgId },
     })
@@ -108,6 +122,8 @@ export default function SettingsPage() {
         if (data.organization) {
           const o = data.organization;
           setOrg(o);
+          setPeppolId(o.peppolId || "");
+          setPeppolScheme(o.peppolScheme || "");
           setForm({
             name: o.name,
             country: o.country ?? "",
@@ -176,6 +192,8 @@ export default function SettingsPage() {
           contactWebsite: form.contactWebsite || null,
           defaultPaymentTerms: form.defaultPaymentTerms || null,
           industrySector: form.industrySector || null,
+          peppolId: peppolId || null,
+          peppolScheme: peppolScheme || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -498,6 +516,95 @@ export default function SettingsPage() {
           {saving ? "Saving..." : "Save changes"}
         </Button>
       </div>
+
+      <div className="h-px bg-border" />
+
+      {/* E-Invoicing / PEPPOL */}
+      <Section title="E-Invoicing" description="PEPPOL identifiers for electronic invoicing (EU/UK/SG compliance).">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">PEPPOL Participant ID</Label>
+            <Input
+              value={peppolId}
+              onChange={(e) => setPeppolId(e.target.value)}
+              placeholder="e.g. 0088:1234567890"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">PEPPOL Scheme</Label>
+            <Select
+              value={peppolScheme}
+              onValueChange={setPeppolScheme}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select scheme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0088">0088 - EAN/GLN</SelectItem>
+                <SelectItem value="0007">0007 - SE Org Nr</SelectItem>
+                <SelectItem value="0009">0009 - FR SIRET</SelectItem>
+                <SelectItem value="0088">0088 - GLN</SelectItem>
+                <SelectItem value="9925">9925 - IT VAT</SelectItem>
+                <SelectItem value="9930">9930 - DE VAT</SelectItem>
+                <SelectItem value="9944">9944 - GB VAT</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Once configured, you can download UBL XML invoices from each invoice detail page.
+        </p>
+      </Section>
+
+      <div className="h-px bg-border" />
+
+      {/* Period Lock */}
+      <Section title="Period Lock" description="Lock transactions on or before a specific date to prevent backdating.">
+        <div className="flex items-end gap-3">
+          <div className="space-y-1.5 flex-1 max-w-xs">
+            <Label className="text-xs">Lock date</Label>
+            <Input
+              type="date"
+              value={lockDate}
+              onChange={(e) => setLockDate(e.target.value)}
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={lockSaving}
+            onClick={async () => {
+              const orgId = localStorage.getItem("activeOrgId");
+              if (!orgId || !lockDate) return;
+              setLockSaving(true);
+              try {
+                const res = await fetch("/api/v1/period-lock", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+                  body: JSON.stringify({ lockDate }),
+                });
+                if (!res.ok) {
+                  const data = await res.json();
+                  toast.error(data.error || "Failed to set lock");
+                  return;
+                }
+                toast.success("Period locked");
+              } finally {
+                setLockSaving(false);
+              }
+            }}
+          >
+            <Lock className="size-3.5" />
+            {lockSaving ? "Saving..." : "Set Lock"}
+          </Button>
+        </div>
+        {lockDate && (
+          <p className="text-xs text-amber-600 mt-2">
+            No transactions can be created or modified on or before {lockDate}.
+          </p>
+        )}
+      </Section>
 
       <div className="h-px bg-border" />
 

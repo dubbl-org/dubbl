@@ -9,6 +9,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    await assertNotLocked(ctx.organizationId, parsed.issueDate);
 
     const debitNoteNumber = await getNextNumber(ctx.organizationId, "debit_note", "debit_note_number", "DN");
 

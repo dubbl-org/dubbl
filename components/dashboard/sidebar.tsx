@@ -43,6 +43,7 @@ import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
 import { UsersAnimatedIcon } from "@/components/ui/users-animated";
 import { TargetIcon } from "@/components/ui/target";
 import { FolderOpenIcon } from "@/components/ui/folder-open";
+import { PercentAnimatedIcon } from "@/components/ui/percent-animated";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnimatedIcon = React.ForwardRefExoticComponent<any>;
@@ -77,6 +78,7 @@ const sections: NavSection[] = [
       { label: "Sales", href: "/sales", icon: FileTextIcon },
       { label: "Purchases", href: "/purchases", icon: CartIcon },
       { label: "Accounting", href: "/accounting", icon: ArrowLeftRightAnimatedIcon },
+      { label: "Tax", href: "/tax", icon: PercentAnimatedIcon },
     ],
   },
   {

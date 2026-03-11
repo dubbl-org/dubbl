@@ -31,3 +31,4 @@ export * from "./workflows";
 export * from "./scheduled-payments";
 export * from "./consolidation";
 export * from "./bulk";
+export * from "./advisor";

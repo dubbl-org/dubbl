@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -25,10 +24,6 @@ import {
   Timer,
   Copy,
   Building2,
-  FileSpreadsheet,
-  Globe,
-  MapPin,
-  Calculator,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -192,85 +187,11 @@ const reportCategories = [
   },
 ];
 
-const EU_COUNTRIES = [
-  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
-  "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
-  "PL", "PT", "RO", "SK", "SI", "ES", "SE",
-];
-
-function getTaxReports(countryCode: string | null) {
-  if (!countryCode) return [];
-
-  const reports: { title: string; description: string; href: string; icon: typeof Receipt }[] = [];
-
-  if (countryCode === "GB" || EU_COUNTRIES.includes(countryCode)) {
-    reports.push({
-      title: "VAT Return",
-      description: "UK/EU VAT Return with boxes 1-9.",
-      href: "/reports/vat-return",
-      icon: Globe,
-    });
-  }
-
-  if (countryCode === "AU") {
-    reports.push({
-      title: "Business Activity Statement",
-      description: "Australian BAS with GST calculations.",
-      href: "/reports/bas",
-      icon: FileSpreadsheet,
-    });
-  }
-
-  if (countryCode === "US") {
-    reports.push(
-      {
-        title: "Sales Tax Report",
-        description: "Sales tax collected by state and jurisdiction.",
-        href: "/reports/sales-tax",
-        icon: MapPin,
-      },
-      {
-        title: "Schedule C",
-        description: "US Schedule C tax filing preparation.",
-        href: "/reports/schedule-c",
-        icon: Calculator,
-      }
-    );
-  }
-
-  return reports;
-}
-
 export default function ReportsPage() {
-  const [countryCode, setCountryCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/organization", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.countryCode) setCountryCode(data.countryCode);
-      })
-      .catch(() => {});
-  }, []);
-
-  const taxReports = getTaxReports(countryCode);
-
-  const allCategories = taxReports.length > 0
-    ? reportCategories.map((cat) =>
-        cat.title === "Tax & Analytics"
-          ? { ...cat, reports: [...taxReports, ...cat.reports] }
-          : cat
-      )
-    : reportCategories;
-
   return (
     <ContentReveal>
       <div className="space-y-6 sm:space-y-10">
-        {allCategories.map((category, i) => (
+        {reportCategories.map((category, i) => (
           <div key={category.title}>
             {i > 0 && <div className="mb-6 sm:mb-10 h-px bg-border" />}
             <Section title={category.title} description={category.description}>

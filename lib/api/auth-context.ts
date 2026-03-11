@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { member, apiKey } from "@/lib/db/schema";
+import { member, apiKey, advisorAccess } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
 import type { MemberRole } from "@/lib/plans";
@@ -9,6 +9,8 @@ export interface AuthContext {
   userId: string;
   organizationId: string;
   role: MemberRole;
+  isAdvisor?: boolean;
+  advisorRole?: string;
 }
 
 export async function getAuthContext(
@@ -66,7 +68,28 @@ export async function getAuthContext(
     ),
   });
 
-  if (!mem) throw new AuthError("Not a member of this organization", 403);
+  if (!mem) {
+    // Check advisor access as fallback
+    const advisor = await db.query.advisorAccess.findFirst({
+      where: and(
+        eq(advisorAccess.advisorUserId, session.user.id),
+        eq(advisorAccess.organizationId, orgId),
+        eq(advisorAccess.isActive, true)
+      ),
+    });
+
+    if (!advisor || !advisor.acceptedAt) {
+      throw new AuthError("Not a member of this organization", 403);
+    }
+
+    return {
+      userId: session.user.id,
+      organizationId: orgId,
+      role: "member" as MemberRole,
+      isAdvisor: true,
+      advisorRole: advisor.role,
+    };
+  }
 
   return {
     userId: session.user.id,

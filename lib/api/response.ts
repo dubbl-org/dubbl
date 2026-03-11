@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AuthError } from "./auth-context";
+import { PeriodLockedError } from "./period-lock";
 
 /** 200 OK response */
 export function ok<T>(data: T) {
@@ -31,6 +32,9 @@ export function notFound(entity = "Resource") {
 export function handleError(err: unknown) {
   if (err instanceof AuthError) {
     return NextResponse.json({ error: err.message }, { status: err.status });
+  }
+  if (err instanceof PeriodLockedError) {
+    return NextResponse.json({ error: err.message }, { status: 422 });
   }
   if (err instanceof z.ZodError) {
     const message = err.issues.map((i) => i.message).join(", ");

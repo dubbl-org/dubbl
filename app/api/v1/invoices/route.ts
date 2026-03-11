@@ -10,6 +10,7 @@ import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { processRecurringTemplates } from "@/lib/api/recurring-generate";
 import { decimalToCents } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -104,6 +105,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    await assertNotLocked(ctx.organizationId, parsed.issueDate);
 
     const invoiceNumber = await getNextNumber(ctx.organizationId, "invoice", "invoice_number", "INV");
 

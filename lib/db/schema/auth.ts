@@ -110,6 +110,10 @@ export const organization = pgTable("organization", {
   interestMethod: text("interest_method"), // "simple" or "compound"
   interestGraceDays: integer("interest_grace_days").default(0),
   mileageRate: integer("mileage_rate").default(67), // cents per mile (IRS rate $0.67)
+  peppolId: text("peppol_id"), // PEPPOL participant identifier
+  peppolScheme: text("peppol_scheme"), // e.g. "0088" (EAN), "9925" (VAT)
+  taxLookupEnabled: integer("tax_lookup_enabled").default(0), // 0 = disabled, 1 = enabled
+  taxLookupProvider: text("tax_lookup_provider"), // "taxjar", "manual"
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
