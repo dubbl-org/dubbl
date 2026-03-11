@@ -1,0 +1,109 @@
+---
+title: MCP Server
+description: Connect AI agents to dubbl via the Model Context Protocol.
+---
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is an open standard that lets AI agents interact with external tools and data sources. dubbl's built-in MCP server gives AI assistants like Claude direct access to your accounting data -- creating entries, managing invoices, generating reports, and more.
+
+## Prerequisites
+
+- **Pro or Business plan** -- MCP access requires API access, which is only available on paid plans
+- An MCP-compatible client (Claude Desktop, Claude Code, or any MCP client)
+
+## Connecting from Claude Desktop
+
+Add the following to your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "dubbl": {
+      "url": "https://your-dubbl-instance.com/api/mcp"
+    }
+  }
+}
+```
+
+Claude Desktop handles OAuth automatically. On first connect, it will open a browser window for you to sign in and authorize access.
+
+## Connecting from Claude Code
+
+```bash
+claude mcp add dubbl --transport streamable-http https://your-dubbl-instance.com/api/mcp
+```
+
+## OAuth Flow
+
+dubbl uses OAuth 2.1 with PKCE for MCP authentication:
+
+1. The MCP client discovers OAuth endpoints via `/.well-known/oauth-authorization-server` on the MCP endpoint
+2. The client registers dynamically at `/api/mcp/oauth/register`
+3. The client redirects you to `/api/mcp/oauth/authorize` to sign in
+4. You select an organization and approve the connection
+5. The client receives an authorization code and exchanges it for access/refresh tokens at `/api/mcp/oauth/token`
+6. Access tokens expire after 1 hour; refresh tokens last 30 days
+
+## Available Tools
+
+### Organization
+- `get_organization` -- Get current organization details
+
+### Chart of Accounts
+- `list_accounts` -- List all accounts with optional type filter
+- `get_account` -- Get account with calculated balance
+- `create_account` -- Create a new account
+- `update_account` -- Update account details
+- `delete_account` -- Delete an account (fails if it has transactions)
+
+### Journal Entries
+- `list_entries` -- List entries with status/date filters
+- `get_entry` -- Get entry with line items
+- `create_entry` -- Create a new entry (debits must equal credits)
+- `post_entry` -- Post a draft entry
+- `void_entry` -- Void a posted entry (creates reversing entry)
+
+### Contacts
+- `list_contacts` -- Search and filter contacts
+- `get_contact` -- Get contact details
+- `create_contact` -- Create a customer, supplier, or both
+- `update_contact` -- Update contact details
+
+### Invoices
+- `list_invoices` -- List invoices with filters
+- `get_invoice` -- Get invoice with line items
+- `create_invoice` -- Create an invoice with line items
+- `void_invoice` -- Void an invoice
+- `pay_invoice` -- Record a payment (amount in cents)
+
+### Bills
+- `list_bills` -- List bills with status filter
+- `create_bill` -- Create a bill with line items
+- `approve_bill` -- Approve a draft/pending bill
+- `pay_bill` -- Record a payment (amount in cents)
+- `void_bill` -- Void a bill
+
+### Reports
+- `trial_balance` -- Trial balance report
+- `balance_sheet` -- Balance sheet
+- `profit_and_loss` -- P&L with date range
+- `aged_receivables` -- AR aging buckets
+- `aged_payables` -- AP aging buckets
+
+## Amount Conventions
+
+- All monetary amounts in tool inputs/outputs are in **integer cents** (e.g. `1250` = $12.50)
+- Invoice/bill line item `unitPrice` and `quantity` are decimal numbers (the system converts to cents internally)
+- Exchange rates are stored as integers with 6 decimal places (`1000000` = 1.0)
+
+## Troubleshooting
+
+### "MCP access requires a Pro or Business plan"
+Your organization is on the free plan. Upgrade at **Settings > Billing** to enable MCP access.
+
+### "Invalid access token"
+Your access token has expired. MCP clients should automatically refresh tokens using the refresh token. If this persists, disconnect and reconnect the MCP server.
+
+### "Not a member of this organization"
+Your user account has been removed from the organization. Ask an admin to re-add you.

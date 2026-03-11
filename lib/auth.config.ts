@@ -23,6 +23,10 @@ export const authConfig: NextAuthConfig = {
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/stripe/webhook") ||
         pathname.startsWith("/api/currencies") ||
+        pathname.startsWith("/api/mcp/oauth/.well-known") ||
+        pathname.startsWith("/api/mcp/oauth/register") ||
+        pathname.startsWith("/api/mcp/oauth/token") ||
+        pathname.startsWith("/.well-known") ||
         pathname.startsWith("/docs") ||
         pathname.startsWith("/_next") ||
         pathname.startsWith("/favicon")
