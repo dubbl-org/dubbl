@@ -1,4 +1,3 @@
-// @ts-ignore -- tesseract.js may lack type declarations
 import Tesseract from "tesseract.js";
 
 export interface ReceiptData {
