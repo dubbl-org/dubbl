@@ -7,7 +7,6 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
@@ -57,7 +56,6 @@ export default function SalesTaxPage() {
 
   if (breakdown.length === 0) {
     return (
-      <ContentReveal>
         <div className="relative">
           {/* Ghost preview */}
           <div className="pointer-events-none w-full space-y-4">
@@ -119,12 +117,11 @@ export default function SalesTaxPage() {
             </div>
           </div>
         </div>
-      </ContentReveal>
     );
   }
 
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Sales Tax Report"
         description="Tax collected by rate for the selected period."
@@ -222,6 +219,6 @@ export default function SalesTaxPage() {
           <span className="font-mono tabular-nums text-blue-600">{formatMoney(totalCollected)}</span>
         </div>
       </div>
-    </ContentReveal>
+    </div>
   );
 }

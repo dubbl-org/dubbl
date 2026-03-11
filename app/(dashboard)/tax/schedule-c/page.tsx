@@ -7,7 +7,6 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -64,7 +63,6 @@ export default function ScheduleCPage() {
 
   if (lines.length === 0) {
     return (
-      <ContentReveal>
         <div className="relative">
           {/* Ghost preview of schedule C layout */}
           <div className="pointer-events-none w-full space-y-4">
@@ -135,12 +133,11 @@ export default function ScheduleCPage() {
             </div>
           </div>
         </div>
-      </ContentReveal>
     );
   }
 
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Schedule C Worksheet"
         description="IRS Schedule C (Form 1040) tax preparation worksheet."
@@ -295,6 +292,6 @@ export default function ScheduleCPage() {
           </div>
         )}
       </div>
-    </ContentReveal>
+    </div>
   );
 }

@@ -7,7 +7,6 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -58,7 +57,6 @@ export default function VatReturnPage() {
 
   if (boxes.length === 0) {
     return (
-      <ContentReveal>
         <div className="relative">
           {/* Ghost preview of what the VAT return looks like */}
           <div className="pointer-events-none w-full space-y-4">
@@ -118,12 +116,11 @@ export default function VatReturnPage() {
             </div>
           </div>
         </div>
-      </ContentReveal>
     );
   }
 
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="VAT Return"
         description="UK/EU VAT return calculation with HMRC boxes 1-9."
@@ -222,6 +219,6 @@ export default function VatReturnPage() {
           );
         })}
       </div>
-    </ContentReveal>
+    </div>
   );
 }

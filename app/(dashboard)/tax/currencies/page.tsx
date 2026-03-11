@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { DollarSign, Search, Coins } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -95,7 +94,7 @@ export default function CurrenciesPage() {
           </p>
         </div>
       ) : (
-        <ContentReveal>
+        <div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {filtered.map((c) => (
               <div
@@ -125,7 +124,7 @@ export default function CurrenciesPage() {
               Showing {filtered.length} of {currencies.length} currenc{currencies.length !== 1 ? "ies" : "y"}
             </p>
           )}
-        </ContentReveal>
+        </div>
       )}
     </div>
   );

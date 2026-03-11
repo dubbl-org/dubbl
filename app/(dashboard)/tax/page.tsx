@@ -23,8 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ContentReveal } from "@/components/ui/content-reveal";
-
 interface TaxRate {
   id: string;
   name: string;
@@ -189,7 +187,7 @@ export default function TaxRatesPage() {
   }
 
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard icon={Scale} label="Total rates" value={rates.length} />
@@ -249,6 +247,6 @@ export default function TaxRatesPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </ContentReveal>
+    </div>
   );
 }

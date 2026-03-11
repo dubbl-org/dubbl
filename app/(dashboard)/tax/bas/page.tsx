@@ -7,7 +7,6 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -68,7 +67,6 @@ export default function BasPage() {
 
   if (fields.length === 0) {
     return (
-      <ContentReveal>
         <div className="relative">
           {/* Ghost preview */}
           <div className="pointer-events-none w-full space-y-4">
@@ -127,12 +125,11 @@ export default function BasPage() {
             </div>
           </div>
         </div>
-      </ContentReveal>
     );
   }
 
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Business Activity Statement"
         description="Australian BAS report with GST calculations."
@@ -274,6 +271,6 @@ export default function BasPage() {
           </div>
         )}
       </div>
-    </ContentReveal>
+    </div>
   );
 }
