@@ -1,4 +1,4 @@
-// @ts-expect-error -- tesseract.js has no type declarations in this project
+// @ts-ignore -- tesseract.js may lack type declarations
 import Tesseract from "tesseract.js";
 
 export interface ReceiptData {
