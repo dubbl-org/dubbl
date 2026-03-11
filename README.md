@@ -118,7 +118,7 @@ dubbl includes a built-in [Model Context Protocol](https://modelcontextprotocol.
 Works with Claude Desktop, Claude Code, Cursor, Windsurf, VS Code Copilot, and any other MCP-enabled agent. Just point your client at:
 
 ```
-https://your-dubbl-instance.com/api/mcp
+https://dubbl.dev/api/mcp
 ```
 
 See the [MCP documentation](https://dubbl.dev/docs/guides/mcp) for setup instructions for each client.

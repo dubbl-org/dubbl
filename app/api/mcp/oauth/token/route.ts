@@ -11,12 +11,30 @@ import { eq, and } from "drizzle-orm";
 import { PLAN_LIMITS } from "@/lib/plans";
 import type { MemberRole } from "@/lib/plans";
 
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function corsJson(data: unknown, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    headers.set(key, value);
+  }
+  return Response.json(data, { ...init, headers });
+}
+
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
 function generateToken(prefix: string): string {
   return `${prefix}${randomBytes(32).toString("hex")}`;
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export async function POST(request: Request) {
@@ -41,14 +59,14 @@ export async function POST(request: Request) {
     } else if (grantType === "refresh_token") {
       return handleRefreshToken(params);
     } else {
-      return Response.json(
+      return corsJson(
         { error: "unsupported_grant_type" },
         { status: 400 }
       );
     }
   } catch (err) {
     console.error("Token endpoint error:", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
+    return corsJson({ error: "server_error" }, { status: 500 });
   }
 }
 
@@ -56,7 +74,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
   const { code, redirect_uri, code_verifier, client_id } = params;
 
   if (!code || !redirect_uri || !code_verifier || !client_id) {
-    return Response.json(
+    return corsJson(
       {
         error: "invalid_request",
         error_description:
@@ -73,7 +91,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
   });
 
   if (!authCode) {
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "Invalid authorization code" },
       { status: 400 }
     );
@@ -83,7 +101,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
   if (authCode.expiresAt < new Date()) {
     // Clean up expired code
     await db.delete(mcpOAuthCode).where(eq(mcpOAuthCode.id, authCode.id));
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "Authorization code expired" },
       { status: 400 }
     );
@@ -91,14 +109,14 @@ async function handleAuthorizationCode(params: Record<string, string>) {
 
   // Validate client_id and redirect_uri
   if (authCode.clientId !== client_id) {
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "client_id mismatch" },
       { status: 400 }
     );
   }
 
   if (authCode.redirectUri !== redirect_uri) {
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "redirect_uri mismatch" },
       { status: 400 }
     );
@@ -110,7 +128,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
     .digest("base64url");
 
   if (expectedChallenge !== authCode.codeChallenge) {
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "PKCE verification failed" },
       { status: 400 }
     );
@@ -125,7 +143,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
   if (!PLAN_LIMITS[plan].apiAccess) {
     // Clean up code
     await db.delete(mcpOAuthCode).where(eq(mcpOAuthCode.id, authCode.id));
-    return Response.json(
+    return corsJson(
       {
         error: "access_denied",
         error_description: "MCP access requires a Pro or Business plan",
@@ -175,7 +193,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
     expiresAt: refreshTokenExpiry,
   });
 
-  return Response.json({
+  return corsJson({
     access_token: accessTokenRaw,
     token_type: "Bearer",
     expires_in: 3600,
@@ -188,7 +206,7 @@ async function handleRefreshToken(params: Record<string, string>) {
   const { refresh_token, client_id } = params;
 
   if (!refresh_token || !client_id) {
-    return Response.json(
+    return corsJson(
       {
         error: "invalid_request",
         error_description: "Missing required parameters: refresh_token, client_id",
@@ -204,7 +222,7 @@ async function handleRefreshToken(params: Record<string, string>) {
   });
 
   if (!storedRefresh) {
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "Invalid refresh token" },
       { status: 400 }
     );
@@ -214,7 +232,7 @@ async function handleRefreshToken(params: Record<string, string>) {
     await db
       .delete(mcpRefreshToken)
       .where(eq(mcpRefreshToken.id, storedRefresh.id));
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "Refresh token expired" },
       { status: 400 }
     );
@@ -222,7 +240,7 @@ async function handleRefreshToken(params: Record<string, string>) {
 
   const oldAccessToken = storedRefresh.accessToken;
   if (oldAccessToken.clientId !== client_id) {
-    return Response.json(
+    return corsJson(
       { error: "invalid_grant", error_description: "client_id mismatch" },
       { status: 400 }
     );
@@ -235,7 +253,7 @@ async function handleRefreshToken(params: Record<string, string>) {
 
   const plan = sub?.plan ?? "free";
   if (!PLAN_LIMITS[plan].apiAccess) {
-    return Response.json(
+    return corsJson(
       {
         error: "access_denied",
         error_description: "MCP access requires a Pro or Business plan",
@@ -287,7 +305,7 @@ async function handleRefreshToken(params: Record<string, string>) {
     expiresAt: refreshTokenExpiry,
   });
 
-  return Response.json({
+  return corsJson({
     access_token: newAccessTokenRaw,
     token_type: "Bearer",
     expires_in: 3600,

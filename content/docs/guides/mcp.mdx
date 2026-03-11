@@ -16,6 +16,8 @@ The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is an open s
 
 Any MCP-compatible agent can connect to dubbl's MCP server. The server uses Streamable HTTP transport at `/api/mcp` and OAuth 2.1 for authentication. Most agents handle the OAuth flow automatically -- they will open a browser window for you to sign in and authorize access on first connect.
 
+The examples below use `https://dubbl.dev/api/mcp`. If you are self-hosting, replace `dubbl.dev` with your own domain.
+
 ### Claude Desktop
 
 Add to your Claude Desktop config (`claude_desktop_config.json`):
@@ -24,7 +26,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 {
   "mcpServers": {
     "dubbl": {
-      "url": "https://your-dubbl-instance.com/api/mcp"
+      "url": "https://dubbl.dev/api/mcp"
     }
   }
 }
@@ -33,7 +35,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 ### Claude Code
 
 ```bash
-claude mcp add dubbl --transport streamable-http https://your-dubbl-instance.com/api/mcp
+claude mcp add dubbl --transport streamable-http https://dubbl.dev/api/mcp
 ```
 
 ### Cursor
@@ -44,7 +46,7 @@ Go to **Cursor Settings > MCP** and add a new server, or add to `.cursor/mcp.jso
 {
   "mcpServers": {
     "dubbl": {
-      "url": "https://your-dubbl-instance.com/api/mcp"
+      "url": "https://dubbl.dev/api/mcp"
     }
   }
 }
@@ -60,7 +62,7 @@ Go to **Windsurf Settings > Cascade > MCP** and click **View raw config**, or ed
 {
   "mcpServers": {
     "dubbl": {
-      "serverUrl": "https://your-dubbl-instance.com/api/mcp"
+      "serverUrl": "https://dubbl.dev/api/mcp"
     }
   }
 }
@@ -75,7 +77,7 @@ Add to `.vscode/mcp.json` in your workspace (available in VS Code 1.99+):
   "servers": {
     "dubbl": {
       "type": "http",
-      "url": "https://your-dubbl-instance.com/api/mcp"
+      "url": "https://dubbl.dev/api/mcp"
     }
   }
 }
@@ -89,7 +91,7 @@ Or add to your user `settings.json` to make it available across all workspaces:
     "servers": {
       "dubbl": {
         "type": "http",
-        "url": "https://your-dubbl-instance.com/api/mcp"
+        "url": "https://dubbl.dev/api/mcp"
       }
     }
   }
@@ -101,7 +103,7 @@ Or add to your user `settings.json` to make it available across all workspaces:
 Any agent that supports the MCP Streamable HTTP transport can connect. Point it at:
 
 ```
-https://your-dubbl-instance.com/api/mcp
+https://dubbl.dev/api/mcp
 ```
 
 The client will discover OAuth endpoints automatically via the `/.well-known/oauth-authorization-server` metadata endpoint.

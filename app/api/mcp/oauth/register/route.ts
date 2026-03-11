@@ -3,10 +3,20 @@ import { mcpOAuthClient } from "@/lib/db/schema";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 const registerSchema = z.object({
   redirect_uris: z.array(z.string().url()).min(1),
   client_name: z.string().optional(),
 });
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
 
 export async function POST(request: Request) {
   try {
@@ -31,19 +41,19 @@ export async function POST(request: Request) {
         redirect_uris: client.redirectUris,
         client_id_issued_at: Math.floor(client.createdAt.getTime() / 1000),
       },
-      { status: 201 }
+      { status: 201, headers: CORS_HEADERS }
     );
   } catch (err) {
     if (err instanceof z.ZodError) {
       return Response.json(
         { error: "invalid_client_metadata", error_description: err.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     console.error("Client registration error:", err);
     return Response.json(
       { error: "server_error" },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
