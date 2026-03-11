@@ -6,9 +6,10 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import Link from "next/link";
 
 interface TaxBreakdown {
@@ -53,76 +54,88 @@ export default function SalesTaxPage() {
   const totalInvoices = breakdown.reduce((sum, b) => sum + b.invoiceCount, 0);
 
   return (
-    <ContentReveal>
-      <div className="space-y-6">
-        <PageHeader
-          title="Sales Tax Report"
-          description="Tax collected by rate for the selected period."
-        >
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => window.print()}>
-            <Printer className="size-3.5" />
-            Print
-          </Button>
-          <ExportButton
-            data={breakdown.map((b) => ({
-              taxRate: b.taxRateName || "Exempt",
-              ratePercent: b.taxRatePercent != null ? (b.taxRatePercent / 100).toFixed(2) : "",
-              taxableAmount: b.taxableAmount,
-              taxCollected: b.taxCollected,
-              invoiceCount: b.invoiceCount,
-            }))}
-            columns={["taxRate", "ratePercent", "taxableAmount", "taxCollected", "invoiceCount"]}
-            filename="sales-tax"
-          />
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
-            <Link href="/tax/periods">
-              <ArrowUpRight className="size-3.5" />
-              Tax Periods
-            </Link>
-          </Button>
-        </PageHeader>
-
-        <DateRangeFilter
-          startDate={startDate}
-          endDate={endDate}
-          onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+    <div className="space-y-6">
+      <PageHeader
+        title="Sales Tax Report"
+        description="Tax collected by rate for the selected period."
+      >
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => window.print()}>
+          <Printer className="size-3.5" />
+          Print
+        </Button>
+        <ExportButton
+          data={breakdown.map((b) => ({
+            taxRate: b.taxRateName || "Exempt",
+            ratePercent: b.taxRatePercent != null ? (b.taxRatePercent / 100).toFixed(2) : "",
+            taxableAmount: b.taxableAmount,
+            taxCollected: b.taxCollected,
+            invoiceCount: b.invoiceCount,
+          }))}
+          columns={["taxRate", "ratePercent", "taxableAmount", "taxCollected", "invoiceCount"]}
+          filename="sales-tax"
         />
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
+          <Link href="/tax/periods">
+            <ArrowUpRight className="size-3.5" />
+            Tax Periods
+          </Link>
+        </Button>
+      </PageHeader>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            title="Taxable Sales"
-            value={formatMoney(totalTaxable)}
-            icon={FileText}
-            change={`${totalInvoices} invoice${totalInvoices !== 1 ? "s" : ""}`}
-            changeType="neutral"
-          />
-          <StatCard
-            title="Tax Collected"
-            value={formatMoney(totalCollected)}
-            icon={Receipt}
-            changeType="neutral"
-          />
-          <StatCard
-            title="Exempt Sales"
-            value={formatMoney(exemptAmount)}
-            icon={MapPin}
-            changeType="neutral"
-          />
-        </div>
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+      />
 
-        {loading ? (
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] rounded-lg" />)}
+          </div>
           <div className="space-y-3">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-[72px] rounded-lg bg-muted/50 animate-pulse" />
-            ))}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[88px] rounded-lg" />)}
           </div>
-        ) : breakdown.length === 0 ? (
-          <div className="rounded-xl border border-dashed py-16 text-center">
-            <MapPin className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm font-medium">No sales tax activity</p>
-            <p className="text-xs text-muted-foreground mt-1">No taxable invoices found for this period.</p>
+        </div>
+      ) : breakdown.length === 0 ? (
+        <EmptyState
+          icon={MapPin}
+          title="No sales tax activity"
+          description="No taxable invoices found for this period. Create invoices with tax rates applied to see your sales tax breakdown here."
+        >
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+              <Link href="/tax">Manage Tax Rates</Link>
+            </Button>
+            <Button size="sm" className="h-8 text-xs" asChild>
+              <Link href="/sales">Go to Sales</Link>
+            </Button>
           </div>
-        ) : (
+        </EmptyState>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              title="Taxable Sales"
+              value={formatMoney(totalTaxable)}
+              icon={FileText}
+              change={`${totalInvoices} invoice${totalInvoices !== 1 ? "s" : ""}`}
+              changeType="neutral"
+            />
+            <StatCard
+              title="Tax Collected"
+              value={formatMoney(totalCollected)}
+              icon={Receipt}
+              changeType="neutral"
+            />
+            <StatCard
+              title="Exempt Sales"
+              value={formatMoney(exemptAmount)}
+              icon={MapPin}
+              changeType="neutral"
+            />
+          </div>
+
           <div className="space-y-3">
             {breakdown.map((b, i) => {
               const pct = totalCollected > 0 ? (b.taxCollected / totalCollected) * 100 : 0;
@@ -160,13 +173,13 @@ export default function SalesTaxPage() {
               );
             })}
 
-            <div className="flex justify-between px-4 py-3 bg-muted/50 rounded-lg text-sm font-semibold">
+            <div className="flex justify-between items-center px-4 py-3 bg-muted/50 rounded-lg text-sm font-semibold">
               <span>Total Tax Collected</span>
               <span className="font-mono tabular-nums text-blue-600">{formatMoney(totalCollected)}</span>
             </div>
           </div>
-        )}
-      </div>
-    </ContentReveal>
+        </>
+      )}
+    </div>
   );
 }

@@ -6,11 +6,12 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import Link from "next/link";
 
 interface BasField {
@@ -64,69 +65,84 @@ export default function BasPage() {
   const otherFields = fields.filter((f) => getFieldSection(f.field) === "other");
 
   return (
-    <ContentReveal>
-      <div className="space-y-6">
-        <PageHeader
-          title="Business Activity Statement"
-          description="Australian BAS report with GST calculations."
-        >
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => window.print()}>
-            <Printer className="size-3.5" />
-            Print
-          </Button>
-          <ExportButton
-            data={fields.map((f) => ({ field: f.field, description: f.label, amount: f.amount }))}
-            columns={["field", "description", "amount"]}
-            filename="bas"
-          />
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
-            <Link href="/tax/periods">
-              <ArrowUpRight className="size-3.5" />
-              Tax Periods
-            </Link>
-          </Button>
-        </PageHeader>
-
-        <DateRangeFilter
-          startDate={startDate}
-          endDate={endDate}
-          onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+    <div className="space-y-6">
+      <PageHeader
+        title="Business Activity Statement"
+        description="Australian BAS report with GST calculations."
+      >
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => window.print()}>
+          <Printer className="size-3.5" />
+          Print
+        </Button>
+        <ExportButton
+          data={fields.map((f) => ({ field: f.field, description: f.label, amount: f.amount }))}
+          columns={["field", "description", "amount"]}
+          filename="bas"
         />
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
+          <Link href="/tax/periods">
+            <ArrowUpRight className="size-3.5" />
+            Tax Periods
+          </Link>
+        </Button>
+      </PageHeader>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            title="GST on Sales (1A)"
-            value={formatMoney(gstOnSales)}
-            icon={ArrowUpRight}
-            changeType="neutral"
-          />
-          <StatCard
-            title="GST on Purchases (1B)"
-            value={formatMoney(gstOnPurchases)}
-            icon={ArrowDownLeft}
-            changeType="neutral"
-          />
-          <StatCard
-            title={netGst >= 0 ? "Net GST Payable" : "Net GST Refund"}
-            value={formatMoney(Math.abs(netGst))}
-            icon={Receipt}
-            changeType={netGst >= 0 ? "negative" : "positive"}
-          />
-        </div>
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+      />
 
-        {loading ? (
-          <div className="space-y-2">
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] rounded-lg" />)}
+          </div>
+          <Skeleton className="h-8 w-40" />
+          <div className="rounded-lg border overflow-hidden">
             {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <div key={i} className="h-14 rounded-lg bg-muted/50 animate-pulse" />
+              <Skeleton key={i} className="h-14 rounded-none border-b last:border-b-0" />
             ))}
           </div>
-        ) : fields.length === 0 ? (
-          <div className="rounded-xl border border-dashed py-16 text-center">
-            <FileSpreadsheet className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm font-medium">No BAS data</p>
-            <p className="text-xs text-muted-foreground mt-1">No GST activity found for this period.</p>
+        </div>
+      ) : fields.length === 0 ? (
+        <EmptyState
+          icon={FileSpreadsheet}
+          title="No BAS data"
+          description="No GST activity found for this period. Create invoices and bills with GST tax rates to see your BAS calculations here."
+        >
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+              <Link href="/tax">Manage Tax Rates</Link>
+            </Button>
+            <Button size="sm" className="h-8 text-xs" asChild>
+              <Link href="/sales">Go to Sales</Link>
+            </Button>
           </div>
-        ) : (
+        </EmptyState>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              title="GST on Sales (1A)"
+              value={formatMoney(gstOnSales)}
+              icon={ArrowUpRight}
+              changeType="neutral"
+            />
+            <StatCard
+              title="GST on Purchases (1B)"
+              value={formatMoney(gstOnPurchases)}
+              icon={ArrowDownLeft}
+              changeType="neutral"
+            />
+            <StatCard
+              title={netGst >= 0 ? "Net GST Payable" : "Net GST Refund"}
+              value={formatMoney(Math.abs(netGst))}
+              icon={Receipt}
+              changeType={netGst >= 0 ? "negative" : "positive"}
+            />
+          </div>
+
           <div className="space-y-6">
             {/* GST Section */}
             {gstFields.length > 0 && (
@@ -151,7 +167,7 @@ export default function BasPage() {
                           <div className={cn(
                             "flex size-8 items-center justify-center rounded-md text-[10px] font-bold font-mono",
                             isGstTotal
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                              ? "bg-blue-600 text-white dark:bg-blue-500"
                               : "bg-muted text-muted-foreground"
                           )}>
                             {f.field}
@@ -160,8 +176,8 @@ export default function BasPage() {
                         </div>
                         <span className={cn(
                           "font-mono text-sm tabular-nums font-medium",
-                          f.field === "1A" && "text-blue-600",
-                          f.field === "1B" && "text-orange-600"
+                          f.field === "1A" && "text-blue-600 dark:text-blue-400",
+                          f.field === "1B" && "text-orange-600 dark:text-orange-400"
                         )}>
                           {formatMoney(f.amount)}
                         </span>
@@ -223,8 +239,8 @@ export default function BasPage() {
               </div>
             )}
           </div>
-        )}
-      </div>
-    </ContentReveal>
+        </>
+      )}
+    </div>
   );
 }

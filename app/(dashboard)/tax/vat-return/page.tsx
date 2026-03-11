@@ -6,11 +6,12 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import Link from "next/link";
 
 interface VatBox {
@@ -54,69 +55,83 @@ export default function VatReturnPage() {
   const netVat = boxes.find((b) => b.box === "5")?.amount || 0;
 
   return (
-    <ContentReveal>
-      <div className="space-y-6">
-        <PageHeader
-          title="VAT Return"
-          description="UK/EU VAT return calculation with HMRC boxes 1-9."
-        >
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => window.print()}>
-            <Printer className="size-3.5" />
-            Print
-          </Button>
-          <ExportButton
-            data={boxes.map((b) => ({ box: b.box, description: b.label, amount: b.amount }))}
-            columns={["box", "description", "amount"]}
-            filename="vat-return"
-          />
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
-            <Link href="/tax/periods">
-              <ArrowUpRight className="size-3.5" />
-              Tax Periods
-            </Link>
-          </Button>
-        </PageHeader>
-
-        <DateRangeFilter
-          startDate={startDate}
-          endDate={endDate}
-          onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+    <div className="space-y-6">
+      <PageHeader
+        title="VAT Return"
+        description="UK/EU VAT return calculation with HMRC boxes 1-9."
+      >
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => window.print()}>
+          <Printer className="size-3.5" />
+          Print
+        </Button>
+        <ExportButton
+          data={boxes.map((b) => ({ box: b.box, description: b.label, amount: b.amount }))}
+          columns={["box", "description", "amount"]}
+          filename="vat-return"
         />
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
+          <Link href="/tax/periods">
+            <ArrowUpRight className="size-3.5" />
+            Tax Periods
+          </Link>
+        </Button>
+      </PageHeader>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            title="Output VAT (Sales)"
-            value={formatMoney(outputVat)}
-            icon={ArrowUpRight}
-            changeType="neutral"
-          />
-          <StatCard
-            title="Input VAT (Purchases)"
-            value={formatMoney(inputVat)}
-            icon={ArrowDownLeft}
-            changeType="neutral"
-          />
-          <StatCard
-            title={netVat >= 0 ? "Net VAT Due" : "Net VAT Refund"}
-            value={formatMoney(Math.abs(netVat))}
-            icon={Receipt}
-            changeType={netVat >= 0 ? "negative" : "positive"}
-          />
-        </div>
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+      />
 
-        {loading ? (
-          <div className="space-y-2">
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] rounded-lg" />)}
+          </div>
+          <div className="rounded-lg border overflow-hidden">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
-              <div key={i} className="h-14 rounded-lg bg-muted/50 animate-pulse" />
+              <Skeleton key={i} className="h-14 rounded-none border-b last:border-b-0" />
             ))}
           </div>
-        ) : boxes.length === 0 ? (
-          <div className="rounded-xl border border-dashed py-16 text-center">
-            <Globe className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm font-medium">No VAT data</p>
-            <p className="text-xs text-muted-foreground mt-1">No VAT activity found for this period.</p>
+        </div>
+      ) : boxes.length === 0 ? (
+        <EmptyState
+          icon={Globe}
+          title="No VAT data"
+          description="No VAT activity found for this period. VAT boxes are calculated from your invoices and bills with VAT-type tax rates applied."
+        >
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+              <Link href="/tax">Manage Tax Rates</Link>
+            </Button>
+            <Button size="sm" className="h-8 text-xs" asChild>
+              <Link href="/sales">Go to Sales</Link>
+            </Button>
           </div>
-        ) : (
+        </EmptyState>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              title="Output VAT (Sales)"
+              value={formatMoney(outputVat)}
+              icon={ArrowUpRight}
+              changeType="neutral"
+            />
+            <StatCard
+              title="Input VAT (Purchases)"
+              value={formatMoney(inputVat)}
+              icon={ArrowDownLeft}
+              changeType="neutral"
+            />
+            <StatCard
+              title={netVat >= 0 ? "Net VAT Due" : "Net VAT Refund"}
+              value={formatMoney(Math.abs(netVat))}
+              icon={Receipt}
+              changeType={netVat >= 0 ? "negative" : "positive"}
+            />
+          </div>
+
           <div className="rounded-lg border overflow-hidden">
             {boxes.map((b, i) => {
               const isKey = b.box === KEY_BOX;
@@ -135,7 +150,7 @@ export default function VatReturnPage() {
                     <div className={cn(
                       "flex size-8 items-center justify-center rounded-md text-xs font-bold font-mono",
                       isKey
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                        ? "bg-emerald-600 text-white dark:bg-emerald-500"
                         : "bg-muted text-muted-foreground"
                     )}>
                       {b.box}
@@ -167,8 +182,8 @@ export default function VatReturnPage() {
               );
             })}
           </div>
-        )}
-      </div>
-    </ContentReveal>
+        </>
+      )}
+    </div>
   );
 }
