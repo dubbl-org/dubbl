@@ -6,14 +6,14 @@ import { auth } from "@/lib/auth";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
-import { nanoid } from "nanoid";
+import { randomUUID } from "crypto";
 import { isValidBusinessType } from "@/lib/data/business-types";
 
 const updateSchema = z
   .object({
     name: z.string().min(1).optional(),
     slug: z.string().min(1).optional(),
-    country: z.string().min(2).max(2).optional().nullable(),
+    country: z.string().min(1).optional().nullable(),
     businessType: z.string().min(1).optional().nullable(),
     defaultCurrency: z.string().min(1).optional(),
     fiscalYearStartMonth: z.number().min(1).max(12).optional(),
@@ -35,8 +35,9 @@ const updateSchema = z
   })
   .refine(
     (data) => {
-      if (data.businessType && data.country) {
-        return isValidBusinessType(data.country, data.businessType);
+      if (data.businessType && (data.countryCode || data.country)) {
+        const code = data.countryCode || data.country!;
+        return isValidBusinessType(code, data.businessType);
       }
       return true;
     },
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
     }
 
     // Create org + owner membership in a transaction
-    const orgId = nanoid();
+    const orgId = randomUUID();
     await db.transaction(async (tx) => {
       await tx.insert(organization).values({
         id: orgId,
@@ -151,7 +152,9 @@ export async function POST(request: Request) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Internal error";
+    console.error("POST /organization error:", message, err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -174,6 +177,11 @@ export async function PATCH(request: Request) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
+    }
+    const message = err instanceof Error ? err.message : "Internal error";
+    console.error("PATCH /organization error:", message, err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

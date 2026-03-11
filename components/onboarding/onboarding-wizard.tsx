@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import { GrainGradient } from "@paper-design/shaders-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -195,24 +196,49 @@ export function OnboardingWizard() {
 
   return (
     <div className="w-full max-w-lg">
-      {/* Progress dots */}
-      <div className="mb-8 flex items-center justify-center gap-2">
-        {STEPS.map((s, i) => (
-          <div
-            key={i}
-            className={`flex h-2.5 w-2.5 rounded-full transition-all duration-300 ${
-              i === step
-                ? "scale-125 bg-emerald-500"
-                : i < step
-                  ? "bg-emerald-500/50"
-                  : "bg-foreground/15"
-            }`}
-          />
-        ))}
-      </div>
-
       {/* Step content */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-black/5 dark:shadow-black/40">
+        {/* Grain gradient banner */}
+        <div className="relative overflow-hidden">
+          <GrainGradient
+            className="pointer-events-none !absolute !inset-0 !rounded-none"
+            width="100%"
+            height="100%"
+            colors={["#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#34d399", "#a7f3d0"]}
+            colorBack="#34d399"
+            softness={1}
+            intensity={0.8}
+            noise={0.9}
+            shape="wave"
+            scale={3.5}
+            speed={0.2}
+          />
+          <div className="relative flex items-center justify-center gap-3 py-5">
+            <div className="flex items-center gap-2">
+              {STEPS.map((s, i) => {
+                const Icon = s.icon;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all duration-300 ${
+                      i === step
+                        ? "border border-white/25 bg-white/20 text-white backdrop-blur-sm"
+                        : i < step
+                          ? "text-white/70"
+                          : "text-white/30"
+                    }`}
+                  >
+                    <Icon className="size-3" />
+                    {i === step && (
+                      <span>{s.label}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         <div className="px-6 py-8 sm:px-10 sm:py-10">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
