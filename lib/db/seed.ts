@@ -238,7 +238,7 @@ async function seed() {
       .values({
         id: "00000000-0000-0000-0000-000000000001",
         name: "Demo User",
-        email: "demo@dubbl.app",
+        email: "demo@dubbl.dev",
         passwordHash,
       })
       .onConflictDoNothing()

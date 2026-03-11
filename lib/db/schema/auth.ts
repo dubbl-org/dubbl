@@ -105,6 +105,7 @@ export const organization = pgTable("organization", {
   contactWebsite: text("contact_website"),
   defaultPaymentTerms: text("default_payment_terms"),
   industrySector: text("industry_sector"),
+  referralSource: text("referral_source"),
   billApprovalThreshold: integer("bill_approval_threshold"), // cents, null = no approval needed
   interestRate: integer("interest_rate"), // basis points, e.g. 500 = 5%
   interestMethod: text("interest_method"), // "simple" or "compound"

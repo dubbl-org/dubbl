@@ -51,7 +51,7 @@ export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
       localStorage.setItem("activeOrgId", data.organization.id);
       toast.success("Organization created");
       onOpenChange(false);
-      window.location.reload();
+      window.location.href = "/onboarding";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create");
     } finally {
