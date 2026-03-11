@@ -1,3 +1,3 @@
 {
-  "pages": ["index", "multi-currency", "api-integration", "solopreneur-setup", "tax-filing-prep"]
+  "pages": ["index", "developer-guide", "api-integration", "mcp", "multi-currency", "solopreneur-setup", "tax-filing-prep"]
 }

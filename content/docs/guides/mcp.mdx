@@ -1,0 +1,338 @@
+---
+title: MCP Server
+description: Connect AI agents to dubbl via the Model Context Protocol.
+---
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is an open standard that lets AI coding agents and assistants interact with external tools and data sources. dubbl's built-in MCP server gives any MCP-compatible agent direct access to your accounting data -- creating entries, managing invoices, generating reports, and more.
+
+## Prerequisites
+
+- **Pro or Business plan** -- MCP access requires API access, which is only available on paid plans
+- Any MCP-compatible client (Claude Desktop, Claude Code, Cursor, Windsurf, Cline, VS Code Copilot, or other MCP-enabled agents)
+
+## Connecting Your Agent
+
+Any MCP-compatible agent can connect to dubbl's MCP server. The server uses Streamable HTTP transport at `/api/mcp` and OAuth 2.1 for authentication. Most agents handle the OAuth flow automatically -- they will open a browser window for you to sign in and authorize access on first connect.
+
+The examples below use `https://dubbl.dev/api/mcp`. If you are self-hosting, replace `dubbl.dev` with your own domain.
+
+### Claude Desktop
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "dubbl": {
+      "url": "https://dubbl.dev/api/mcp"
+    }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude mcp add dubbl --transport streamable-http https://dubbl.dev/api/mcp
+```
+
+### Cursor
+
+Go to **Cursor Settings > MCP** and add a new server, or add to `.cursor/mcp.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "dubbl": {
+      "url": "https://dubbl.dev/api/mcp"
+    }
+  }
+}
+```
+
+Cursor auto-detects Streamable HTTP transport from the URL and handles OAuth automatically.
+
+### Windsurf
+
+Go to **Windsurf Settings > Cascade > MCP** and click **View raw config**, or edit `~/.codeium/windsurf/mcp_config.json` directly:
+
+```json
+{
+  "mcpServers": {
+    "dubbl": {
+      "serverUrl": "https://dubbl.dev/api/mcp"
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot)
+
+Add to `.vscode/mcp.json` in your workspace (available in VS Code 1.99+):
+
+```json
+{
+  "servers": {
+    "dubbl": {
+      "type": "http",
+      "url": "https://dubbl.dev/api/mcp"
+    }
+  }
+}
+```
+
+Or add to your user `settings.json` to make it available across all workspaces:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "dubbl": {
+        "type": "http",
+        "url": "https://dubbl.dev/api/mcp"
+      }
+    }
+  }
+}
+```
+
+### Other MCP Clients
+
+Any agent that supports the MCP Streamable HTTP transport can connect. Point it at:
+
+```
+https://dubbl.dev/api/mcp
+```
+
+The client will discover OAuth endpoints automatically via the `/.well-known/oauth-authorization-server` metadata endpoint.
+
+## OAuth Flow
+
+dubbl uses OAuth 2.1 with PKCE for MCP authentication:
+
+1. The MCP client discovers OAuth endpoints via `/.well-known/oauth-authorization-server` on the MCP endpoint
+2. The client registers dynamically at `/api/mcp/oauth/register`
+3. The client redirects you to `/api/mcp/oauth/authorize` to sign in
+4. You select an organization and approve the connection
+5. The client receives an authorization code and exchanges it for access/refresh tokens at `/api/mcp/oauth/token`
+6. Access tokens expire after 1 hour; refresh tokens last 30 days
+
+## Available Tools
+
+### Organization
+- `get_organization` -- Get current organization details
+
+### Chart of Accounts
+- `list_accounts` -- List all accounts with optional type filter
+- `get_account` -- Get account with calculated balance
+- `create_account` -- Create a new account
+- `update_account` -- Update account details
+- `delete_account` -- Delete an account (fails if it has transactions)
+
+### Journal Entries
+- `list_entries` -- List entries with status/date filters
+- `get_entry` -- Get entry with line items
+- `create_entry` -- Create a new entry (debits must equal credits)
+- `post_entry` -- Post a draft entry
+- `void_entry` -- Void a posted entry (creates reversing entry)
+
+### Contacts
+- `list_contacts` -- Search and filter contacts
+- `get_contact` -- Get contact details
+- `create_contact` -- Create a customer, supplier, or both
+- `update_contact` -- Update contact details
+
+### Invoices
+- `list_invoices` -- List invoices with filters
+- `get_invoice` -- Get invoice with line items
+- `create_invoice` -- Create an invoice with line items
+- `void_invoice` -- Void an invoice
+- `pay_invoice` -- Record a payment (amount in cents)
+
+### Bills
+- `list_bills` -- List bills with status filter
+- `create_bill` -- Create a bill with line items
+- `approve_bill` -- Approve a draft/pending bill
+- `pay_bill` -- Record a payment (amount in cents)
+- `void_bill` -- Void a bill
+
+### Reports
+- `trial_balance` -- Trial balance report
+- `balance_sheet` -- Balance sheet
+- `profit_and_loss` -- P&L with date range
+- `aged_receivables` -- AR aging buckets
+- `aged_payables` -- AP aging buckets
+
+## Amount Conventions
+
+- All monetary amounts in tool inputs/outputs are in **integer cents** (e.g. `1250` = $12.50)
+- Invoice/bill line item `unitPrice` and `quantity` are decimal numbers (the system converts to cents internally)
+- Exchange rates are stored as integers with 6 decimal places (`1000000` = 1.0)
+
+## Testing
+
+### With MCP Inspector
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the easiest way to test the MCP server interactively during development.
+
+```bash
+# Start the dev server first
+pnpm dev
+
+# Launch MCP Inspector pointed at your local instance
+npx @modelcontextprotocol/inspector --url http://localhost:3000/api/mcp
+```
+
+The Inspector will open in your browser and walk you through the OAuth flow. Once authenticated, you can browse available tools, invoke them with custom inputs, and inspect the JSON-RPC responses.
+
+### Manual OAuth Flow
+
+If you want to test the OAuth flow step by step:
+
+**1. Check metadata discovery**
+
+```bash
+curl http://localhost:3000/.well-known/oauth-authorization-server/api/mcp
+```
+
+This should return JSON with all OAuth endpoint URLs.
+
+**2. Register a client**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/oauth/register \
+  -H "Content-Type: application/json" \
+  -d '{"redirect_uris": ["http://localhost:9999/callback"], "client_name": "Test Client"}'
+```
+
+Save the `client_id` from the response.
+
+**3. Start the authorization flow**
+
+Open this URL in your browser (replace `CLIENT_ID` with the value from step 2):
+
+```
+http://localhost:3000/api/mcp/oauth/authorize?client_id=CLIENT_ID&redirect_uri=http://localhost:9999/callback&code_challenge=TEST_CHALLENGE&code_challenge_method=S256&state=test123&response_type=code
+```
+
+You will be redirected to sign in (if needed) and then to the consent page. After approving, you'll be redirected to the callback URL with a `code` parameter.
+
+**4. Exchange code for tokens**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "authorization_code",
+    "code": "THE_CODE_FROM_STEP_3",
+    "redirect_uri": "http://localhost:9999/callback",
+    "client_id": "CLIENT_ID",
+    "code_verifier": "THE_VERIFIER_MATCHING_YOUR_CHALLENGE"
+  }'
+```
+
+This returns `access_token` and `refresh_token`.
+
+**5. Call the MCP endpoint**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer mcp_at_YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {},
+      "clientInfo": { "name": "test", "version": "1.0" }
+    }
+  }'
+```
+
+**6. List available tools**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer mcp_at_YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+**7. Call a tool**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer mcp_at_YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "get_organization",
+      "arguments": {}
+    }
+  }'
+```
+
+### Verifying Plan Gating
+
+To confirm that free plan users are rejected:
+
+1. Create or use an organization on the free plan
+2. Complete the OAuth flow for that org
+3. The token exchange (step 4) should return `403` with `"MCP access requires a Pro or Business plan"`
+
+### With an MCP Client (local)
+
+For local testing with any MCP client, point it at localhost:
+
+```
+http://localhost:3000/api/mcp
+```
+
+For example, in Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "dubbl-local": {
+      "url": "http://localhost:3000/api/mcp"
+    }
+  }
+}
+```
+
+Or in Cursor's `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "dubbl-local": {
+      "url": "http://localhost:3000/api/mcp"
+    }
+  }
+}
+```
+
+Restart your agent and it will initiate the OAuth flow in your browser.
+
+## Troubleshooting
+
+### "MCP access requires a Pro or Business plan"
+Your organization is on the free plan. Upgrade at **Settings > Billing** to enable MCP access.
+
+### "Invalid access token"
+Your access token has expired. MCP clients should automatically refresh tokens using the refresh token. If this persists, disconnect and reconnect the MCP server.
+
+### "Not a member of this organization"
+Your user account has been removed from the organization. Ask an admin to re-add you.

@@ -1,0 +1,311 @@
+---
+title: Developer Guide
+description: Architecture overview and conventions for contributing to dubbl.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+## Tech Stack
+
+- **Framework** - [Next.js](https://nextjs.org) 16 (App Router)
+- **Database** - [PostgreSQL](https://www.postgresql.org) 15+ with [Drizzle ORM](https://orm.drizzle.team)
+- **Auth** - [NextAuth.js](https://next-auth.js.org) v5
+- **UI** - [Tailwind CSS](https://tailwindcss.com) 4 + [shadcn/ui](https://ui.shadcn.com) + [Radix UI](https://www.radix-ui.com)
+- **Validation** - [Zod](https://zod.dev)
+- **Docs** - [Fumadocs](https://fumadocs.vercel.app)
+- **Payments** - [Stripe](https://stripe.com)
+
+## Project Structure
+
+```
+dubbl/
+├── app/                    # Next.js App Router
+│   ├── (landing)/          # Public landing pages
+│   ├── (auth)/             # Sign in, sign up, OAuth consent
+│   ├── (dashboard)/        # Protected dashboard routes
+│   ├── api/                # REST API + MCP server
+│   ├── docs/               # Documentation pages
+│   └── .well-known/        # OAuth metadata
+├── components/
+│   ├── dashboard/          # Dashboard-specific components
+│   ├── shared/             # Reusable components (logo, theme toggle)
+│   ├── ui/                 # shadcn/ui base components
+│   ├── landing/            # Landing page components
+│   └── onboarding/         # Onboarding flow
+├── lib/
+│   ├── api/                # API utilities (auth, pagination, responses)
+│   ├── db/                 # Drizzle ORM instance and schemas
+│   ├── mcp/                # MCP server, auth, and tools
+│   ├── banking/            # Banking integrations
+│   ├── currency/           # Multi-currency support
+│   ├── documents/          # PDF generation
+│   ├── email/              # Email templates
+│   ├── payroll/            # Payroll calculations
+│   ├── tax/                # Tax logic per jurisdiction
+│   └── workflows/          # Automated workflows
+├── content/docs/           # MDX documentation content
+├── drizzle/                # Database migrations
+└── public/                 # Static assets
+```
+
+## Development Setup
+
+<Steps>
+  <Step>
+    ### Clone and install
+
+    ```bash
+    git clone https://github.com/dubbl-org/dubbl.git
+    cd dubbl && pnpm install
+    ```
+  </Step>
+  <Step>
+    ### Configure environment
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    At minimum you need `DATABASE_URL`, `AUTH_SECRET`, and `AUTH_URL`.
+  </Step>
+  <Step>
+    ### Set up database
+
+    ```bash
+    pnpm db:push    # Push schema to database
+    pnpm db:seed    # Seed with demo data (optional)
+    ```
+  </Step>
+  <Step>
+    ### Start development
+
+    ```bash
+    pnpm dev
+    ```
+  </Step>
+</Steps>
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `pnpm dev` | Start Next.js dev server |
+| `pnpm lint` | Run ESLint |
+| `pnpm db:push` | Push Drizzle schema to database |
+| `pnpm db:generate` | Generate Drizzle migrations |
+| `pnpm db:studio` | Open Drizzle Studio UI |
+| `pnpm db:seed` | Seed database with demo data |
+
+<Callout type="info">
+  Use `pnpm lint` or `npx tsc --noEmit` to verify changes. Avoid running full builds (`pnpm build`) during development.
+</Callout>
+
+## Database
+
+### Schema
+
+Database schemas live in `lib/db/schema/` and are organized by domain:
+
+| File | Domain |
+|------|--------|
+| `auth.ts` | Users, accounts, sessions |
+| `bookkeeping.ts` | Chart of accounts, journal entries |
+| `invoicing.ts` | Invoices, credit notes, recurring invoices |
+| `bills.ts` | Bills, purchase orders, expenses |
+| `contacts.ts` | Customers, suppliers |
+| `banking.ts` | Bank accounts, transactions, reconciliation |
+| `inventory.ts` | Items, warehouses, stock takes |
+| `payroll.ts` | Employees, pay runs, timesheets |
+| `crm.ts` | Pipelines, deals |
+| `budgets.ts` | Budgets, budget lines |
+| `projects.ts` | Projects, tasks, milestones |
+| `mcp.ts` | OAuth clients, tokens, authorization codes |
+
+All schemas are re-exported from `lib/db/schema/index.ts`.
+
+### Conventions
+
+- Primary keys are UUIDs generated with `crypto.randomUUID()`
+- Monetary amounts are stored as **integer cents** (e.g. `$12.50` = `1250`)
+- Soft deletes use a `deletedAt` timestamp column
+- Every table that belongs to an organization has an `organizationId` foreign key
+- Use `lib/money.ts` for `centsToDecimal()` / `decimalToCents()` conversions
+
+### Making Schema Changes
+
+```bash
+# Edit a schema file in lib/db/schema/
+# Then push changes to your local database:
+pnpm db:push
+```
+
+## API Routes
+
+### Structure
+
+REST API routes live under `app/api/v1/`. Each route file exports HTTP method handlers:
+
+```ts
+// app/api/v1/contacts/route.ts
+import { getAuthContext } from "@/lib/api/auth-context";
+import { ok, created, handleError } from "@/lib/api/response";
+
+export async function GET(req: Request) {
+  try {
+    const ctx = await getAuthContext(req);
+    // ... query database
+    return ok({ data: contacts });
+  } catch (e) {
+    return handleError(e);
+  }
+}
+```
+
+### Key Utilities
+
+- **`getAuthContext(req)`** - Resolves the authenticated user, organization, and role from the request. Throws `AuthError` if unauthenticated.
+- **`requireRole(ctx, permission)`** - Checks if the user has a specific permission (e.g. `"manage:invoices"`). Throws if denied.
+- **`ok()` / `created()` / `error()`** - Standard JSON response helpers in `lib/api/response.ts`.
+- **`handleError(e)`** - Catches `AuthError`, `ZodError`, and generic errors, returning appropriate HTTP responses.
+- **`parsePagination(url)`** - Extracts `page` and `limit` from query params. `paginatedResponse()` formats the result.
+- **`getNextNumber(orgId, type)`** - Generates sequential numbers for invoices, bills, etc.
+
+### Authentication
+
+API routes accept two authentication methods:
+
+1. **Session cookies** - Automatically included when making requests from the web app
+2. **API keys** - `Authorization: Bearer <api-key>` header with `x-organization-id` header
+
+Both resolve to the same `AuthContext` object: `{ userId, organizationId, role }`.
+
+### Permissions
+
+Roles are defined in `lib/plans.ts`. Each role maps to a set of permissions:
+
+- `owner` - Full access
+- `admin` - Everything except billing
+- `accountant` - Financial operations
+- `member` - Read access, limited writes
+
+Check permissions with `requireRole(ctx, "manage:invoices")`.
+
+## MCP Server
+
+The MCP server lets AI agents interact with dubbl via the [Model Context Protocol](https://modelcontextprotocol.io). See the [MCP guide](/docs/guides/mcp) for user-facing docs.
+
+### Architecture
+
+- **Endpoint** - `app/api/mcp/route.ts` handles Streamable HTTP transport
+- **Server factory** - `lib/mcp/server.ts` creates a per-request `McpServer` with tools registered
+- **Auth** - `lib/mcp/auth.ts` resolves Bearer tokens to `AuthContext`
+- **Tools** - `lib/mcp/tools/` contains tool definitions grouped by domain
+
+### Adding a New Tool
+
+<Steps>
+  <Step>
+    ### Create or edit a tool file
+
+    Tool files live in `lib/mcp/tools/` and export a register function:
+
+    ```ts
+    // lib/mcp/tools/example.ts
+    import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+    import { z } from "zod";
+    import { db } from "@/lib/db";
+    import { wrapTool } from "@/lib/mcp/errors";
+    import type { AuthContext } from "@/lib/api/auth-context";
+
+    export function registerExampleTools(server: McpServer, ctx: AuthContext) {
+      server.tool(
+        "tool_name",
+        "Clear description of what this tool does and what it returns.",
+        {
+          param: z.string().describe("What this parameter is for"),
+        },
+        (params) =>
+          wrapTool(ctx, async () => {
+            // Direct database access, not HTTP calls
+            const result = await db.query.someTable.findMany({
+              where: eq(someTable.organizationId, ctx.organizationId),
+            });
+            return { data: result };
+          })
+      );
+    }
+    ```
+  </Step>
+  <Step>
+    ### Register in the barrel file
+
+    Add your register function to `lib/mcp/tools/index.ts`:
+
+    ```ts
+    import { registerExampleTools } from "./example";
+
+    export function registerAllTools(server: McpServer, ctx: AuthContext) {
+      // ... existing registrations
+      registerExampleTools(server, ctx);
+    }
+    ```
+  </Step>
+  <Step>
+    ### Update docs
+
+    Add the new tool to the Available Tools section in `content/docs/guides/mcp.mdx`.
+  </Step>
+</Steps>
+
+### Tool Conventions
+
+- Use `.describe()` on every Zod field
+- One tool per operation (no multi-purpose tools)
+- All monetary amounts are in integer cents
+- Tools access the database directly via Drizzle, not via HTTP self-calls
+- Always use `wrapTool()` for consistent error handling
+- Check permissions with `requireRole(ctx, "manage:...")` for write operations
+
+## Frontend
+
+### Component Organization
+
+- **`components/ui/`** - Base shadcn/ui components (buttons, inputs, dialogs, etc.)
+- **`components/dashboard/`** - Dashboard-specific components (sidebar, topbar, create drawer, data tables)
+- **`components/shared/`** - Components shared across layouts (logo, theme toggle)
+
+### Dashboard Layout
+
+The dashboard uses a sidebar + topbar layout defined in `app/(dashboard)/layout.tsx`:
+
+- **Sidebar** (`components/dashboard/sidebar.tsx`) - Navigation, project list, org switcher
+- **Topbar** (`components/dashboard/topbar.tsx`) - Breadcrumbs, search, notifications, contextual CTAs
+- **Create Drawer** (`components/dashboard/create-drawer.tsx`) - Slide-over forms for creating entities
+
+### Styling
+
+- Tailwind CSS 4 with custom theme variables in `app/globals.css`
+- Light and dark mode via CSS variables
+- Use `cn()` from `lib/utils.ts` for conditional class merging
+
+## Documentation
+
+Docs are built with [Fumadocs](https://fumadocs.vercel.app) and live in `content/docs/`:
+
+- MDX files with frontmatter (`title`, `description`, `full`)
+- Page ordering is controlled by `meta.json` files in each directory
+- The docs layout is in `app/docs/layout.tsx`
+- Source configuration is in `lib/source.ts`
+
+To add a new page:
+
+1. Create `content/docs/<section>/my-page.mdx`
+2. Add `"my-page"` to the section's `meta.json`
+
+## Code Style
+
+- ESLint enforces consistent formatting
+- Use existing patterns in the codebase
+- Keep PRs focused on a single change
+- Don't use em dashes in UI text -- use `·` for separators, `-` for empty values
