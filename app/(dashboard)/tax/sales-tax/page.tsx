@@ -7,6 +7,7 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
@@ -100,7 +101,7 @@ export default function SalesTaxPage() {
       {loading || refetching ? (
         <BrandLoader className="h-48" />
       ) : (
-        <>
+        <ContentReveal className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard
               title="Taxable Sales"
@@ -165,7 +166,7 @@ export default function SalesTaxPage() {
               <span className="font-mono tabular-nums text-blue-600">{formatMoney(totalCollected)}</span>
             </div>
           </div>
-        </>
+        </ContentReveal>
       )}
     </div>
   );

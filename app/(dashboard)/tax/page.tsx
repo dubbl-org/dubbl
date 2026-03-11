@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Scale, Percent, ShoppingCart, Package, Pencil } from "lucide-react";
+import { Plus, Scale, Percent, ShoppingCart, Package, Pencil, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 interface TaxRate {
   id: string;
   name: string;
@@ -82,56 +87,6 @@ function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolea
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-        <Icon className="size-4 text-muted-foreground" />
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-lg font-semibold tabular-nums">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function TaxRateRow({ rate, isLast, onEdit }: { rate: TaxRate; isLast: boolean; onEdit: (rate: TaxRate) => void }) {
-  return (
-    <div className={`flex items-center justify-between gap-4 px-5 py-3.5 ${!isLast ? "border-b" : ""}`}>
-      <div className="flex items-center gap-4 min-w-0">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-          <Percent className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{rate.name}</p>
-          <p className="text-xs text-muted-foreground capitalize">{rate.type}</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 shrink-0">
-        <span className="font-mono text-sm font-medium tabular-nums">
-          {(rate.rate / 100).toFixed(2)}%
-        </span>
-
-        <Badge variant="outline" className="capitalize text-[11px]">
-          {rate.type}
-        </Badge>
-
-        {rate.isDefault && (
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px]" variant="outline">
-            Default
-          </Badge>
-        )}
-
-        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => onEdit(rate)}>
-          <Pencil className="size-3" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function TaxRatesPage() {
   const [rates, setRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +115,7 @@ export default function TaxRatesPage() {
 
   const salesCount = rates.filter((r) => r.type === "sales" || r.type === "both").length;
   const purchaseCount = rates.filter((r) => r.type === "purchase" || r.type === "both").length;
+  const activeCount = rates.filter((r) => r.isActive).length;
 
   function openEdit(rate: TaxRate) {
     setEditing(rate);
@@ -188,47 +144,92 @@ export default function TaxRatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Stats row */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard icon={Scale} label="Total rates" value={rates.length} />
-        <StatCard icon={ShoppingCart} label="Sales" value={salesCount} />
-        <StatCard icon={Package} label="Purchase" value={purchaseCount} />
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold">Tax Rates</h2>
-          <p className="text-sm text-muted-foreground">
-            Define tax rates to apply on invoices and bills. Rates can be scoped to sales, purchases, or both.
-          </p>
-        </div>
+      <PageHeader
+        title="Tax Rates"
+        description="Define tax rates to apply on invoices and bills."
+      >
         <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
+      </PageHeader>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Total Rates"
+          value={String(rates.length)}
+          icon={Scale}
+          changeType="neutral"
+        />
+        <StatCard
+          title="Sales Rates"
+          value={String(salesCount)}
+          icon={ShoppingCart}
+          change={salesCount > 0 ? `${salesCount} rate${salesCount !== 1 ? "s" : ""} for invoices` : undefined}
+          changeType="neutral"
+        />
+        <StatCard
+          title="Purchase Rates"
+          value={String(purchaseCount)}
+          icon={Package}
+          change={purchaseCount > 0 ? `${purchaseCount} rate${purchaseCount !== 1 ? "s" : ""} for bills` : undefined}
+          changeType="neutral"
+        />
       </div>
 
-      {/* Tax rate list */}
-      {!loading && rates.length === 0 ? (
+      {loading ? (
+        <BrandLoader className="h-48" />
+      ) : rates.length === 0 ? (
         <EmptyState icon={Scale} title="No tax rates" description="Add tax rates to apply taxes on invoices and bills." />
-      ) : loading ? (
-        <div className="rounded-xl border bg-card">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className={`flex items-center gap-4 px-5 py-3.5 ${i < 2 ? "border-b" : ""}`}>
-              <div className="size-8 rounded-lg bg-muted animate-pulse" />
-              <div className="space-y-1.5 flex-1">
-                <div className="h-3.5 w-28 rounded bg-muted animate-pulse" />
-                <div className="h-2.5 w-16 rounded bg-muted animate-pulse" />
+      ) : (
+        <div className="rounded-xl border bg-card overflow-hidden">
+          {rates.map((rate, i) => (
+            <div
+              key={rate.id}
+              className={cn(
+                "flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/30",
+                i < rates.length - 1 && "border-b"
+              )}
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                  <Percent className="size-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">{rate.name}</p>
+                    {rate.isDefault && (
+                      <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 text-[10px]" variant="outline">
+                        Default
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground capitalize">{rate.type}</p>
+                </div>
               </div>
-              <div className="h-4 w-14 rounded bg-muted animate-pulse" />
+
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="text-right mr-1">
+                  <p className="font-mono text-sm font-semibold tabular-nums">
+                    {(rate.rate / 100).toFixed(2)}%
+                  </p>
+                </div>
+
+                <Badge variant="outline" className={cn(
+                  "capitalize text-[10px] min-w-[58px] justify-center",
+                  rate.type === "sales" && "border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:bg-blue-950/40",
+                  rate.type === "purchase" && "border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:bg-orange-950/40",
+                  rate.type === "both" && "border-violet-200 text-violet-700 bg-violet-50 dark:border-violet-800 dark:text-violet-400 dark:bg-violet-950/40"
+                )}>
+                  {rate.type}
+                </Badge>
+
+                <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={() => openEdit(rate)}>
+                  <Pencil className="size-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
-      ) : (
-        <div className="rounded-xl border bg-card">
-          {rates.map((rate, i) => (
-            <TaxRateRow key={rate.id} rate={rate} isLast={i === rates.length - 1} onEdit={openEdit} />
-          ))}
-        </div>
       )}
+
       <Sheet open={!!editing} onOpenChange={(v) => { if (!v) setEditing(null); }}>
         <SheetContent>
           <SheetHeader><SheetTitle>Edit Tax Rate</SheetTitle></SheetHeader>

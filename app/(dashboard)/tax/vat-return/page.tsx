@@ -7,6 +7,7 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -95,7 +96,7 @@ export default function VatReturnPage() {
       {loading || refetching ? (
         <BrandLoader className="h-48" />
       ) : (
-        <>
+        <ContentReveal className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard
               title="Output VAT (Sales)"
@@ -167,7 +168,7 @@ export default function VatReturnPage() {
               );
             })}
           </div>
-        </>
+        </ContentReveal>
       )}
     </div>
   );
