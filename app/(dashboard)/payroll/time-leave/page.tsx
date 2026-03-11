@@ -325,7 +325,7 @@ export default function TimeLeavePage() {
       .then((data) => {
         if (data.data)
           setEmployees(
-            data.data.map((e: any) => ({ id: e.id, name: e.name })),
+            data.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })),
           );
       });
 
@@ -334,7 +334,7 @@ export default function TimeLeavePage() {
       .then((data) => {
         if (data.data)
           setPolicies(
-            data.data.map((p: any) => ({ id: p.id, name: p.name })),
+            data.data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })),
           );
       });
   }, [orgId]);

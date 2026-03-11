@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { ArrowUpRight, ArrowDownLeft, Printer } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -28,18 +28,11 @@ export default function VatReturnPage() {
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [boxes, setBoxes] = useState<VatBox[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refetching, setRefetching] = useState(false);
-  const initialLoad = useRef(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
-    if (initialLoad.current) {
-      setLoading(true);
-    } else {
-      setRefetching(true);
-    }
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/vat-return?${params}`, {
       headers: { "x-organization-id": orgId },
@@ -52,8 +45,6 @@ export default function VatReturnPage() {
       .finally(() => {
         if (!cancelled) {
           setLoading(false);
-          setRefetching(false);
-          initialLoad.current = false;
         }
       });
     return () => { cancelled = true; };
@@ -95,7 +86,7 @@ export default function VatReturnPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {loading || refetching ? (
+      {loading ? (
         <BrandLoader className="h-48" />
       ) : (
         <ContentReveal className="space-y-6">

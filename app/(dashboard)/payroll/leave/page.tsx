@@ -69,8 +69,8 @@ export default function LeavePage() {
     ])
       .then(([reqData, empData, polData]) => {
         if (reqData.data) setRequests(reqData.data);
-        if (empData.data) setEmployees(empData.data.map((e: any) => ({ id: e.id, name: e.name })));
-        if (polData.data) setPolicies(polData.data.map((p: any) => ({ id: p.id, name: p.name })));
+        if (empData.data) setEmployees(empData.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
+        if (polData.data) setPolicies(polData.data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
       })
       .finally(() => setLoading(false));
   }, [orgId]);

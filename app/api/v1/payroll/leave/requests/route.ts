@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const conditions = [eq(leaveRequest.organizationId, ctx.organizationId)];
     if (status) {
-      conditions.push(eq(leaveRequest.status, status as any));
+      conditions.push(eq(leaveRequest.status, status as string));
     }
 
     const requests = await db.query.leaveRequest.findMany({

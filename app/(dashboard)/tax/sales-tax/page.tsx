@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { MapPin, Receipt, FileText, Printer, ArrowUpRight } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -27,18 +27,11 @@ export default function SalesTaxPage() {
   const [breakdown, setBreakdown] = useState<TaxBreakdown[]>([]);
   const [exemptAmount, setExemptAmount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [refetching, setRefetching] = useState(false);
-  const initialLoad = useRef(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
-    if (initialLoad.current) {
-      setLoading(true);
-    } else {
-      setRefetching(true);
-    }
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/sales-tax?${params}`, {
       headers: { "x-organization-id": orgId },
@@ -52,8 +45,6 @@ export default function SalesTaxPage() {
       .finally(() => {
         if (!cancelled) {
           setLoading(false);
-          setRefetching(false);
-          initialLoad.current = false;
         }
       });
     return () => { cancelled = true; };
@@ -99,7 +90,7 @@ export default function SalesTaxPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {loading || refetching ? (
+      {loading ? (
         <BrandLoader className="h-48" />
       ) : (
         <ContentReveal className="space-y-6">

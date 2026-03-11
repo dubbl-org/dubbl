@@ -64,7 +64,7 @@ export default function RunPayslipsPage() {
             <FileText className="size-5 text-muted-foreground" />
           </div>
           <p className="text-sm font-medium">No payslips generated yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Use the "Generate Payslips" button on the run detail page</p>
+          <p className="text-xs text-muted-foreground mt-1">Use the &quot;Generate Payslips&quot; button on the run detail page</p>
         </div>
       ) : (
         <div className="rounded-xl border bg-card divide-y">

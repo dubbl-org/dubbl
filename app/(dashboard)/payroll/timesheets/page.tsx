@@ -65,7 +65,7 @@ export default function TimesheetsPage() {
     ])
       .then(([tsData, empData]) => {
         if (tsData.data) setTimesheets(tsData.data);
-        if (empData.data) setEmployees(empData.data.map((e: any) => ({ id: e.id, name: e.name })));
+        if (empData.data) setEmployees(empData.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
       })
       .finally(() => setLoading(false));
   }, [orgId]);
