@@ -8,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CreateOrgDialog } from "./create-org-dialog";
 
 interface Org {
   id: string;
@@ -30,7 +29,6 @@ const ROLE_LABELS: Record<string, string> = {
 export function OrgSwitcher() {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrg, setActiveOrg] = useState<Org | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/v1/organization")
@@ -144,7 +142,10 @@ export function OrgSwitcher() {
           {/* New org */}
           <div className="border-t border-border p-1">
             <DropdownMenuItem
-              onClick={() => setCreateOpen(true)}
+              onClick={() => {
+                localStorage.removeItem("activeOrgId");
+                window.location.href = "/onboarding";
+              }}
               className="gap-2 text-[13px] text-muted-foreground"
             >
               <Plus className="size-3.5" />
@@ -153,8 +154,6 @@ export function OrgSwitcher() {
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <CreateOrgDialog open={createOpen} onOpenChange={setCreateOpen} />
     </>
   );
 }

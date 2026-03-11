@@ -129,6 +129,26 @@ export function OnboardingWizard() {
   async function handleComplete() {
     setSubmitting(true);
     try {
+      let currentOrgId = orgId;
+
+      // If no org exists yet, create one first
+      if (!currentOrgId) {
+        const createRes = await fetch("/api/v1/organization", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: orgName, slug }),
+        });
+
+        if (!createRes.ok) {
+          const data = await createRes.json();
+          throw new Error(data.error || "Failed to create organization");
+        }
+
+        const createData = await createRes.json();
+        currentOrgId = createData.organization.id;
+        localStorage.setItem("activeOrgId", currentOrgId);
+      }
+
       const selectedCountry = COUNTRIES.find((c) => c.code === countryCode);
       const finalReferral =
         referralSource === "other" && referralOther.trim()
@@ -139,7 +159,7 @@ export function OnboardingWizard() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-organization-id": orgId,
+          "x-organization-id": currentOrgId,
         },
         body: JSON.stringify({
           name: orgName,
