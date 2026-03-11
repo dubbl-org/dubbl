@@ -154,6 +154,20 @@ export const payslipStatusEnum = pgEnum("payslip_status", [
   "viewed",
 ]);
 
+export const taxFormTypeEnum = pgEnum("tax_form_type", [
+  "1099_nec",
+  "1099_misc",
+  "w2",
+]);
+
+export const taxFormStatusEnum = pgEnum("tax_form_status", [
+  "draft",
+  "generated",
+  "sent",
+  "filed",
+  "corrected",
+]);
+
 // ─── Payroll Settings (one per org) ─────────────────────────────────
 export const payrollSettings = pgTable("payroll_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -624,6 +638,42 @@ export const payslip = pgTable("payslip", {
   viewedAt: timestamp("viewed_at", { mode: "date" }),
 });
 
+// ─── Tax Form Generation ────────────────────────────────────────────
+// Tax Form Generation batch
+export const taxFormGeneration = pgTable("tax_form_generation", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  taxYear: integer("tax_year").notNull(),
+  formType: taxFormTypeEnum("form_type").notNull(),
+  status: taxFormStatusEnum("status").notNull().default("draft"),
+  generatedAt: timestamp("generated_at", { mode: "date" }),
+  filedAt: timestamp("filed_at", { mode: "date" }),
+  createdBy: uuid("created_by").references(() => member.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+// Individual tax form
+export const taxForm = pgTable("tax_form", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  generationId: uuid("generation_id")
+    .notNull()
+    .references(() => taxFormGeneration.id, { onDelete: "cascade" }),
+  recipientType: text("recipient_type").notNull(), // "employee" or "contractor"
+  recipientId: uuid("recipient_id").notNull(),
+  recipientName: text("recipient_name").notNull(),
+  recipientTaxId: text("recipient_tax_id"),
+  formType: taxFormTypeEnum("form_type").notNull(),
+  taxYear: integer("tax_year").notNull(),
+  formData: jsonb("form_data").$type<Record<string, unknown>>(),
+  pdfFileKey: text("pdf_file_key"),
+  status: taxFormStatusEnum("status").notNull().default("draft"),
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // ─── Relations ──────────────────────────────────────────────────────
 export const payrollSettingsRelations = relations(payrollSettings, ({ one }) => ({
   organization: one(organization, {
@@ -952,5 +1002,24 @@ export const payslipRelations = relations(payslip, ({ one }) => ({
   payrollItem: one(payrollItem, {
     fields: [payslip.payrollItemId],
     references: [payrollItem.id],
+  }),
+}));
+
+export const taxFormGenerationRelations = relations(taxFormGeneration, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [taxFormGeneration.organizationId],
+    references: [organization.id],
+  }),
+  createdByMember: one(member, {
+    fields: [taxFormGeneration.createdBy],
+    references: [member.id],
+  }),
+  forms: many(taxForm),
+}));
+
+export const taxFormRelations = relations(taxForm, ({ one }) => ({
+  generation: one(taxFormGeneration, {
+    fields: [taxForm.generationId],
+    references: [taxFormGeneration.id],
   }),
 }));

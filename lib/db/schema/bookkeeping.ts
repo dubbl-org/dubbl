@@ -394,3 +394,67 @@ export const exchangeRateRelations = relations(exchangeRate, ({ one }) => ({
     references: [organization.id],
   }),
 }));
+
+export const taxPeriodTypeEnum = pgEnum("tax_period_type", [
+  "monthly",
+  "quarterly",
+  "annual",
+]);
+
+export const taxPeriodStatusEnum = pgEnum("tax_period_status", [
+  "open",
+  "filed",
+  "amended",
+]);
+
+// Tax Period - for filing tracking
+export const taxPeriod = pgTable("tax_period", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g. "Q1 2026"
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  type: taxPeriodTypeEnum("type").notNull(),
+  status: taxPeriodStatusEnum("status").notNull().default("open"),
+  filedAt: timestamp("filed_at", { mode: "date" }),
+  filedBy: uuid("filed_by").references(() => users.id),
+  filedReference: text("filed_reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Tax Return Line - individual boxes/fields on a tax return
+export const taxReturnLine = pgTable("tax_return_line", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taxPeriodId: uuid("tax_period_id")
+    .notNull()
+    .references(() => taxPeriod.id, { onDelete: "cascade" }),
+  boxNumber: text("box_number").notNull(),
+  label: text("label").notNull(),
+  amount: integer("amount").notNull().default(0), // cents
+  isCalculated: boolean("is_calculated").notNull().default(true),
+  sourceDescription: text("source_description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const taxPeriodRelations = relations(taxPeriod, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [taxPeriod.organizationId],
+    references: [organization.id],
+  }),
+  filedByUser: one(users, {
+    fields: [taxPeriod.filedBy],
+    references: [users.id],
+  }),
+  lines: many(taxReturnLine),
+}));
+
+export const taxReturnLineRelations = relations(taxReturnLine, ({ one }) => ({
+  taxPeriod: one(taxPeriod, {
+    fields: [taxReturnLine.taxPeriodId],
+    references: [taxPeriod.id],
+  }),
+}));

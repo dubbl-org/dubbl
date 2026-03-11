@@ -375,6 +375,10 @@ export default function DashboardPage() {
       .then((r) => r.json())
       .then((data) => setActionAlerts(data))
       .catch(() => {});
+
+    // Process due payment reminders in background
+    fetch("/api/v1/reminders/process", { method: "POST", headers })
+      .catch(() => {});
   }, []);
 
   const receivablesCount = receivables.buckets.reduce(

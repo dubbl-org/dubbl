@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { reminderRule } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
+import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
+import { handleError } from "@/lib/api/response";
+import { notDeleted } from "@/lib/db/soft-delete";
+import { z } from "zod";
+
+const createSchema = z.object({
+  name: z.string().min(1),
+  triggerType: z.enum(["before_due", "on_due", "after_due"]),
+  triggerDays: z.number().int().min(0),
+  enabled: z.boolean().default(false),
+  subjectTemplate: z.string().min(1),
+  bodyTemplate: z.string().min(1),
+  documentType: z.enum(["invoice", "bill"]),
+  recipientType: z.enum(["contact_email", "contact_persons", "custom"]),
+  customEmails: z.array(z.string().email()).nullable().optional(),
+});
+
+export async function GET(request: Request) {
+  try {
+    const ctx = await getAuthContext(request);
+    const rules = await db.query.reminderRule.findMany({
+      where: and(
+        eq(reminderRule.organizationId, ctx.organizationId),
+        notDeleted(reminderRule.deletedAt)
+      ),
+      orderBy: (r, { asc }) => [asc(r.createdAt)],
+    });
+    return NextResponse.json({ data: rules });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:settings");
+    const body = await request.json();
+    const parsed = createSchema.parse(body);
+
+    const [created] = await db
+      .insert(reminderRule)
+      .values({
+        organizationId: ctx.organizationId,
+        ...parsed,
+        customEmails: parsed.customEmails || null,
+      })
+      .returning();
+
+    return NextResponse.json({ rule: created }, { status: 201 });
+  } catch (err) {
+    return handleError(err);
+  }
+}

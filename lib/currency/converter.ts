@@ -14,7 +14,8 @@ export async function getExchangeRate(
 ): Promise<number | null> {
   if (baseCurrency === targetCurrency) return 1000000;
 
-  const rate = await db.query.exchangeRate.findFirst({
+  // Try direct rate
+  const direct = await db.query.exchangeRate.findFirst({
     where: and(
       eq(exchangeRate.organizationId, orgId),
       eq(exchangeRate.baseCurrency, baseCurrency),
@@ -24,7 +25,24 @@ export async function getExchangeRate(
     orderBy: desc(exchangeRate.date),
   });
 
-  return rate?.rate ?? null;
+  if (direct) return direct.rate;
+
+  // Try inverse rate
+  const inverse = await db.query.exchangeRate.findFirst({
+    where: and(
+      eq(exchangeRate.organizationId, orgId),
+      eq(exchangeRate.baseCurrency, targetCurrency),
+      eq(exchangeRate.targetCurrency, baseCurrency),
+      lte(exchangeRate.date, date)
+    ),
+    orderBy: desc(exchangeRate.date),
+  });
+
+  if (inverse && inverse.rate !== 0) {
+    return Math.round(1000000000000 / inverse.rate);
+  }
+
+  return null;
 }
 
 /**

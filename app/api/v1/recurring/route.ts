@@ -20,7 +20,7 @@ const lineSchema = z.object({
 
 const createSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["invoice", "bill"]),
+  type: z.enum(["invoice", "bill", "expense"]),
   contactId: z.string().min(1),
   frequency: z.enum(["weekly", "fortnightly", "monthly", "quarterly", "semi_annual", "annual"]),
   startDate: z.string().min(1),
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       notDeleted(recurringTemplate.deletedAt),
     ];
 
-    if (type && ["invoice", "bill"].includes(type)) {
+    if (type && ["invoice", "bill", "expense"].includes(type)) {
       conditions.push(eq(recurringTemplate.type, type));
     }
     if (status && ["active", "paused", "completed"].includes(status)) {
