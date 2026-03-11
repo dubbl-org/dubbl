@@ -34,7 +34,11 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then(() => {
+      .then((data) => {
+        if (data.organization && data.organization.country === null) {
+          window.location.href = "/onboarding";
+          return;
+        }
         startFadeOut();
       })
       .catch(() => {

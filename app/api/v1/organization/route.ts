@@ -31,6 +31,7 @@ const updateSchema = z
     contactWebsite: z.string().nullable().optional(),
     defaultPaymentTerms: z.string().nullable().optional(),
     industrySector: z.string().nullable().optional(),
+    referralSource: z.string().nullable().optional(),
   })
   .refine(
     (data) => {

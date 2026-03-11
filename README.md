@@ -1,4 +1,8 @@
 <p align="center">
+  <svg viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="80" height="64">
+    <path d="M18 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10h-8V4z" fill="#34d399"/>
+    <path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#059669"/>
+  </svg>
   <h1 align="center">dubbl</h1>
   <p align="center">Open source, double-entry bookkeeping for modern teams.</p>
 </p>
@@ -95,7 +99,7 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-If you ran the seed script, log in with `demo@dubbl.app` / `password123`.
+If you ran the seed script, log in with `demo@dubbl.dev` / `password123`.
 
 ## Tech Stack
 
@@ -107,11 +111,11 @@ If you ran the seed script, log in with `demo@dubbl.app` / `password123`.
 
 ## Self-Hosting
 
-See the [Self-Hosting Guide](https://dubbl.app/docs/self-hosting) for instructions on deploying dubbl with Docker.
+See the [Self-Hosting Guide](https://dubbl.dev/docs/self-hosting) for instructions on deploying dubbl with Docker.
 
 ## Documentation
 
-Full documentation is available at [dubbl.app/docs](https://dubbl.app/docs) or by running the app locally and visiting `/docs`.
+Full documentation is available at [dubbl.dev/docs](https://dubbl.dev/docs) or by running the app locally and visiting `/docs`.
 
 ## Contributing
 
@@ -120,7 +124,7 @@ We welcome contributions of all kinds: bug fixes, features, documentation, and t
 - Open an issue to report bugs or request features
 - Submit a pull request with your changes
 - Help keep tax information accurate by reporting outdated rules
-- See the [Contributing Guide](https://dubbl.app/docs/contributing) for details
+- See the [Contributing Guide](https://dubbl.dev/docs/contributing) for details
 
 ## License
 

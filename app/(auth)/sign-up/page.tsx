@@ -77,7 +77,7 @@ export default function SignUpPage() {
         throw new Error("Failed to sign in after registration");
       }
 
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
       setLoading(false);

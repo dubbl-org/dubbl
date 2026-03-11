@@ -12,7 +12,7 @@ const DEV_USER = {
 };
 
 const DEMO_USER = {
-  email: "demo@dubbl.app",
+  email: "demo@dubbl.dev",
   password: "password123",
 };
 
