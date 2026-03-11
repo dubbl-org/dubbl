@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowUpRight, ArrowDownLeft, Receipt, Printer } from "lucide-react";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { ArrowUpRight, ArrowDownLeft, Printer } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -69,6 +68,9 @@ export default function BasPage() {
   const gstOnSales = fields.find((f) => f.field === "1A")?.amount || 0;
   const gstOnPurchases = fields.find((f) => f.field === "1B")?.amount || 0;
   const netGst = fields.find((f) => f.field === "NET")?.amount || 0;
+  const maxGst = Math.max(Math.abs(gstOnSales), Math.abs(gstOnPurchases), 1);
+  const salesPct = (Math.abs(gstOnSales) / maxGst) * 100;
+  const purchasesPct = (Math.abs(gstOnPurchases) / maxGst) * 100;
 
   const gstFields = fields.filter((f) => getFieldSection(f.field) === "gst");
   const netField = fields.find((f) => f.field === KEY_FIELD);
@@ -107,120 +109,165 @@ export default function BasPage() {
         <BrandLoader className="h-48" />
       ) : (
         <ContentReveal className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              title="GST on Sales (1A)"
-              value={formatMoney(gstOnSales)}
-              icon={ArrowUpRight}
-              changeType="neutral"
-            />
-            <StatCard
-              title="GST on Purchases (1B)"
-              value={formatMoney(gstOnPurchases)}
-              icon={ArrowDownLeft}
-              changeType="neutral"
-            />
-            <StatCard
-              title={netGst >= 0 ? "Net GST Payable" : "Net GST Refund"}
-              value={formatMoney(Math.abs(netGst))}
-              icon={Receipt}
-              changeType={netGst >= 0 ? "negative" : "positive"}
-            />
+          {/* GST comparison */}
+          <div className="rounded-lg border bg-card p-5">
+            <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+              GST on Sales vs Purchases
+            </h3>
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpRight className="size-3.5 text-blue-500" />
+                    <span className="text-muted-foreground">GST on Sales (1A)</span>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums font-medium text-blue-600 dark:text-blue-400">
+                    {formatMoney(gstOnSales)}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${salesPct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <ArrowDownLeft className="size-3.5 text-orange-500" />
+                    <span className="text-muted-foreground">GST on Purchases (1B)</span>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums font-medium text-orange-600 dark:text-orange-400">
+                    {formatMoney(gstOnPurchases)}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-orange-500 transition-all"
+                    style={{ width: `${purchasesPct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t pt-3">
+                <span className="text-sm font-medium">
+                  {netGst >= 0 ? "Net GST Payable" : "Net GST Refund"}
+                </span>
+                <span className={cn(
+                  "font-mono text-sm tabular-nums font-semibold",
+                  netGst >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                )}>
+                  {formatMoney(Math.abs(netGst))}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-6">
-            {gstFields.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">GST Information</h2>
-                  <Badge variant="outline" className="text-[10px]">G1-G11, 1A-1B</Badge>
-                </div>
-                <div className="rounded-lg border overflow-hidden">
-                  {gstFields.map((f, i) => {
-                    const isGstTotal = f.field === "1A" || f.field === "1B";
-                    return (
-                      <div
-                        key={f.field}
-                        className={cn(
-                          "flex items-center justify-between px-4 py-3.5",
-                          i < gstFields.length - 1 && "border-b",
-                          isGstTotal && "bg-muted/30"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "flex size-8 items-center justify-center rounded-md text-[10px] font-bold font-mono",
-                            isGstTotal
-                              ? "bg-blue-600 text-white dark:bg-blue-500"
-                              : "bg-muted text-muted-foreground"
-                          )}>
-                            {f.field}
-                          </div>
-                          <p className={cn("text-sm", isGstTotal && "font-medium")}>{f.label}</p>
-                        </div>
-                        <span className={cn(
-                          "font-mono text-sm tabular-nums font-medium",
-                          f.field === "1A" && "text-blue-600 dark:text-blue-400",
-                          f.field === "1B" && "text-orange-600 dark:text-orange-400"
-                        )}>
-                          {formatMoney(f.amount)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {otherFields.length > 0 && (
-              <div className="space-y-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Other Obligations</h2>
-                <div className="rounded-lg border overflow-hidden">
-                  {otherFields.map((f, i) => (
-                    <div
-                      key={f.field}
-                      className={cn(
-                        "flex items-center justify-between px-4 py-3.5",
-                        i < otherFields.length - 1 && "border-b"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-8 items-center justify-center rounded-md bg-muted text-[10px] font-bold font-mono text-muted-foreground">
-                          {f.field}
-                        </div>
-                        <p className="text-sm">{f.label}</p>
-                      </div>
-                      <span className="font-mono text-sm tabular-nums font-medium">{formatMoney(f.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {netField && (
-              <div className={cn(
-                "rounded-lg border p-5",
-                netField.amount >= 0
-                  ? "border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20"
-                  : "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20"
-              )}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{netField.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {netField.amount < 0 ? "Refund due from ATO" : "Amount payable to ATO"}
-                    </p>
-                  </div>
+          {/* Net result hero */}
+          {netField && (
+            <div className={cn(
+              "rounded-xl border-2 p-5",
+              netField.amount >= 0
+                ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
+                : "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+            )}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {netField.amount < 0 ? "Refund Due from ATO" : "Amount Payable to ATO"}
+                  </p>
                   <p className={cn(
-                    "text-xl font-bold font-mono tabular-nums",
+                    "mt-1 text-2xl font-bold font-mono tabular-nums",
                     netField.amount >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
                   )}>
                     {formatMoney(Math.abs(netField.amount))}
                   </p>
                 </div>
+                <div className={cn(
+                  "flex size-12 items-center justify-center rounded-xl",
+                  netField.amount >= 0
+                    ? "bg-red-100 dark:bg-red-900/40"
+                    : "bg-emerald-100 dark:bg-emerald-900/40"
+                )}>
+                  {netField.amount >= 0 ? (
+                    <ArrowUpRight className="size-5 text-red-600 dark:text-red-400" />
+                  ) : (
+                    <ArrowDownLeft className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* GST fields */}
+          {gstFields.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">GST Information</h3>
+                <Badge variant="outline" className="text-[10px]">G1-G11, 1A-1B</Badge>
+              </div>
+              <div className="rounded-lg border overflow-hidden">
+                {gstFields.map((f, i) => {
+                  const isGstTotal = f.field === "1A" || f.field === "1B";
+                  return (
+                    <div
+                      key={f.field}
+                      className={cn(
+                        "flex items-center justify-between px-4 py-3.5",
+                        i < gstFields.length - 1 && "border-b",
+                        isGstTotal && "bg-muted/30"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "flex size-8 items-center justify-center rounded-md text-[10px] font-bold font-mono",
+                          isGstTotal
+                            ? "bg-blue-600 text-white dark:bg-blue-500"
+                            : "bg-muted text-muted-foreground"
+                        )}>
+                          {f.field}
+                        </div>
+                        <p className={cn("text-sm", isGstTotal && "font-medium")}>{f.label}</p>
+                      </div>
+                      <span className={cn(
+                        "font-mono text-sm tabular-nums font-medium",
+                        f.field === "1A" && "text-blue-600 dark:text-blue-400",
+                        f.field === "1B" && "text-orange-600 dark:text-orange-400"
+                      )}>
+                        {formatMoney(f.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Other obligations */}
+          {otherFields.length > 0 && (
+            <div>
+              <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Other Obligations</h3>
+              <div className="rounded-lg border overflow-hidden">
+                {otherFields.map((f, i) => (
+                  <div
+                    key={f.field}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-3.5",
+                      i < otherFields.length - 1 && "border-b"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-8 items-center justify-center rounded-md bg-muted text-[10px] font-bold font-mono text-muted-foreground">
+                        {f.field}
+                      </div>
+                      <p className="text-sm">{f.label}</p>
+                    </div>
+                    <span className="font-mono text-sm tabular-nums font-medium">{formatMoney(f.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </ContentReveal>
       )}
     </div>

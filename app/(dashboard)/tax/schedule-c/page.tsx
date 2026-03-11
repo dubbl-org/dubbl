@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { TrendingUp, TrendingDown, DollarSign, Printer, Info } from "lucide-react";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -69,6 +68,10 @@ export default function ScheduleCPage() {
   const expenseLines = lines.filter((l) => !INCOME_LINES.includes(l.line) && !SUMMARY_LINES.includes(l.line));
   const summaryLines = lines.filter((l) => SUMMARY_LINES.includes(l.line));
 
+  const maxIncExp = Math.max(totalIncome, totalExpenses, 1);
+  const incomePct = (totalIncome / maxIncExp) * 100;
+  const expensesPct = (totalExpenses / maxIncExp) * 100;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -108,32 +111,100 @@ export default function ScheduleCPage() {
         <BrandLoader className="h-48" />
       ) : (
         <ContentReveal className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              title="Gross Income"
-              value={formatMoney(totalIncome)}
-              icon={TrendingUp}
-              changeType="positive"
-            />
-            <StatCard
-              title="Total Expenses"
-              value={formatMoney(totalExpenses)}
-              icon={TrendingDown}
-              changeType="negative"
-            />
-            <StatCard
-              title="Net Profit/Loss"
-              value={formatMoney(netProfit)}
-              icon={DollarSign}
-              changeType={netProfit >= 0 ? "positive" : "negative"}
-            />
+          {/* Income vs Expenses comparison */}
+          <div className="rounded-lg border bg-card p-5">
+            <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+              Income vs Expenses
+            </h3>
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="size-3.5 text-emerald-500" />
+                    <span className="text-muted-foreground">Gross Income</span>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums font-medium text-emerald-600 dark:text-emerald-400">
+                    {formatMoney(totalIncome)}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${incomePct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <TrendingDown className="size-3.5 text-red-500" />
+                    <span className="text-muted-foreground">Total Expenses</span>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums font-medium text-red-600 dark:text-red-400">
+                    {formatMoney(totalExpenses)}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-red-500 transition-all"
+                    style={{ width: `${expensesPct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t pt-3">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="size-3.5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Net Profit/Loss</span>
+                </div>
+                <span className={cn(
+                  "font-mono text-sm tabular-nums font-semibold",
+                  netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                )}>
+                  {formatMoney(netProfit)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Net result hero */}
+          <div className={cn(
+            "rounded-xl border-2 p-5",
+            netProfit >= 0
+              ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+              : "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
+          )}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Line 31 · Net {netProfit >= 0 ? "Profit" : "Loss"}
+                </p>
+                <p className={cn(
+                  "mt-1 text-2xl font-bold font-mono tabular-nums",
+                  netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                )}>
+                  {formatMoney(Math.abs(netProfit))}
+                </p>
+              </div>
+              <div className={cn(
+                "flex size-12 items-center justify-center rounded-xl",
+                netProfit >= 0
+                  ? "bg-emerald-100 dark:bg-emerald-900/40"
+                  : "bg-red-100 dark:bg-red-900/40"
+              )}>
+                <DollarSign className={cn(
+                  "size-5",
+                  netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                )} />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-6">
+            {/* Income section */}
             {incomeLines.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Part I · Income</h2>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">Part I · Income</h3>
                   <Badge variant="outline" className="text-[10px]">Lines 1-7</Badge>
                 </div>
                 <div className="rounded-lg border overflow-hidden">
@@ -153,17 +224,18 @@ export default function ScheduleCPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between items-center px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200/60 dark:border-emerald-900/40 text-sm font-semibold">
+                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200/60 dark:border-emerald-900/40 text-sm font-semibold">
                   <span>Gross Income</span>
                   <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(totalIncome)}</span>
                 </div>
               </div>
             )}
 
+            {/* Expenses section */}
             {expenseLines.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Part II · Expenses</h2>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">Part II · Expenses</h3>
                   <Badge variant="outline" className="text-[10px]">Lines 8-27</Badge>
                 </div>
                 <div className="rounded-lg border overflow-hidden">
@@ -186,16 +258,17 @@ export default function ScheduleCPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between items-center px-4 py-2.5 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200/60 dark:border-red-900/40 text-sm font-semibold">
+                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200/60 dark:border-red-900/40 text-sm font-semibold">
                   <span>Total Expenses</span>
                   <span className="font-mono tabular-nums text-red-600 dark:text-red-400">{formatMoney(totalExpenses)}</span>
                 </div>
               </div>
             )}
 
+            {/* Summary section */}
             {summaryLines.length > 0 && (
-              <div className="space-y-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Summary</h2>
+              <div>
+                <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Summary</h3>
                 <div className="rounded-lg border overflow-hidden">
                   {summaryLines.map((l, i) => {
                     const isNet = l.line === "31";

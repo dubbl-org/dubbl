@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Globe, ArrowUpRight, ArrowDownLeft, Receipt, Printer, Loader2 } from "lucide-react";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { ArrowUpRight, ArrowDownLeft, Printer } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -63,6 +62,9 @@ export default function VatReturnPage() {
   const outputVat = boxes.find((b) => b.box === "1")?.amount || 0;
   const inputVat = boxes.find((b) => b.box === "4")?.amount || 0;
   const netVat = boxes.find((b) => b.box === "5")?.amount || 0;
+  const maxVat = Math.max(Math.abs(outputVat), Math.abs(inputVat), 1);
+  const outputPct = (Math.abs(outputVat) / maxVat) * 100;
+  const inputPct = (Math.abs(inputVat) / maxVat) * 100;
 
   return (
     <div className="space-y-6">
@@ -97,76 +99,144 @@ export default function VatReturnPage() {
         <BrandLoader className="h-48" />
       ) : (
         <ContentReveal className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              title="Output VAT (Sales)"
-              value={formatMoney(outputVat)}
-              icon={ArrowUpRight}
-              changeType="neutral"
-            />
-            <StatCard
-              title="Input VAT (Purchases)"
-              value={formatMoney(inputVat)}
-              icon={ArrowDownLeft}
-              changeType="neutral"
-            />
-            <StatCard
-              title={netVat >= 0 ? "Net VAT Due" : "Net VAT Refund"}
-              value={formatMoney(Math.abs(netVat))}
-              icon={Receipt}
-              changeType={netVat >= 0 ? "negative" : "positive"}
-            />
+          {/* Output vs Input comparison */}
+          <div className="rounded-lg border bg-card p-5">
+            <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+              Output vs Input VAT
+            </h3>
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpRight className="size-3.5 text-blue-500" />
+                    <span className="text-muted-foreground">Output VAT (Sales)</span>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums font-medium">
+                    {formatMoney(outputVat)}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${outputPct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <ArrowDownLeft className="size-3.5 text-orange-500" />
+                    <span className="text-muted-foreground">Input VAT (Purchases)</span>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums font-medium">
+                    {formatMoney(inputVat)}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-orange-500 transition-all"
+                    style={{ width: `${inputPct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t pt-3">
+                <span className="text-sm font-medium">
+                  {netVat >= 0 ? "Net VAT Due" : "Net VAT Refund"}
+                </span>
+                <span className={cn(
+                  "font-mono text-sm tabular-nums font-semibold",
+                  netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                )}>
+                  {formatMoney(Math.abs(netVat))}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="rounded-lg border overflow-hidden">
-            {boxes.map((b, i) => {
-              const isKey = b.box === KEY_BOX;
-              const isCalc = CALCULATED_BOXES.includes(b.box);
-              return (
-                <div
-                  key={b.box}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-3.5",
-                    i < boxes.length - 1 && "border-b",
-                    isKey && "bg-emerald-50/60 dark:bg-emerald-950/20",
-                    isCalc && !isKey && "bg-muted/30"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "flex size-8 items-center justify-center rounded-md text-xs font-bold font-mono",
-                      isKey
-                        ? "bg-emerald-600 text-white dark:bg-emerald-500"
-                        : "bg-muted text-muted-foreground"
-                    )}>
-                      {b.box}
-                    </div>
-                    <div>
-                      <p className={cn("text-sm", isKey && "font-semibold")}>{b.label}</p>
-                      {isCalc && (
-                        <Badge variant="outline" className="text-[9px] mt-0.5">Calculated</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={cn(
-                      "font-mono text-sm tabular-nums",
-                      isKey && "text-base font-bold",
-                      isKey && netVat >= 0 && "text-red-600 dark:text-red-400",
-                      isKey && netVat < 0 && "text-emerald-600 dark:text-emerald-400",
-                      !isKey && "font-medium"
-                    )}>
-                      {formatMoney(Math.abs(b.amount))}
-                    </p>
-                    {isKey && (
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {netVat < 0 ? "Refund due to you" : "Amount due to HMRC"}
-                      </p>
+          {/* Net result hero */}
+          <div className={cn(
+            "rounded-xl border-2 p-5",
+            netVat >= 0
+              ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
+              : "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+          )}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Box 5 · {netVat >= 0 ? "Amount Due to HMRC" : "Refund Due to You"}
+                </p>
+                <p className={cn(
+                  "mt-1 text-2xl font-bold font-mono tabular-nums",
+                  netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                )}>
+                  {formatMoney(Math.abs(netVat))}
+                </p>
+              </div>
+              <div className={cn(
+                "flex size-12 items-center justify-center rounded-xl",
+                netVat >= 0
+                  ? "bg-red-100 dark:bg-red-900/40"
+                  : "bg-emerald-100 dark:bg-emerald-900/40"
+              )}>
+                {netVat >= 0 ? (
+                  <ArrowUpRight className="size-5 text-red-600 dark:text-red-400" />
+                ) : (
+                  <ArrowDownLeft className="size-5 text-emerald-600 dark:text-emerald-400" />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Box breakdown */}
+          <div>
+            <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+              All Boxes
+            </h3>
+            <div className="rounded-lg border overflow-hidden">
+              {boxes.map((b, i) => {
+                const isKey = b.box === KEY_BOX;
+                const isCalc = CALCULATED_BOXES.includes(b.box);
+                return (
+                  <div
+                    key={b.box}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-3.5",
+                      i < boxes.length - 1 && "border-b",
+                      isKey && "bg-emerald-50/60 dark:bg-emerald-950/20",
+                      isCalc && !isKey && "bg-muted/30"
                     )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "flex size-8 items-center justify-center rounded-md text-xs font-bold font-mono",
+                        isKey
+                          ? "bg-emerald-600 text-white dark:bg-emerald-500"
+                          : "bg-muted text-muted-foreground"
+                      )}>
+                        {b.box}
+                      </div>
+                      <div>
+                        <p className={cn("text-sm", isKey && "font-semibold")}>{b.label}</p>
+                        {isCalc && (
+                          <Badge variant="outline" className="text-[9px] mt-0.5">Calculated</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={cn(
+                        "font-mono text-sm tabular-nums",
+                        isKey && "text-base font-bold",
+                        isKey && netVat >= 0 && "text-red-600 dark:text-red-400",
+                        isKey && netVat < 0 && "text-emerald-600 dark:text-emerald-400",
+                        !isKey && "font-medium"
+                      )}>
+                        {formatMoney(Math.abs(b.amount))}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </ContentReveal>
       )}
