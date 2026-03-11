@@ -11,6 +11,7 @@ interface Tab {
   label: string;
   icon?: LucideIcon;
   exact?: boolean;
+  badge?: string | number;
 }
 
 export function TabLayout({
@@ -62,6 +63,11 @@ export function TabLayout({
               >
                 {Icon && <Icon className="size-3.5" />}
                 {tab.label}
+                {tab.badge != null && (
+                  <span className="ml-1 flex size-4.5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                    {tab.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

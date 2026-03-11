@@ -10,12 +10,6 @@ const EU_COUNTRIES = [
   "PL", "PT", "RO", "SK", "SI", "ES", "SE",
 ];
 
-const BASE_TABS = [
-  { href: "/tax", label: "Tax Rates", icon: Percent, exact: true },
-  { href: "/tax/currencies", label: "Currencies", icon: Coins },
-  { href: "/tax/periods", label: "Tax Periods", icon: Calendar },
-];
-
 function getFilingTabs(countryCode: string | null) {
   if (!countryCode) return [];
 
@@ -45,22 +39,39 @@ export default function TaxLayout({
   children: React.ReactNode;
 }) {
   const [countryCode, setCountryCode] = useState<string | null>(null);
+  const [openPeriods, setOpenPeriods] = useState(0);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-    fetch("/api/v1/organization", {
-      headers: { "x-organization-id": orgId },
-    })
+    const headers = { "x-organization-id": orgId };
+
+    fetch("/api/v1/organization", { headers })
       .then((r) => r.json())
       .then((data) => {
         const code = data.organization?.countryCode || data.countryCode;
         if (code) setCountryCode(code);
       })
       .catch(() => {});
+
+    fetch("/api/v1/tax-periods", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.taxPeriods) {
+          const open = data.taxPeriods.filter((p: { status: string }) => p.status === "open").length;
+          setOpenPeriods(open);
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  const tabs = [...BASE_TABS, ...getFilingTabs(countryCode)];
+  const baseTabs = [
+    { href: "/tax", label: "Tax Rates", icon: Percent, exact: true },
+    { href: "/tax/currencies", label: "Currencies", icon: Coins },
+    { href: "/tax/periods", label: "Tax Periods", icon: Calendar, badge: openPeriods > 0 ? openPeriods : undefined },
+  ];
+
+  const tabs = [...baseTabs, ...getFilingTabs(countryCode)];
 
   return <TabLayout tabs={tabs}>{children}</TabLayout>;
 }
