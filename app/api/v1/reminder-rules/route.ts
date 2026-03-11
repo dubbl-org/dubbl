@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);

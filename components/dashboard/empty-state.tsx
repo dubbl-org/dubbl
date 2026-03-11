@@ -18,7 +18,7 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-200 dark:border-emerald-900/50 py-16 px-6 text-center",
+      "flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-16 px-6 text-center",
       !compact && "min-h-[50vh]"
     )}>
       <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">

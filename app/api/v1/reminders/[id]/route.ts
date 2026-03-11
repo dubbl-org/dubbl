@@ -48,7 +48,7 @@ export async function PUT(
 ) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
     const { id } = await params;
     const body = await request.json();
     const parsed = updateSchema.parse(body);
@@ -78,7 +78,7 @@ export async function DELETE(
 ) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
     const { id } = await params;
 
     const [deleted] = await db

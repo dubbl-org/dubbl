@@ -222,7 +222,7 @@ export default function TagsPage() {
           <SheetHeader>
             <SheetTitle>{editingTag ? "Edit Tag" : "New Tag"}</SheetTitle>
           </SheetHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
               <Input

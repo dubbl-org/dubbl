@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:tax-config");
     const body = await request.json();
     const { mileageRate } = z
       .object({ mileageRate: z.number().int().min(0) })

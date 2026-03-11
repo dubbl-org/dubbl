@@ -13,7 +13,7 @@ export async function POST(
 ) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:tax-config");
     const { id } = await params;
     const body = await request.json();
     const { filedReference } = z.object({ filedReference: z.string().optional() }).parse(body);

@@ -19,7 +19,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:tax-config");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
@@ -52,7 +52,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:tax-config");
 
     const existing = await db.query.exchangeRate.findFirst({
       where: and(
