@@ -1,0 +1,38 @@
+---
+title: Business Activity Statement (BAS)
+description: Generate Australian Business Activity Statements.
+---
+
+The BAS is a form submitted to the Australian Taxation Office (ATO) to report GST, PAYG withholding, and other tax obligations. Navigate to **Tax > BAS** to generate your statement.
+
+> **Disclaimer:** Australian tax rules change frequently. Always verify your BAS with a qualified tax professional or BAS agent before lodging. If you notice outdated information, please [open an issue](https://github.com/dubbl-org/dubbl/issues).
+
+## Prerequisites
+
+- Set up GST tax rates (typically 10%) in your organization settings
+- Apply GST to invoices and expenses as appropriate
+- Close the relevant tax period before generating
+
+## BAS Sections
+
+dubbl calculates the following sections:
+
+### GST
+- **1A** - GST on sales
+- **1B** - GST on purchases
+- **Net GST** - Amount to pay or refund
+
+### PAYG Withholding
+If you use the payroll module, PAYG amounts withheld from employee pay are included.
+
+### PAYG Instalments
+Estimated income tax instalments based on your reported income.
+
+## Lodging
+
+dubbl generates the data for your BAS. Lodge through the ATO Business Portal or your registered tax agent.
+
+## Frequency
+
+- **Monthly** - For businesses with GST turnover of $20 million or more
+- **Quarterly** - Most common for small to medium businesses

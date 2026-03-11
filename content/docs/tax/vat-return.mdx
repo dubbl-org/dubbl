@@ -1,0 +1,37 @@
+---
+title: VAT Return
+description: Generate UK and EU Value Added Tax returns.
+---
+
+dubbl can generate VAT return data for UK and EU jurisdictions. Navigate to **Tax > VAT Return** to access this feature.
+
+> **Disclaimer:** VAT rules vary by country and change frequently. Always verify your return with a qualified tax professional before filing. If you notice outdated information, please [open an issue](https://github.com/dubbl-org/dubbl/issues).
+
+## How It Works
+
+1. Ensure your tax rates are set up correctly with the appropriate VAT percentages
+2. Apply VAT rates to invoices (output tax) and bills/expenses (input tax)
+3. Navigate to Tax > VAT Return and select the period
+4. dubbl calculates the return boxes automatically
+
+## VAT Return Boxes
+
+The return typically includes:
+
+- **Box 1** - VAT due on sales
+- **Box 2** - VAT due on acquisitions from EU (if applicable)
+- **Box 3** - Total VAT due (Box 1 + Box 2)
+- **Box 4** - VAT reclaimed on purchases
+- **Box 5** - Net VAT to pay or reclaim (Box 3 - Box 4)
+- **Box 6** - Total sales excluding VAT
+- **Box 7** - Total purchases excluding VAT
+
+## Filing
+
+dubbl generates the data needed for your VAT return. You will need to submit the return through your country's tax authority portal (e.g., HMRC for the UK).
+
+## Tips
+
+- Reconcile your accounts before generating the return
+- Review the tax summary report for any unusual amounts
+- Keep a copy of the generated return data for your records

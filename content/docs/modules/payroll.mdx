@@ -1,16 +1,18 @@
 ---
 title: Payroll
-description: Manage employees and process payroll runs.
+description: Manage employees, contractors, and process payroll runs.
 ---
+
+The Payroll module handles employee and contractor compensation. Navigate to **Payroll** in the sidebar.
 
 ## Employees
 
-Register employees with their compensation details.
+Register employees with their compensation details. Navigate to **Payroll > Employees**.
 
 ### Employee Fields
 
 | Field | Description |
-|-------|-------------|
+|---|---|
 | Name | Employee name |
 | Email | Contact email |
 | Employee Number | Unique identifier |
@@ -20,11 +22,15 @@ Register employees with their compensation details.
 | Tax Rate | Tax rate in basis points (2200 = 22%) |
 | Start Date | Employment start date |
 
+## Contractors
+
+Manage contractors separately from employees. Navigate to **Payroll > Contractors**. Contractors have different tax treatment and are typically paid per invoice rather than through payroll runs.
+
 ## Payroll Runs
 
 ### Creating a Run
 
-1. Navigate to **Payroll → Runs → New Payroll Run**
+1. Navigate to **Payroll > Runs > New Payroll Run**
 2. Set the pay period start and end dates
 3. The system auto-generates payroll items for all active employees
 4. Gross pay is calculated from annual salary divided by pay frequency
@@ -34,16 +40,16 @@ Register employees with their compensation details.
 Click **Process Payroll** to finalize the run:
 
 1. Creates a journal entry:
-   - **Debit** Wages & Salaries (5100) — total gross
-   - **Credit** Tax Payable (2200) — total tax
-   - **Credit** Bank (1100) — total net pay
+   - **Debit** Wages & Salaries (5100) - total gross
+   - **Credit** Tax Payable (2200) - total tax
+   - **Credit** Bank (1100) - total net pay
 2. Marks the run as completed
 
 ### Pay Calculations
 
 ```
 Gross = Annual Salary / Pay Periods per Year
-Tax = Gross × (Tax Rate / 10000)
+Tax = Gross x (Tax Rate / 10000)
 Net = Gross - Tax - Deductions
 ```
 
@@ -51,3 +57,59 @@ Pay periods per year:
 - Monthly = 12
 - Biweekly = 26
 - Weekly = 52
+
+### Payslips
+
+After processing, view and download individual payslips at **Payroll > Runs > [Run] > Payslips**.
+
+## Timesheets
+
+Track employee hours worked. Navigate to **Payroll > Timesheets**.
+
+- Create timesheets for pay periods
+- Employees log hours by day
+- Approved timesheets feed into payroll calculations
+- Link timesheet entries to projects for billable hour tracking
+
+## Leave Management
+
+Navigate to **Payroll > Leave** to manage time off.
+
+- **Leave requests** - Employees submit requests for time off
+- **Leave balances** - Track accrued and used leave days
+- **Leave types** - Annual leave, sick leave, personal leave, etc.
+- **Approval** - Managers approve or decline requests
+
+## Tax Forms
+
+Navigate to **Payroll > Tax Forms** for year-end and periodic tax documents.
+
+- Generate tax forms for employees (e.g., W-2, P60)
+- View and download completed forms
+- Track filing status
+
+## Compensation
+
+Navigate to **Payroll > Compensation** to manage salary structures and conduct compensation reviews.
+
+## Analytics and Forecasting
+
+- **Payroll Analytics** (**Payroll > Analytics**) - Visualize payroll costs, headcount trends, and department breakdowns
+- **Payroll Forecasting** (**Payroll > Forecasting**) - Project future payroll costs based on current employees and planned changes
+
+## Payroll Reports
+
+Navigate to **Payroll > Reports** for payroll-specific reports including:
+
+- Payroll summary by period
+- Tax withholding summary
+- Department cost breakdown
+- Year-to-date totals
+
+## Settings
+
+Configure payroll defaults at **Payroll > Settings**, including default tax rates, pay frequencies, and leave policies.
+
+## Employee Self-Service
+
+Navigate to **Payroll > Self-Service** for the employee portal where team members can view their payslips, submit leave requests, and update personal details.

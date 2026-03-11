@@ -1,0 +1,37 @@
+---
+title: Payment Reminders
+description: Set up automated payment reminders for overdue invoices.
+---
+
+Payment reminders (dunning) automatically notify customers about overdue invoices. Navigate to **Settings > Reminders**.
+
+## Setting Up Reminders
+
+Configure reminder schedules to automatically follow up on unpaid invoices:
+
+1. Navigate to **Settings > Reminders**
+2. Create reminder rules with timing and message templates
+
+## Reminder Configuration
+
+| Field | Description |
+|---|---|
+| Trigger | Days after due date (e.g., 7, 14, 30 days overdue) |
+| Subject | Email subject line |
+| Message | Email body template |
+| Enabled | Toggle the reminder on/off |
+
+## How It Works
+
+- dubbl checks for overdue invoices daily
+- When an invoice matches a reminder rule, the customer receives an email
+- The reminder is logged in the invoice activity feed
+- Subsequent reminders follow the escalation schedule
+
+## Best Practices
+
+- Start with a gentle reminder at 7 days overdue
+- Send a firmer follow-up at 14 days
+- Consider a final notice at 30 days
+- Keep messages professional and include payment instructions
+- Review overdue invoices regularly in the Aged Receivables report

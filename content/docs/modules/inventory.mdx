@@ -1,7 +1,9 @@
 ---
 title: Inventory
-description: Manage products, stock levels, and reorder points.
+description: Manage products, stock levels, warehouses, and assembly.
 ---
+
+The Inventory module provides comprehensive stock management. Navigate to **Inventory** in the sidebar.
 
 ## Inventory Items
 
@@ -10,7 +12,7 @@ Track physical products with purchase prices, sale prices, and stock levels.
 ### Item Fields
 
 | Field | Description |
-|-------|-------------|
+|---|---|
 | Code | Unique product code |
 | Name | Product name |
 | SKU | Stock keeping unit |
@@ -18,6 +20,18 @@ Track physical products with purchase prices, sale prices, and stock levels.
 | Sale Price | Price to sell (cents) |
 | Quantity on Hand | Current stock level |
 | Reorder Point | Low stock threshold |
+
+### Item Details
+
+Each item has detail pages for:
+
+- **Variants** - Size, color, or other variations of the same product
+- **Suppliers** - Which suppliers provide this item and at what price
+- **History** - Transaction history showing all stock movements
+
+## Categories
+
+Organize items into categories for easier browsing and reporting. Navigate to **Inventory > Categories**.
 
 ## Stock Adjustments
 
@@ -31,11 +45,31 @@ The system prevents negative stock levels.
 
 ## Low Stock Alerts
 
-Items at or below their reorder point are highlighted with a **Low Stock** badge on the inventory list page.
+Items at or below their reorder point are highlighted with a **Low Stock** badge. Navigate to **Inventory > Alerts** for a consolidated view of all low-stock items.
+
+## Warehouses
+
+Track stock across multiple locations. See [Warehouses](/docs/modules/warehouses) for details.
+
+## Stock Transfers
+
+Move inventory between warehouses. Navigate to **Inventory > Transfers** to create and manage transfers.
+
+## Stock Takes
+
+Conduct physical inventory counts. See [Stock Takes](/docs/modules/stock-takes) for details.
+
+## Assembly and Bill of Materials
+
+Define how finished products are assembled from components. See [Assembly and BOM](/docs/modules/assembly-bom) for details.
+
+## Inventory Valuation
+
+Navigate to **Inventory > Valuation** to view the total value of your inventory, broken down by item and optionally by warehouse.
 
 ## Dashboard Stats
 
 The inventory page shows:
-- **Total Items** — Number of active products
-- **Total Value** — Sum of (quantity × purchase price)
-- **Low Stock** — Count of items at/below reorder point
+- **Total Items** - Number of active products
+- **Total Value** - Sum of (quantity x purchase price)
+- **Low Stock** - Count of items at/below reorder point

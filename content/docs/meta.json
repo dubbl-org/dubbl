@@ -1,15 +1,19 @@
 {
   "root": true,
   "pages": [
-    "---Getting Started---",
     "getting-started",
-    "---Self-Hosting---",
     "self-hosting",
     "---Modules---",
     "modules",
-    "---API Reference---",
+    "---Tax & Compliance---",
+    "tax",
+    "---Settings---",
+    "settings",
+    "---Concepts---",
+    "concepts",
     "api-reference",
     "---Guides---",
-    "guides"
+    "guides",
+    "contributing"
   ]
 }

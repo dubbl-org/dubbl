@@ -1,0 +1,30 @@
+---
+title: Tax and Compliance
+description: Manage tax rates, tax periods, and jurisdiction-specific tax reports.
+---
+
+import { Cards, Card } from "fumadocs-ui/components/card";
+import { Callout } from "fumadocs-ui/components/callout";
+
+Dubbl supports multi-jurisdiction tax management with tools for tracking tax obligations, filing returns, and managing currencies.
+
+<Callout type="warn">
+  Tax regulations change frequently. Always verify current rules with a qualified tax professional. If you notice outdated tax information in Dubbl or this documentation, please [open an issue](https://github.com/dubbl-org/dubbl/issues) or submit a pull request.
+</Callout>
+
+<Cards>
+  <Card title="Currencies" description="Multi-currency support and exchange rates" href="/docs/tax/currencies" />
+  <Card title="Tax Periods" description="Define and manage tax reporting periods" href="/docs/tax/tax-periods" />
+  <Card title="VAT Return" description="UK and EU Value Added Tax returns" href="/docs/tax/vat-return" />
+  <Card title="BAS" description="Australian Business Activity Statement" href="/docs/tax/bas" />
+  <Card title="Sales Tax" description="US state and local sales tax" href="/docs/tax/sales-tax" />
+  <Card title="Schedule C" description="US Schedule C worksheet for sole proprietors" href="/docs/tax/schedule-c" />
+</Cards>
+
+## Tax Rates
+
+Tax rates are configured per organization and can be applied to invoices, bills, and expenses. See [Tax Rates](/docs/modules/tax-rates) for setup details.
+
+## Navigation
+
+Access tax features from **Tax** in the sidebar. The tax dashboard shows an overview of your current tax obligations and upcoming deadlines.

@@ -1,14 +1,17 @@
 ---
 title: Self-Hosting
-description: Deploy dubbl with Docker Compose for production use.
+description: Deploy Dubbl with Docker Compose for production use.
 ---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Steps, Step } from "fumadocs-ui/components/steps";
+import { Tabs, Tab } from "fumadocs-ui/components/tabs";
 
 ## Docker Compose
 
-The easiest way to self-host dubbl is with Docker Compose.
+The easiest way to self-host Dubbl is with Docker Compose.
 
-```yaml
-# docker-compose.yml
+```yaml title="docker-compose.yml"
 services:
   app:
     build: .
@@ -36,16 +39,29 @@ volumes:
 
 ## Production Deployment
 
-```bash
-# Build and start
-docker compose up -d
+<Steps>
+  <Step>
+    ### Build and start
 
-# Push database schema
-docker compose exec app npm run db:push
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  <Step>
+    ### Push database schema
 
-# Seed demo data (optional)
-docker compose exec app npm run db:seed
-```
+    ```bash
+    docker compose exec app pnpm db:push
+    ```
+  </Step>
+  <Step>
+    ### Seed demo data (optional)
+
+    ```bash
+    docker compose exec app pnpm db:seed
+    ```
+  </Step>
+</Steps>
 
 ## Environment Variables
 
@@ -62,43 +78,68 @@ docker compose exec app npm run db:seed
 | `S3_SECRET_ACCESS_KEY` | No | S3 secret key |
 | `S3_ENDPOINT` | No | Custom S3 endpoint (for MinIO, etc.) |
 
+<Callout type="warn">
+  Always set a strong, unique `AUTH_SECRET` in production. Never reuse the default value.
+</Callout>
+
 ## Database
 
-dubbl uses PostgreSQL. Minimum version: **15**.
+Dubbl uses PostgreSQL. Minimum version: **15**.
 
 The schema is managed by Drizzle ORM. To apply schema changes:
 
 ```bash
-npm run db:push
+pnpm db:push
 ```
 
 ## Storage
 
-File uploads (receipts, attachments) require S3-compatible storage. Options:
+File uploads (receipts, attachments) require S3-compatible storage:
 
-- **AWS S3** — Standard cloud storage
-- **MinIO** — Self-hosted S3-compatible storage
-- **Cloudflare R2** — Cost-effective alternative
+<Tabs items={["AWS S3", "MinIO", "Cloudflare R2"]}>
+  <Tab value="AWS S3">
+    Standard cloud storage. Set `S3_ENDPOINT` to `https://s3.amazonaws.com` or omit it.
+  </Tab>
+  <Tab value="MinIO">
+    Self-hosted S3-compatible storage. Set `S3_ENDPOINT` to your MinIO server URL.
+  </Tab>
+  <Tab value="Cloudflare R2">
+    Cost-effective alternative. Set `S3_ENDPOINT` to your R2 endpoint URL.
+  </Tab>
+</Tabs>
 
-Without S3 configured, file upload features are disabled but the rest of the app works normally.
+<Callout type="info">
+  Without S3 configured, file upload features are disabled but the rest of the app works normally.
+</Callout>
 
 ## Reverse Proxy
 
-For production, place dubbl behind a reverse proxy like Nginx or Caddy:
+For production, place Dubbl behind a reverse proxy:
 
-```nginx
-server {
-    server_name accounting.example.com;
+<Tabs items={["Nginx", "Caddy"]}>
+  <Tab value="Nginx">
+    ```nginx
+    server {
+        server_name accounting.example.com;
 
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        location / {
+            proxy_pass http://localhost:3000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
     }
-}
-```
+    ```
+  </Tab>
+  <Tab value="Caddy">
+    ```
+    accounting.example.com {
+        reverse_proxy localhost:3000
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ## Backups
 
@@ -111,3 +152,7 @@ docker compose exec db pg_dump -U dubbl dubbl > backup.sql
 # Restore
 docker compose exec -T db psql -U dubbl dubbl < backup.sql
 ```
+
+<Callout type="warn">
+  Schedule automated backups. Losing financial data can be catastrophic.
+</Callout>

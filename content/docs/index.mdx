@@ -1,31 +1,107 @@
 ---
-title: dubbl Documentation
+title: Dubbl Documentation
 description: The open-source accounting platform for modern businesses.
+full: true
 ---
 
-Welcome to the **dubbl** documentation. dubbl is a full-featured, open-source alternative to Xero and QuickBooks built with Next.js, Drizzle ORM, and PostgreSQL.
+import { Cards, Card } from "fumadocs-ui/components/card";
+import { Callout } from "fumadocs-ui/components/callout";
+import { Steps, Step } from "fumadocs-ui/components/steps";
+import {
+  BookOpenIcon,
+  RocketIcon,
+  ServerIcon,
+  LayoutGridIcon,
+  ReceiptIcon,
+  SettingsIcon,
+  BookIcon,
+  CodeIcon,
+  MapIcon,
+  UsersIcon,
+} from "lucide-react";
 
-## Features
+<div className="mx-auto max-w-5xl px-4 py-16 md:py-24">
 
-- **Double-entry bookkeeping** with chart of accounts and journal entries
-- **Invoicing & quotes** with PDF generation and payment tracking
-- **Bills & purchase orders** for accounts payable
-- **Banking & reconciliation** with CSV import
-- **Expense claims** with approval workflows
-- **Projects & time tracking** with billable hours
-- **Inventory management** with stock tracking
-- **Fixed asset management** with depreciation
-- **Payroll** with tax calculations
-- **Budgets** with variance analysis
-- **10+ financial reports** including P&L, balance sheet, cash flow
-- **Audit trail** for compliance
-- **Multi-currency** support
-- **API-first** with full REST API
+<div className="flex flex-col items-center text-center mb-16">
+  <div className="mb-6">
+    <svg viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-16 w-20 mx-auto">
+      <path d="M18 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10h-8V4z" fill="#34d399" />
+      <path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#059669" />
+    </svg>
+  </div>
+  <h1 className="text-4xl font-bold tracking-tight md:text-5xl mb-4">Dubbl Documentation</h1>
+  <p className="text-lg text-fd-muted-foreground max-w-2xl">
+    Full-featured, open-source alternative to Xero and QuickBooks. Double-entry bookkeeping, invoicing, inventory, payroll, CRM, tax compliance, and 25+ financial reports.
+  </p>
+</div>
 
-## Quick Links
+<Cards>
+  <Card icon={<RocketIcon />} title="Getting Started" description="Set up Dubbl and start managing your finances in minutes." href="/docs/getting-started" />
+  <Card icon={<ServerIcon />} title="Self-Hosting" description="Deploy Dubbl with Docker on your own infrastructure." href="/docs/self-hosting" />
+  <Card icon={<LayoutGridIcon />} title="Modules" description="Explore all features: invoicing, expenses, inventory, payroll, and more." href="/docs/modules" />
+  <Card icon={<ReceiptIcon />} title="Tax & Compliance" description="VAT returns, BAS, Schedule C, sales tax, and multi-currency." href="/docs/tax" />
+  <Card icon={<SettingsIcon />} title="Settings" description="Organization, workflows, templates, API keys, and audit log." href="/docs/settings" />
+  <Card icon={<BookIcon />} title="Accounting Concepts" description="Learn double-entry bookkeeping, chart of accounts, and reconciliation." href="/docs/concepts" />
+  <Card icon={<CodeIcon />} title="API Reference" description="REST API documentation for integrating with external systems." href="/docs/api-reference" />
+  <Card icon={<MapIcon />} title="Guides" description="Step-by-step tutorials for common workflows and setups." href="/docs/guides" />
+  <Card icon={<UsersIcon />} title="Contributing" description="Help improve Dubbl: code, docs, and tax regulation updates." href="/docs/contributing" />
+</Cards>
 
-- [Getting Started](/docs/getting-started) — Set up dubbl in minutes
-- [Self-Hosting](/docs/self-hosting) — Deploy with Docker
-- [Modules](/docs/modules) — Feature documentation
-- [API Reference](/docs/api-reference) — REST API docs
-- [Guides](/docs/guides) — Tutorials and how-tos
+<div className="mt-16">
+
+## Quick Start
+
+<Steps>
+  <Step>
+    ### Clone and install
+
+    ```bash
+    git clone https://github.com/dubbl-org/dubbl.git
+    cd dubbl && pnpm install
+    ```
+  </Step>
+  <Step>
+    ### Configure environment
+
+    ```bash
+    cp .env.example .env
+    # Edit .env with your database URL and auth secret
+    ```
+  </Step>
+  <Step>
+    ### Set up database
+
+    ```bash
+    pnpm db:push
+    pnpm db:seed  # optional demo data
+    ```
+  </Step>
+  <Step>
+    ### Start the app
+
+    ```bash
+    pnpm dev
+    ```
+
+    Open [http://localhost:3000](http://localhost:3000) in your browser.
+  </Step>
+</Steps>
+
+</div>
+
+<div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div className="rounded-lg border border-fd-border bg-fd-card p-6">
+    <h3 className="font-semibold mb-2">Built with</h3>
+    <p className="text-sm text-fd-muted-foreground">Next.js, Drizzle ORM, PostgreSQL, Tailwind CSS, shadcn/ui</p>
+  </div>
+  <div className="rounded-lg border border-fd-border bg-fd-card p-6">
+    <h3 className="font-semibold mb-2">License</h3>
+    <p className="text-sm text-fd-muted-foreground">Apache 2.0 - Free to use, modify, and distribute</p>
+  </div>
+  <div className="rounded-lg border border-fd-border bg-fd-card p-6">
+    <h3 className="font-semibold mb-2">Community</h3>
+    <p className="text-sm text-fd-muted-foreground">Open source on GitHub. PRs, issues, and tax updates welcome.</p>
+  </div>
+</div>
+
+</div>

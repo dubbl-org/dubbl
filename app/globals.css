@@ -61,6 +61,24 @@
 }
 
 :root {
+  /* Fumadocs theme */
+  --color-fd-background: #ffffff;
+  --color-fd-foreground: #0a0a0a;
+  --color-fd-primary: #059669;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #f5f5f5;
+  --color-fd-secondary-foreground: #0a0a0a;
+  --color-fd-accent: #f5f5f5;
+  --color-fd-accent-foreground: #0a0a0a;
+  --color-fd-muted: #f5f5f5;
+  --color-fd-muted-foreground: #737373;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #0a0a0a;
+  --color-fd-border: #e5e5e5;
+  --color-fd-ring: #10b981;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0a0a0a;
+
   --radius: 0.625rem;
   --background: #ffffff;
   --foreground: #0a0a0a;
@@ -533,6 +551,24 @@
 
 
 .dark {
+  /* Fumadocs dark theme */
+  --color-fd-background: #0a0d0b;
+  --color-fd-foreground: #f0fdf4;
+  --color-fd-primary: #10b981;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #1a1f1c;
+  --color-fd-secondary-foreground: #f0fdf4;
+  --color-fd-accent: #1a1f1c;
+  --color-fd-accent-foreground: #f0fdf4;
+  --color-fd-muted: #1a1f1c;
+  --color-fd-muted-foreground: #94a3b8;
+  --color-fd-card: #111614;
+  --color-fd-card-foreground: #f0fdf4;
+  --color-fd-border: #2a2a2a;
+  --color-fd-ring: #10b981;
+  --color-fd-popover: #111614;
+  --color-fd-popover-foreground: #f0fdf4;
+
   --background: #0a0d0b;
   --foreground: #f0fdf4;
   --card: #111614;

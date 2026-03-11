@@ -1,7 +1,10 @@
 ---
 title: Getting Started
-description: Set up dubbl and start managing your finances in minutes.
+description: Set up Dubbl and start managing your finances in minutes.
 ---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Tabs, Tab } from "fumadocs-ui/components/tabs";
 
 ## Prerequisites
 
@@ -12,22 +15,20 @@ description: Set up dubbl and start managing your finances in minutes.
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/dubbl/dubbl.git
+git clone https://github.com/dubbl-org/dubbl.git
 cd dubbl
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
+pnpm install
 ```
 
 ## Environment Variables
 
+```bash
+cp .env.example .env
+```
+
 Edit `.env` with your configuration:
 
-```bash
+```bash title=".env"
 # Database
 DATABASE_URL=postgresql://user:password@localhost:5432/dubbl
 
@@ -49,33 +50,35 @@ S3_ENDPOINT=https://s3.amazonaws.com
 
 ## Database Setup
 
-```bash
-# Push schema to database
-npm run db:push
-
-# Seed with demo data (optional)
-npm run db:seed
-```
+<Tabs items={["Fresh Database", "With Demo Data"]}>
+  <Tab value="Fresh Database">
+    ```bash
+    pnpm db:push
+    ```
+  </Tab>
+  <Tab value="With Demo Data">
+    ```bash
+    pnpm db:push
+    pnpm db:seed
+    ```
+  </Tab>
+</Tabs>
 
 ## Start Development
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Demo Login
-
-If you ran the seed script, log in with:
-
-- **Email:** `demo@dubbl.app`
-- **Password:** `password123`
-
-This gives you a fully populated demo organization with chart of accounts, contacts, invoices, bills, bank accounts, projects, and more.
+<Callout type="info">
+  If you ran the seed script, log in with **demo@dubbl.app** / **password123**. This gives you a fully populated demo organization with chart of accounts, contacts, invoices, bills, bank accounts, projects, and more.
+</Callout>
 
 ## Next Steps
 
-- [Self-Hosting Guide](/docs/self-hosting) — Deploy to production with Docker
-- [Chart of Accounts](/docs/modules/chart-of-accounts) — Set up your accounts
-- [Invoicing](/docs/modules/invoicing) — Create and send invoices
+- [Self-Hosting Guide](/docs/self-hosting) - Deploy to production with Docker
+- [Chart of Accounts](/docs/modules/chart-of-accounts) - Set up your accounts
+- [Invoicing](/docs/modules/invoicing) - Create and send invoices
+- [Accounting Concepts](/docs/concepts) - Learn double-entry basics
