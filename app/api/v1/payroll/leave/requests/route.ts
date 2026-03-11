@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const conditions = [eq(leaveRequest.organizationId, ctx.organizationId)];
     if (status) {
-      conditions.push(eq(leaveRequest.status, status as string));
+      conditions.push(eq(leaveRequest.status, status as "approved" | "rejected" | "pending" | "cancelled"));
     }
 
     const requests = await db.query.leaveRequest.findMany({

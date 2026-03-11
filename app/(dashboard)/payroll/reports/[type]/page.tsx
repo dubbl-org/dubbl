@@ -12,7 +12,8 @@ import { formatMoney } from "@/lib/money";
 export default function ReportDetailPage() {
   const { type } = useParams<{ type: string }>();
   const router = useRouter();
-  const [data, setData] = useState<Record<string, unknown> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -84,8 +85,8 @@ export default function ReportDetailPage() {
               <span className="text-xs font-medium text-muted-foreground w-24 text-right">Tax</span>
             </div>
           </div>
-          {(data.data as Array<Record<string, unknown>>).map((row) => (
-            <div key={row.employeeId as string} className="px-4 py-2.5 flex items-center justify-between">
+          {data.data.map((row: { employeeId: string; employeeName: string; totalGross: number; totalTax: number }) => (
+            <div key={row.employeeId} className="px-4 py-2.5 flex items-center justify-between">
               <span className="text-sm">{row.employeeName}</span>
               <div className="flex gap-8">
                 <span className="text-sm font-mono tabular-nums w-24 text-right">{formatMoney(row.totalGross)}</span>
@@ -112,9 +113,9 @@ export default function ReportDetailPage() {
               <span className="text-xs font-medium text-muted-foreground w-24 text-right">Net</span>
             </div>
           </div>
-          {(data.data as Array<Record<string, unknown>>).map((row, i: number) => (
+          {data.data.map((row: { department: string; employeeCount: number; totalGross: number; totalNet: number }, i: number) => (
             <div key={i} className="px-4 py-2.5 flex items-center justify-between">
-              <span className="text-sm">{row.department as string}</span>
+              <span className="text-sm">{row.department}</span>
               <div className="flex gap-8">
                 <span className="text-sm font-mono tabular-nums w-16 text-right">{row.employeeCount}</span>
                 <span className="text-sm font-mono tabular-nums w-24 text-right">{formatMoney(row.totalGross)}</span>
@@ -135,8 +136,8 @@ export default function ReportDetailPage() {
               <span className="text-xs font-medium text-muted-foreground w-24 text-right">Net</span>
             </div>
           </div>
-          {(data.data as Array<Record<string, unknown>>).map((row) => (
-            <div key={row.month as string} className="px-4 py-2.5 flex items-center justify-between">
+          {data.data.map((row: { month: string; runCount: number; totalGross: number; totalNet: number }) => (
+            <div key={row.month} className="px-4 py-2.5 flex items-center justify-between">
               <span className="text-sm font-mono">{row.month}</span>
               <div className="flex gap-8">
                 <span className="text-sm font-mono tabular-nums w-16 text-right">{row.runCount}</span>

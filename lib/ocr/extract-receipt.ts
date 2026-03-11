@@ -1,3 +1,4 @@
+// @ts-expect-error -- tesseract.js has no type declarations in this project
 import Tesseract from "tesseract.js";
 
 export interface ReceiptData {
@@ -13,7 +14,7 @@ export async function extractReceiptData(
   onProgress?: (progress: number) => void
 ): Promise<ReceiptData> {
   const result = await Tesseract.recognize(imageFile, "eng", {
-    logger: (m) => {
+    logger: (m: { status: string; progress: number }) => {
       if (m.status === "recognizing text" && onProgress) {
         onProgress(Math.round(m.progress * 100));
       }

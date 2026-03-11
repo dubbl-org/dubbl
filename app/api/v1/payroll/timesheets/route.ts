@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     ];
 
     if (status) {
-      conditions.push(eq(timesheet.status, status as string));
+      conditions.push(eq(timesheet.status, status as "draft" | "submitted" | "approved" | "rejected"));
     }
 
     const timesheets = await db.query.timesheet.findMany({
