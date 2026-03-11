@@ -97,6 +97,143 @@ dubbl uses OAuth 2.1 with PKCE for MCP authentication:
 - Invoice/bill line item `unitPrice` and `quantity` are decimal numbers (the system converts to cents internally)
 - Exchange rates are stored as integers with 6 decimal places (`1000000` = 1.0)
 
+## Testing
+
+### With MCP Inspector
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the easiest way to test the MCP server interactively during development.
+
+```bash
+# Start the dev server first
+pnpm dev
+
+# Launch MCP Inspector pointed at your local instance
+npx @modelcontextprotocol/inspector --url http://localhost:3000/api/mcp
+```
+
+The Inspector will open in your browser and walk you through the OAuth flow. Once authenticated, you can browse available tools, invoke them with custom inputs, and inspect the JSON-RPC responses.
+
+### Manual OAuth Flow
+
+If you want to test the OAuth flow step by step:
+
+**1. Check metadata discovery**
+
+```bash
+curl http://localhost:3000/.well-known/oauth-authorization-server/api/mcp
+```
+
+This should return JSON with all OAuth endpoint URLs.
+
+**2. Register a client**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/oauth/register \
+  -H "Content-Type: application/json" \
+  -d '{"redirect_uris": ["http://localhost:9999/callback"], "client_name": "Test Client"}'
+```
+
+Save the `client_id` from the response.
+
+**3. Start the authorization flow**
+
+Open this URL in your browser (replace `CLIENT_ID` with the value from step 2):
+
+```
+http://localhost:3000/api/mcp/oauth/authorize?client_id=CLIENT_ID&redirect_uri=http://localhost:9999/callback&code_challenge=TEST_CHALLENGE&code_challenge_method=S256&state=test123&response_type=code
+```
+
+You will be redirected to sign in (if needed) and then to the consent page. After approving, you'll be redirected to the callback URL with a `code` parameter.
+
+**4. Exchange code for tokens**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "authorization_code",
+    "code": "THE_CODE_FROM_STEP_3",
+    "redirect_uri": "http://localhost:9999/callback",
+    "client_id": "CLIENT_ID",
+    "code_verifier": "THE_VERIFIER_MATCHING_YOUR_CHALLENGE"
+  }'
+```
+
+This returns `access_token` and `refresh_token`.
+
+**5. Call the MCP endpoint**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer mcp_at_YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {},
+      "clientInfo": { "name": "test", "version": "1.0" }
+    }
+  }'
+```
+
+**6. List available tools**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer mcp_at_YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+**7. Call a tool**
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer mcp_at_YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "get_organization",
+      "arguments": {}
+    }
+  }'
+```
+
+### Verifying Plan Gating
+
+To confirm that free plan users are rejected:
+
+1. Create or use an organization on the free plan
+2. Complete the OAuth flow for that org
+3. The token exchange (step 4) should return `403` with `"MCP access requires a Pro or Business plan"`
+
+### With Claude Desktop (local)
+
+For local testing with Claude Desktop, update your config to point at localhost:
+
+```json
+{
+  "mcpServers": {
+    "dubbl-local": {
+      "url": "http://localhost:3000/api/mcp"
+    }
+  }
+}
+```
+
+Restart Claude Desktop and it will initiate the OAuth flow in your browser.
+
 ## Troubleshooting
 
 ### "MCP access requires a Pro or Business plan"
