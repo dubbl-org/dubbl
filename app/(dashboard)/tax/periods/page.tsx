@@ -502,7 +502,7 @@ export default function TaxPeriodsPage() {
             </div>
 
             {/* Open */}
-            <div className="flex items-center gap-3 rounded-xl border border-blue-200/60 bg-blue-50/40 px-4 py-3 dark:border-blue-800/40 dark:bg-blue-950/20">
+            <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800/40 dark:bg-blue-950/20">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/50">
                 <Clock className="size-4 text-blue-600 dark:text-blue-400" />
               </div>
@@ -515,7 +515,7 @@ export default function TaxPeriodsPage() {
             </div>
 
             {/* Filed */}
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200/60 bg-emerald-50/40 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
                 <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
               </div>

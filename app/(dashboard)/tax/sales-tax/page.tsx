@@ -194,7 +194,7 @@ export default function SalesTaxPage() {
           </div>
 
           {/* Total */}
-          <div className="rounded-lg border-2 border-blue-200 bg-blue-50/40 dark:border-blue-800 dark:bg-blue-950/20 px-5 py-3.5">
+          <div className="rounded-lg border-2 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 px-5 py-3.5">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold">Total Tax Collected</span>
               <span className="font-mono text-base tabular-nums font-bold text-blue-600 dark:text-blue-400">{formatMoney(totalCollected)}</span>

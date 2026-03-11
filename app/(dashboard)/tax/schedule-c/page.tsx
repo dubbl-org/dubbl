@@ -224,7 +224,7 @@ export default function ScheduleCPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200/60 dark:border-emerald-900/40 text-sm font-semibold">
+                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-900/40 text-sm font-semibold">
                   <span>Gross Income</span>
                   <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(totalIncome)}</span>
                 </div>
@@ -258,7 +258,7 @@ export default function ScheduleCPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200/60 dark:border-red-900/40 text-sm font-semibold">
+                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-900/40 text-sm font-semibold">
                   <span>Total Expenses</span>
                   <span className="font-mono tabular-nums text-red-600 dark:text-red-400">{formatMoney(totalExpenses)}</span>
                 </div>

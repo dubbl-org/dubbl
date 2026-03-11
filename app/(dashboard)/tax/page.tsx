@@ -183,7 +183,7 @@ export default function TaxRatesPage() {
           </div>
           <p className="mt-1 text-2xl font-bold tabular-nums">{rates.length}</p>
         </div>
-        <div className="rounded-lg border border-blue-200/60 bg-blue-50/40 dark:border-blue-800/40 dark:bg-blue-950/20 p-4">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800/40 dark:bg-blue-950/20 p-4">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700/70 dark:text-blue-400/70">Sales Rates</p>
             <div className="size-4 rounded bg-blue-500/20 flex items-center justify-center">
@@ -193,7 +193,7 @@ export default function TaxRatesPage() {
           <p className="mt-1 text-2xl font-bold tabular-nums text-blue-700 dark:text-blue-300">{salesCount}</p>
           <p className="text-[11px] text-blue-600/60 dark:text-blue-400/60 mt-0.5">Applied on invoices</p>
         </div>
-        <div className="rounded-lg border border-orange-200/60 bg-orange-50/40 dark:border-orange-800/40 dark:bg-orange-950/20 p-4">
+        <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-800/40 dark:bg-orange-950/20 p-4">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-medium uppercase tracking-wide text-orange-700/70 dark:text-orange-400/70">Purchase Rates</p>
             <div className="size-4 rounded bg-orange-500/20 flex items-center justify-center">

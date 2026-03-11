@@ -23,12 +23,14 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetFooter,
 } from "@/components/ui/sheet";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+import { CurrencySelect } from "@/components/ui/currency-select";
 
 interface Currency {
   id: string;
@@ -51,6 +53,112 @@ function formatRate(rate: number): string {
   return (rate / 1_000_000).toFixed(6);
 }
 
+function AddCurrencySheet({
+  open,
+  setOpen,
+  onCreated,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  onCreated: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [symbol, setSymbol] = useState("");
+  const [decimalPlaces, setDecimalPlaces] = useState("2");
+  const [saving, setSaving] = useState(false);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/currencies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          name,
+          symbol,
+          decimalPlaces: parseInt(decimalPlaces),
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Currency added");
+      setOpen(false);
+      setCode("");
+      setName("");
+      setSymbol("");
+      setDecimalPlaces("2");
+      onCreated();
+    } catch {
+      toast.error("Failed to add currency");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>Add Currency</SheetTitle>
+        </SheetHeader>
+        <form onSubmit={handleCreate} className="space-y-4 px-4">
+          <div className="space-y-2">
+            <Label>Code</Label>
+            <Input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="e.g. JPY"
+              maxLength={3}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Japanese Yen"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Symbol</Label>
+            <Input
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+              placeholder="e.g. ¥"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Decimal Places</Label>
+            <Input
+              type="number"
+              min="0"
+              max="4"
+              value={decimalPlaces}
+              onChange={(e) => setDecimalPlaces(e.target.value)}
+              required
+            />
+          </div>
+        </form>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleCreate}
+            disabled={saving}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {saving ? "Adding..." : "Add Currency"}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function AddRateSheet({
   open,
   setOpen,
@@ -66,12 +174,11 @@ function AddRateSheet({
   const [targetCurrency, setTargetCurrency] = useState("");
   const [rate, setRate] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [source, setSource] = useState<"manual" | "api">("manual");
   const [saving, setSaving] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!orgId) return;
+    if (!orgId || !baseCurrency || !targetCurrency) return;
     setSaving(true);
     try {
       const rateInt = Math.round(parseFloat(rate) * 1_000_000);
@@ -84,11 +191,11 @@ function AddRateSheet({
         body: JSON.stringify({
           rates: [
             {
-              baseCurrency: baseCurrency.toUpperCase(),
-              targetCurrency: targetCurrency.toUpperCase(),
+              baseCurrency,
+              targetCurrency,
               rate: rateInt,
               date,
-              source,
+              source: "manual",
             },
           ],
         }),
@@ -117,23 +224,11 @@ function AddRateSheet({
         <form onSubmit={handleCreate} className="space-y-4 px-4">
           <div className="space-y-2">
             <Label>Base Currency</Label>
-            <Input
-              value={baseCurrency}
-              onChange={(e) => setBaseCurrency(e.target.value)}
-              placeholder="e.g. USD"
-              maxLength={3}
-              required
-            />
+            <CurrencySelect value={baseCurrency} onValueChange={setBaseCurrency} />
           </div>
           <div className="space-y-2">
             <Label>Target Currency</Label>
-            <Input
-              value={targetCurrency}
-              onChange={(e) => setTargetCurrency(e.target.value)}
-              placeholder="e.g. EUR"
-              maxLength={3}
-              required
-            />
+            <CurrencySelect value={targetCurrency} onValueChange={setTargetCurrency} />
           </div>
           <div className="space-y-2">
             <Label>Rate</Label>
@@ -159,35 +254,17 @@ function AddRateSheet({
               required
             />
           </div>
-          <div className="space-y-2">
-            <Label>Source</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={source === "manual" ? "default" : "outline"}
-                onClick={() => setSource("manual")}
-              >
-                Manual
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={source === "api" ? "default" : "outline"}
-                onClick={() => setSource("api")}
-              >
-                API
-              </Button>
-            </div>
-          </div>
+        </form>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button
-            type="submit"
+            onClick={handleCreate}
             disabled={saving}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="bg-emerald-600 hover:bg-emerald-700"
           >
             {saving ? "Creating..." : "Create"}
           </Button>
-        </form>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );
@@ -201,6 +278,7 @@ export default function CurrenciesPage() {
   const [ratesLoading, setRatesLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [refOpen, setRefOpen] = useState(false);
 
   const orgId =
@@ -290,6 +368,14 @@ export default function CurrenciesPage() {
       >
         <Button
           size="sm"
+          variant="outline"
+          onClick={() => setCurrencySheetOpen(true)}
+        >
+          <Plus className="mr-1.5 size-3.5" />
+          Add Currency
+        </Button>
+        <Button
+          size="sm"
           className="bg-emerald-600 hover:bg-emerald-700"
           onClick={() => setSheetOpen(true)}
         >
@@ -300,7 +386,7 @@ export default function CurrenciesPage() {
 
       {/* Base Currency Card */}
       {baseCurrency && (
-        <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-800/40 dark:bg-emerald-950/20 p-4">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800/40 dark:bg-emerald-950/20 p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700/70 dark:text-emerald-400/70">
             Organization Base Currency
           </p>
@@ -315,7 +401,7 @@ export default function CurrenciesPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-blue-200/60 bg-blue-50/40 dark:border-blue-800/40 dark:bg-blue-950/20 p-4">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800/40 dark:bg-blue-950/20 p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700/70 dark:text-blue-400/70">
             Exchange Rates
           </p>
@@ -323,7 +409,7 @@ export default function CurrenciesPage() {
             {exchangeRates.length}
           </p>
         </div>
-        <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-800/40 dark:bg-emerald-950/20 p-4">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800/40 dark:bg-emerald-950/20 p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700/70 dark:text-emerald-400/70">
             Currency Pairs
           </p>
@@ -333,7 +419,7 @@ export default function CurrenciesPage() {
             ).size}
           </p>
         </div>
-        <div className="rounded-lg border border-amber-200/60 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/20 p-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-950/20 p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-amber-700/70 dark:text-amber-400/70">
             ISO Currencies
           </p>
@@ -506,6 +592,13 @@ export default function CurrenciesPage() {
         setOpen={setSheetOpen}
         onCreated={() => fetchExchangeRates()}
         orgId={orgId}
+      />
+
+      {/* Add Currency Sheet */}
+      <AddCurrencySheet
+        open={currencySheetOpen}
+        setOpen={setCurrencySheetOpen}
+        onCreated={() => fetchCurrencies()}
       />
     </div>
   );
