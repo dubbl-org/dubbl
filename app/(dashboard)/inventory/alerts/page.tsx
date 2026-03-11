@@ -73,13 +73,13 @@ export default function AlertsPage() {
   return (
     <ContentReveal className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <AlertTriangle className="size-3.5 text-amber-500" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Total Alerts</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400">
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate text-amber-600 dark:text-amber-400">
             {lowCount}
           </p>
         </div>
@@ -89,7 +89,7 @@ export default function AlertsPage() {
             <span className="text-[11px] font-medium uppercase tracking-wide">Out of Stock</span>
           </div>
           <p className={cn(
-            "mt-2 text-2xl font-bold font-mono tabular-nums",
+            "mt-2 text-2xl font-bold font-mono tabular-nums truncate",
             criticalCount > 0 ? "text-red-600 dark:text-red-400" : ""
           )}>
             {criticalCount}
@@ -100,7 +100,7 @@ export default function AlertsPage() {
             <Package className="size-3.5" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Below Reorder</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums">
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
             {lowCount - criticalCount}
           </p>
         </div>

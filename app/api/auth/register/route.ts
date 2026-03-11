@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.issues }, { status: 400 });
+      return NextResponse.json({ error: err.issues.map((i) => i.message).join(", ") }, { status: 400 });
     }
     console.error("Registration error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

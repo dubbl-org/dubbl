@@ -40,6 +40,10 @@ import { SettingsIcon } from "@/components/ui/settings";
 import { CircleHelpIcon } from "@/components/ui/circle-help";
 import { ReceiptAnimatedIcon } from "@/components/ui/receipt-animated";
 import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
+import { UsersAnimatedIcon } from "@/components/ui/users-animated";
+import { TargetIcon } from "@/components/ui/target";
+import { FolderOpenIcon } from "@/components/ui/folder-open";
+import { PercentAnimatedIcon } from "@/components/ui/percent-animated";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnimatedIcon = React.ForwardRefExoticComponent<any>;
@@ -74,11 +78,13 @@ const sections: NavSection[] = [
       { label: "Sales", href: "/sales", icon: FileTextIcon },
       { label: "Purchases", href: "/purchases", icon: CartIcon },
       { label: "Accounting", href: "/accounting", icon: ArrowLeftRightAnimatedIcon },
+      { label: "Tax", href: "/tax", icon: PercentAnimatedIcon },
     ],
   },
   {
     label: "Operations",
     items: [
+      { label: "Teams", href: "/teams", icon: UsersAnimatedIcon },
       { label: "Inventory", href: "/inventory", icon: ReceiptAnimatedIcon },
       { label: "Payroll", href: "/payroll", icon: LandmarkAnimatedIcon },
     ],
@@ -86,6 +92,8 @@ const sections: NavSection[] = [
   {
     label: "",
     items: [
+      { label: "CRM", href: "/crm", icon: TargetIcon },
+      { label: "Documents", href: "/documents", icon: FolderOpenIcon },
       { label: "Reports", href: "/reports", icon: ChartLineIcon },
     ],
   },

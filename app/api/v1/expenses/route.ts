@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { expenseClaim, expenseItem } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { decimalToCents } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const itemSchema = z.object({
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(expenseClaim) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(expenseClaim)
       .where(and(...conditions));
 
@@ -71,6 +72,11 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    // Check period lock for each item date
+    for (const item of parsed.items) {
+      await assertNotLocked(ctx.organizationId, item.date);
+    }
 
     // Calculate total from items
     let totalAmount = 0;

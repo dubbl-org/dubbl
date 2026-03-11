@@ -267,7 +267,7 @@ export default function FixedAssetsPage() {
         );
         window.location.reload();
       } else {
-        toast.error(data.error || "Failed to run depreciation");
+        toast.error(typeof data.error === "string" ? data.error : "Failed to run depreciation");
       }
     } catch {
       toast.error("Failed to run depreciation");

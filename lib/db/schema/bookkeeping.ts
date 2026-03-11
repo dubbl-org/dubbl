@@ -394,3 +394,162 @@ export const exchangeRateRelations = relations(exchangeRate, ({ one }) => ({
     references: [organization.id],
   }),
 }));
+
+export const taxPeriodTypeEnum = pgEnum("tax_period_type", [
+  "monthly",
+  "quarterly",
+  "annual",
+]);
+
+export const taxPeriodStatusEnum = pgEnum("tax_period_status", [
+  "open",
+  "filed",
+  "amended",
+]);
+
+// Tax Period - for filing tracking
+export const taxPeriod = pgTable("tax_period", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g. "Q1 2026"
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  type: taxPeriodTypeEnum("type").notNull(),
+  status: taxPeriodStatusEnum("status").notNull().default("open"),
+  filedAt: timestamp("filed_at", { mode: "date" }),
+  filedBy: uuid("filed_by").references(() => users.id),
+  filedReference: text("filed_reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Tax Return Line - individual boxes/fields on a tax return
+export const taxReturnLine = pgTable("tax_return_line", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taxPeriodId: uuid("tax_period_id")
+    .notNull()
+    .references(() => taxPeriod.id, { onDelete: "cascade" }),
+  boxNumber: text("box_number").notNull(),
+  label: text("label").notNull(),
+  amount: integer("amount").notNull().default(0), // cents
+  isCalculated: boolean("is_calculated").notNull().default(true),
+  sourceDescription: text("source_description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const taxPeriodRelations = relations(taxPeriod, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [taxPeriod.organizationId],
+    references: [organization.id],
+  }),
+  filedByUser: one(users, {
+    fields: [taxPeriod.filedBy],
+    references: [users.id],
+  }),
+  lines: many(taxReturnLine),
+}));
+
+export const taxReturnLineRelations = relations(taxReturnLine, ({ one }) => ({
+  taxPeriod: one(taxPeriod, {
+    fields: [taxReturnLine.taxPeriodId],
+    references: [taxPeriod.id],
+  }),
+}));
+
+// Tax Jurisdiction - cached tax rates by location for auto sales tax
+export const taxJurisdictionSourceEnum = pgEnum("tax_jurisdiction_source", [
+  "manual",
+  "api",
+]);
+
+export const taxJurisdiction = pgTable(
+  "tax_jurisdiction",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    country: text("country").notNull(),
+    state: text("state"),
+    county: text("county"),
+    city: text("city"),
+    postalCode: text("postal_code"),
+    combinedRate: integer("combined_rate").notNull(), // basis points
+    stateRate: integer("state_rate").notNull().default(0),
+    countyRate: integer("county_rate").notNull().default(0),
+    cityRate: integer("city_rate").notNull().default(0),
+    specialRate: integer("special_rate").notNull().default(0),
+    source: taxJurisdictionSourceEnum("source").notNull().default("manual"),
+    lastSyncedAt: timestamp("last_synced_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("tax_jurisdiction_lookup_idx").on(
+      table.organizationId,
+      table.country,
+      table.state,
+      table.postalCode
+    ),
+  ]
+);
+
+export const taxJurisdictionRelations = relations(taxJurisdiction, ({ one }) => ({
+  organization: one(organization, {
+    fields: [taxJurisdiction.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+// Tags - flexible segmentation for transactions
+export const tag = pgTable(
+  "tag",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    color: text("color").notNull().default("#6b7280"),
+    description: text("description"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("tag_org_name_idx").on(table.organizationId, table.name),
+  ]
+);
+
+export const entityTag = pgTable(
+  "entity_tag",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tag.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(), // "journal_entry", "invoice", "bill", "expense", "contact", "project"
+    entityId: uuid("entity_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("entity_tag_unique_idx").on(table.tagId, table.entityType, table.entityId),
+  ]
+);
+
+export const tagRelations = relations(tag, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [tag.organizationId],
+    references: [organization.id],
+  }),
+  entityTags: many(entityTag),
+}));
+
+export const entityTagRelations = relations(entityTag, ({ one }) => ({
+  tag: one(tag, {
+    fields: [entityTag.tagId],
+    references: [tag.id],
+  }),
+}));

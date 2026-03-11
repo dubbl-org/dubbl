@@ -61,18 +61,19 @@ export default function MembersPage() {
   const [saving, setSaving] = useState(false);
   const [actionMemberId, setActionMemberId] = useState<string | null>(null);
 
-  function fetchMembers() {
+  async function fetchMembers() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    fetch("/api/v1/members", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.members) setMembers(data.members);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const res = await fetch("/api/v1/members", {
+        headers: { "x-organization-id": orgId },
+      });
+      const data = await res.json();
+      if (data.members) setMembers(data.members);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -93,11 +94,11 @@ export default function MembersPage() {
         body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      toast.success("Member added");
       setInviteOpen(false);
       setInviteEmail("");
       setInviteRole("member");
-      fetchMembers();
+      await fetchMembers();
+      toast.success("Member added");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to invite");
     } finally {
@@ -115,8 +116,8 @@ export default function MembersPage() {
         headers: { "x-organization-id": orgId },
       });
       if (!res.ok) throw new Error((await res.json()).error);
+      await fetchMembers();
       toast.success("Member removed");
-      fetchMembers();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to remove");
     } finally { setActionMemberId(null); }
@@ -136,8 +137,8 @@ export default function MembersPage() {
         body: JSON.stringify({ role }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
+      await fetchMembers();
       toast.success("Role updated");
-      fetchMembers();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update role");
     } finally { setActionMemberId(null); }

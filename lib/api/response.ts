@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AuthError } from "./auth-context";
+import { PeriodLockedError } from "./period-lock";
 
 /** 200 OK response */
 export function ok<T>(data: T) {
@@ -32,8 +33,12 @@ export function handleError(err: unknown) {
   if (err instanceof AuthError) {
     return NextResponse.json({ error: err.message }, { status: err.status });
   }
+  if (err instanceof PeriodLockedError) {
+    return NextResponse.json({ error: err.message }, { status: 422 });
+  }
   if (err instanceof z.ZodError) {
-    return NextResponse.json({ error: err.issues }, { status: 400 });
+    const message = err.issues.map((i) => i.message).join(", ");
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   console.error(err);
   return NextResponse.json({ error: "Internal error" }, { status: 500 });

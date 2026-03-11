@@ -43,6 +43,8 @@ export const contact = pgTable("contact", {
   defaultRevenueAccountId: uuid("default_revenue_account_id").references(() => chartAccount.id),
   defaultExpenseAccountId: uuid("default_expense_account_id").references(() => chartAccount.id),
   defaultTaxRateId: uuid("default_tax_rate_id").references(() => taxRate.id),
+  peppolId: text("peppol_id"), // PEPPOL participant identifier
+  peppolScheme: text("peppol_scheme"), // e.g. "0088" (EAN), "9925" (VAT)
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),

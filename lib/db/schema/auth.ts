@@ -109,6 +109,11 @@ export const organization = pgTable("organization", {
   interestRate: integer("interest_rate"), // basis points, e.g. 500 = 5%
   interestMethod: text("interest_method"), // "simple" or "compound"
   interestGraceDays: integer("interest_grace_days").default(0),
+  mileageRate: integer("mileage_rate").default(67), // cents per mile (IRS rate $0.67)
+  peppolId: text("peppol_id"), // PEPPOL participant identifier
+  peppolScheme: text("peppol_scheme"), // e.g. "0088" (EAN), "9925" (VAT)
+  taxLookupEnabled: integer("tax_lookup_enabled").default(0), // 0 = disabled, 1 = enabled
+  taxLookupProvider: text("tax_lookup_provider"), // "taxjar", "manual"
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
@@ -137,6 +142,36 @@ export const member = pgTable(
   ]
 );
 
+// Organization-level Teams
+export const team = pgTable("team", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").notNull().default("#3b82f6"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const teamMember = pgTable(
+  "team_member",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => team.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => member.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("team_member_unique_idx").on(table.teamId, table.memberId),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -154,12 +189,30 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 
 export const organizationRelations = relations(organization, ({ many }) => ({
   members: many(member),
+  teams: many(team),
 }));
 
-export const memberRelations = relations(member, ({ one }) => ({
+export const memberRelations = relations(member, ({ one, many }) => ({
   organization: one(organization, {
     fields: [member.organizationId],
     references: [organization.id],
   }),
   user: one(users, { fields: [member.userId], references: [users.id] }),
+  teamMemberships: many(teamMember),
+}));
+
+export const teamRelations = relations(team, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [team.organizationId],
+    references: [organization.id],
+  }),
+  members: many(teamMember),
+}));
+
+export const teamMemberRelations = relations(teamMember, ({ one }) => ({
+  team: one(team, { fields: [teamMember.teamId], references: [team.id] }),
+  member: one(member, {
+    fields: [teamMember.memberId],
+    references: [member.id],
+  }),
 }));

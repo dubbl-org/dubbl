@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:banking");
 
     const body = await request.json();
     const parsed = upsertSchema.parse(body);

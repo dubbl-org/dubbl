@@ -102,7 +102,11 @@ export default function ProjectOverviewPage() {
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* Row 1: Stat Cards - always full width */}
-      <div className={cn("grid gap-2", stats.length <= 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6")}>
+      <div className={cn("grid gap-2", {
+        "grid-cols-2 sm:grid-cols-4": stats.length <= 4,
+        "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5": stats.length === 5,
+        "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6": stats.length >= 6,
+      })}>
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
 

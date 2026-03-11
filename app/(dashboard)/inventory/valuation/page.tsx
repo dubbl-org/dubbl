@@ -246,11 +246,11 @@ export default function InventoryValuationPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Total Cost</p>
-              <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(summary.totalCost)}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(summary.totalCost)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Retail Value</p>
-              <p className="text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(summary.totalRetailValue)}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{formatMoney(summary.totalRetailValue)}</p>
             </div>
           </div>
           {/* Margin bar */}
@@ -277,7 +277,7 @@ export default function InventoryValuationPage() {
         </motion.div>
 
         {/* Right: key metric cards */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {stats.map((stat, i) => (
             <motion.div
               key={stat.label}
@@ -293,7 +293,7 @@ export default function InventoryValuationPage() {
                 <stat.icon className={cn("size-4", stat.color || "text-muted-foreground")} />
               </div>
               <div className="mt-3">
-                <p className={cn("text-2xl font-bold font-mono tabular-nums", stat.color)}>
+                <p className={cn("text-2xl font-bold font-mono tabular-nums truncate", stat.color)}>
                   {stat.value}
                 </p>
                 <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">

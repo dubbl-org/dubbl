@@ -1,15 +1,40 @@
 "use client";
 
-import { useCallback } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Menu } from "lucide-react";
+import { Search, Plus, Menu, Bell } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useSidebar } from "@/components/ui/sidebar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+
+/* ------------------------------------------------------------------ */
+/*  Custom topbar action slot                                          */
+/* ------------------------------------------------------------------ */
+
+const TopbarActionCtx = createContext<{
+  setAction: (node: ReactNode) => void;
+}>({ setAction: () => {} });
+
+/** Render a custom action in the topbar from any page. */
+export function useTopbarAction(node: ReactNode) {
+  const { setAction } = useContext(TopbarActionCtx);
+  useLayoutEffect(() => {
+    setAction(node);
+    return () => setAction(null);
+  }, [node, setAction]);
+}
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -21,6 +46,8 @@ const LABELS: Record<string, string> = {
   inventory: "Inventory",
   payroll: "Payroll",
   reports: "Reports",
+  notifications: "Notifications",
+  documents: "Documents",
   settings: "Settings",
   // Sales subtabs
   invoices: "Invoices",
@@ -43,6 +70,7 @@ const LABELS: Record<string, string> = {
   currencies: "Currencies",
   "tax-rates": "Tax Rates",
   "audit-log": "Audit Log",
+  "document-templates": "Document Templates",
   // Payroll sub-pages
   employees: "Employees",
   runs: "Pay Runs",
@@ -56,6 +84,7 @@ const LABELS: Record<string, string> = {
   "aged-receivables": "Aged Receivables",
   "aged-payables": "Aged Payables",
   "budget-vs-actual": "Budget vs Actual",
+  custom: "Custom Reports",
   general: "General",
   time: "Time Tracking",
   // Inventory subtabs
@@ -67,6 +96,15 @@ const LABELS: Record<string, string> = {
   alerts: "Alerts",
   history: "History",
   suppliers: "Suppliers",
+  bom: "Bill of Materials",
+  assembly: "Assembly Orders",
+  // CRM subtabs
+  crm: "CRM",
+  deals: "Deals",
+  analytics: "Analytics",
+  pipelines: "Pipelines",
+  // Workflow subtabs
+  workflows: "Workflows",
   variants: "Variants",
   // Sales subtabs
   "credit-notes": "Credit Notes",
@@ -79,7 +117,7 @@ const LABELS: Record<string, string> = {
   team: "Team",
 };
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
 
 const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
@@ -102,14 +140,47 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   "inventory/transfers": { label: "New Transfer", drawer: "transfer" },
   "inventory/valuation": null,
   "payroll/employees": { label: "New Employee", drawer: "employee" },
+  "payroll/contractors": { label: "Add Contractor", drawer: "contractor" },
+  "payroll/time-leave": null,
+  "payroll/compensation": null,
+  "payroll/analytics": null,
+  teams: null,
 };
 
 export function Topbar() {
+  const [customAction, setCustomAction] = useState<ReactNode>(null);
+  const stableSetAction = useCallback((n: ReactNode) => setCustomAction(n), []);
+
+  return (
+    <TopbarActionCtx.Provider value={{ setAction: stableSetAction }}>
+      <TopbarInner customAction={customAction} />
+    </TopbarActionCtx.Provider>
+  );
+}
+
+function useUnreadCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+    if (!orgId) return;
+    fetch("/api/v1/notifications?unread=true&limit=1", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.unreadCount !== undefined) setCount(data.unreadCount); })
+      .catch(() => {});
+  }, []);
+  return count;
+}
+
+function TopbarInner({ customAction }: { customAction: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
   const { toggleSidebar, isMobile } = useSidebar();
   const segments = pathname.split("/").filter(Boolean);
+  const unreadCount = useUnreadCount();
 
   // For group roots, show the default subtab in the breadcrumb
   const DEFAULT_SUBTABS: Record<string, string> = {
@@ -191,6 +262,19 @@ export function Topbar() {
           <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative size-7"
+            onClick={() => router.push("/notifications")}
+          >
+            <Bell className="size-3.5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-medium text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Button>
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
           <div className="h-4 w-px bg-border" />
           <Button
@@ -216,6 +300,12 @@ export function Topbar() {
                 <Plus className="size-3" />
                 <span className="hidden sm:inline">{cta.label}</span>
               </Button>
+            </>
+          )}
+          {customAction && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              {customAction}
             </>
           )}
         </div>

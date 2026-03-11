@@ -50,7 +50,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
 
     const existing = await db.query.reminderRule.findFirst({
       where: and(
@@ -84,7 +84,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
 
     const existing = await db.query.reminderRule.findFirst({
       where: and(

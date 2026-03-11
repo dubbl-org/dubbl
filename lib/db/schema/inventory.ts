@@ -8,11 +8,26 @@ import {
   uniqueIndex,
   pgEnum,
   jsonb,
+  date,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization } from "./auth";
 import { chartAccount } from "./bookkeeping";
 import { contact } from "./contacts";
+
+export const trackingMethodEnum = pgEnum("tracking_method", [
+  "none",
+  "serial",
+  "lot",
+  "batch",
+]);
+
+export const serialStatusEnum = pgEnum("serial_status", [
+  "available",
+  "sold",
+  "reserved",
+  "damaged",
+]);
 
 // --- Inventory Category ---
 
@@ -64,6 +79,7 @@ export const inventoryItem = pgTable(
     inventoryAccountId: uuid("inventory_account_id").references(() => chartAccount.id),
     quantityOnHand: integer("quantity_on_hand").notNull().default(0),
     reorderPoint: integer("reorder_point").notNull().default(0),
+    trackingMethod: trackingMethodEnum("tracking_method").notNull().default("none"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -315,6 +331,78 @@ export const inventoryTransferLine = pgTable("inventory_transfer_line", {
   receivedQuantity: integer("received_quantity"),
 });
 
+// Serial Number tracking
+export const serialNumber = pgTable(
+  "serial_number",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItem.id, { onDelete: "cascade" }),
+    serialNumber: text("serial_number").notNull(),
+    status: serialStatusEnum("status").notNull().default("available"),
+    warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+    purchaseMovementId: uuid("purchase_movement_id").references(() => inventoryMovement.id),
+    saleMovementId: uuid("sale_movement_id").references(() => inventoryMovement.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("serial_number_org_item_serial_idx").on(
+      table.organizationId,
+      table.inventoryItemId,
+      table.serialNumber
+    ),
+  ]
+);
+
+// Lot/Batch tracking
+export const lotBatch = pgTable("lot_batch", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  inventoryItemId: uuid("inventory_item_id")
+    .notNull()
+    .references(() => inventoryItem.id, { onDelete: "cascade" }),
+  lotNumber: text("lot_number"),
+  batchNumber: text("batch_number"),
+  quantity: integer("quantity").notNull().default(0),
+  availableQuantity: integer("available_quantity").notNull().default(0),
+  warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+  manufacturingDate: date("manufacturing_date"),
+  expiryDate: date("expiry_date"),
+  purchaseMovementId: uuid("purchase_movement_id").references(() => inventoryMovement.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+// Movement-Serial assignment
+export const movementSerialAssignment = pgTable("movement_serial_assignment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  movementId: uuid("movement_id")
+    .notNull()
+    .references(() => inventoryMovement.id, { onDelete: "cascade" }),
+  serialNumberId: uuid("serial_number_id")
+    .notNull()
+    .references(() => serialNumber.id, { onDelete: "cascade" }),
+});
+
+// Movement-Lot assignment
+export const movementLotAssignment = pgTable("movement_lot_assignment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  movementId: uuid("movement_id")
+    .notNull()
+    .references(() => inventoryMovement.id, { onDelete: "cascade" }),
+  lotBatchId: uuid("lot_batch_id")
+    .notNull()
+    .references(() => lotBatch.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+});
+
 // --- Relations ---
 
 export const inventoryCategoryRelations = relations(inventoryCategory, ({ one, many }) => ({
@@ -360,6 +448,8 @@ export const inventoryItemRelations = relations(inventoryItem, ({ one, many }) =
   variants: many(inventoryVariant),
   stockTakeLines: many(stockTakeLine),
   warehouseStocks: many(warehouseStock),
+  serialNumbers: many(serialNumber),
+  lotBatches: many(lotBatch),
 }));
 
 export const warehouseRelations = relations(warehouse, ({ one, many }) => ({
@@ -477,5 +567,57 @@ export const inventoryTransferLineRelations = relations(inventoryTransferLine, (
   inventoryItem: one(inventoryItem, {
     fields: [inventoryTransferLine.inventoryItemId],
     references: [inventoryItem.id],
+  }),
+}));
+
+export const serialNumberRelations = relations(serialNumber, ({ one }) => ({
+  organization: one(organization, {
+    fields: [serialNumber.organizationId],
+    references: [organization.id],
+  }),
+  inventoryItem: one(inventoryItem, {
+    fields: [serialNumber.inventoryItemId],
+    references: [inventoryItem.id],
+  }),
+  warehouse: one(warehouse, {
+    fields: [serialNumber.warehouseId],
+    references: [warehouse.id],
+  }),
+}));
+
+export const lotBatchRelations = relations(lotBatch, ({ one }) => ({
+  organization: one(organization, {
+    fields: [lotBatch.organizationId],
+    references: [organization.id],
+  }),
+  inventoryItem: one(inventoryItem, {
+    fields: [lotBatch.inventoryItemId],
+    references: [inventoryItem.id],
+  }),
+  warehouse: one(warehouse, {
+    fields: [lotBatch.warehouseId],
+    references: [warehouse.id],
+  }),
+}));
+
+export const movementSerialAssignmentRelations = relations(movementSerialAssignment, ({ one }) => ({
+  movement: one(inventoryMovement, {
+    fields: [movementSerialAssignment.movementId],
+    references: [inventoryMovement.id],
+  }),
+  serialNumber: one(serialNumber, {
+    fields: [movementSerialAssignment.serialNumberId],
+    references: [serialNumber.id],
+  }),
+}));
+
+export const movementLotAssignmentRelations = relations(movementLotAssignment, ({ one }) => ({
+  movement: one(inventoryMovement, {
+    fields: [movementLotAssignment.movementId],
+    references: [inventoryMovement.id],
+  }),
+  lotBatch: one(lotBatch, {
+    fields: [movementLotAssignment.lotBatchId],
+    references: [lotBatch.id],
   }),
 }));

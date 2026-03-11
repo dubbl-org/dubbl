@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -467,24 +468,22 @@ export default function ReconcilePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Opening Balance</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
+                    prefix="$"
                     value={recForm.startBalance}
-                    onChange={(e) =>
-                      setRecForm({ ...recForm, startBalance: e.target.value })
+                    onChange={(v) =>
+                      setRecForm({ ...recForm, startBalance: v })
                     }
                     placeholder="0.00"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Closing Balance</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
+                    prefix="$"
                     value={recForm.endBalance}
-                    onChange={(e) =>
-                      setRecForm({ ...recForm, endBalance: e.target.value })
+                    onChange={(v) =>
+                      setRecForm({ ...recForm, endBalance: v })
                     }
                     placeholder="0.00"
                   />

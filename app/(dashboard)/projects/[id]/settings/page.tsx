@@ -7,6 +7,7 @@ import { Trash2, Loader2 } from "lucide-react";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -31,6 +32,9 @@ export default function SettingsPage() {
   const [contactId, setContactId] = useState(proj?.contactId || "");
   const [projStartDate, setProjStartDate] = useState(proj?.startDate || "");
   const [projEndDate, setProjEndDate] = useState(proj?.endDate || "");
+  const [projBudget, setProjBudget] = useState(centsToDecimal(proj?.budget ?? 0));
+  const [projHourlyRate, setProjHourlyRate] = useState(centsToDecimal(proj?.hourlyRate ?? 0));
+  const [projFixedPrice, setProjFixedPrice] = useState(centsToDecimal(proj?.fixedPrice ?? 0));
 
   if (!proj) return null;
 
@@ -55,9 +59,9 @@ export default function SettingsPage() {
           priority: form.get("priority"),
           billingType: form.get("billingType"),
           color: form.get("color"),
-          budget: Math.round(parseFloat(form.get("budget") as string || "0") * 100),
-          hourlyRate: Math.round(parseFloat(form.get("hourlyRate") as string || "0") * 100),
-          fixedPrice: Math.round(parseFloat(form.get("fixedPrice") as string || "0") * 100),
+          budget: Math.round(parseFloat(projBudget || "0") * 100),
+          hourlyRate: Math.round(parseFloat(projHourlyRate || "0") * 100),
+          fixedPrice: Math.round(parseFloat(projFixedPrice || "0") * 100),
           estimatedHours: Math.round(parseFloat(form.get("estimatedHours") as string || "0") * 60),
           startDate: projStartDate || null,
           endDate: projEndDate || null,
@@ -182,9 +186,9 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5"><Label className="text-xs">Budget</Label><Input name="budget" type="number" step="0.01" min={0} defaultValue={centsToDecimal(proj.budget)} /></div>
-          <div className="space-y-1.5"><Label className="text-xs">Hourly Rate</Label><Input name="hourlyRate" type="number" step="0.01" min={0} defaultValue={centsToDecimal(proj.hourlyRate)} /></div>
-          <div className="space-y-1.5"><Label className="text-xs">Fixed Price</Label><Input name="fixedPrice" type="number" step="0.01" min={0} defaultValue={centsToDecimal(proj.fixedPrice)} /></div>
+          <div className="space-y-1.5"><Label className="text-xs">Budget</Label><CurrencyInput prefix="$" value={projBudget} onChange={setProjBudget} /></div>
+          <div className="space-y-1.5"><Label className="text-xs">Hourly Rate</Label><CurrencyInput prefix="$" value={projHourlyRate} onChange={setProjHourlyRate} /></div>
+          <div className="space-y-1.5"><Label className="text-xs">Fixed Price</Label><CurrencyInput prefix="$" value={projFixedPrice} onChange={setProjFixedPrice} /></div>
         </div>
       </Section>
 

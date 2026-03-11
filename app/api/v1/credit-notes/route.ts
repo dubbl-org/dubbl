@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { creditNote, creditNoteLine } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -9,6 +9,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -29,6 +30,15 @@ const createSchema = z.object({
   lines: z.array(lineSchema).min(1),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SORT_COLUMNS: Record<string, any> = {
+  date: creditNote.issueDate,
+  total: creditNote.total,
+  remaining: creditNote.amountRemaining,
+  number: creditNote.creditNoteNumber,
+  created: creditNote.createdAt,
+};
+
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
@@ -36,6 +46,10 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const status = url.searchParams.get("status");
     const contactId = url.searchParams.get("contactId");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const sortBy = url.searchParams.get("sortBy") || "created";
+    const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
     const conditions = [
       eq(creditNote.organizationId, ctx.organizationId),
@@ -50,16 +64,26 @@ export async function GET(request: Request) {
       conditions.push(eq(creditNote.contactId, contactId));
     }
 
+    if (from) {
+      conditions.push(gte(creditNote.issueDate, from));
+    }
+    if (to) {
+      conditions.push(lte(creditNote.issueDate, to));
+    }
+
+    const sortCol = SORT_COLUMNS[sortBy] || creditNote.createdAt;
+    const orderFn = sortOrder === "asc" ? asc : desc;
+
     const creditNotes = await db.query.creditNote.findMany({
       where: and(...conditions),
-      orderBy: desc(creditNote.createdAt),
+      orderBy: orderFn(sortCol),
       limit,
       offset,
       with: { contact: true },
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(creditNote) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(creditNote)
       .where(and(...conditions));
 
@@ -78,6 +102,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    await assertNotLocked(ctx.organizationId, parsed.issueDate);
 
     const creditNoteNumber = await getNextNumber(ctx.organizationId, "credit_note", "credit_note_number", "CN");
 

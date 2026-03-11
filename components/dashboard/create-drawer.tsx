@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Tag,
   ArrowLeftRight,
+  Briefcase,
 } from "lucide-react";
 import {
   Sheet,
@@ -47,12 +48,16 @@ import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-item
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
 import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
+import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
+import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
+import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
 
 interface CreateDrawerContextValue {
   open: (type: DrawerType) => void;
@@ -96,6 +101,8 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <StockTakeDrawer open={activeType === "stockTake"} onClose={close} />
       <CategoryDrawer open={activeType === "category"} onClose={close} />
       <TransferDrawer open={activeType === "transfer"} onClose={close} />
+      <ContractorDrawer open={activeType === "contractor"} onClose={close} />
+      <DealDrawer open={activeType === "deal"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -269,6 +276,9 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   const [contactId, setContactId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [projectBudget, setProjectBudget] = useState("0.00");
+  const [projectHourlyRate, setProjectHourlyRate] = useState("0.00");
+  const [projectFixedPrice, setProjectFixedPrice] = useState("0.00");
 
   const PROJECT_COLORS = [
     "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
@@ -424,17 +434,17 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-budget">Budget</Label>
-                  <Input id="drawer-project-budget" name="budget" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-project-budget" name="budget" prefix="$" value={projectBudget} onChange={setProjectBudget} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-rate">Hourly Rate</Label>
-                  <Input id="drawer-project-rate" name="hourlyRate" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-project-rate" name="hourlyRate" prefix="$" value={projectHourlyRate} onChange={setProjectHourlyRate} />
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Fixed Price</Label>
-                  <Input name="fixedPrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput name="fixedPrice" prefix="$" value={projectFixedPrice} onChange={setProjectFixedPrice} />
                 </div>
                 <div className="space-y-2">
                   <Label>Estimated Hours</Label>
@@ -625,6 +635,22 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     }
   }, [open]);
 
+  const handleReceiptExtracted = useCallback((data: ReceiptData) => {
+    if (data.date) {
+      setIssueDate(data.date);
+      const d = new Date(data.date);
+      d.setDate(d.getDate() + 30);
+      setDueDate(d.toISOString().split("T")[0]);
+    }
+    if (data.total !== null) {
+      const totalStr = (data.total / 100).toFixed(2);
+      setLines([{ description: data.vendor || "Receipt item", quantity: "1", unitPrice: totalStr, accountId: "", taxRateId: "" }]);
+    }
+    if (data.vendor) {
+      setReference(data.vendor);
+    }
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!contactId) { toast.error("Please select a supplier"); return; }
@@ -678,6 +704,10 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <ReceiptOcr onExtracted={handleReceiptExtracted} />
+
+            <div className="h-px bg-border" />
+
             <div className="space-y-4">
               <SectionLabel>Bill Details</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -822,6 +852,9 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
 function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [categoryId, setCategoryId] = useState("");
+  const [invPurchasePrice, setInvPurchasePrice] = useState("0.00");
+  const [invSalePrice, setInvSalePrice] = useState("0.00");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -838,7 +871,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
-          category: form.get("category") || null,
+          categoryId: categoryId || null,
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
@@ -889,8 +922,8 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="drawer-inv-category">Category</Label>
-                  <Input id="drawer-inv-category" name="category" placeholder="e.g. Electronics" />
+                  <Label>Category</Label>
+                  <CategoryPicker value={categoryId} onChange={setCategoryId} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-sku">SKU</Label>
@@ -906,11 +939,11 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-purchase">Purchase Price</Label>
-                  <Input id="drawer-inv-purchase" name="purchasePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-inv-purchase" name="purchasePrice" prefix="$" value={invPurchasePrice} onChange={setInvPurchasePrice} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-sale">Sale Price</Label>
-                  <Input id="drawer-inv-sale" name="salePrice" type="number" step="0.01" min={0} defaultValue="0.00" placeholder="0.00" />
+                  <CurrencyInput id="drawer-inv-sale" name="salePrice" prefix="$" value={invSalePrice} onChange={setInvSalePrice} />
                 </div>
               </div>
             </div>
@@ -1335,7 +1368,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                       </div>
                       <div className="space-y-2">
                         <Label>Amount *</Label>
-                        <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateItem(index, { amount: e.target.value })} placeholder="0.00" />
+                        <CurrencyInput prefix="$" value={item.amount} onChange={(v) => updateItem(index, { amount: v })} />
                       </div>
                       <div className="space-y-2">
                         <Label>Category</Label>
@@ -1497,7 +1530,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                 </div>
                 <div className="space-y-2">
                   <Label>Purchase Price *</Label>
-                  <Input type="number" step="0.01" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="10000.00" />
+                  <CurrencyInput prefix="$" value={purchasePrice} onChange={setPurchasePrice} placeholder="10000.00" />
                 </div>
               </div>
             </div>
@@ -1509,7 +1542,7 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Residual Value</Label>
-                  <Input type="number" step="0.01" value={residualValue} onChange={(e) => setResidualValue(e.target.value)} placeholder="500.00" />
+                  <CurrencyInput prefix="$" value={residualValue} onChange={setResidualValue} placeholder="500.00" />
                 </div>
                 <div className="space-y-2">
                   <Label>Useful Life (months)</Label>
@@ -1928,12 +1961,14 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
   const [taxRate, setTaxRate] = useState("20");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [empStartDate, setEmpStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [empCurrency, setEmpCurrency] = useState("USD");
 
   useEffect(() => {
     if (!open) {
       setEmpName(""); setEmail(""); setEmployeeNumber(""); setPosition("");
       setSalary(""); setPayFrequency("monthly"); setTaxRate("20");
       setBankAccountNumber(""); setEmpStartDate(new Date().toISOString().split("T")[0]);
+      setEmpCurrency("USD");
     }
   }, [open]);
 
@@ -1958,6 +1993,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
           taxRate: Math.round(parseFloat(taxRate) * 100),
           bankAccountNumber: bankAccountNumber || null,
           startDate: empStartDate,
+          currency: empCurrency,
         }),
       });
       if (!res.ok) {
@@ -2017,10 +2053,10 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
 
             <div className="space-y-4">
               <SectionLabel>Compensation</SectionLabel>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Annual Salary *</Label>
-                  <Input type="number" step="0.01" value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="75000.00" />
+                  <CurrencyInput prefix="$" value={salary} onChange={setSalary} placeholder="75000.00" />
                 </div>
                 <div className="space-y-2">
                   <Label>Pay Frequency</Label>
@@ -2036,6 +2072,10 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                 <div className="space-y-2">
                   <Label>Tax Rate (%)</Label>
                   <Input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="20.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <CurrencySelect value={empCurrency} onValueChange={setEmpCurrency} />
                 </div>
               </div>
             </div>
@@ -2328,6 +2368,9 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
 // ---------------------------------------------------------------------------
 function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
+  const [acctCurrency, setAcctCurrency] = useState("USD");
+
+  useEffect(() => { if (!open) setAcctCurrency("USD"); }, [open]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2346,7 +2389,7 @@ function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           type: form.get("type") || "asset",
           subType: form.get("subType") || null,
           description: form.get("description") || null,
-          currencyCode: form.get("currencyCode") || "USD",
+          currencyCode: acctCurrency,
         }),
       });
       if (!res.ok) {
@@ -2407,7 +2450,7 @@ function AccountDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-account-currency">Currency</Label>
-                  <Input id="drawer-account-currency" name="currencyCode" defaultValue="USD" placeholder="USD" maxLength={3} />
+                  <CurrencySelect value={acctCurrency} onValueChange={setAcctCurrency} />
                 </div>
               </div>
             </div>
@@ -2547,7 +2590,7 @@ function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => vo
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Currency</Label>
-                  <Input value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value.toUpperCase())} placeholder="USD" maxLength={3} />
+                  <CurrencySelect value={currencyCode} onValueChange={setCurrencyCode} />
                 </div>
                 <div className="space-y-2">
                   <Label>Country</Label>
@@ -2667,6 +2710,7 @@ function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () => void
 // ---------------------------------------------------------------------------
 function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
+  const [warehouseId, setWarehouseId] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2681,6 +2725,7 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           name: form.get("name"),
+          warehouseId: warehouseId || null,
           notes: form.get("notes") || null,
         }),
       });
@@ -2699,7 +2744,7 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+    <Sheet open={open} onOpenChange={(v) => { if (!v) { onClose(); setWarehouseId(""); } }}>
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
@@ -2717,6 +2762,11 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
               <div className="space-y-2">
                 <Label htmlFor="drawer-st-name">Name *</Label>
                 <Input id="drawer-st-name" name="name" required placeholder="e.g. Q1 2026 Full Count" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Warehouse (optional)</Label>
+                <WarehousePicker value={warehouseId} onChange={setWarehouseId} placeholder="All warehouses" />
+                <p className="text-xs text-muted-foreground">Leave empty to count all items across all warehouses.</p>
               </div>
             </div>
 
@@ -2737,8 +2787,14 @@ function StockTakeDrawer({ open, onClose }: { open: boolean; onClose: () => void
 // ---------------------------------------------------------------------------
 // Category Drawer
 // ---------------------------------------------------------------------------
+const CATEGORY_COLORS = [
+  "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+];
+
 function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
+  const [color, setColor] = useState(CATEGORY_COLORS[0]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2753,7 +2809,7 @@ function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void 
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           name: form.get("name"),
-          color: form.get("color") || null,
+          color: color || null,
           description: form.get("description") || null,
         }),
       });
@@ -2798,8 +2854,15 @@ function CategoryDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             <div className="space-y-4">
               <SectionLabel>Details</SectionLabel>
               <div className="space-y-2">
-                <Label htmlFor="drawer-cat-color">Color</Label>
-                <Input id="drawer-cat-color" name="color" placeholder="#10b981" />
+                <Label>Color</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {CATEGORY_COLORS.map((c) => (
+                    <label key={c} className="cursor-pointer">
+                      <input type="radio" name="color" value={c} checked={color === c} onChange={() => setColor(c)} className="sr-only peer" />
+                      <div className="size-6 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-gray-400 transition-all" style={{ backgroundColor: c }} />
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="drawer-cat-desc">Description</Label>
@@ -2959,6 +3022,330 @@ function TransferDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Transfer" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [cName, setCName] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const [cCompany, setCCompany] = useState("");
+  const [cRate, setCRate] = useState("");
+  const [cCurrency, setCCurrency] = useState("USD");
+
+  useEffect(() => {
+    if (!open) {
+      setCName(""); setCEmail(""); setCCompany(""); setCRate(""); setCCurrency("USD");
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cName) { toast.error("Name is required"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/payroll/contractors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name: cName,
+          email: cEmail || null,
+          company: cCompany || null,
+          defaultRate: cRate ? Math.round(parseFloat(cRate) * 100) : null,
+          currency: cCurrency,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add contractor");
+      }
+      const data = await res.json();
+      toast.success("Contractor added");
+      onClose();
+      router.push(`/payroll/contractors/${data.contractor.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add contractor");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Briefcase className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Contractor</SheetTitle>
+              <SheetDescription>Add a contractor for payments.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Contractor Info</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Jane Smith" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input type="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} placeholder="jane@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <Input value={cCompany} onChange={(e) => setCCompany(e.target.value)} placeholder="Acme LLC" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Default Rate</Label>
+                  <CurrencyInput prefix="$" value={cRate} onChange={setCRate} placeholder="150.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <CurrencySelect value={cCurrency} onValueChange={setCCurrency} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Add Contractor" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Deal Drawer
+// ---------------------------------------------------------------------------
+interface DealPipeline {
+  id: string;
+  name: string;
+  stages: { id: string; name: string; color: string }[];
+  isDefault: boolean;
+}
+
+function DealDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [pipelines, setPipelines] = useState<DealPipeline[]>([]);
+  const [pipelineId, setPipelineId] = useState("");
+  const [stageId, setStageId] = useState("");
+  const [contactId, setContactId] = useState("");
+  const [value, setValue] = useState("");
+  const [probability, setProbability] = useState("");
+  const [expectedClose, setExpectedClose] = useState<string | undefined>();
+  const [source, setSource] = useState<string>("");
+  const [dirty, setDirty] = useState(false);
+
+  // Fetch pipelines when drawer opens
+  useEffect(() => {
+    if (!open) return;
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/crm/pipelines", {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const pipes = data.pipelines || [];
+        setPipelines(pipes);
+        const def = pipes.find((p: DealPipeline) => p.isDefault) || pipes[0];
+        if (def) {
+          setPipelineId(def.id);
+          if (def.stages?.length) setStageId(def.stages[0].id);
+        }
+      })
+      .catch(() => {});
+  }, [open]);
+
+  const activePipeline = pipelines.find((p) => p.id === pipelineId);
+  const stages = activePipeline?.stages || [];
+
+  function reset() {
+    setValue("");
+    setProbability("");
+    setExpectedClose(undefined);
+    setSource("");
+    setContactId("");
+    setDirty(false);
+  }
+
+  function handleClose() {
+    if (dirty && !window.confirm("You have unsaved changes. Discard?")) return;
+    reset();
+    onClose();
+  }
+
+  function markDirty() {
+    if (!dirty) setDirty(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const title = (form.get("title") as string)?.trim();
+    if (!title || !pipelineId || saving) return;
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    try {
+      const res = await fetch("/api/v1/crm/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          pipelineId,
+          stageId: stageId || stages[0]?.id || "lead",
+          contactId: contactId || undefined,
+          title,
+          valueCents: value ? Math.round(parseFloat(value) * 100) : 0,
+          currency: "USD",
+          probability: probability ? parseInt(probability) : null,
+          expectedCloseDate: expectedClose || null,
+          source: source || null,
+          notes: (form.get("notes") as string) || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create deal");
+      }
+      const data = await res.json();
+      toast.success("Deal created");
+      reset();
+      onClose();
+      window.dispatchEvent(new CustomEvent("deals-changed"));
+      router.push(`/crm/deals/${data.deal.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create deal");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && handleClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Target className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Deal</SheetTitle>
+              <SheetDescription>Add a deal to your sales pipeline.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Deal Info</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-deal-title">Title *</Label>
+                <Input
+                  id="drawer-deal-title"
+                  name="title"
+                  required
+                  placeholder="e.g. Acme Corp - Enterprise Plan"
+                  onChange={markDirty}
+                />
+              </div>
+              {pipelines.length > 1 && (
+                <div className="space-y-2">
+                  <Label>Pipeline</Label>
+                  <Select value={pipelineId} onValueChange={(v) => { setPipelineId(v); markDirty(); const p = pipelines.find((pp) => pp.id === v); if (p?.stages?.length) setStageId(p.stages[0].id); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {pipelines.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>Stage</Label>
+                <Select value={stageId} onValueChange={(v) => { setStageId(v); markDirty(); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {stages.filter((s) => s.id !== "closed_lost" && s.id !== "closed_won").map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
+                          {s.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Contact</SectionLabel>
+              <div className="space-y-2">
+                <Label>Associated Contact</Label>
+                <ContactPicker value={contactId} onChange={(v) => { setContactId(v); markDirty(); }} placeholder="Select a contact..." />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Value &amp; Probability</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Deal Value</Label>
+                  <CurrencyInput value={value} onChange={(v) => { setValue(v); markDirty(); }} placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-deal-prob">Win Probability %</Label>
+                  <Input id="drawer-deal-prob" type="number" min={0} max={100} placeholder="50" value={probability} onChange={(e) => { setProbability(e.target.value); markDirty(); }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Expected Close</Label>
+                  <DatePicker value={expectedClose} onChange={(v) => { setExpectedClose(v); markDirty(); }} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Source</Label>
+                  <Select value={source} onValueChange={(v) => { setSource(v); markDirty(); }}>
+                    <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="website">Website</SelectItem>
+                      <SelectItem value="referral">Referral</SelectItem>
+                      <SelectItem value="cold_outreach">Cold Outreach</SelectItem>
+                      <SelectItem value="event">Event</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-deal-notes">Notes</Label>
+                <Textarea id="drawer-deal-notes" name="notes" placeholder="Additional context about this deal..." rows={3} onChange={markDirty} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={handleClose} saving={saving} label="Create Deal" />
         </form>
       </SheetContent>
     </Sheet>

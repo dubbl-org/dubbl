@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
 import { BlurReveal } from "@/components/ui/blur-reveal";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
 
 interface Quote {
   id: string;
@@ -112,7 +113,11 @@ export default function QuotesPage() {
     .filter((q) => q.status === "accepted")
     .reduce((sum, q) => sum + q.total, 0);
 
-  if (!loading && quotes.length === 0 && statusFilter === "all") {
+  if (loading) {
+    return <BrandLoader />;
+  }
+
+  if (quotes.length === 0 && statusFilter === "all") {
     return (
       <BlurReveal>
         <div className="flex items-start px-3 sm:px-6 pt-16 pb-12">

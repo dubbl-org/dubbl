@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { reminderRule } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(reminderRule) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(reminderRule)
       .where(and(...conditions));
 
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);

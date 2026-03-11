@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { payrollEmployee } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -20,6 +20,10 @@ const createSchema = z.object({
   bankAccountNumber: z.string().nullable().optional(),
   startDate: z.string().min(1),
   endDate: z.string().nullable().optional(),
+  memberId: z.string().uuid().nullable().optional(),
+  compensationType: z.enum(["salary", "hourly", "milestone", "commission"]).default("salary"),
+  hourlyRate: z.number().int().min(0).nullable().optional(),
+  currency: z.string().max(3).default("USD"),
 });
 
 export async function GET(request: Request) {
@@ -45,12 +49,13 @@ export async function GET(request: Request) {
     const employees = await db.query.payrollEmployee.findMany({
       where: and(...conditions),
       orderBy: desc(payrollEmployee.createdAt),
+      with: { member: { with: { user: true } } },
       limit,
       offset,
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(payrollEmployee) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(payrollEmployee)
       .where(and(...conditions));
 
@@ -89,6 +94,10 @@ export async function POST(request: Request) {
         bankAccountNumber: parsed.bankAccountNumber || null,
         startDate: parsed.startDate,
         endDate: parsed.endDate || null,
+        memberId: parsed.memberId || null,
+        compensationType: parsed.compensationType,
+        hourlyRate: parsed.hourlyRate ?? null,
+        currency: parsed.currency,
       })
       .returning();
 

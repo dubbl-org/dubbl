@@ -5,8 +5,9 @@ import {
   stockTakeLine,
   inventoryItem,
   inventoryMovement,
+  warehouseStock,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
@@ -68,6 +69,29 @@ export async function POST(
         })
         .where(eq(inventoryItem.id, line.inventoryItemId));
 
+      // Update warehouse stock if stock take is scoped to a warehouse
+      if (st.warehouseId) {
+        await db
+          .insert(warehouseStock)
+          .values({
+            organizationId: ctx.organizationId,
+            inventoryItemId: line.inventoryItemId,
+            warehouseId: st.warehouseId,
+            quantity: newQuantity,
+          })
+          .onConflictDoUpdate({
+            target: [
+              warehouseStock.organizationId,
+              warehouseStock.inventoryItemId,
+              warehouseStock.warehouseId,
+            ],
+            set: {
+              quantity: sql`${newQuantity}`,
+              updatedAt: new Date(),
+            },
+          });
+      }
+
       // Insert inventory movement
       await db.insert(inventoryMovement).values({
         organizationId: ctx.organizationId,
@@ -102,10 +126,20 @@ export async function POST(
       })
       .where(eq(stockTake.id, id));
 
-    return NextResponse.json({
-      success: true,
-      adjustedCount,
+    const updatedSt = await db.query.stockTake.findFirst({
+      where: and(eq(stockTake.id, id), eq(stockTake.organizationId, ctx.organizationId)),
+      with: {
+        lines: {
+          with: {
+            inventoryItem: {
+              columns: { id: true, name: true, code: true },
+            },
+          },
+        },
+      },
     });
+
+    return NextResponse.json({ stockTake: updatedSt, adjustedCount });
   } catch (err) {
     return handleError(err);
   }

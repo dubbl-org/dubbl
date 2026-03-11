@@ -7,6 +7,7 @@ import { ArrowLeft, Send, ShoppingCart, Pencil, Trash2, Plus, Package } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -274,7 +275,7 @@ function EditPODrawer({
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Unit Price *</Label>
-                        <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} />
+                        <CurrencyInput prefix="$" value={line.unitPrice} onChange={(v) => updateLine(index, { unitPrice: v })} />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Account</Label>
@@ -367,7 +368,7 @@ export default function PODetailPage() {
       router.push("/purchases/orders");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to delete");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to delete");
     }
   }
 

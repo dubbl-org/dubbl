@@ -5,6 +5,7 @@ import {
   journalEntry,
   journalLine,
   chartAccount,
+  approvalChain,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
@@ -36,9 +37,27 @@ export async function POST(
 
     if (!run) return notFound("Payroll run");
 
-    if (run.status !== "draft") {
+    const isApprovedPendingRun =
+      run.status === "pending_approval" && run.approvalStatus === "approved";
+
+    if (run.status !== "draft" && !isApprovedPendingRun) {
       return NextResponse.json(
         { error: "Only draft payroll runs can be processed" },
+        { status: 400 }
+      );
+    }
+
+    // Check if an approval chain is configured for this org
+    const chains = await db.query.approvalChain.findMany({
+      where: and(
+        eq(approvalChain.organizationId, ctx.organizationId),
+        notDeleted(approvalChain.deletedAt)
+      ),
+    });
+
+    if (chains.length > 0 && run.approvalStatus !== "approved") {
+      return NextResponse.json(
+        { error: "This run requires approval before processing" },
         { status: 400 }
       );
     }

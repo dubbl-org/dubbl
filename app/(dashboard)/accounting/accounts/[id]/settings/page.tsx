@@ -105,7 +105,7 @@ export default function AccountSettingsPage() {
           router.push("/accounting/accounts");
         } else {
           const data = await res.json();
-          toast.error(data.error || "Failed to delete account");
+          toast.error(typeof data.error === "string" ? data.error : "Failed to delete account");
         }
       },
     });

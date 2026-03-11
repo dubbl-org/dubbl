@@ -5,6 +5,7 @@ import { eq, sql, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import { centsToDecimal } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    await assertNotLocked(ctx.organizationId, parsed.date);
 
     // Validate balance
     const totalDebit = parsed.lines.reduce((sum, l) => sum + l.debitAmount, 0);

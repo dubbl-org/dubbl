@@ -11,6 +11,7 @@ import { z } from "zod";
 const addMemberSchema = z.object({
   memberId: z.string().min(1),
   role: z.enum(["manager", "contributor", "viewer"]).default("contributor"),
+  hourlyRate: z.number().int().min(0).optional(),
 });
 
 export async function GET(
@@ -94,6 +95,7 @@ export async function POST(
         projectId: id,
         memberId: parsed.memberId,
         role: parsed.role,
+        hourlyRate: parsed.hourlyRate ?? null,
       })
       .returning();
 

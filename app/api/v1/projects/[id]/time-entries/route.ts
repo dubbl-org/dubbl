@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, timeEntry } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { project, projectMember, timeEntry } from "@/lib/db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
@@ -48,7 +48,7 @@ export async function GET(
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(timeEntry) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(timeEntry)
       .where(eq(timeEntry.projectId, id));
 
@@ -83,7 +83,16 @@ export async function POST(
 
     if (!proj) return notFound("Project");
 
-    const rate = parsed.hourlyRate ?? proj.hourlyRate;
+    // Rate cascade: explicit > member rate > project rate
+    let rate = parsed.hourlyRate;
+    if (rate == null) {
+      const pms = await db.query.projectMember.findMany({
+        where: eq(projectMember.projectId, id),
+        with: { member: { columns: { userId: true } } },
+      });
+      const userPm = pms.find(pm => pm.member?.userId === ctx.userId);
+      rate = userPm?.hourlyRate ?? proj.hourlyRate;
+    }
 
     const [created] = await db
       .insert(timeEntry)

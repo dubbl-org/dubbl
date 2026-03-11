@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 export interface ProjectMemberData {
   id: string;
   role: string;
+  hourlyRate: number | null;
   member: {
     id: string;
     role: string;
@@ -81,6 +82,8 @@ export interface MilestoneData {
   status: string;
   dueDate: string | null;
   amount: number;
+  invoicedAmountCents: number;
+  progressPercent: number;
   completedAt: string | null;
 }
 

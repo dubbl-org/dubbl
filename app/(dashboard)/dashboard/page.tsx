@@ -28,6 +28,7 @@ import { devDelay } from "@/lib/dev-delay";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { cn } from "@/lib/utils";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { CashFlowWidget } from "@/components/dashboard/cash-flow-widget";
 
 const GREETINGS_MORNING = [
   "Good morning",
@@ -320,8 +321,8 @@ export default function DashboardPage() {
             expenses: pnlData.expenses || [],
           });
         }
-        if (arData) setReceivables(arData);
-        if (apData) setPayables(apData);
+        if (arData?.buckets) setReceivables(arData);
+        if (apData?.buckets) setPayables(apData);
       })
       .then(() => devDelay())
       .finally(() => setLoading(false));
@@ -373,6 +374,10 @@ export default function DashboardPage() {
     fetch("/api/v1/dashboard/alerts", { headers })
       .then((r) => r.json())
       .then((data) => setActionAlerts(data))
+      .catch(() => {});
+
+    // Process due payment reminders in background
+    fetch("/api/v1/reminders/process", { method: "POST", headers })
       .catch(() => {});
   }, []);
 
@@ -648,6 +653,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* Cash Flow Forecast */}
+            <CashFlowWidget />
 
             {/* Financial KPIs */}
             {ratios && Object.values(ratios).some((v) => v !== null) && (

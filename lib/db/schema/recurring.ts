@@ -10,7 +10,7 @@ import {
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
 import { contact } from "./contacts";
-import { chartAccount, taxRate } from "./bookkeeping";
+import { chartAccount, taxRate, costCenter } from "./bookkeeping";
 
 export const recurringFrequencyEnum = pgEnum("recurring_frequency", [
   "weekly",
@@ -70,6 +70,7 @@ export const recurringTemplateLine = pgTable("recurring_template_line", {
   unitPrice: integer("unit_price").notNull().default(0), // cents
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -102,5 +103,9 @@ export const recurringTemplateLineRelations = relations(recurringTemplateLine, (
   taxRate: one(taxRate, {
     fields: [recurringTemplateLine.taxRateId],
     references: [taxRate.id],
+  }),
+  costCenter: one(costCenter, {
+    fields: [recurringTemplateLine.costCenterId],
+    references: [costCenter.id],
   }),
 }));

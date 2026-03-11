@@ -10,7 +10,7 @@ import {
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
 import { contact } from "./contacts";
-import { journalEntry, chartAccount, taxRate } from "./bookkeeping";
+import { journalEntry, chartAccount, taxRate, costCenter } from "./bookkeeping";
 
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "draft",
@@ -60,6 +60,7 @@ export const invoice = pgTable("invoice", {
   amountPaid: integer("amount_paid").notNull().default(0),
   amountDue: integer("amount_due").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
+  paymentLinkToken: text("payment_link_token").unique(),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   sentAt: timestamp("sent_at", { mode: "date" }),
   paidAt: timestamp("paid_at", { mode: "date" }),
@@ -85,6 +86,7 @@ export const invoiceLine = pgTable("invoice_line", {
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0), // qty * unitPrice (before tax)
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -132,6 +134,7 @@ export const quoteLine = pgTable("quote_line", {
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -182,6 +185,7 @@ export const creditNoteLine = pgTable("credit_note_line", {
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -220,6 +224,10 @@ export const invoiceLineRelations = relations(invoiceLine, ({ one }) => ({
     fields: [invoiceLine.taxRateId],
     references: [taxRate.id],
   }),
+  costCenter: one(costCenter, {
+    fields: [invoiceLine.costCenterId],
+    references: [costCenter.id],
+  }),
 }));
 
 export const quoteRelations = relations(quote, ({ one, many }) => ({
@@ -250,6 +258,10 @@ export const quoteLineRelations = relations(quoteLine, ({ one }) => ({
   taxRate: one(taxRate, {
     fields: [quoteLine.taxRateId],
     references: [taxRate.id],
+  }),
+  costCenter: one(costCenter, {
+    fields: [quoteLine.costCenterId],
+    references: [costCenter.id],
   }),
 }));
 
@@ -289,5 +301,9 @@ export const creditNoteLineRelations = relations(creditNoteLine, ({ one }) => ({
   taxRate: one(taxRate, {
     fields: [creditNoteLine.taxRateId],
     references: [taxRate.id],
+  }),
+  costCenter: one(costCenter, {
+    fields: [creditNoteLine.costCenterId],
+    references: [costCenter.id],
   }),
 }));

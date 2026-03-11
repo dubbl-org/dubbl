@@ -10,7 +10,7 @@ import { sendEmail } from "@/lib/email/smtp-client";
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:banking");
 
     const config = await db.query.emailConfig.findFirst({
       where: eq(emailConfig.organizationId, ctx.organizationId),

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -710,12 +711,10 @@ export function MatchToBillSheet({
                   Bill due: {formatMoney(selected.amountDue, currencyCode)}
                 </span>
               </div>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
+                prefix="$"
                 value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-                className="font-mono"
+                onChange={setPayAmount}
               />
             </div>
           )}
@@ -848,7 +847,7 @@ export function CreateExpenseSheet({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Amount</Label>
-                <Input type="number" step="0.01" value={itemAmount} onChange={(e) => setItemAmount(e.target.value)} className="font-mono" />
+                <CurrencyInput prefix="$" value={itemAmount} onChange={setItemAmount} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Category (optional)</Label>

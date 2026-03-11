@@ -14,6 +14,7 @@ const createSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
+  categoryId: z.string().uuid().nullable().optional(),
   sku: z.string().nullable().optional(),
   purchasePrice: z.number().int().min(0).default(0),
   salePrice: z.number().int().min(0).default(0),
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const search = url.searchParams.get("search");
     const category = url.searchParams.get("category");
+    const categoryId = url.searchParams.get("categoryId");
     const status = url.searchParams.get("status"); // active, inactive, low_stock
     const sortBy = url.searchParams.get("sortBy") || "createdAt";
     const sortOrder = url.searchParams.get("sortOrder") || "desc";
@@ -62,7 +64,9 @@ export async function GET(request: Request) {
       );
     }
 
-    if (category) {
+    if (categoryId) {
+      conditions.push(eq(inventoryItem.categoryId, categoryId));
+    } else if (category) {
       conditions.push(eq(inventoryItem.category, category));
     }
 
@@ -88,7 +92,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(inventoryItem) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(inventoryItem)
       .where(and(...conditions));
 

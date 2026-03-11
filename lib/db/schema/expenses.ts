@@ -4,12 +4,13 @@ import {
   uuid,
   timestamp,
   integer,
+  boolean,
   date,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
-import { journalEntry, chartAccount } from "./bookkeeping";
+import { journalEntry, chartAccount, costCenter } from "./bookkeeping";
 
 export const expenseStatusEnum = pgEnum("expense_status", [
   "draft",
@@ -50,8 +51,12 @@ export const expenseItem = pgTable("expense_item", {
   amount: integer("amount").notNull().default(0),
   category: text("category"),
   accountId: uuid("account_id").references(() => chartAccount.id),
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   receiptFileKey: text("receipt_file_key"),
   receiptFileName: text("receipt_file_name"),
+  isMileage: boolean("is_mileage").notNull().default(false),
+  distanceMiles: integer("distance_miles"), // miles x 100 for 2 decimals
+  mileageRate: integer("mileage_rate"), // cents per mile
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -67,4 +72,5 @@ export const expenseClaimRelations = relations(expenseClaim, ({ one, many }) => 
 export const expenseItemRelations = relations(expenseItem, ({ one }) => ({
   expenseClaim: one(expenseClaim, { fields: [expenseItem.expenseClaimId], references: [expenseClaim.id] }),
   account: one(chartAccount, { fields: [expenseItem.accountId], references: [chartAccount.id] }),
+  costCenter: one(costCenter, { fields: [expenseItem.costCenterId], references: [costCenter.id] }),
 }));

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { recurringTemplate, invoice, invoiceLine } from "@/lib/db/schema";
+import { recurringTemplate, invoice, invoiceLine, bill, billLine, expenseClaim, expenseItem } from "@/lib/db/schema";
 import { eq, and, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { getNextNumber } from "@/lib/api/numbering";
@@ -68,7 +68,101 @@ export async function processRecurringTemplates(organizationId: string): Promise
         break;
       }
 
-      // Only generate invoices (not bills, for now)
+      if (tmpl.type === "bill") {
+        const billNumber = await getNextNumber(organizationId, "bill", "bill_number", "BILL");
+        const dueDateBill = new Date(nextRun + "T00:00:00Z");
+        dueDateBill.setUTCDate(dueDateBill.getUTCDate() + 30);
+        const dueDateBillStr = dueDateBill.toISOString().split("T")[0];
+
+        let billSubtotal = 0;
+        const billLines = tmpl.lines.map((l, i) => {
+          const amt = Math.round((l.quantity / 100) * l.unitPrice);
+          billSubtotal += amt;
+          return {
+            description: l.description,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            accountId: l.accountId,
+            taxRateId: l.taxRateId,
+            taxAmount: 0,
+            amount: amt,
+            sortOrder: l.sortOrder ?? i,
+          };
+        });
+
+        const [createdBill] = await db
+          .insert(bill)
+          .values({
+            organizationId,
+            contactId: tmpl.contactId,
+            billNumber,
+            issueDate: nextRun,
+            dueDate: dueDateBillStr,
+            reference: tmpl.reference,
+            notes: tmpl.notes,
+            subtotal: billSubtotal,
+            taxTotal: 0,
+            total: billSubtotal,
+            amountPaid: 0,
+            amountDue: billSubtotal,
+            currencyCode: tmpl.currencyCode,
+            createdBy: tmpl.createdBy,
+          })
+          .returning();
+
+        if (billLines.length > 0) {
+          await db.insert(billLine).values(
+            billLines.map((l) => ({ billId: createdBill.id, ...l }))
+          );
+        }
+
+        occurrences++;
+        generated++;
+        nextRun = advanceDate(nextRun, tmpl.frequency);
+        continue;
+      }
+
+      if (tmpl.type === "expense") {
+        let expenseTotal = 0;
+        const expenseItems = tmpl.lines.map((l, i) => {
+          const amt = Math.round((l.quantity / 100) * l.unitPrice);
+          expenseTotal += amt;
+          return {
+            date: nextRun,
+            description: l.description,
+            amount: amt,
+            accountId: l.accountId,
+            sortOrder: l.sortOrder ?? i,
+          };
+        });
+
+        const [createdClaim] = await db
+          .insert(expenseClaim)
+          .values({
+            organizationId,
+            title: tmpl.name,
+            description: tmpl.notes,
+            submittedBy: tmpl.createdBy!,
+            totalAmount: expenseTotal,
+            currencyCode: tmpl.currencyCode,
+          })
+          .returning();
+
+        if (expenseItems.length > 0) {
+          await db.insert(expenseItem).values(
+            expenseItems.map((item) => ({
+              expenseClaimId: createdClaim.id,
+              ...item,
+            }))
+          );
+        }
+
+        occurrences++;
+        generated++;
+        nextRun = advanceDate(nextRun, tmpl.frequency);
+        continue;
+      }
+
       if (tmpl.type !== "invoice") {
         break;
       }

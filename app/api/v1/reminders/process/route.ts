@@ -7,7 +7,7 @@ import { processReminders } from "@/lib/email/reminder-processor";
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:settings");
+    requireRole(ctx, "manage:recurring");
 
     const results = await processReminders(ctx.organizationId);
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { subscription } from "@/lib/db/schema";
+import { subscription, invoice, payment, paymentAllocation } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import type Stripe from "stripe";
@@ -73,6 +73,53 @@ export async function POST(request: Request) {
             organizationId: orgId,
             ...data,
           });
+        }
+      }
+
+      // Handle invoice payments
+      const invoiceId = session.metadata?.invoiceId;
+      if (invoiceId && !session.metadata?.plan) {
+        const inv = await db.query.invoice.findFirst({
+          where: eq(invoice.id, invoiceId),
+        });
+
+        if (inv && inv.status !== "paid") {
+          const paymentNumber = `PMT-${Date.now().toString(36).toUpperCase()}`;
+
+          const [newPayment] = await db
+            .insert(payment)
+            .values({
+              organizationId: inv.organizationId,
+              contactId: inv.contactId,
+              paymentNumber,
+              type: "received",
+              date: new Date().toISOString().slice(0, 10),
+              amount: inv.amountDue,
+              method: "card",
+              reference: `Stripe: ${session.payment_intent || session.id}`,
+              currencyCode: inv.currencyCode,
+              stripePaymentIntentId:
+                (session.payment_intent as string) || null,
+            })
+            .returning();
+
+          await db.insert(paymentAllocation).values({
+            paymentId: newPayment.id,
+            documentType: "invoice",
+            documentId: inv.id,
+            amount: inv.amountDue,
+          });
+
+          await db
+            .update(invoice)
+            .set({
+              amountPaid: inv.amountPaid + inv.amountDue,
+              amountDue: 0,
+              status: "paid",
+              paidAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(invoice.id, inv.id));
         }
       }
       break;

@@ -343,7 +343,7 @@ export default function ExpensesPage() {
         </PageHeader>
 
         {/* Stats strip */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Total</p>
             <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight">

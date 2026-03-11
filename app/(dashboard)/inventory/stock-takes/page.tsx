@@ -148,7 +148,7 @@ export default function StockTakesPage() {
                   { label: "Completed", value: "0" },
                 ].map(({ label, value }) => (
                   <div key={label}>
-                    <p className="text-xl font-bold font-mono tabular-nums text-muted-foreground/40">{value}</p>
+                    <p className="text-xl font-bold font-mono tabular-nums truncate text-muted-foreground/40">{value}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
                   </div>
                 ))}
@@ -315,7 +315,7 @@ export default function StockTakesPage() {
         </motion.div>
 
         {/* Right: status breakdown cards */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { label: "Draft", value: draftCount, icon: FileText, color: "text-zinc-500", bg: "bg-zinc-100 dark:bg-zinc-800" },
             { label: "In Progress", value: inProgressCount, icon: Clock, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40" },
@@ -333,7 +333,7 @@ export default function StockTakesPage() {
                 <stat.icon className={cn("size-4", stat.color)} />
               </div>
               <div className="mt-3">
-                <p className={cn("text-2xl font-bold font-mono tabular-nums", stat.color)}>
+                <p className={cn("text-2xl font-bold font-mono tabular-nums truncate", stat.color)}>
                   {stat.value}
                 </p>
                 <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">

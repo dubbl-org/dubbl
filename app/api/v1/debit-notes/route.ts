@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { debitNote, debitNoteLine } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -9,6 +9,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(debitNote) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(debitNote)
       .where(and(...conditions));
 
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    await assertNotLocked(ctx.organizationId, parsed.issueDate);
 
     const debitNoteNumber = await getNextNumber(ctx.organizationId, "debit_note", "debit_note_number", "DN");
 

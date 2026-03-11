@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ export default function BankSettingsPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const { account, setAccount, refetch } = useBankAccountContext();
   const [saving, setSaving] = useState(false);
+  const [bankCurrency, setBankCurrency] = useState(account?.currencyCode || "USD");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -40,7 +42,7 @@ export default function BankSettingsPage() {
           accountName: fd.get("accountName"),
           bankName: fd.get("bankName") || null,
           accountNumber: fd.get("accountNumber") || null,
-          currencyCode: fd.get("currencyCode") || undefined,
+          currencyCode: bankCurrency || undefined,
           countryCode: fd.get("countryCode") || null,
           accountType: fd.get("accountType") || undefined,
           color: fd.get("color") || undefined,
@@ -127,7 +129,7 @@ export default function BankSettingsPage() {
           <div className="min-w-0 grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">Currency</Label>
-              <Input name="currencyCode" defaultValue={account.currencyCode} placeholder="USD" maxLength={3} />
+              <CurrencySelect value={bankCurrency} onValueChange={setBankCurrency} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Country</Label>

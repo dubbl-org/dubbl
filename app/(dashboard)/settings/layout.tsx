@@ -1,15 +1,18 @@
 "use client";
 
-import { Settings, Users, CreditCard, Key, Percent, Coins, ScrollText } from "lucide-react";
+import { Settings, Users, CreditCard, Key, ScrollText, Target, Bell, GitBranch, Tags, Shield } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
 const TABS = [
   { href: "/settings", label: "General", icon: Settings, exact: true },
   { href: "/settings/members", label: "Members", icon: Users },
   { href: "/settings/billing", label: "Billing", icon: CreditCard },
+  { href: "/settings/pipelines", label: "Pipelines", icon: Target },
   { href: "/settings/api-keys", label: "API Keys", icon: Key },
-  { href: "/settings/tax-rates", label: "Tax Rates", icon: Percent },
-  { href: "/settings/currencies", label: "Currencies", icon: Coins },
+  { href: "/settings/reminders", label: "Reminders", icon: Bell },
+  { href: "/settings/cost-centers", label: "Cost Centers", icon: GitBranch },
+  { href: "/settings/tags", label: "Tags", icon: Tags },
+  { href: "/settings/advisors", label: "Advisors", icon: Shield },
   { href: "/settings/audit-log", label: "Audit Log", icon: ScrollText },
 ];
 

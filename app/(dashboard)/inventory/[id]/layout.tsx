@@ -28,6 +28,7 @@ export interface InventoryItemDetail {
   name: string;
   description: string | null;
   category: string | null;
+  categoryId: string | null;
   sku: string | null;
   imageUrl: string | null;
   purchasePrice: number;
@@ -237,7 +238,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-8">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-8">
           <motion.div
             className="rounded-xl border bg-card p-4"
             initial={{ opacity: 0, y: 8 }}
@@ -246,7 +247,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
           >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">On Hand</p>
             <p className={cn(
-              "mt-1.5 text-2xl font-bold font-mono tabular-nums",
+              "mt-1.5 text-2xl font-bold font-mono tabular-nums truncate",
               isLowStock && "text-amber-600 dark:text-amber-400"
             )}>
               {item.quantityOnHand}
@@ -275,7 +276,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Stock Value</p>
-            <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums">
+            <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums truncate">
               {formatMoney(stockValue)}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -289,7 +290,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
           >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sale Price</p>
-            <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+            <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">
               {formatMoney(item.salePrice)}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -304,7 +305,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
           >
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Margin</p>
             <p className={cn(
-              "mt-1.5 text-2xl font-bold font-mono tabular-nums",
+              "mt-1.5 text-2xl font-bold font-mono tabular-nums truncate",
               margin > 0 ? "text-emerald-600 dark:text-emerald-400" : margin < 0 ? "text-red-600" : ""
             )}>
               {item.purchasePrice > 0 ? `${margin.toFixed(1)}%` : "-"}
@@ -352,7 +353,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             <div className="space-y-4 px-4">
               <div className="rounded-lg bg-muted p-3">
                 <p className="text-xs text-muted-foreground">Current Quantity</p>
-                <p className="text-xl font-bold font-mono tabular-nums">{item.quantityOnHand}</p>
+                <p className="text-xl font-bold font-mono tabular-nums truncate">{item.quantityOnHand}</p>
               </div>
               <div className="space-y-2">
                 <Label>Adjustment (positive or negative)</Label>

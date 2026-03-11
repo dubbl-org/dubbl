@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import { Plus, FileText, X, Banknote, Search, Loader2 } from "lucide-react";
@@ -242,6 +242,21 @@ export default function InvoicesPage() {
   }, [orgId, page, buildParams, loadingMore]);
 
   const hasMore = invoices.length < totalCount;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !refetching) loadMore();
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore, refetching]);
 
   // Fetch summary stats and recent payments (independent of filters)
   useEffect(() => {
@@ -551,28 +566,20 @@ export default function InvoicesPage() {
           </ContentReveal>
         )}
 
-        {/* Load more / count */}
+        {/* Infinite scroll sentinel & count */}
         {!refetching && !pendingSearch && filteredInvoices.length > 0 && (
-          <div className="flex items-center justify-between pt-1">
-            <p className="text-xs text-muted-foreground">
-              Showing {invoices.length} of {totalCount} invoice{totalCount !== 1 ? "s" : ""}
-            </p>
+          <>
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-muted-foreground">
+                Showing {invoices.length} of {totalCount} invoice{totalCount !== 1 ? "s" : ""}
+              </p>
+            </div>
             {hasMore && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={loadMore}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <><Loader2 className="mr-1.5 size-3 animate-spin" />Loading...</>
-                ) : (
-                  `Load more (${totalCount - invoices.length} remaining)`
-                )}
-              </Button>
+              <div ref={sentinelRef} className="flex justify-center py-4">
+                {loadingMore && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </ContentReveal>

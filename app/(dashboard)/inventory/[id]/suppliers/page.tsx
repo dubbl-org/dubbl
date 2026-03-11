@@ -9,8 +9,10 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ContactPicker } from "@/components/dashboard/contact-picker";
 import {
   Sheet,
   SheetContent,
@@ -19,12 +21,14 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 export default function InventoryItemSuppliersPage() {
   const { id } = useParams<{ id: string }>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [linkOpen, setLinkOpen] = useState(false);
   const [contactId, setContactId] = useState("");
@@ -33,7 +37,7 @@ export default function InventoryItemSuppliersPage() {
   const [price, setPrice] = useState("");
   const [preferred, setPreferred] = useState(false);
 
-  useEffect(() => {
+  function fetchSuppliers() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -41,8 +45,13 @@ export default function InventoryItemSuppliersPage() {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then((data) => { if (data.suppliers) setSuppliers(data.suppliers); })
+      .then((data) => { if (data.data) setSuppliers(data.data); })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    fetchSuppliers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleLink() {
@@ -70,9 +79,8 @@ export default function InventoryItemSuppliersPage() {
         throw new Error(data.error || "Failed to link supplier");
       }
 
-      const data = await res.json();
-      setSuppliers((prev) => [...prev, data.supplier]);
       setLinkOpen(false);
+      fetchSuppliers();
       setContactId("");
       setSupplierCode("");
       setLeadDays("");
@@ -85,6 +93,14 @@ export default function InventoryItemSuppliersPage() {
   }
 
   async function handleUnlink(supplierId: string) {
+    const confirmed = await confirm({
+      title: "Unlink this supplier?",
+      description: "This will remove the supplier link from this item.",
+      confirmLabel: "Unlink",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -169,11 +185,12 @@ export default function InventoryItemSuppliersPage() {
           </SheetHeader>
           <div className="space-y-4 px-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">Contact ID *</Label>
-              <Input
+              <Label className="text-xs">Supplier *</Label>
+              <ContactPicker
                 value={contactId}
-                onChange={(e) => setContactId(e.target.value)}
-                placeholder="Paste supplier contact UUID"
+                onChange={setContactId}
+                type="supplier"
+                placeholder="Select supplier..."
               />
             </div>
             <div className="space-y-1.5">
@@ -196,13 +213,10 @@ export default function InventoryItemSuppliersPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Purchase Price</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
+              <CurrencyInput
+                prefix="$"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
+                onChange={setPrice}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -222,6 +236,7 @@ export default function InventoryItemSuppliersPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      {confirmDialog}
     </>
   );
 }

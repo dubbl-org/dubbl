@@ -40,7 +40,8 @@ export function WarehousePicker({ value, onChange, placeholder = "Select warehou
   const debouncedSearch = useDebounce(search);
   const fetchIdRef = useRef(0);
   const [fetchCount, setFetchCount] = useState(0);
-  const loading = fetchCount > 0;
+  const isSearching = search !== debouncedSearch;
+  const loading = fetchCount > 0 || isSearching;
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

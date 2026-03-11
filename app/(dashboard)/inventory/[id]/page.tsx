@@ -7,11 +7,13 @@ import { Trash2, Save, Loader2, Warehouse, Printer } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
+import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { useInventoryItem } from "./layout";
 import JsBarcode from "jsbarcode";
 
@@ -29,6 +31,9 @@ export default function InventoryItemDetailsPage() {
   const router = useRouter();
   const { item, setItem } = useInventoryItem();
   const [saving, setSaving] = useState(false);
+  const [categoryId, setCategoryId] = useState(item.categoryId || "");
+  const [invPurchasePrice, setInvPurchasePrice] = useState(centsToDecimal(item.purchasePrice));
+  const [invSalePrice, setInvSalePrice] = useState(centsToDecimal(item.salePrice));
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -61,10 +66,10 @@ export default function InventoryItemDetailsPage() {
           code: form.get("code"),
           name: form.get("name"),
           description: form.get("description") || null,
-          category: form.get("category") || null,
+          categoryId: categoryId || null,
           sku: form.get("sku") || null,
-          purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
-          salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
+          purchasePrice: Math.round(parseFloat(invPurchasePrice || "0") * 100),
+          salePrice: Math.round(parseFloat(invSalePrice || "0") * 100),
           reorderPoint: parseInt(form.get("reorderPoint") as string) || 0,
         }),
       });
@@ -164,8 +169,8 @@ export default function InventoryItemDetailsPage() {
                 <Input id="name" name="name" required defaultValue={item.name} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs" htmlFor="category">Category</Label>
-                <Input id="category" name="category" defaultValue={item.category || ""} placeholder="e.g. Electronics" />
+                <Label className="text-xs">Category</Label>
+                <CategoryPicker value={categoryId} onChange={setCategoryId} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs" htmlFor="sku">SKU</Label>
@@ -181,24 +186,20 @@ export default function InventoryItemDetailsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="purchasePrice">Purchase Price</Label>
-              <Input
+              <CurrencyInput
                 id="purchasePrice"
-                name="purchasePrice"
-                type="number"
-                step="0.01"
-                min={0}
-                defaultValue={centsToDecimal(item.purchasePrice)}
+                prefix="$"
+                value={invPurchasePrice}
+                onChange={setInvPurchasePrice}
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="salePrice">Sale Price</Label>
-              <Input
+              <CurrencyInput
                 id="salePrice"
-                name="salePrice"
-                type="number"
-                step="0.01"
-                min={0}
-                defaultValue={centsToDecimal(item.salePrice)}
+                prefix="$"
+                value={invSalePrice}
+                onChange={setInvSalePrice}
               />
             </div>
           </div>
@@ -259,6 +260,7 @@ export default function InventoryItemDetailsPage() {
       {warehouseStocks.length > 0 && (
         <>
           <div className="h-px bg-border mt-10" />
+          <div className="mt-10">
           <Section title="Stock by Warehouse" description="Quantity breakdown across warehouses.">
             <div className="rounded-lg border divide-y">
               {warehouseStocks.map((ws) => (
@@ -280,26 +282,29 @@ export default function InventoryItemDetailsPage() {
               ))}
             </div>
           </Section>
+          </div>
         </>
       )}
 
       {/* Barcode */}
       <div className="h-px bg-border mt-10" />
-      <Section title="Barcode" description="Generated from SKU or item code.">
-        <div className="flex flex-col items-start gap-3">
-          <div className="rounded-lg border bg-white p-3">
-            <canvas ref={barcodeRef} />
+      <div className="mt-10">
+        <Section title="Barcode" description="Generated from SKU or item code.">
+          <div className="flex flex-col items-start gap-3">
+            <div className="rounded-lg border bg-white p-3">
+              <canvas ref={barcodeRef} />
+            </div>
+            <Button type="button" size="sm" variant="outline" onClick={printBarcode}>
+              <Printer className="mr-1.5 size-3.5" />
+              Print Barcode
+            </Button>
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={printBarcode}>
-            <Printer className="mr-1.5 size-3.5" />
-            Print Barcode
-          </Button>
-        </div>
-      </Section>
+        </Section>
+      </div>
 
-      <div className="h-px bg-border" />
-
-      <Section title="Danger zone" description="Irreversible actions for this item.">
+      <div className="h-px bg-border mt-10" />
+      <div className="mt-10">
+        <Section title="Danger zone" description="Irreversible actions for this item.">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
           <div>
             <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete this item</p>
@@ -317,6 +322,7 @@ export default function InventoryItemDetailsPage() {
           </Button>
         </div>
       </Section>
+      </div>
 
       {confirmDialog}
     </>

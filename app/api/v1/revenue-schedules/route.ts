@@ -4,7 +4,7 @@ import {
   revenueSchedule,
   revenueEntry,
 } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     });
 
     const [countResult] = await db
-      .select({ count: db.$count(revenueSchedule) })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(revenueSchedule)
       .where(and(...conditions));
 

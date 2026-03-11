@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -389,7 +390,7 @@ function EditExpenseDrawer({
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Amount *</Label>
-                        <Input type="number" step="0.01" min="0" value={item.amount} onChange={(e) => updateEditItem(index, { amount: e.target.value })} />
+                        <CurrencyInput prefix="$" value={item.amount} onChange={(v) => updateEditItem(index, { amount: v })} />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Category</Label>
@@ -481,7 +482,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim submitted for approval");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to submit");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to submit");
     }
   }
 
@@ -497,7 +498,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim approved");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to approve");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
     }
   }
 
@@ -519,7 +520,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim rejected");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to reject");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
     }
   }
 
@@ -537,7 +538,7 @@ export default function ExpenseDetailPage() {
       toast.success("Expense claim marked as paid");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to mark as paid");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to mark as paid");
     }
   }
 
@@ -559,7 +560,7 @@ export default function ExpenseDetailPage() {
       router.push("/purchases/expenses");
     } else {
       const data = await res.json();
-      toast.error(data.error || "Failed to delete");
+      toast.error(typeof data.error === "string" ? data.error : "Failed to delete");
     }
   }
 
