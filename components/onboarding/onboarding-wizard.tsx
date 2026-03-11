@@ -38,7 +38,6 @@ const STEPS = [
 interface OrgData {
   id: string;
   name: string;
-  slug: string;
   country: string | null;
 }
 
@@ -51,7 +50,6 @@ export function OnboardingWizard() {
   // Form state
   const [orgId, setOrgId] = useState("");
   const [orgName, setOrgName] = useState("");
-  const [slug, setSlug] = useState("");
   const [countryCode, setCountryCode] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [industry, setIndustry] = useState("");
@@ -75,7 +73,6 @@ export function OnboardingWizard() {
         if (org) {
           setOrgId(org.id);
           setOrgName(org.name);
-          setSlug(org.slug);
         }
       })
       .catch(() => {})
@@ -93,7 +90,6 @@ export function OnboardingWizard() {
 
   function handleNameChange(value: string) {
     setOrgName(value);
-    setSlug(generateSlug(value));
   }
 
   function goNext() {
@@ -109,7 +105,7 @@ export function OnboardingWizard() {
   function canProceed(): boolean {
     switch (step) {
       case 0:
-        return orgName.trim().length > 0 && slug.trim().length > 0;
+        return orgName.trim().length > 0;
       case 1:
         return countryCode.length > 0;
       case 2:
@@ -136,7 +132,7 @@ export function OnboardingWizard() {
         const createRes = await fetch("/api/v1/organization", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: orgName, slug }),
+          body: JSON.stringify({ name: orgName, slug: generateSlug(orgName) }),
         });
 
         if (!createRes.ok) {
@@ -155,15 +151,18 @@ export function OnboardingWizard() {
           ? `other: ${referralOther.trim()}`
           : referralSource;
 
+      const patchHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (currentOrgId) {
+        patchHeaders["x-organization-id"] = currentOrgId;
+      }
+
       const res = await fetch("/api/v1/organization", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": currentOrgId,
-        },
+        headers: patchHeaders,
         body: JSON.stringify({
           name: orgName,
-          slug,
           country: selectedCountry?.name ?? null,
           countryCode: countryCode || null,
           defaultCurrency: selectedCountry?.defaultCurrency ?? "USD",
@@ -225,9 +224,7 @@ export function OnboardingWizard() {
               {step === 0 && (
                 <StepOrgName
                   name={orgName}
-                  slug={slug}
                   onNameChange={handleNameChange}
-                  onSlugChange={setSlug}
                 />
               )}
               {step === 1 && (
@@ -319,14 +316,10 @@ export function OnboardingWizard() {
 
 function StepOrgName({
   name,
-  slug,
   onNameChange,
-  onSlugChange,
 }: {
   name: string;
-  slug: string;
   onNameChange: (v: string) => void;
-  onSlugChange: (v: string) => void;
 }) {
   return (
     <div>
@@ -336,7 +329,7 @@ function StepOrgName({
       <p className="mt-1.5 text-sm text-muted-foreground">
         This is how your organization will appear across dubbl.
       </p>
-      <div className="mt-6 space-y-4">
+      <div className="mt-6">
         <div className="space-y-2">
           <Label htmlFor="org-name" className="text-xs font-medium">
             Organization Name
@@ -349,27 +342,6 @@ function StepOrgName({
             autoFocus
             className="h-11 rounded-lg"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="org-slug" className="text-xs font-medium">
-            URL Slug
-          </Label>
-          <Input
-            id="org-slug"
-            value={slug}
-            onChange={(e) =>
-              onSlugChange(
-                e.target.value
-                  .toLowerCase()
-                  .replace(/[^a-z0-9-]/g, "")
-              )
-            }
-            placeholder="my-company"
-            className="h-11 rounded-lg"
-          />
-          <p className="text-xs text-muted-foreground">
-            Only lowercase letters, numbers, and hyphens.
-          </p>
         </div>
       </div>
     </div>

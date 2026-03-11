@@ -59,7 +59,26 @@ export async function getAuthContext(
   if (!session?.user?.id) throw new AuthError("Not authenticated", 401);
 
   const orgId = organizationId || request.headers.get("x-organization-id");
-  if (!orgId) throw new AuthError("Organization ID required", 400);
+
+  // If no org ID provided, auto-resolve if user has exactly one membership
+  if (!orgId) {
+    const memberships = await db.query.member.findMany({
+      where: eq(member.userId, session.user.id),
+    });
+
+    if (memberships.length === 0) {
+      throw new AuthError("Not a member of any organization", 403);
+    }
+    if (memberships.length > 1) {
+      throw new AuthError("Organization ID required when user belongs to multiple organizations", 400);
+    }
+
+    return {
+      userId: session.user.id,
+      organizationId: memberships[0].organizationId,
+      role: memberships[0].role as MemberRole,
+    };
+  }
 
   const mem = await db.query.member.findFirst({
     where: and(
