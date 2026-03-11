@@ -5,16 +5,20 @@ description: Connect AI agents to dubbl via the Model Context Protocol.
 
 ## What is MCP?
 
-The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is an open standard that lets AI agents interact with external tools and data sources. dubbl's built-in MCP server gives AI assistants like Claude direct access to your accounting data -- creating entries, managing invoices, generating reports, and more.
+The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is an open standard that lets AI coding agents and assistants interact with external tools and data sources. dubbl's built-in MCP server gives any MCP-compatible agent direct access to your accounting data -- creating entries, managing invoices, generating reports, and more.
 
 ## Prerequisites
 
 - **Pro or Business plan** -- MCP access requires API access, which is only available on paid plans
-- An MCP-compatible client (Claude Desktop, Claude Code, or any MCP client)
+- Any MCP-compatible client (Claude Desktop, Claude Code, Cursor, Windsurf, Cline, VS Code Copilot, or other MCP-enabled agents)
 
-## Connecting from Claude Desktop
+## Connecting Your Agent
 
-Add the following to your Claude Desktop configuration:
+Any MCP-compatible agent can connect to dubbl's MCP server. The server uses Streamable HTTP transport at `/api/mcp` and OAuth 2.1 for authentication. Most agents handle the OAuth flow automatically -- they will open a browser window for you to sign in and authorize access on first connect.
+
+### Claude Desktop
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
 
 ```json
 {
@@ -26,13 +30,81 @@ Add the following to your Claude Desktop configuration:
 }
 ```
 
-Claude Desktop handles OAuth automatically. On first connect, it will open a browser window for you to sign in and authorize access.
-
-## Connecting from Claude Code
+### Claude Code
 
 ```bash
 claude mcp add dubbl --transport streamable-http https://your-dubbl-instance.com/api/mcp
 ```
+
+### Cursor
+
+Go to **Cursor Settings > MCP** and add a new server, or add to `.cursor/mcp.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "dubbl": {
+      "url": "https://your-dubbl-instance.com/api/mcp"
+    }
+  }
+}
+```
+
+Cursor auto-detects Streamable HTTP transport from the URL and handles OAuth automatically.
+
+### Windsurf
+
+Go to **Windsurf Settings > Cascade > MCP** and click **View raw config**, or edit `~/.codeium/windsurf/mcp_config.json` directly:
+
+```json
+{
+  "mcpServers": {
+    "dubbl": {
+      "serverUrl": "https://your-dubbl-instance.com/api/mcp"
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot)
+
+Add to `.vscode/mcp.json` in your workspace (available in VS Code 1.99+):
+
+```json
+{
+  "servers": {
+    "dubbl": {
+      "type": "http",
+      "url": "https://your-dubbl-instance.com/api/mcp"
+    }
+  }
+}
+```
+
+Or add to your user `settings.json` to make it available across all workspaces:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "dubbl": {
+        "type": "http",
+        "url": "https://your-dubbl-instance.com/api/mcp"
+      }
+    }
+  }
+}
+```
+
+### Other MCP Clients
+
+Any agent that supports the MCP Streamable HTTP transport can connect. Point it at:
+
+```
+https://your-dubbl-instance.com/api/mcp
+```
+
+The client will discover OAuth endpoints automatically via the `/.well-known/oauth-authorization-server` metadata endpoint.
 
 ## OAuth Flow
 
@@ -218,9 +290,15 @@ To confirm that free plan users are rejected:
 2. Complete the OAuth flow for that org
 3. The token exchange (step 4) should return `403` with `"MCP access requires a Pro or Business plan"`
 
-### With Claude Desktop (local)
+### With an MCP Client (local)
 
-For local testing with Claude Desktop, update your config to point at localhost:
+For local testing with any MCP client, point it at localhost:
+
+```
+http://localhost:3000/api/mcp
+```
+
+For example, in Claude Desktop config:
 
 ```json
 {
@@ -232,7 +310,19 @@ For local testing with Claude Desktop, update your config to point at localhost:
 }
 ```
 
-Restart Claude Desktop and it will initiate the OAuth flow in your browser.
+Or in Cursor's `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "dubbl-local": {
+      "url": "http://localhost:3000/api/mcp"
+    }
+  }
+}
+```
+
+Restart your agent and it will initiate the OAuth flow in your browser.
 
 ## Troubleshooting
 

@@ -33,7 +33,7 @@ dubbl is a full-featured, open-source alternative to Xero and QuickBooks. It is 
 - **Documents** - File management and storage
 - **Audit trail** - Full audit log for compliance
 - **API-first** - Complete REST API with API key management
-- **MCP Server** - AI agent integration via Model Context Protocol (OAuth 2.1, paid plans)
+- **MCP Server** - Connect any AI coding agent via Model Context Protocol (OAuth 2.1, paid plans)
 
 ## Quick Start
 
@@ -113,21 +113,15 @@ See the [Self-Hosting Guide](https://dubbl.dev/docs/self-hosting) for instructio
 
 ## MCP Server
 
-dubbl includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) server that lets AI agents interact with your accounting data. The MCP server uses Streamable HTTP transport with OAuth 2.1 authentication (backed by your existing dubbl session) and is available on Pro and Business plans.
+dubbl includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) server that lets any MCP-compatible AI agent interact with your accounting data. The MCP server uses Streamable HTTP transport with OAuth 2.1 authentication and is available on Pro and Business plans.
 
-To connect from Claude Desktop, add to your config:
+Works with Claude Desktop, Claude Code, Cursor, Windsurf, VS Code Copilot, and any other MCP-enabled agent. Just point your client at:
 
-```json
-{
-  "mcpServers": {
-    "dubbl": {
-      "url": "https://your-dubbl-instance.com/api/mcp"
-    }
-  }
-}
+```
+https://your-dubbl-instance.com/api/mcp
 ```
 
-See the [MCP documentation](https://dubbl.dev/docs/guides/mcp) for details.
+See the [MCP documentation](https://dubbl.dev/docs/guides/mcp) for setup instructions for each client.
 
 ## Documentation
 
