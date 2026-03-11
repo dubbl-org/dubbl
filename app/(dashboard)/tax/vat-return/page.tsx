@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Globe, ArrowUpRight, ArrowDownLeft, Receipt, Printer } from "lucide-react";
+import { Globe, ArrowUpRight, ArrowDownLeft, Receipt, Printer, Loader2 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -65,69 +63,8 @@ export default function VatReturnPage() {
   const inputVat = boxes.find((b) => b.box === "4")?.amount || 0;
   const netVat = boxes.find((b) => b.box === "5")?.amount || 0;
 
-  if (loading) return <BrandLoader />;
-
-  if (boxes.length === 0 && !refetching) {
-    return (
-      <div className="relative">
-        <div className="pointer-events-none w-full space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-lg border p-4 space-y-2">
-                <div className="h-2 w-20 rounded bg-muted" />
-                <div className="h-4 w-24 rounded bg-muted/70" />
-              </div>
-            ))}
-          </div>
-          <div className="rounded-lg border overflow-hidden">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-12">
-                <div className="flex items-center gap-3">
-                  <div className="size-8 rounded-md bg-muted" />
-                  <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-40" : "w-32"}`} />
-                </div>
-                <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-16" : "w-20"}`} />
-              </div>
-            ))}
-          </div>
-          <div className="rounded-lg border p-5">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1.5">
-                <div className="h-3 w-28 rounded bg-muted" />
-                <div className="h-2 w-36 rounded bg-muted/50" />
-              </div>
-              <div className="h-5 w-24 rounded bg-muted/70" />
-            </div>
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950/50">
-            <Globe className="size-7 text-blue-600 dark:text-blue-400" />
-          </div>
-          <h2 className="mt-5 text-xl font-semibold tracking-tight">
-            No VAT data yet
-          </h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-            VAT boxes are calculated from your invoices and bills with VAT-type
-            tax rates applied. Start by creating transactions.
-          </p>
-          <div className="flex items-center gap-2 mt-6">
-            <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
-              <Link href="/tax">Manage Tax Rates</Link>
-            </Button>
-            <Button size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700" asChild>
-              <Link href="/sales">Go to Sales</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="VAT Return"
         description="UK/EU VAT return calculation with HMRC boxes 1-9."
@@ -155,7 +92,7 @@ export default function VatReturnPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {refetching ? (
+      {loading || refetching ? (
         <BrandLoader className="h-48" />
       ) : (
         <>
@@ -232,6 +169,6 @@ export default function VatReturnPage() {
           </div>
         </>
       )}
-    </ContentReveal>
+    </div>
   );
 }

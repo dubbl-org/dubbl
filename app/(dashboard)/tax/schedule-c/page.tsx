@@ -1,18 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Calculator, TrendingUp, TrendingDown, DollarSign, Printer, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Printer, Info } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 
 interface ScheduleCLine {
   line: string;
@@ -70,84 +68,8 @@ export default function ScheduleCPage() {
   const expenseLines = lines.filter((l) => !INCOME_LINES.includes(l.line) && !SUMMARY_LINES.includes(l.line));
   const summaryLines = lines.filter((l) => SUMMARY_LINES.includes(l.line));
 
-  if (loading) return <BrandLoader />;
-
-  if (lines.length === 0 && !refetching) {
-    return (
-      <div className="relative">
-        <div className="pointer-events-none w-full space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-lg border p-4 space-y-2">
-                <div className="h-2 w-20 rounded bg-muted" />
-                <div className="h-4 w-24 rounded bg-muted/70" />
-              </div>
-            ))}
-          </div>
-          <div className="space-y-1.5">
-            <div className="h-2.5 w-24 rounded bg-muted/60" />
-          </div>
-          <div className="rounded-lg border overflow-hidden">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-11">
-                <div className="flex items-center gap-3">
-                  <div className="size-7 rounded-md bg-muted" />
-                  <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-36" : "w-28"}`} />
-                </div>
-                <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-14" : "w-18"}`} />
-              </div>
-            ))}
-          </div>
-          <div className="rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/40 dark:border-emerald-900/30 px-4 py-2.5">
-            <div className="flex items-center justify-between">
-              <div className="h-2.5 w-24 rounded bg-emerald-200/60 dark:bg-emerald-800/40" />
-              <div className="h-2.5 w-20 rounded bg-emerald-200/60 dark:bg-emerald-800/40" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <div className="h-2.5 w-28 rounded bg-muted/60" />
-          </div>
-          <div className="rounded-lg border overflow-hidden">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-11">
-                <div className="flex items-center gap-3">
-                  <div className="size-7 rounded-md bg-muted" />
-                  <div className={`h-2.5 rounded bg-muted/70 ${i % 3 === 0 ? "w-32" : i % 3 === 1 ? "w-40" : "w-28"}`} />
-                </div>
-                <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-14" : "w-16"}`} />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-violet-100 dark:bg-violet-950/50">
-            <Calculator className="size-7 text-violet-600 dark:text-violet-400" />
-          </div>
-          <h2 className="mt-5 text-xl font-semibold tracking-tight">
-            No data for this period
-          </h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-            No income or expenses found for the selected tax year. Once you have
-            invoices and bills, this worksheet will map them to IRS Schedule C
-            line items.
-          </p>
-          <div className="flex items-center gap-2 mt-6">
-            <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
-              <Link href="/sales">Go to Sales</Link>
-            </Button>
-            <Button size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700" asChild>
-              <Link href="/purchases">Go to Purchases</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Schedule C Worksheet"
         description="IRS Schedule C (Form 1040) tax preparation worksheet."
@@ -181,7 +103,7 @@ export default function ScheduleCPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {refetching ? (
+      {loading || refetching ? (
         <BrandLoader className="h-48" />
       ) : (
         <>
@@ -308,6 +230,6 @@ export default function ScheduleCPage() {
           </div>
         </>
       )}
-    </ContentReveal>
+    </div>
   );
 }

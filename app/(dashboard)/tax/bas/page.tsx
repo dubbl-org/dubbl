@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { FileSpreadsheet, ArrowUpRight, ArrowDownLeft, Receipt, Printer } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Receipt, Printer } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -74,72 +73,8 @@ export default function BasPage() {
   const netField = fields.find((f) => f.field === KEY_FIELD);
   const otherFields = fields.filter((f) => getFieldSection(f.field) === "other");
 
-  if (loading) return <BrandLoader />;
-
-  if (fields.length === 0 && !refetching) {
-    return (
-      <div className="relative">
-        <div className="pointer-events-none w-full space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-lg border p-4 space-y-2">
-                <div className="h-2 w-20 rounded bg-muted" />
-                <div className="h-4 w-24 rounded bg-muted/70" />
-              </div>
-            ))}
-          </div>
-          <div className="space-y-1.5">
-            <div className="h-2.5 w-28 rounded bg-muted/60" />
-          </div>
-          <div className="rounded-lg border overflow-hidden">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-12">
-                <div className="flex items-center gap-3">
-                  <div className="size-8 rounded-md bg-muted" />
-                  <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-44" : "w-36"}`} />
-                </div>
-                <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-16" : "w-20"}`} />
-              </div>
-            ))}
-          </div>
-          <div className="rounded-lg border p-5">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1.5">
-                <div className="h-3 w-24 rounded bg-muted" />
-                <div className="h-2 w-32 rounded bg-muted/50" />
-              </div>
-              <div className="h-5 w-24 rounded bg-muted/70" />
-            </div>
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-            <FileSpreadsheet className="size-7 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <h2 className="mt-5 text-xl font-semibold tracking-tight">
-            No BAS data yet
-          </h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-            No GST activity found for this period. Create invoices and bills
-            with GST tax rates to see your BAS calculations here.
-          </p>
-          <div className="flex items-center gap-2 mt-6">
-            <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
-              <Link href="/tax">Manage Tax Rates</Link>
-            </Button>
-            <Button size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700" asChild>
-              <Link href="/sales">Go to Sales</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Business Activity Statement"
         description="Australian BAS report with GST calculations."
@@ -167,7 +102,7 @@ export default function BasPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {refetching ? (
+      {loading || refetching ? (
         <BrandLoader className="h-48" />
       ) : (
         <>
@@ -287,6 +222,6 @@ export default function BasPage() {
           </div>
         </>
       )}
-    </ContentReveal>
+    </div>
   );
 }

@@ -7,7 +7,6 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
@@ -63,75 +62,8 @@ export default function SalesTaxPage() {
   const totalCollected = breakdown.reduce((sum, b) => sum + b.taxCollected, 0);
   const totalInvoices = breakdown.reduce((sum, b) => sum + b.invoiceCount, 0);
 
-  if (loading) return <BrandLoader />;
-
-  if (breakdown.length === 0 && !refetching) {
-    return (
-      <div className="relative">
-        <div className="pointer-events-none w-full space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-lg border p-4 space-y-2">
-                <div className="h-2 w-20 rounded bg-muted" />
-                <div className="h-4 w-24 rounded bg-muted/70" />
-              </div>
-            ))}
-          </div>
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="size-9 rounded-lg bg-muted" />
-                    <div className="space-y-1.5">
-                      <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-28" : "w-24"}`} />
-                      <div className="h-2 w-20 rounded bg-muted/40" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 flex flex-col items-end">
-                    <div className="h-2.5 w-16 rounded bg-muted/70" />
-                    <div className="h-2 w-20 rounded bg-muted/40" />
-                  </div>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted" />
-              </div>
-            ))}
-          </div>
-          <div className="rounded-lg bg-muted/30 px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="h-2.5 w-28 rounded bg-muted/60" />
-              <div className="h-2.5 w-20 rounded bg-muted/60" />
-            </div>
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950/50">
-            <MapPin className="size-7 text-blue-600 dark:text-blue-400" />
-          </div>
-          <h2 className="mt-5 text-xl font-semibold tracking-tight">
-            No sales tax activity
-          </h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-            No taxable invoices found for this period. Create invoices with
-            tax rates applied to see your sales tax breakdown here.
-          </p>
-          <div className="flex items-center gap-2 mt-6">
-            <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
-              <Link href="/tax">Manage Tax Rates</Link>
-            </Button>
-            <Button size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700" asChild>
-              <Link href="/sales">Go to Sales</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <ContentReveal className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Sales Tax Report"
         description="Tax collected by rate for the selected period."
@@ -165,7 +97,7 @@ export default function SalesTaxPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {refetching ? (
+      {loading || refetching ? (
         <BrandLoader className="h-48" />
       ) : (
         <>
@@ -235,6 +167,6 @@ export default function SalesTaxPage() {
           </div>
         </>
       )}
-    </ContentReveal>
+    </div>
   );
 }
