@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FileSpreadsheet, ArrowUpRight, ArrowDownLeft, Receipt, Printer } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -34,12 +35,18 @@ export default function BasPage() {
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [fields, setFields] = useState<BasField[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetching, setRefetching] = useState(false);
+  const initialLoad = useRef(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
-    setLoading(true);
+    if (initialLoad.current) {
+      setLoading(true);
+    } else {
+      setRefetching(true);
+    }
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/bas?${params}`, {
       headers: { "x-organization-id": orgId },
@@ -50,7 +57,11 @@ export default function BasPage() {
         setFields(data.fields || []);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefetching(false);
+          initialLoad.current = false;
+        }
       });
     return () => { cancelled = true; };
   }, [startDate, endDate]);
@@ -65,71 +76,70 @@ export default function BasPage() {
 
   if (loading) return <BrandLoader />;
 
-  if (fields.length === 0) {
+  if (fields.length === 0 && !refetching) {
     return (
-        <div className="relative">
-          {/* Ghost preview */}
-          <div className="pointer-events-none w-full space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-2">
-                  <div className="h-2 w-20 rounded bg-muted" />
-                  <div className="h-4 w-24 rounded bg-muted/70" />
-                </div>
-              ))}
-            </div>
-            <div className="space-y-1.5">
-              <div className="h-2.5 w-28 rounded bg-muted/60" />
-            </div>
-            <div className="rounded-lg border overflow-hidden">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-12">
-                  <div className="flex items-center gap-3">
-                    <div className="size-8 rounded-md bg-muted" />
-                    <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-44" : "w-36"}`} />
-                  </div>
-                  <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-16" : "w-20"}`} />
-                </div>
-              ))}
-            </div>
-            <div className="rounded-lg border p-5">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1.5">
-                  <div className="h-3 w-24 rounded bg-muted" />
-                  <div className="h-2 w-32 rounded bg-muted/50" />
-                </div>
-                <div className="h-5 w-24 rounded bg-muted/70" />
+      <div className="relative">
+        <div className="pointer-events-none w-full space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-lg border p-4 space-y-2">
+                <div className="h-2 w-20 rounded bg-muted" />
+                <div className="h-4 w-24 rounded bg-muted/70" />
               </div>
-            </div>
+            ))}
           </div>
-          <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
-
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-              <FileSpreadsheet className="size-7 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="mt-5 text-xl font-semibold tracking-tight">
-              No BAS data yet
-            </h2>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-              No GST activity found for this period. Create invoices and bills
-              with GST tax rates to see your BAS calculations here.
-            </p>
-            <div className="flex items-center gap-2 mt-6">
-              <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
-                <Link href="/tax">Manage Tax Rates</Link>
-              </Button>
-              <Button size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700" asChild>
-                <Link href="/sales">Go to Sales</Link>
-              </Button>
+          <div className="space-y-1.5">
+            <div className="h-2.5 w-28 rounded bg-muted/60" />
+          </div>
+          <div className="rounded-lg border overflow-hidden">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between border-b last:border-0 px-4 h-12">
+                <div className="flex items-center gap-3">
+                  <div className="size-8 rounded-md bg-muted" />
+                  <div className={`h-2.5 rounded bg-muted/70 ${i % 2 === 0 ? "w-44" : "w-36"}`} />
+                </div>
+                <div className={`h-2.5 rounded bg-muted/50 ${i % 2 === 0 ? "w-16" : "w-20"}`} />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-lg border p-5">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1.5">
+                <div className="h-3 w-24 rounded bg-muted" />
+                <div className="h-2 w-32 rounded bg-muted/50" />
+              </div>
+              <div className="h-5 w-24 rounded bg-muted/70" />
             </div>
           </div>
         </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
+            <FileSpreadsheet className="size-7 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h2 className="mt-5 text-xl font-semibold tracking-tight">
+            No BAS data yet
+          </h2>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+            No GST activity found for this period. Create invoices and bills
+            with GST tax rates to see your BAS calculations here.
+          </p>
+          <div className="flex items-center gap-2 mt-6">
+            <Button variant="outline" size="sm" className="h-9 text-xs" asChild>
+              <Link href="/tax">Manage Tax Rates</Link>
+            </Button>
+            <Button size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700" asChild>
+              <Link href="/sales">Go to Sales</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
       <PageHeader
         title="Business Activity Statement"
         description="Australian BAS report with GST calculations."
@@ -157,120 +167,126 @@ export default function BasPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          title="GST on Sales (1A)"
-          value={formatMoney(gstOnSales)}
-          icon={ArrowUpRight}
-          changeType="neutral"
-        />
-        <StatCard
-          title="GST on Purchases (1B)"
-          value={formatMoney(gstOnPurchases)}
-          icon={ArrowDownLeft}
-          changeType="neutral"
-        />
-        <StatCard
-          title={netGst >= 0 ? "Net GST Payable" : "Net GST Refund"}
-          value={formatMoney(Math.abs(netGst))}
-          icon={Receipt}
-          changeType={netGst >= 0 ? "negative" : "positive"}
-        />
-      </div>
-
-      <div className="space-y-6">
-        {gstFields.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">GST Information</h2>
-              <Badge variant="outline" className="text-[10px]">G1-G11, 1A-1B</Badge>
-            </div>
-            <div className="rounded-lg border overflow-hidden">
-              {gstFields.map((f, i) => {
-                const isGstTotal = f.field === "1A" || f.field === "1B";
-                return (
-                  <div
-                    key={f.field}
-                    className={cn(
-                      "flex items-center justify-between px-4 py-3.5",
-                      i < gstFields.length - 1 && "border-b",
-                      isGstTotal && "bg-muted/30"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "flex size-8 items-center justify-center rounded-md text-[10px] font-bold font-mono",
-                        isGstTotal
-                          ? "bg-blue-600 text-white dark:bg-blue-500"
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {f.field}
-                      </div>
-                      <p className={cn("text-sm", isGstTotal && "font-medium")}>{f.label}</p>
-                    </div>
-                    <span className={cn(
-                      "font-mono text-sm tabular-nums font-medium",
-                      f.field === "1A" && "text-blue-600 dark:text-blue-400",
-                      f.field === "1B" && "text-orange-600 dark:text-orange-400"
-                    )}>
-                      {formatMoney(f.amount)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+      {refetching ? (
+        <BrandLoader className="h-48" />
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              title="GST on Sales (1A)"
+              value={formatMoney(gstOnSales)}
+              icon={ArrowUpRight}
+              changeType="neutral"
+            />
+            <StatCard
+              title="GST on Purchases (1B)"
+              value={formatMoney(gstOnPurchases)}
+              icon={ArrowDownLeft}
+              changeType="neutral"
+            />
+            <StatCard
+              title={netGst >= 0 ? "Net GST Payable" : "Net GST Refund"}
+              value={formatMoney(Math.abs(netGst))}
+              icon={Receipt}
+              changeType={netGst >= 0 ? "negative" : "positive"}
+            />
           </div>
-        )}
 
-        {otherFields.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Other Obligations</h2>
-            <div className="rounded-lg border overflow-hidden">
-              {otherFields.map((f, i) => (
-                <div
-                  key={f.field}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-3.5",
-                    i < otherFields.length - 1 && "border-b"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-8 items-center justify-center rounded-md bg-muted text-[10px] font-bold font-mono text-muted-foreground">
-                      {f.field}
-                    </div>
-                    <p className="text-sm">{f.label}</p>
-                  </div>
-                  <span className="font-mono text-sm tabular-nums font-medium">{formatMoney(f.amount)}</span>
+          <div className="space-y-6">
+            {gstFields.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">GST Information</h2>
+                  <Badge variant="outline" className="text-[10px]">G1-G11, 1A-1B</Badge>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {netField && (
-          <div className={cn(
-            "rounded-lg border p-5",
-            netField.amount >= 0
-              ? "border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20"
-              : "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20"
-          )}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold">{netField.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {netField.amount < 0 ? "Refund due from ATO" : "Amount payable to ATO"}
-                </p>
+                <div className="rounded-lg border overflow-hidden">
+                  {gstFields.map((f, i) => {
+                    const isGstTotal = f.field === "1A" || f.field === "1B";
+                    return (
+                      <div
+                        key={f.field}
+                        className={cn(
+                          "flex items-center justify-between px-4 py-3.5",
+                          i < gstFields.length - 1 && "border-b",
+                          isGstTotal && "bg-muted/30"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "flex size-8 items-center justify-center rounded-md text-[10px] font-bold font-mono",
+                            isGstTotal
+                              ? "bg-blue-600 text-white dark:bg-blue-500"
+                              : "bg-muted text-muted-foreground"
+                          )}>
+                            {f.field}
+                          </div>
+                          <p className={cn("text-sm", isGstTotal && "font-medium")}>{f.label}</p>
+                        </div>
+                        <span className={cn(
+                          "font-mono text-sm tabular-nums font-medium",
+                          f.field === "1A" && "text-blue-600 dark:text-blue-400",
+                          f.field === "1B" && "text-orange-600 dark:text-orange-400"
+                        )}>
+                          {formatMoney(f.amount)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <p className={cn(
-                "text-xl font-bold font-mono tabular-nums",
-                netField.amount >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+            )}
+
+            {otherFields.length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Other Obligations</h2>
+                <div className="rounded-lg border overflow-hidden">
+                  {otherFields.map((f, i) => (
+                    <div
+                      key={f.field}
+                      className={cn(
+                        "flex items-center justify-between px-4 py-3.5",
+                        i < otherFields.length - 1 && "border-b"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-8 items-center justify-center rounded-md bg-muted text-[10px] font-bold font-mono text-muted-foreground">
+                          {f.field}
+                        </div>
+                        <p className="text-sm">{f.label}</p>
+                      </div>
+                      <span className="font-mono text-sm tabular-nums font-medium">{formatMoney(f.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {netField && (
+              <div className={cn(
+                "rounded-lg border p-5",
+                netField.amount >= 0
+                  ? "border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20"
+                  : "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20"
               )}>
-                {formatMoney(Math.abs(netField.amount))}
-              </p>
-            </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{netField.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {netField.amount < 0 ? "Refund due from ATO" : "Amount payable to ATO"}
+                    </p>
+                  </div>
+                  <p className={cn(
+                    "text-xl font-bold font-mono tabular-nums",
+                    netField.amount >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                  )}>
+                    {formatMoney(Math.abs(netField.amount))}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </ContentReveal>
   );
 }
