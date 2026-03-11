@@ -3,16 +3,11 @@
   "pages": [
     "getting-started",
     "self-hosting",
-    "---Modules---",
     "modules",
-    "---Tax & Compliance---",
     "tax",
-    "---Settings---",
     "settings",
-    "---Concepts---",
     "concepts",
     "api-reference",
-    "---Guides---",
     "guides",
     "contributing"
   ]

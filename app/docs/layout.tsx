@@ -14,7 +14,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="font-semibold tracking-tight">Dubbl</span>
           </div>
         ),
-        url: "/docs",
+        url: "/",
       }}
       links={[
         { text: "App", url: "/dashboard" },
