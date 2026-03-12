@@ -425,18 +425,18 @@ async function seed() {
   const existingEntries = await db.query.journalEntry.findFirst({
     where: eq(journalEntry.organizationId, org.id),
   });
+  const existingInvoices = await db.query.invoice.findFirst({
+    where: eq(invoice.organizationId, org.id),
+  });
   const existingCreditNotes = await db.query.creditNote.findFirst({
     where: eq(creditNote.organizationId, org.id),
   });
-  const hasTransactionalData = !!existingEntries;
 
   const invoiceIds: { id: string; contactIdx: number; status: string; paid: number; total: number }[] = [];
 
-  if (hasTransactionalData) {
-    console.log("\nTransactional data already exists, skipping journal entries, invoices, bills, etc.");
-  }
-
-  if (!hasTransactionalData) {
+  if (existingEntries) {
+    console.log("\nJournal entries already exist, skipping...");
+  } else {
   // 8. Journal Entries (manual entries for opening balances)
   console.log("Creating journal entries...");
   let entryNum = 1;
@@ -532,8 +532,12 @@ async function seed() {
     ]);
   }
   console.log(`  ${entryNum - 1} journal entries`);
+  } // end journal entries
 
   // 9. Invoices
+  if (existingInvoices) {
+    console.log("Invoices already exist, skipping...");
+  } else {
   console.log("Creating invoices...");
   const invoiceData = [
     { contact: 0, number: "INV-00001", date: "2026-01-10", due: "2026-02-09", status: "paid" as const, desc: "Web Development", qty: 100, price: 15000, paid: 1500000 },
@@ -580,7 +584,7 @@ async function seed() {
     invoiceIds.push({ id: row.id, contactIdx: inv.contact, status: inv.status, paid: inv.paid, total: lineAmount });
   }
   console.log(`  ${invoiceData.length} invoices`);
-  } // end if (!hasTransactionalData) - invoices block
+  } // end invoices block
 
   // 9b. Credit Notes (always check, even on re-run)
   if (existingCreditNotes) {
@@ -666,7 +670,13 @@ async function seed() {
   console.log(`  ${creditNoteData.length} credit notes`);
   } // end credit notes
 
-  if (!hasTransactionalData) {
+  const billIds: { id: string; contactIdx: number; status: string; paid: number }[] = [];
+  const existingBills = await db.query.bill.findFirst({
+    where: eq(bill.organizationId, org.id),
+  });
+  if (existingBills) {
+    console.log("Bills already exist, skipping...");
+  } else {
   // 10. Bills
   console.log("Creating bills...");
   const billData = [
@@ -682,7 +692,6 @@ async function seed() {
     { contact: 12, number: "BILL-00010", date: "2026-02-01", due: "2026-02-02", status: "paid" as const, desc: "Rent February", amount: 350000, paid: 350000 },
   ];
 
-  const billIds: { id: string; contactIdx: number; status: string; paid: number }[] = [];
   for (const b of billData) {
     const [row] = await db
       .insert(bill)
@@ -714,8 +723,15 @@ async function seed() {
     billIds.push({ id: row.id, contactIdx: b.contact, status: b.status, paid: b.paid });
   }
   console.log(`  ${billData.length} bills`);
+  } // end bills block
 
   // 11. Bank Accounts + Transactions
+  const existingBankAccounts = await db.query.bankAccount.findFirst({
+    where: eq(bankAccount.organizationId, org.id),
+  });
+  if (existingBankAccounts) {
+    console.log("Bank accounts already exist, skipping...");
+  } else {
   console.log("Creating bank accounts...");
   const [checkingBank] = await db
     .insert(bankAccount)
@@ -887,8 +903,15 @@ async function seed() {
     });
   }
   console.log(`  ${recurringData.length} recurring templates`);
+  } // end bank accounts block
 
   // 12. Budget
+  const existingBudget = await db.query.budget.findFirst({
+    where: eq(budget.organizationId, org.id),
+  });
+  if (existingBudget) {
+    console.log("Budget already exists, skipping...");
+  } else {
   console.log("Creating budget...");
   const [bud] = await db
     .insert(budget)
@@ -931,8 +954,15 @@ async function seed() {
     );
   }
   console.log(`  1 budget with ${budgetAccounts.length} line items`);
+  } // end budget block
 
   // 13. Projects + Time Entries + Tasks + Milestones + Notes
+  const existingProjects = await db.query.project.findFirst({
+    where: eq(project.organizationId, org.id),
+  });
+  if (existingProjects) {
+    console.log("Projects already exist, skipping...");
+  } else {
   console.log("Creating projects...");
 
   // Get member ID for task assignees
@@ -1185,8 +1215,15 @@ async function seed() {
     }
   }
   console.log("  Labels, milestones, tasks, and notes created");
+  } // end projects block
 
   // 14. Fixed Assets
+  const existingAssets = await db.query.fixedAsset.findFirst({
+    where: eq(fixedAsset.organizationId, org.id),
+  });
+  if (existingAssets) {
+    console.log("Fixed assets already exist, skipping...");
+  } else {
   console.log("Creating fixed assets...");
   const assetData = [
     { name: "MacBook Pro 16\"", number: "FA-001", date: "2026-01-15", price: 350000, life: 36, residual: 50000 },
@@ -1210,8 +1247,15 @@ async function seed() {
     });
   }
   console.log(`  ${assetData.length} fixed assets`);
+  } // end fixed assets block
 
   // 15. Payroll Employees
+  const existingEmployees = await db.query.payrollEmployee.findFirst({
+    where: eq(payrollEmployee.organizationId, org.id),
+  });
+  if (existingEmployees) {
+    console.log("Payroll employees already exist, skipping...");
+  } else {
   console.log("Creating payroll employees...");
   const employees = [
     { name: "Alice Johnson", email: "alice@demo.com", number: "EMP-001", position: "Senior Developer", salary: 12000000, freq: "monthly" as const },
@@ -1234,8 +1278,15 @@ async function seed() {
     });
   }
   console.log(`  ${employees.length} employees`);
+  } // end payroll employees block
 
   // 17. Expense Claims
+  const existingClaims = await db.query.expenseClaim.findFirst({
+    where: eq(expenseClaim.organizationId, org.id),
+  });
+  if (existingClaims) {
+    console.log("Expense claims already exist, skipping...");
+  } else {
   console.log("Creating expense claims...");
   const [claim1] = await db
     .insert(expenseClaim)
@@ -1327,7 +1378,7 @@ async function seed() {
     },
   ]);
   console.log("  2 expense claims");
-  } // end if (!hasTransactionalData) - bills through expense claims
+  } // end expense claims block
 
   // 18. Inventory Items + Warehouses + Movements + Suppliers + Variants
   const existingInventory = await db.query.inventoryItem.findFirst({

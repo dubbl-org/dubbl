@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ErrorState } from "@/components/dashboard/error-state";
 import { cn } from "@/lib/utils";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { CashFlowWidget } from "@/components/dashboard/cash-flow-widget";
@@ -264,6 +265,7 @@ export default function DashboardPage() {
     grandTotal: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sparklines, setSparklines] = useState<{
     revenue: number[];
     expenses: number[];
@@ -325,6 +327,7 @@ export default function DashboardPage() {
         if (apData?.buckets) setPayables(apData);
       })
       .then(() => devDelay())
+      .catch(() => setError("Failed to load dashboard data. Please check your connection."))
       .finally(() => setLoading(false));
 
     // Load sparkline trends in background
@@ -410,6 +413,14 @@ export default function DashboardPage() {
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
             <BrandLoader />
+          </motion.div>
+        ) : error ? (
+          <motion.div
+            key="error"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <ErrorState message={error} onRetry={() => window.location.reload()} />
           </motion.div>
         ) : (
           <motion.div
