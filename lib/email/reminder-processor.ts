@@ -8,7 +8,7 @@ import {
   organization,
 } from "@/lib/db/schema";
 import { eq, and, isNull, notInArray } from "drizzle-orm";
-import { sendOrgEmail } from "./resend-client";
+import { sendEmail } from "./smtp-client";
 import { renderTemplate } from "./template-engine";
 import { formatMoney } from "@/lib/money";
 
@@ -128,7 +128,7 @@ export async function processReminders(orgId: string) {
 
       for (const recipient of recipients) {
         try {
-          await sendOrgEmail(orgId, { to: recipient, subject, html });
+          await sendEmail(config, { to: recipient, subject, html });
           await db.insert(reminderLog).values({
             organizationId: orgId,
             reminderRuleId: rule.id,

@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
-import { sendOrgEmail } from "@/lib/email/resend-client";
+import { sendEmail } from "@/lib/email/smtp-client";
 
 export async function POST(request: Request) {
   try {
@@ -18,16 +18,16 @@ export async function POST(request: Request) {
 
     if (!config) {
       return NextResponse.json(
-        { error: "Email config not found. Please configure email settings first." },
+        { error: "Email config not found. Please configure SMTP settings first." },
         { status: 404 }
       );
     }
 
     try {
-      await sendOrgEmail(ctx.organizationId, {
+      await sendEmail(config, {
         to: config.fromEmail,
-        subject: "dubbl - Test Email",
-        html: "<p>This is a test email from your dubbl email configuration. If you received this, your email settings are working correctly.</p>",
+        subject: "Dubbl - Test Email",
+        html: "<p>This is a test email from your Dubbl SMTP configuration. If you received this, your email settings are working correctly.</p>",
       });
 
       // Mark as verified if test succeeds
