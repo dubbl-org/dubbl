@@ -219,7 +219,7 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
 
   return (
     <header className="shrink-0">
-      <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-2 px-3 sm:px-6">
+      <div className="mx-auto flex h-14 w-full max-w-[1250px] items-center justify-between gap-2 px-3 sm:px-6">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {isMobile && (
             <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={toggleSidebar}>

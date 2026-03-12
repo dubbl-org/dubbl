@@ -12,17 +12,11 @@ import {
   ClipboardList,
   Mail,
   Save,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
@@ -38,14 +32,7 @@ const NOTIFICATION_TYPES = [
   { type: "task_assigned", label: "Task Assigned", description: "When a task is assigned to you", icon: ClipboardList, color: "text-indigo-500 bg-indigo-500/10" },
 ] as const;
 
-const DIGEST_OPTIONS = [
-  { value: "0", label: "Instant" },
-  { value: "15", label: "Every 15 min" },
-  { value: "30", label: "Every 30 min" },
-  { value: "60", label: "Every hour" },
-  { value: "360", label: "Every 6 hours" },
-  { value: "1440", label: "Daily" },
-];
+const DEBOUNCE_MINUTES = 120; // 2 hours
 
 interface Preference {
   type: string;
@@ -54,12 +41,12 @@ interface Preference {
   digestIntervalMinutes: number;
 }
 
-type PrefState = Record<string, { inApp: boolean; email: boolean; digest: number }>;
+type PrefState = Record<string, { inApp: boolean; email: boolean }>;
 
 function buildDefaultState(): PrefState {
   const state: PrefState = {};
   for (const t of NOTIFICATION_TYPES) {
-    state[t.type] = { inApp: true, email: false, digest: 0 };
+    state[t.type] = { inApp: true, email: false };
   }
   return state;
 }
@@ -72,7 +59,6 @@ function mergePrefs(prefs: Preference[]): PrefState {
       state[p.type].inApp = p.enabled;
     } else if (p.channel === "email") {
       state[p.type].email = p.enabled;
-      state[p.type].digest = p.digestIntervalMinutes;
     }
   }
   return state;
@@ -108,7 +94,7 @@ export default function NotificationPreferencesPage() {
       const preferences: Preference[] = [];
       for (const [type, val] of Object.entries(prefs)) {
         preferences.push({ type, channel: "in_app", enabled: val.inApp, digestIntervalMinutes: 0 });
-        preferences.push({ type, channel: "email", enabled: val.email, digestIntervalMinutes: val.digest });
+        preferences.push({ type, channel: "email", enabled: val.email, digestIntervalMinutes: DEBOUNCE_MINUTES });
       }
 
       const res = await fetch("/api/v1/notifications/preferences", {
@@ -138,9 +124,7 @@ export default function NotificationPreferencesPage() {
     setPrefs((p) => ({ ...p, [type]: { ...p[type], email: !p[type].email } }));
   };
 
-  const setDigest = (type: string, value: string) => {
-    setPrefs((p) => ({ ...p, [type]: { ...p[type], digest: parseInt(value) } }));
-  };
+  const anyEmailEnabled = Object.values(prefs).some((v) => v.email);
 
   if (loading) return <BrandLoader />;
 
@@ -152,7 +136,7 @@ export default function NotificationPreferencesPage() {
           <div>
             <h2 className="text-base font-semibold">Notification Preferences</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Choose how and when you want to be notified
+              Choose how you want to be notified
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -215,26 +199,24 @@ export default function NotificationPreferencesPage() {
                       className="scale-90"
                     />
                   </div>
-                  {/* Digest interval (only for email) */}
-                  {val.email && (
-                    <Select value={String(val.digest)} onValueChange={(v) => setDigest(t.type, v)}>
-                      <SelectTrigger className="h-7 w-[120px] text-[11px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DIGEST_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value} className="text-xs">
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
               </div>
             );
           })}
         </div>
+
+        {/* Email debounce info */}
+        {anyEmailEnabled && (
+          <div className="flex items-start gap-3 rounded-lg border border-dashed px-4 py-3">
+            <Clock className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[13px] font-medium">Email debounce</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                If multiple notifications arrive close together, they&apos;ll be grouped into a single digest email sent after a 2-hour window. This prevents inbox spam.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </ContentReveal>
   );
