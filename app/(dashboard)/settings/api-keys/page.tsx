@@ -250,7 +250,7 @@ export default function ApiKeysPage() {
             )}
           </SheetHeader>
           {newKey ? (
-            <div className="space-y-3 px-4">
+            <div className="space-y-3 px-4 py-4">
               <div className="flex items-center gap-2 rounded-lg bg-muted p-3">
                 <code className="flex-1 text-xs font-mono break-all">
                   {newKey}
@@ -269,7 +269,7 @@ export default function ApiKeysPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4 px-4">
+            <div className="space-y-4 px-4 py-4">
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input

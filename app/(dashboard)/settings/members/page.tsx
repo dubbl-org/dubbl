@@ -379,7 +379,7 @@ export default function MembersPage() {
           <SheetHeader>
             <SheetTitle>Add Member</SheetTitle>
           </SheetHeader>
-          <div className="space-y-4 px-4">
+          <div className="space-y-4 px-4 py-4">
             <div className="space-y-2">
               <Label>Email</Label>
               <Input

@@ -213,7 +213,7 @@ export default function AdvisorsPage() {
           <SheetHeader>
             <SheetTitle>Invite Advisor</SheetTitle>
           </SheetHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <Input
@@ -251,7 +251,14 @@ export default function AdvisorsPage() {
             </div>
           </div>
           <SheetFooter>
-            <Button onClick={handleInvite} disabled={saving || !email.trim()} className="w-full">
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleInvite}
+              disabled={saving || !email.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
               {saving ? "Inviting..." : "Send Invitation"}
             </Button>
           </SheetFooter>

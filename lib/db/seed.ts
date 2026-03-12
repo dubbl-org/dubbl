@@ -11,14 +11,23 @@ import {
   journalLine,
   taxRate,
   contact,
+  contactPerson,
   invoice,
   invoiceLine,
   creditNote,
   creditNoteLine,
+  quote,
+  quoteLine,
   bill,
   billLine,
+  purchaseOrder,
+  purchaseOrderLine,
+  debitNote,
+  debitNoteLine,
   bankAccount,
   bankTransaction,
+  bankRule,
+  bankReconciliation,
   budget,
   budgetLine,
   budgetPeriod,
@@ -31,7 +40,11 @@ import {
   taskComment,
   timeEntry,
   fixedAsset,
+  depreciationEntry,
   payrollEmployee,
+  payrollSettings,
+  payrollRun,
+  payrollItem,
   inventoryItem,
   inventoryCategory,
   warehouse,
@@ -47,6 +60,29 @@ import {
   paymentAllocation,
   recurringTemplate,
   recurringTemplateLine,
+  costCenter,
+  tag,
+  entityTag,
+  periodLock,
+  exchangeRate,
+  numberSequence,
+  customRole,
+  team,
+  teamMember,
+  pipeline,
+  deal,
+  dealActivity,
+  loan,
+  loanSchedule,
+  reminderRule,
+  notification,
+  documentTemplate,
+  documentFolder,
+  savedReport,
+  scheduledPayment,
+  workflow,
+  revenueSchedule,
+  revenueEntry,
 } from "./schema";
 import { eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -207,16 +243,19 @@ async function seed() {
   console.log("Looking for existing user/organization...");
 
   // Prefer the dev user's org first, then fall back to any owner membership
-  const existingMember =
-    (await db.query.member.findFirst({
-      where: eq(member.userId, (
-        await db.query.users.findFirst({
-          where: eq(users.email, "dev@dubbl.local"),
-          columns: { id: true },
-        })
-      )?.id ?? ""),
-      with: { user: true, organization: true },
-    })) ??
+  const devUser = await db.query.users.findFirst({
+    where: eq(users.email, "dev@dubbl.local"),
+    columns: { id: true },
+  });
+
+  const existingMember = devUser
+    ? (await db.query.member.findFirst({
+        where: eq(member.userId, devUser.id),
+        with: { user: true, organization: true },
+      }))
+    : null;
+
+  const resolvedMember = existingMember ??
     (await db.query.member.findFirst({
       where: eq(member.role, "owner"),
       with: { user: true, organization: true },
@@ -225,10 +264,10 @@ async function seed() {
   let userId: string;
   let org: { id: string; name: string };
 
-  if (existingMember) {
-    userId = existingMember.userId;
-    org = { id: existingMember.organizationId, name: existingMember.organization.name };
-    console.log(`  Using existing user: ${existingMember.user.email}`);
+  if (resolvedMember) {
+    userId = resolvedMember.userId;
+    org = { id: resolvedMember.organizationId, name: resolvedMember.organization.name };
+    console.log(`  Using existing user: ${resolvedMember.user.email}`);
     console.log(`  Using existing org: ${org.name}`);
   } else {
     console.log("  No existing user found, creating demo user...");
@@ -1561,6 +1600,1028 @@ async function seed() {
   console.log("  3 stock transfers");
   } else {
     console.log("\nInventory data already exists, skipping...");
+  }
+
+  // ===== ADDITIONAL SEED DATA =====
+
+  // 19. Cost Centers
+  const existingCostCenters = await db.query.costCenter.findFirst({
+    where: eq(costCenter.organizationId, org.id),
+  });
+  if (!existingCostCenters) {
+    console.log("Creating cost centers...");
+    const ccData = [
+      { code: "DEPT-ENG", name: "Engineering" },
+      { code: "DEPT-SALES", name: "Sales" },
+      { code: "DEPT-MKT", name: "Marketing" },
+      { code: "DEPT-OPS", name: "Operations" },
+      { code: "DEPT-HR", name: "Human Resources" },
+      { code: "DEPT-FIN", name: "Finance" },
+    ];
+    const createdCCs: { id: string; code: string }[] = [];
+    for (const cc of ccData) {
+      const [row] = await db.insert(costCenter).values({
+        organizationId: org.id,
+        code: cc.code,
+        name: cc.name,
+      }).returning();
+      createdCCs.push({ id: row.id, code: cc.code });
+    }
+    // Sub-departments under Engineering
+    const engCC = createdCCs.find((c) => c.code === "DEPT-ENG");
+    if (engCC) {
+      await db.insert(costCenter).values([
+        { organizationId: org.id, code: "ENG-FE", name: "Frontend", parentId: engCC.id },
+        { organizationId: org.id, code: "ENG-BE", name: "Backend", parentId: engCC.id },
+        { organizationId: org.id, code: "ENG-INFRA", name: "Infrastructure", parentId: engCC.id },
+      ]);
+    }
+    console.log(`  ${ccData.length + 3} cost centers`);
+  }
+
+  // 20. Tags
+  const existingTags = await db.query.tag.findFirst({
+    where: eq(tag.organizationId, org.id),
+  });
+  if (!existingTags) {
+    console.log("Creating tags...");
+    const tagData = [
+      { name: "Q1 2026", color: "#3b82f6", description: "First quarter transactions" },
+      { name: "Recurring", color: "#10b981", description: "Recurring transactions" },
+      { name: "Marketing", color: "#f59e0b", description: "Marketing related" },
+      { name: "Client Project", color: "#8b5cf6", description: "Client project expenses" },
+      { name: "Tax Deductible", color: "#ef4444", description: "Tax deductible items" },
+      { name: "Needs Review", color: "#f97316", description: "Items needing review" },
+      { name: "Auto-imported", color: "#6b7280", description: "Automatically imported transactions" },
+    ];
+    for (const t of tagData) {
+      await db.insert(tag).values({
+        organizationId: org.id,
+        name: t.name,
+        color: t.color,
+        description: t.description,
+      });
+    }
+    console.log(`  ${tagData.length} tags`);
+  }
+
+  // 21. Number Sequences
+  const existingSeq = await db.query.numberSequence.findFirst({
+    where: eq(numberSequence.organizationId, org.id),
+  });
+  if (!existingSeq) {
+    console.log("Creating number sequences...");
+    const seqData = [
+      { entityType: "invoice", prefix: "INV-", lastNumber: 10 },
+      { entityType: "bill", prefix: "BILL-", lastNumber: 10 },
+      { entityType: "quote", prefix: "QT-", lastNumber: 5 },
+      { entityType: "credit_note", prefix: "CN-", lastNumber: 3 },
+      { entityType: "debit_note", prefix: "DN-", lastNumber: 2 },
+      { entityType: "purchase_order", prefix: "PO-", lastNumber: 5 },
+      { entityType: "payment", prefix: "PAY-", lastNumber: 15 },
+      { entityType: "journal", prefix: "JE-", lastNumber: 20 },
+      { entityType: "expense_claim", prefix: "EXP-", lastNumber: 2 },
+    ];
+    for (const s of seqData) {
+      await db.insert(numberSequence).values({
+        organizationId: org.id,
+        entityType: s.entityType,
+        prefix: s.prefix,
+        lastNumber: s.lastNumber,
+      });
+    }
+    console.log(`  ${seqData.length} sequences`);
+  }
+
+  // 22. Custom Roles
+  const existingRoles = await db.query.customRole.findFirst({
+    where: eq(customRole.organizationId, org.id),
+  });
+  if (!existingRoles) {
+    console.log("Creating custom roles...");
+    await db.insert(customRole).values([
+      {
+        organizationId: org.id,
+        name: "Bookkeeper",
+        description: "Can manage day-to-day accounting tasks",
+        permissions: ["transactions:read", "transactions:write", "contacts:read", "contacts:write", "reports:read", "banking:read", "banking:write"],
+      },
+      {
+        organizationId: org.id,
+        name: "Sales Manager",
+        description: "Full access to sales, invoices, and CRM",
+        permissions: ["invoices:read", "invoices:write", "contacts:read", "contacts:write", "crm:read", "crm:write", "quotes:read", "quotes:write", "reports:read"],
+      },
+      {
+        organizationId: org.id,
+        name: "Viewer",
+        description: "Read-only access to all financial data",
+        permissions: ["transactions:read", "contacts:read", "invoices:read", "bills:read", "reports:read", "banking:read", "inventory:read"],
+        isSystem: true,
+      },
+    ]);
+    console.log("  3 custom roles");
+  }
+
+  // 23. Teams
+  const existingTeams = await db.query.team.findFirst({
+    where: eq(team.organizationId, org.id),
+  });
+  if (!existingTeams) {
+    console.log("Creating teams...");
+    const [engTeam] = await db.insert(team).values({
+      organizationId: org.id,
+      name: "Engineering",
+      description: "Product engineering team",
+      color: "#3b82f6",
+    }).returning();
+    const [finTeam] = await db.insert(team).values({
+      organizationId: org.id,
+      name: "Finance",
+      description: "Finance and accounting team",
+      color: "#10b981",
+    }).returning();
+    await db.insert(team).values({
+      organizationId: org.id,
+      name: "Leadership",
+      description: "Executive leadership",
+      color: "#8b5cf6",
+    });
+
+    // Add demo member to teams
+    const demoMem = await db.query.member.findFirst({
+      where: eq(member.organizationId, org.id),
+    });
+    if (demoMem) {
+      await db.insert(teamMember).values([
+        { teamId: engTeam.id, memberId: demoMem.id },
+        { teamId: finTeam.id, memberId: demoMem.id },
+      ]);
+    }
+    console.log("  3 teams");
+  }
+
+  // 24. Contact Persons
+  const existingContactPersons = await db.query.contactPerson.findFirst({});
+  if (!existingContactPersons) {
+    console.log("Creating contact persons...");
+    const contacts = await db.query.contact.findMany({
+      where: eq(contact.organizationId, org.id),
+      limit: 6,
+    });
+    const personData = [
+      { name: "John Anderson", email: "john@acme.com", phone: "+1-555-0101", jobTitle: "CFO", isPrimary: true },
+      { name: "Sarah Mitchell", email: "sarah@acme.com", phone: "+1-555-0102", jobTitle: "AP Manager", isPrimary: false },
+      { name: "Michael Chen", email: "michael@globalind.com", phone: "+1-555-0201", jobTitle: "Procurement Director", isPrimary: true },
+      { name: "Emily Davis", email: "emily@techstart.io", phone: "+1-555-0301", jobTitle: "CEO", isPrimary: true },
+      { name: "Robert Wilson", email: "robert@brightsolutions.com", phone: "+1-555-0401", jobTitle: "Finance Manager", isPrimary: true },
+      { name: "Lisa Thompson", email: "lisa@metroservices.com", phone: "+1-555-0501", jobTitle: "Operations Lead", isPrimary: true },
+    ];
+    for (let i = 0; i < Math.min(personData.length, contacts.length); i++) {
+      await db.insert(contactPerson).values({
+        contactId: contacts[i].id,
+        ...personData[i],
+      });
+    }
+    console.log(`  ${Math.min(personData.length, contacts.length)} contact persons`);
+  }
+
+  // 25. Quotes
+  const existingQuotes = await db.query.quote.findFirst({
+    where: eq(quote.organizationId, org.id),
+  });
+  if (!existingQuotes) {
+    console.log("Creating quotes...");
+    const allContacts = await db.query.contact.findMany({
+      where: eq(contact.organizationId, org.id),
+      limit: 10,
+    });
+    const allAccounts = await db.query.chartAccount.findMany({
+      where: eq(chartAccount.organizationId, org.id),
+    });
+    const serviceAcct = allAccounts.find((a) => a.code === "4010");
+
+    const quoteData = [
+      { contact: 0, number: "QT-00001", date: "2026-02-01", expiry: "2026-03-01", status: "accepted" as const, desc: "Website Redesign Phase 3", price: 3500000 },
+      { contact: 2, number: "QT-00002", date: "2026-02-10", expiry: "2026-03-10", status: "sent" as const, desc: "Mobile App Enhancement", price: 2800000 },
+      { contact: 5, number: "QT-00003", date: "2026-02-15", expiry: "2026-03-15", status: "draft" as const, desc: "Data Analytics Dashboard", price: 1500000 },
+      { contact: 8, number: "QT-00004", date: "2026-02-20", expiry: "2026-03-20", status: "sent" as const, desc: "Cloud Migration Project", price: 4200000 },
+      { contact: 9, number: "QT-00005", date: "2026-02-25", expiry: "2026-03-25", status: "declined" as const, desc: "Security Audit", price: 800000 },
+    ];
+
+    for (const q of quoteData) {
+      if (!allContacts[q.contact]) continue;
+      const [row] = await db.insert(quote).values({
+        organizationId: org.id,
+        contactId: allContacts[q.contact].id,
+        quoteNumber: q.number,
+        issueDate: q.date,
+        expiryDate: q.expiry,
+        status: q.status,
+        subtotal: q.price,
+        taxTotal: 0,
+        total: q.price,
+        currencyCode: "USD",
+        createdBy: userId,
+        sentAt: q.status !== "draft" ? new Date(q.date) : undefined,
+      }).returning();
+
+      await db.insert(quoteLine).values({
+        quoteId: row.id,
+        description: q.desc,
+        quantity: 100,
+        unitPrice: q.price,
+        amount: q.price,
+        accountId: serviceAcct?.id,
+        sortOrder: 0,
+      });
+    }
+    console.log(`  ${quoteData.length} quotes`);
+  }
+
+  // 26. Purchase Orders
+  const existingPOs = await db.query.purchaseOrder.findFirst({
+    where: eq(purchaseOrder.organizationId, org.id),
+  });
+  if (!existingPOs) {
+    console.log("Creating purchase orders...");
+    const supplierContacts2 = await db.query.contact.findMany({
+      where: eq(contact.organizationId, org.id),
+    });
+    const suppliers = supplierContacts2.filter((c) => c.type === "supplier" || c.type === "both");
+    const allAccounts2 = await db.query.chartAccount.findMany({
+      where: eq(chartAccount.organizationId, org.id),
+    });
+    const cogsAcct = allAccounts2.find((a) => a.code === "5000");
+
+    const poData = [
+      { contact: 0, number: "PO-00001", date: "2026-02-01", delivery: "2026-02-15", status: "received" as const, desc: "Office Supplies Q1", amount: 45000 },
+      { contact: 1, number: "PO-00002", date: "2026-02-05", delivery: "2026-02-20", status: "sent" as const, desc: "Cloud Services March", amount: 52000 },
+      { contact: 2, number: "PO-00003", date: "2026-02-10", delivery: "2026-03-01", status: "sent" as const, desc: "Office Lease March", amount: 350000 },
+      { contact: 3, number: "PO-00004", date: "2026-02-15", delivery: "2026-03-15", status: "draft" as const, desc: "New Monitors x5", amount: 750000 },
+      { contact: 4, number: "PO-00005", date: "2026-02-20", delivery: "2026-03-20", status: "draft" as const, desc: "Annual Insurance Renewal", amount: 300000 },
+    ];
+
+    for (const po of poData) {
+      if (!suppliers[po.contact]) continue;
+      const [row] = await db.insert(purchaseOrder).values({
+        organizationId: org.id,
+        contactId: suppliers[po.contact].id,
+        poNumber: po.number,
+        issueDate: po.date,
+        deliveryDate: po.delivery,
+        status: po.status,
+        subtotal: po.amount,
+        taxTotal: 0,
+        total: po.amount,
+        currencyCode: "USD",
+        createdBy: userId,
+        sentAt: po.status !== "draft" ? new Date(po.date) : undefined,
+      }).returning();
+
+      await db.insert(purchaseOrderLine).values({
+        purchaseOrderId: row.id,
+        description: po.desc,
+        quantity: 100,
+        unitPrice: po.amount,
+        amount: po.amount,
+        accountId: cogsAcct?.id,
+        sortOrder: 0,
+      });
+    }
+    console.log(`  ${poData.length} purchase orders`);
+  }
+
+  // 27. Debit Notes
+  const existingDNs = await db.query.debitNote.findFirst({
+    where: eq(debitNote.organizationId, org.id),
+  });
+  if (!existingDNs) {
+    console.log("Creating debit notes...");
+    const supplierContacts3 = await db.query.contact.findMany({
+      where: eq(contact.organizationId, org.id),
+    });
+    const suppliers2 = supplierContacts3.filter((c) => c.type === "supplier" || c.type === "both");
+    const allAccounts3 = await db.query.chartAccount.findMany({
+      where: eq(chartAccount.organizationId, org.id),
+    });
+    const cogsAcct2 = allAccounts3.find((a) => a.code === "5000");
+
+    if (suppliers2.length >= 2) {
+      const dnData = [
+        { contact: 0, number: "DN-00001", date: "2026-02-05", status: "sent" as const, desc: "Defective supplies return", amount: 8500 },
+        { contact: 1, number: "DN-00002", date: "2026-02-12", status: "draft" as const, desc: "Overcharge on hosting", amount: 5000 },
+      ];
+
+      for (const dn of dnData) {
+        const [row] = await db.insert(debitNote).values({
+          organizationId: org.id,
+          contactId: suppliers2[dn.contact].id,
+          debitNoteNumber: dn.number,
+          issueDate: dn.date,
+          status: dn.status,
+          subtotal: dn.amount,
+          taxTotal: 0,
+          total: dn.amount,
+          amountApplied: 0,
+          amountRemaining: dn.amount,
+          currencyCode: "USD",
+          createdBy: userId,
+          sentAt: dn.status !== "draft" ? new Date(dn.date) : undefined,
+        }).returning();
+
+        await db.insert(debitNoteLine).values({
+          debitNoteId: row.id,
+          description: dn.desc,
+          quantity: 100,
+          unitPrice: dn.amount,
+          amount: dn.amount,
+          accountId: cogsAcct2?.id,
+          sortOrder: 0,
+        });
+      }
+      console.log("  2 debit notes");
+    }
+  }
+
+  // 28. Bank Rules
+  const existingBankRules = await db.query.bankRule.findFirst({
+    where: eq(bankRule.organizationId, org.id),
+  });
+  if (!existingBankRules) {
+    console.log("Creating bank rules...");
+    const allAccounts4 = await db.query.chartAccount.findMany({
+      where: eq(chartAccount.organizationId, org.id),
+    });
+    const acctMap: Record<string, string> = {};
+    for (const a of allAccounts4) acctMap[a.code] = a.id;
+
+    await db.insert(bankRule).values([
+      { organizationId: org.id, name: "AWS Hosting", priority: 1, matchField: "description", matchType: "contains" as const, matchValue: "AWS", accountId: acctMap["5220"] },
+      { organizationId: org.id, name: "Payroll", priority: 2, matchField: "description", matchType: "contains" as const, matchValue: "Payroll", accountId: acctMap["5100"] },
+      { organizationId: org.id, name: "Rent Payment", priority: 3, matchField: "description", matchType: "contains" as const, matchValue: "Rent", accountId: acctMap["5200"] },
+      { organizationId: org.id, name: "Client Deposits", priority: 4, matchField: "description", matchType: "contains" as const, matchValue: "Client payment", accountId: acctMap["4010"] },
+      { organizationId: org.id, name: "Insurance", priority: 5, matchField: "description", matchType: "contains" as const, matchValue: "Insurance", accountId: acctMap["5400"] },
+    ]);
+    console.log("  5 bank rules");
+  }
+
+  // 29. Bank Reconciliation
+  const existingRecon = await db.query.bankReconciliation.findFirst({});
+  if (!existingRecon) {
+    console.log("Creating bank reconciliation...");
+    const bankAccts = await db.query.bankAccount.findMany({
+      where: eq(bankAccount.organizationId, org.id),
+      limit: 1,
+    });
+    if (bankAccts.length > 0) {
+      await db.insert(bankReconciliation).values({
+        bankAccountId: bankAccts[0].id,
+        startDate: "2026-01-01",
+        endDate: "2026-01-31",
+        startBalance: 0,
+        endBalance: 5878100,
+        status: "completed",
+      });
+      await db.insert(bankReconciliation).values({
+        bankAccountId: bankAccts[0].id,
+        startDate: "2026-02-01",
+        endDate: "2026-02-28",
+        startBalance: 5878100,
+        endBalance: 5028200,
+        status: "in_progress",
+      });
+      console.log("  2 reconciliations");
+    }
+  }
+
+  // 30. CRM: Pipelines & Deals
+  const existingPipeline = await db.query.pipeline.findFirst({
+    where: eq(pipeline.organizationId, org.id),
+  });
+  if (!existingPipeline) {
+    console.log("Creating CRM pipelines and deals...");
+    const [salesPipeline] = await db.insert(pipeline).values({
+      organizationId: org.id,
+      name: "Sales Pipeline",
+      isDefault: true,
+      stages: [
+        { id: "lead", name: "Lead", color: "#6b7280" },
+        { id: "qualified", name: "Qualified", color: "#3b82f6" },
+        { id: "proposal", name: "Proposal", color: "#f59e0b" },
+        { id: "negotiation", name: "Negotiation", color: "#f97316" },
+        { id: "closed_won", name: "Closed Won", color: "#10b981" },
+        { id: "closed_lost", name: "Closed Lost", color: "#ef4444" },
+      ],
+    }).returning();
+
+    await db.insert(pipeline).values({
+      organizationId: org.id,
+      name: "Partnership Pipeline",
+      stages: [
+        { id: "inquiry", name: "Inquiry", color: "#6b7280" },
+        { id: "evaluation", name: "Evaluation", color: "#3b82f6" },
+        { id: "agreement", name: "Agreement", color: "#f59e0b" },
+        { id: "signed", name: "Signed", color: "#10b981" },
+        { id: "declined", name: "Declined", color: "#ef4444" },
+      ],
+    });
+
+    // Deals
+    const allContacts2 = await db.query.contact.findMany({
+      where: eq(contact.organizationId, org.id),
+      limit: 10,
+    });
+
+    const dealData = [
+      { contact: 0, title: "Acme Corp - Enterprise Package", stage: "negotiation", value: 12000000, prob: 75, source: "referral" as const, close: "2026-04-15" },
+      { contact: 2, title: "TechStart - Annual Contract", stage: "proposal", value: 4800000, prob: 50, source: "website" as const, close: "2026-05-01" },
+      { contact: 5, title: "Pinnacle Group - Consulting", stage: "qualified", value: 2400000, prob: 25, source: "cold_outreach" as const, close: "2026-06-01" },
+      { contact: 7, title: "Summit Digital - Platform License", stage: "lead", value: 3600000, prob: 10, source: "event" as const, close: "2026-07-01" },
+      { contact: 8, title: "CloudBase - Infrastructure", stage: "closed_won", value: 8000000, prob: 100, source: "referral" as const, close: "2026-02-28", won: true },
+      { contact: 1, title: "Global Industries - Migration", stage: "closed_lost", value: 5500000, prob: 0, source: "website" as const, close: "2026-02-15", lost: true },
+      { contact: 6, title: "Riverdale - Support Plan", stage: "proposal", value: 1800000, prob: 50, source: "referral" as const, close: "2026-04-30" },
+      { contact: 9, title: "Sterling - Custom Development", stage: "negotiation", value: 15000000, prob: 75, source: "cold_outreach" as const, close: "2026-05-15" },
+    ];
+
+    const dealIds: string[] = [];
+    for (const d of dealData) {
+      if (!allContacts2[d.contact]) continue;
+      const [row] = await db.insert(deal).values({
+        organizationId: org.id,
+        pipelineId: salesPipeline.id,
+        stageId: d.stage,
+        contactId: allContacts2[d.contact].id,
+        title: d.title,
+        valueCents: d.value,
+        currency: "USD",
+        probability: d.prob,
+        expectedCloseDate: d.close,
+        assignedTo: userId,
+        source: d.source,
+        wonAt: "won" in d ? new Date("2026-02-28") : undefined,
+        lostAt: "lost" in d ? new Date("2026-02-15") : undefined,
+        lostReason: "lost" in d ? "Budget constraints - decided to go with in-house solution" : undefined,
+      }).returning();
+      dealIds.push(row.id);
+    }
+
+    // Deal activities
+    const activities = [
+      { dealIdx: 0, type: "call" as const, content: "Initial discovery call - discussed requirements and timeline" },
+      { dealIdx: 0, type: "email" as const, content: "Sent detailed proposal with pricing tiers" },
+      { dealIdx: 0, type: "meeting" as const, content: "Demo session with stakeholders - very positive feedback" },
+      { dealIdx: 1, type: "note" as const, content: "Contact is evaluating 3 vendors, decision by end of month" },
+      { dealIdx: 1, type: "email" as const, content: "Sent case study and reference contacts" },
+      { dealIdx: 4, type: "meeting" as const, content: "Contract signing meeting - deal closed!" },
+      { dealIdx: 7, type: "call" as const, content: "Scope review call - additional modules requested" },
+      { dealIdx: 7, type: "task" as const, content: "Prepare revised proposal with additional scope" },
+    ];
+
+    for (const act of activities) {
+      if (!dealIds[act.dealIdx]) continue;
+      await db.insert(dealActivity).values({
+        dealId: dealIds[act.dealIdx],
+        userId,
+        type: act.type,
+        content: act.content,
+        completedAt: new Date(),
+      });
+    }
+    console.log(`  2 pipelines, ${dealData.length} deals, ${activities.length} activities`);
+  }
+
+  // 31. Loans
+  const existingLoans = await db.query.loan.findFirst({
+    where: eq(loan.organizationId, org.id),
+  });
+  if (!existingLoans) {
+    console.log("Creating loans...");
+    const allAccounts5 = await db.query.chartAccount.findMany({
+      where: eq(chartAccount.organizationId, org.id),
+    });
+    const acctMap2: Record<string, string> = {};
+    for (const a of allAccounts5) acctMap2[a.code] = a.id;
+
+    const bankAccts2 = await db.query.bankAccount.findMany({
+      where: eq(bankAccount.organizationId, org.id),
+      limit: 1,
+    });
+
+    const [equipLoan] = await db.insert(loan).values({
+      organizationId: org.id,
+      name: "Equipment Financing",
+      bankAccountId: bankAccts2[0]?.id,
+      principalAmount: 5000000, // $50,000
+      interestRate: 650, // 6.5%
+      termMonths: 36,
+      startDate: "2026-01-01",
+      monthlyPayment: 153300,
+      status: "active",
+      principalAccountId: acctMap2["2700"],
+      interestAccountId: acctMap2["5910"],
+    }).returning();
+
+    // Generate loan schedule (first 6 months)
+    let remaining = 5000000;
+    for (let i = 1; i <= 6; i++) {
+      const interest = Math.round((remaining * 650) / (12 * 10000));
+      const principal = 153300 - interest;
+      remaining -= principal;
+      await db.insert(loanSchedule).values({
+        loanId: equipLoan.id,
+        periodNumber: i,
+        date: `2026-${String(i).padStart(2, "0")}-01`,
+        principalAmount: principal,
+        interestAmount: interest,
+        totalPayment: 153300,
+        remainingBalance: remaining,
+        posted: i <= 2,
+        sortOrder: i,
+      });
+    }
+
+    await db.insert(loan).values({
+      organizationId: org.id,
+      name: "Office Renovation Loan",
+      bankAccountId: bankAccts2[0]?.id,
+      principalAmount: 2500000, // $25,000
+      interestRate: 550, // 5.5%
+      termMonths: 24,
+      startDate: "2026-02-01",
+      monthlyPayment: 110200,
+      status: "active",
+      principalAccountId: acctMap2["2700"],
+      interestAccountId: acctMap2["5910"],
+    });
+
+    console.log("  2 loans with amortization schedule");
+  }
+
+  // 32. Depreciation Entries
+  const existingDepEntries = await db.query.depreciationEntry.findFirst({});
+  if (!existingDepEntries) {
+    console.log("Creating depreciation entries...");
+    const assets = await db.query.fixedAsset.findMany({
+      where: eq(fixedAsset.organizationId, org.id),
+    });
+    for (const asset of assets) {
+      const monthlyDep = Math.round((asset.purchasePrice - (asset.residualValue ?? 0)) / asset.usefulLifeMonths);
+      for (let m = 1; m <= 2; m++) {
+        await db.insert(depreciationEntry).values({
+          fixedAssetId: asset.id,
+          date: `2026-${String(m).padStart(2, "0")}-28`,
+          amount: monthlyDep,
+        });
+      }
+    }
+    console.log(`  ${assets.length * 2} depreciation entries`);
+  }
+
+  // 33. Reminder Rules
+  const existingReminders = await db.query.reminderRule.findFirst({
+    where: eq(reminderRule.organizationId, org.id),
+  });
+  if (!existingReminders) {
+    console.log("Creating reminder rules...");
+    await db.insert(reminderRule).values([
+      {
+        organizationId: org.id,
+        name: "Invoice Due in 7 Days",
+        triggerType: "before_due",
+        triggerDays: 7,
+        enabled: true,
+        documentType: "invoice",
+        recipientType: "contact_email",
+        subjectTemplate: "Payment reminder: Invoice {{invoiceNumber}} due in 7 days",
+        bodyTemplate: "Dear {{contactName}},\n\nThis is a friendly reminder that invoice {{invoiceNumber}} for {{amount}} is due on {{dueDate}}.\n\nPlease arrange payment at your earliest convenience.\n\nBest regards,\n{{orgName}}",
+      },
+      {
+        organizationId: org.id,
+        name: "Invoice Overdue - 3 Days",
+        triggerType: "after_due",
+        triggerDays: 3,
+        enabled: true,
+        documentType: "invoice",
+        recipientType: "contact_email",
+        subjectTemplate: "Overdue: Invoice {{invoiceNumber}} was due {{dueDate}}",
+        bodyTemplate: "Dear {{contactName}},\n\nInvoice {{invoiceNumber}} for {{amount}} was due on {{dueDate}} and remains unpaid.\n\nPlease process this payment as soon as possible.\n\nBest regards,\n{{orgName}}",
+      },
+      {
+        organizationId: org.id,
+        name: "Invoice Overdue - 14 Days",
+        triggerType: "after_due",
+        triggerDays: 14,
+        enabled: true,
+        documentType: "invoice",
+        recipientType: "contact_email",
+        subjectTemplate: "URGENT: Invoice {{invoiceNumber}} is 14 days overdue",
+        bodyTemplate: "Dear {{contactName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is now 14 days overdue.\n\nPlease contact us immediately if there are any issues with payment.\n\nBest regards,\n{{orgName}}",
+      },
+      {
+        organizationId: org.id,
+        name: "Bill Due Tomorrow",
+        triggerType: "before_due",
+        triggerDays: 1,
+        enabled: true,
+        documentType: "bill",
+        recipientType: "custom",
+        customEmails: ["finance@demo.com"],
+        subjectTemplate: "Bill {{billNumber}} due tomorrow",
+        bodyTemplate: "Bill {{billNumber}} for {{amount}} to {{contactName}} is due tomorrow ({{dueDate}}). Please ensure payment is scheduled.",
+      },
+    ]);
+    console.log("  4 reminder rules");
+  }
+
+  // 34. Notifications
+  const existingNotifs = await db.query.notification.findFirst({
+    where: eq(notification.organizationId, org.id),
+  });
+  if (!existingNotifs) {
+    console.log("Creating notifications...");
+    await db.insert(notification).values([
+      { organizationId: org.id, userId, type: "invoice_overdue", title: "Invoice INV-00004 is overdue", body: "Invoice to Bright Solutions for $5,000.00 was due Feb 8", channel: "in_app" },
+      { organizationId: org.id, userId, type: "payment_received", title: "Payment received from Acme Corp", body: "Payment of $15,000.00 received for INV-00001", channel: "in_app", readAt: new Date() },
+      { organizationId: org.id, userId, type: "inventory_low", title: "Low stock: Noise Cancelling Headphones", body: "Only 5 units remaining (reorder point: 8)", channel: "in_app" },
+      { organizationId: org.id, userId, type: "payroll_due", title: "Payroll run due in 3 days", body: "March 2026 payroll needs to be processed by March 15", channel: "in_app" },
+      { organizationId: org.id, userId, type: "task_assigned", title: "Task assigned: Build contact page", body: "You were assigned to 'Build contact page' in Website Redesign", channel: "in_app", readAt: new Date() },
+      { organizationId: org.id, userId, type: "system_alert", title: "Bank sync completed", body: "17 new transactions imported from Business Checking", channel: "in_app", readAt: new Date() },
+      { organizationId: org.id, userId, type: "approval_needed", title: "Expense claim needs approval", body: "Software Subscriptions claim for $159.00 submitted", channel: "in_app" },
+    ]);
+    console.log("  7 notifications");
+  }
+
+  // 35. Document Templates
+  const existingTemplates = await db.query.documentTemplate.findFirst({
+    where: eq(documentTemplate.organizationId, org.id),
+  });
+  if (!existingTemplates) {
+    console.log("Creating document templates...");
+    await db.insert(documentTemplate).values([
+      {
+        organizationId: org.id,
+        name: "Standard Invoice",
+        type: "invoice",
+        isDefault: true,
+        accentColor: "#10b981",
+        showTaxBreakdown: true,
+        showPaymentTerms: true,
+        notes: "Thank you for your business. Payment is due within the terms specified above.",
+        headerHtml: "<h1 style=\"color: #10b981;\">{{orgName}}</h1>",
+        footerHtml: "<p style=\"color: #6b7280; font-size: 10px;\">{{orgName}} · {{orgAddress}}</p>",
+      },
+      {
+        organizationId: org.id,
+        name: "Professional Quote",
+        type: "quote",
+        isDefault: true,
+        accentColor: "#3b82f6",
+        showTaxBreakdown: true,
+        showPaymentTerms: false,
+        notes: "This quote is valid for 30 days from the issue date.",
+      },
+      {
+        organizationId: org.id,
+        name: "Payment Receipt",
+        type: "receipt",
+        isDefault: true,
+        accentColor: "#10b981",
+        showTaxBreakdown: false,
+        showPaymentTerms: false,
+      },
+      {
+        organizationId: org.id,
+        name: "Purchase Order",
+        type: "purchase_order",
+        isDefault: true,
+        accentColor: "#f59e0b",
+        showTaxBreakdown: true,
+        showPaymentTerms: true,
+        notes: "Please confirm receipt of this purchase order.",
+      },
+    ]);
+    console.log("  4 document templates");
+  }
+
+  // 36. Document Folders
+  const existingFolders = await db.query.documentFolder.findFirst({
+    where: eq(documentFolder.organizationId, org.id),
+  });
+  if (!existingFolders) {
+    console.log("Creating document folders...");
+    const [invoicesFolder] = await db.insert(documentFolder).values({
+      organizationId: org.id,
+      name: "Invoices",
+    }).returning();
+    const [receiptsFolder] = await db.insert(documentFolder).values({
+      organizationId: org.id,
+      name: "Receipts",
+    }).returning();
+    await db.insert(documentFolder).values([
+      { organizationId: org.id, name: "Contracts" },
+      { organizationId: org.id, name: "Tax Documents" },
+      { organizationId: org.id, name: "2026", parentId: invoicesFolder.id },
+      { organizationId: org.id, name: "2025", parentId: invoicesFolder.id },
+      { organizationId: org.id, name: "Expense Receipts", parentId: receiptsFolder.id },
+    ]);
+    console.log("  7 document folders");
+  }
+
+  // 37. Saved Reports
+  const existingReports = await db.query.savedReport.findFirst({
+    where: eq(savedReport.organizationId, org.id),
+  });
+  if (!existingReports) {
+    console.log("Creating saved reports...");
+    const reportData = [
+      { name: "Monthly P&L", description: "Profit & Loss report by month", config: { type: "profit_loss", period: "monthly", compareLastYear: true } },
+      { name: "AR Aging Summary", description: "Accounts receivable aging buckets", config: { type: "ar_aging", asOfDate: "today", buckets: [30, 60, 90, 120] } },
+      { name: "Cash Flow Forecast", description: "12-month cash flow projection", config: { type: "cash_flow", period: "monthly", months: 12 } },
+      { name: "Expense by Department", description: "Expenses broken down by cost center", config: { type: "expense_by_cost_center", period: "quarterly", year: 2026 } },
+    ];
+    for (const r of reportData) {
+      await db.insert(savedReport).values({
+        organizationId: org.id,
+        name: r.name,
+        description: r.description,
+        config: r.config as any,
+      });
+    }
+    console.log("  4 saved reports");
+  }
+
+  // 38. Scheduled Payments
+  const existingScheduledPay = await db.query.scheduledPayment.findFirst({
+    where: eq(scheduledPayment.organizationId, org.id),
+  });
+  if (!existingScheduledPay) {
+    console.log("Creating scheduled payments...");
+    const unpaidBills = await db.query.bill.findMany({
+      where: eq(bill.organizationId, org.id),
+    });
+    const pendingBills = unpaidBills.filter((b) => b.status !== "paid" && b.status !== "draft" && b.status !== "void");
+
+    for (const b of pendingBills.slice(0, 3)) {
+      await db.insert(scheduledPayment).values({
+        organizationId: org.id,
+        billId: b.id,
+        contactId: b.contactId,
+        amount: b.amountDue,
+        currencyCode: "USD",
+        scheduledDate: b.dueDate,
+        status: "pending",
+        notes: `Scheduled payment for ${b.billNumber}`,
+      });
+    }
+    console.log(`  ${Math.min(pendingBills.length, 3)} scheduled payments`);
+  }
+
+  // 39. Workflows
+  const existingWorkflows = await db.query.workflow.findFirst({
+    where: eq(workflow.organizationId, org.id),
+  });
+  if (!existingWorkflows) {
+    console.log("Creating workflows...");
+    const workflowData: { name: string; description: string; trigger: "invoice_overdue" | "payment_received" | "inventory_low" | "contact_created"; conditions: any[]; actions: any[]; isActive: boolean; triggerCount?: number }[] = [
+      {
+        name: "Invoice Overdue Notification",
+        description: "Send notification when invoice becomes overdue",
+        trigger: "invoice_overdue",
+        conditions: [{ field: "amountDue", operator: "greater_than", value: 0 }],
+        actions: [{ type: "send_notification", config: { title: "Invoice overdue", body: "Invoice {{invoiceNumber}} is now overdue" } }],
+        isActive: true,
+        triggerCount: 3,
+      },
+      {
+        name: "Payment Thank You",
+        description: "Send thank you email when payment received",
+        trigger: "payment_received",
+        conditions: [],
+        actions: [{ type: "send_email", config: { subject: "Thank you for your payment", template: "payment_thanks" } }],
+        isActive: true,
+        triggerCount: 5,
+      },
+      {
+        name: "Low Stock Alert",
+        description: "Alert when inventory drops below reorder point",
+        trigger: "inventory_low",
+        conditions: [],
+        actions: [{ type: "send_notification", config: { title: "Low stock alert", body: "{{itemName}} is below reorder point" } }, { type: "create_task", config: { title: "Reorder {{itemName}}", priority: "high" } }],
+        isActive: true,
+        triggerCount: 1,
+      },
+      {
+        name: "New Contact Welcome",
+        description: "Create onboarding task when new contact added",
+        trigger: "contact_created",
+        conditions: [],
+        actions: [{ type: "create_task", config: { title: "Onboard: {{contactName}}", description: "Review payment terms and set up portal access" } }],
+        isActive: false,
+      },
+    ];
+    for (const w of workflowData) {
+      await db.insert(workflow).values({
+        organizationId: org.id,
+        name: w.name,
+        description: w.description,
+        trigger: w.trigger,
+        conditions: w.conditions,
+        actions: w.actions,
+        isActive: w.isActive,
+        triggerCount: w.triggerCount,
+      });
+    }
+    console.log("  4 workflows");
+  }
+
+  // 40. Payroll Settings
+  const existingPayrollSettings = await db.query.payrollSettings.findFirst({
+    where: eq(payrollSettings.organizationId, org.id),
+  });
+  if (!existingPayrollSettings) {
+    console.log("Creating payroll settings and runs...");
+    await db.insert(payrollSettings).values({
+      organizationId: org.id,
+      defaultTaxRate: 2200,
+      overtimeThresholdHours: 40,
+      overtimeMultiplier: 1.5,
+      defaultCurrency: "USD",
+      salaryExpenseAccountCode: "5100",
+      taxPayableAccountCode: "2200",
+      bankAccountCode: "1100",
+    });
+
+    // Payroll runs
+    const demoMem2 = await db.query.member.findFirst({
+      where: eq(member.organizationId, org.id),
+    });
+
+    const [janRun] = await db.insert(payrollRun).values({
+      organizationId: org.id,
+      payPeriodStart: "2026-01-01",
+      payPeriodEnd: "2026-01-31",
+      status: "completed",
+      totalGross: 3300000,
+      totalDeductions: 726000,
+      totalNet: 2574000,
+      processedAt: new Date("2026-01-31"),
+      approvedBy: demoMem2?.id,
+      approvedAt: new Date("2026-01-30"),
+      approvalStatus: "approved",
+    }).returning();
+
+    const [febRun] = await db.insert(payrollRun).values({
+      organizationId: org.id,
+      payPeriodStart: "2026-02-01",
+      payPeriodEnd: "2026-02-28",
+      status: "completed",
+      totalGross: 3300000,
+      totalDeductions: 726000,
+      totalNet: 2574000,
+      processedAt: new Date("2026-02-28"),
+      approvedBy: demoMem2?.id,
+      approvedAt: new Date("2026-02-27"),
+      approvalStatus: "approved",
+    }).returning();
+
+    await db.insert(payrollRun).values({
+      organizationId: org.id,
+      payPeriodStart: "2026-03-01",
+      payPeriodEnd: "2026-03-31",
+      status: "draft",
+      totalGross: 0,
+      totalDeductions: 0,
+      totalNet: 0,
+    });
+
+    // Payroll items for Jan/Feb
+    const empList = await db.query.payrollEmployee.findMany({
+      where: eq(payrollEmployee.organizationId, org.id),
+    });
+
+    for (const run of [janRun, febRun]) {
+      for (const emp of empList) {
+        const monthly = Math.round(emp.salary / 12);
+        const tax = Math.round(monthly * (emp.taxRate ?? 2200) / 10000);
+        await db.insert(payrollItem).values({
+          payrollRunId: run.id,
+          employeeId: emp.id,
+          type: "regular_salary",
+          description: `Monthly salary - ${emp.name}`,
+          grossAmount: monthly,
+          taxAmount: tax,
+          deductions: 0,
+          netAmount: monthly - tax,
+        });
+      }
+    }
+    console.log(`  payroll settings, 3 runs, ${empList.length * 2} items`);
+  }
+
+  // 41. Exchange Rates
+  const existingFx = await db.query.exchangeRate.findFirst({
+    where: eq(exchangeRate.organizationId, org.id),
+  });
+  if (!existingFx) {
+    console.log("Creating exchange rates...");
+    const fxData = [
+      { base: "USD", target: "EUR", rate: 92000, date: "2026-03-01" },
+      { base: "USD", target: "GBP", rate: 79000, date: "2026-03-01" },
+      { base: "USD", target: "JPY", rate: 150200, date: "2026-03-01" },
+      { base: "USD", target: "CAD", rate: 136500, date: "2026-03-01" },
+      { base: "USD", target: "AUD", rate: 154800, date: "2026-03-01" },
+      { base: "USD", target: "CHF", rate: 88500, date: "2026-03-01" },
+    ];
+    for (const fx of fxData) {
+      await db.insert(exchangeRate).values({
+        organizationId: org.id,
+        baseCurrency: fx.base,
+        targetCurrency: fx.target,
+        rate: fx.rate,
+        date: fx.date,
+        source: "manual",
+      });
+    }
+    console.log(`  ${fxData.length} exchange rates`);
+  }
+
+  // 42. Period Lock
+  const existingLock = await db.query.periodLock.findFirst({
+    where: eq(periodLock.organizationId, org.id),
+  });
+  if (!existingLock) {
+    console.log("Creating period lock...");
+    await db.insert(periodLock).values({
+      organizationId: org.id,
+      lockDate: "2025-12-31",
+      lockedBy: userId,
+      reason: "Year-end close for FY 2025",
+    });
+    console.log("  1 period lock (through 2025-12-31)");
+  }
+
+  // 43. Revenue Recognition
+  const existingRevSchedule = await db.query.revenueSchedule.findFirst({
+    where: eq(revenueSchedule.organizationId, org.id),
+  });
+  if (!existingRevSchedule) {
+    console.log("Creating revenue recognition schedules...");
+    const invoices2 = await db.query.invoice.findMany({
+      where: eq(invoice.organizationId, org.id),
+      limit: 2,
+    });
+
+    if (invoices2.length >= 2) {
+      // Service revenue recognized over 3 months
+      const [schedule1] = await db.insert(revenueSchedule).values({
+        organizationId: org.id,
+        invoiceId: invoices2[0].id,
+        totalAmount: invoices2[0].total,
+        recognizedAmount: Math.round(invoices2[0].total * 2 / 3),
+        startDate: "2026-01-01",
+        endDate: "2026-03-31",
+        method: "straight_line",
+        status: "active",
+        createdBy: userId,
+      }).returning();
+
+      const monthlyAmount = Math.round(invoices2[0].total / 3);
+      for (let m = 1; m <= 3; m++) {
+        await db.insert(revenueEntry).values({
+          scheduleId: schedule1.id,
+          periodDate: `2026-${String(m).padStart(2, "0")}-01`,
+          amount: monthlyAmount,
+          recognized: m <= 2,
+          sortOrder: m,
+        });
+      }
+
+      // Second schedule
+      const [schedule2] = await db.insert(revenueSchedule).values({
+        organizationId: org.id,
+        invoiceId: invoices2[1].id,
+        totalAmount: invoices2[1].total,
+        recognizedAmount: Math.round(invoices2[1].total / 6),
+        startDate: "2026-01-15",
+        endDate: "2026-06-15",
+        method: "straight_line",
+        status: "active",
+        createdBy: userId,
+      }).returning();
+
+      const monthly2 = Math.round(invoices2[1].total / 6);
+      for (let m = 1; m <= 6; m++) {
+        await db.insert(revenueEntry).values({
+          scheduleId: schedule2.id,
+          periodDate: `2026-${String(m).padStart(2, "0")}-15`,
+          amount: monthly2,
+          recognized: m <= 1,
+          sortOrder: m,
+        });
+      }
+      console.log("  2 revenue schedules with entries");
+    }
   }
 
   console.log(`\nSeed complete! Organization: ${org.name}`);

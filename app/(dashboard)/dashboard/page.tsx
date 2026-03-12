@@ -690,9 +690,9 @@ export default function DashboardPage() {
             )}
 
             {/* Quick Actions */}
-            {actionAlerts && (actionAlerts.overdueInvoices.count > 0 || actionAlerts.overdueBills.count > 0 || actionAlerts.uncategorizedTransactions > 0 || actionAlerts.accountsNeedingReconciliation.length > 0) && (
+            {actionAlerts && (actionAlerts.overdueInvoices?.count > 0 || actionAlerts.overdueBills?.count > 0 || actionAlerts.uncategorizedTransactions > 0 || (actionAlerts.accountsNeedingReconciliation?.length ?? 0) > 0) && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {actionAlerts.overdueInvoices.count > 0 && (
+                {actionAlerts.overdueInvoices?.count > 0 && (
                   <button
                     onClick={() => router.push("/sales")}
                     className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-left transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
@@ -702,7 +702,7 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-red-600/70 font-mono tabular-nums">{formatMoney(actionAlerts.overdueInvoices.total)} outstanding</p>
                   </button>
                 )}
-                {actionAlerts.overdueBills.count > 0 && (
+                {actionAlerts.overdueBills?.count > 0 && (
                   <button
                     onClick={() => router.push("/purchases")}
                     className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-3 text-left transition-colors hover:bg-orange-100 dark:hover:bg-orange-950/50"
@@ -722,7 +722,7 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-blue-600/70">Need categorization</p>
                   </button>
                 )}
-                {actionAlerts.accountsNeedingReconciliation.length > 0 && (
+                {actionAlerts.accountsNeedingReconciliation?.length > 0 && (
                   <button
                     onClick={() => router.push("/accounting/banking")}
                     className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-3 text-left transition-colors hover:bg-violet-100 dark:hover:bg-violet-950/50"

@@ -235,7 +235,7 @@ export default function RolesPage() {
           <SheetHeader>
             <SheetTitle>{editingRole ? "Edit Role" : "Create Role"}</SheetTitle>
           </SheetHeader>
-          <div className="space-y-4 px-4">
+          <div className="space-y-4 px-4 py-4">
             <div className="space-y-2">
               <Label>Name</Label>
               <Input
