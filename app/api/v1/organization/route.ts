@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { organization, member } from "@/lib/db/schema";
+import { organization, member, users } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
@@ -8,6 +8,10 @@ import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { isValidBusinessType } from "@/lib/data/business-types";
+import { render } from "@react-email/render";
+import { createElement } from "react";
+import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
+import { sendPlatformEmail } from "@/lib/email/resend-client";
 
 const updateSchema = z
   .object({
@@ -143,6 +147,17 @@ export async function POST(request: Request) {
     const created = await db.query.organization.findFirst({
       where: eq(organization.id, orgId),
     });
+
+    // Send org-created email (fire and forget)
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, session.user!.id!),
+    });
+    if (user) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
+      render(createElement(OrgCreatedEmail, { userName: user.name || "there", orgName: parsed.name, dashboardUrl: `${appUrl}/dashboard` }))
+        .then((html) => sendPlatformEmail({ to: user.email, subject: `${parsed.name} is ready`, html }))
+        .catch(() => {});
+    }
 
     return NextResponse.json({ organization: created }, { status: 201 });
   } catch (err) {

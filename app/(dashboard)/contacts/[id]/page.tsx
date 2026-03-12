@@ -23,6 +23,7 @@ import {
   BarChart3,
   Download,
   Send,
+  Target,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { DatePicker } from "@/components/ui/date-picker";
 
 interface ContactPerson {
@@ -165,6 +167,7 @@ export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const { open: openDrawer } = useCreateDrawer();
 
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -577,13 +580,24 @@ export default function ContactDetailPage() {
 
   return (
     <div>
-      <button
-        onClick={() => router.push("/contacts")}
-        className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to contacts
-      </button>
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => router.push("/contacts")}
+          className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to contacts
+        </button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs gap-1.5"
+          onClick={() => openDrawer("deal", { contactId: contact.id, contactName: contact.name })}
+        >
+          <Target className="size-3" />
+          Create Lead
+        </Button>
+      </div>
 
       {/* Tab nav - same style as settings */}
       <nav className="-mt-2 mb-8 flex items-center gap-1 overflow-x-auto border-b border-border">

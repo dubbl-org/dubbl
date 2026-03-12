@@ -4,6 +4,11 @@ import { users, organization, member, subscription } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { render } from "@react-email/render";
+import { createElement } from "react";
+import { WelcomeEmail } from "@/lib/email/templates/welcome";
+import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
+import { sendPlatformEmail } from "@/lib/email/resend-client";
 
 const registerSchema = z.object({
   name: z.string().min(1),
@@ -66,6 +71,17 @@ export async function POST(request: Request) {
       plan: "free",
       status: "active",
     });
+
+    // Send welcome and org-created emails (fire and forget)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
+
+    render(createElement(WelcomeEmail, { userName: parsed.name, loginUrl: `${appUrl}/sign-in` }))
+      .then((html) => sendPlatformEmail({ to: parsed.email, subject: "Welcome to dubbl", html }))
+      .catch(() => {});
+
+    render(createElement(OrgCreatedEmail, { userName: parsed.name, orgName: org.name, dashboardUrl: `${appUrl}/dashboard` }))
+      .then((html) => sendPlatformEmail({ to: parsed.email, subject: `${org.name} is ready`, html }))
+      .catch(() => {});
 
     return NextResponse.json(
       { user: { id: user.id, name: user.name, email: user.email } },

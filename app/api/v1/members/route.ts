@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { member, users } from "@/lib/db/schema";
+import { member, users, organization } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
+import { render } from "@react-email/render";
+import { createElement } from "react";
+import { MemberInviteEmail } from "@/lib/email/templates/member-invite";
+import { sendPlatformEmail } from "@/lib/email/resend-client";
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -82,6 +86,25 @@ export async function POST(request: Request) {
         role: parsed.role,
       })
       .returning();
+
+    // Send invite email (fire and forget)
+    const inviter = await db.query.users.findFirst({
+      where: eq(users.id, ctx.userId),
+    });
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+    });
+    if (inviter && org) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
+      render(createElement(MemberInviteEmail, {
+        inviterName: inviter.name || "A team member",
+        orgName: org.name,
+        role: parsed.role,
+        loginUrl: `${appUrl}/sign-in`,
+      }))
+        .then((html) => sendPlatformEmail({ to: user.email, subject: `You've been invited to ${org.name}`, html }))
+        .catch(() => {});
+    }
 
     return NextResponse.json(
       {

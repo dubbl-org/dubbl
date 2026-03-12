@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
-import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X } from "lucide-react";
+import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X, Target } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -53,7 +53,7 @@ const typeBadgeClass: Record<Contact["type"], string> = {
   both: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
 };
 
-function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => void): Column<Contact>[] {
+function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => void, onCreateLead: (c: Contact) => void): Column<Contact>[] {
   return [
     {
       key: "name",
@@ -171,6 +171,10 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpen(r); }}>
               <ExternalLink className="size-4" />
               Open
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateLead(r); }}>
+              <Target className="size-4" />
+              Create Lead
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
@@ -326,7 +330,11 @@ export default function ContactsPage() {
     });
   }, []);
 
-  const columns = buildColumns(handleDelete, (c) => router.push(`/contacts/${c.id}`));
+  const columns = buildColumns(
+    handleDelete,
+    (c) => router.push(`/contacts/${c.id}`),
+    (c) => openDrawer("deal", { contactId: c.id, contactName: c.name }),
+  );
 
   const customers = contacts.filter(
     (c) => c.type === "customer" || c.type === "both"

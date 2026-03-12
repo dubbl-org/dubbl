@@ -282,6 +282,7 @@ async function seed() {
         name: "Demo User",
         email: "demo@dubbl.dev",
         passwordHash,
+        isSiteAdmin: true,
       })
       .onConflictDoNothing()
       .returning();

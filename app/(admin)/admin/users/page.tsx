@@ -1,18 +1,34 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ShieldCheck, User, MoreHorizontal, Shield, ShieldOff, Building2 } from "lucide-react";
+import {
+  ShieldCheck,
+  User,
+  MoreHorizontal,
+  Shield,
+  ShieldOff,
+  Building2,
+  ArrowUpDown,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
@@ -26,10 +42,15 @@ interface PlatformUser {
   orgCount: number;
 }
 
+type SortKey = "name" | "email" | "created" | "orgs";
+
 export default function AdminUsersPage() {
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("created");
+  const [sortAsc, setSortAsc] = useState(false);
   const debouncedSearch = useDebounce(search, 200);
 
   const fetchUsers = useCallback(async () => {
@@ -65,13 +86,46 @@ export default function AdminUsersPage() {
     }
   };
 
-  const filtered = debouncedSearch
-    ? platformUsers.filter(
+  const hasFilters = roleFilter !== "all" || debouncedSearch !== "";
+
+  const filtered = useMemo(() => {
+    let result = platformUsers;
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter(
         (u) =>
-          (u.name || "").toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          u.email.toLowerCase().includes(debouncedSearch.toLowerCase())
-      )
-    : platformUsers;
+          (u.name || "").toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
+      );
+    }
+
+    if (roleFilter === "admin") {
+      result = result.filter((u) => u.isSiteAdmin);
+    } else if (roleFilter === "user") {
+      result = result.filter((u) => !u.isSiteAdmin);
+    } else if (roleFilter === "no-org") {
+      result = result.filter((u) => u.orgCount === 0);
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "name") cmp = (a.name || a.email).localeCompare(b.name || b.email);
+      else if (sortBy === "email") cmp = a.email.localeCompare(b.email);
+      else if (sortBy === "orgs") cmp = a.orgCount - b.orgCount;
+      else cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return sortAsc ? cmp : -cmp;
+    });
+
+    return result;
+  }, [platformUsers, debouncedSearch, roleFilter, sortBy, sortAsc]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setRoleFilter("all");
+    setSortBy("created");
+    setSortAsc(false);
+  };
 
   return (
     <ContentReveal>
@@ -83,16 +137,53 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Search users..."
-            className="w-64"
+            placeholder="Search name or email..."
+            className="w-56"
           />
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-[120px] h-8 text-xs">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              <SelectItem value="admin">Admins Only</SelectItem>
+              <SelectItem value="user">Regular Users</SelectItem>
+              <SelectItem value="no-org">No Organization</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={`${sortBy}-${sortAsc ? "asc" : "desc"}`} onValueChange={(v) => {
+            const [key, dir] = v.split("-") as [SortKey, string];
+            setSortBy(key);
+            setSortAsc(dir === "asc");
+          }}>
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+              <ArrowUpDown className="size-3 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created-desc">Newest First</SelectItem>
+              <SelectItem value="created-asc">Oldest First</SelectItem>
+              <SelectItem value="name-asc">Name A-Z</SelectItem>
+              <SelectItem value="name-desc">Name Z-A</SelectItem>
+              <SelectItem value="email-asc">Email A-Z</SelectItem>
+              <SelectItem value="orgs-desc">Most Orgs</SelectItem>
+              <SelectItem value="orgs-asc">Fewest Orgs</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" onClick={clearFilters}>
+              <X className="size-3" />
+              Clear
+            </Button>
+          )}
           {!loading && (
-            <Badge variant="secondary" className="text-xs">
-              {filtered.length} users
+            <Badge variant="secondary" className="text-xs ml-auto">
+              {filtered.length} of {platformUsers.length}
             </Badge>
           )}
         </div>
@@ -125,7 +216,7 @@ export default function AdminUsersPage() {
                   <Building2 className="size-3" />
                   {u.orgCount}
                 </div>
-                <p className="hidden md:block text-xs text-muted-foreground">
+                <p className="hidden md:block text-xs text-muted-foreground tabular-nums">
                   {new Date(u.createdAt).toLocaleDateString()}
                 </p>
                 {u.isSiteAdmin ? (
