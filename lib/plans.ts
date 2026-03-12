@@ -1,7 +1,7 @@
 export const PLAN_LIMITS = {
   free: {
     organizations: 1,
-    members: 2,
+    members: 1,
     entriesPerMonth: 500,
     currencies: 1,
     contacts: 50,
