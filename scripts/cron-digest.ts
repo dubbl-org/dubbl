@@ -7,6 +7,8 @@
  *   CRON_SECRET - Shared secret to authenticate with the cron endpoint
  */
 
+export {};
+
 const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
 const CRON_SECRET = process.env.CRON_SECRET;
 

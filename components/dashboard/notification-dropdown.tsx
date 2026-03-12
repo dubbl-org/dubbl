@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -74,6 +74,7 @@ export function NotificationDropdown() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const hasFetched = useRef(false);
 
   const fetchNotifications = useCallback(() => {
     const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -87,6 +88,7 @@ export function NotificationDropdown() {
       .then((data) => {
         if (data.data) setNotifications(data.data);
         if (data.unreadCount !== undefined) setUnreadCount(data.unreadCount);
+        hasFetched.current = true;
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -116,30 +118,30 @@ export function NotificationDropdown() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    await fetch(`/api/v1/notifications/${id}/read`, {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    });
-
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
     );
     setUnreadCount((c) => Math.max(0, c - 1));
+
+    await fetch(`/api/v1/notifications/${id}/read`, {
+      method: "POST",
+      headers: { "x-organization-id": orgId },
+    });
   };
 
   const markAllRead = async () => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    await fetch("/api/v1/notifications/read-all", {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    });
-
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
     );
     setUnreadCount(0);
+
+    await fetch("/api/v1/notifications/read-all", {
+      method: "POST",
+      headers: { "x-organization-id": orgId },
+    });
   };
 
   return (
@@ -176,13 +178,9 @@ export function NotificationDropdown() {
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Notifications</h3>
             {unreadCount > 0 && (
-              <motion.span
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-semibold"
-              >
+              <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-semibold">
                 {unreadCount}
-              </motion.span>
+              </span>
             )}
           </div>
           {unreadCount > 0 && (
@@ -198,7 +196,7 @@ export function NotificationDropdown() {
 
         {/* Notification list */}
         <div className="max-h-[400px] overflow-y-auto overscroll-contain">
-          {loading && notifications.length === 0 ? (
+          {loading && !hasFetched.current ? (
             <div className="flex items-center justify-center py-12">
               <div className="size-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground animate-spin" />
             </div>
@@ -211,65 +209,54 @@ export function NotificationDropdown() {
               <p className="mt-0.5 text-xs text-muted-foreground/60">No notifications yet</p>
             </div>
           ) : (
-            <AnimatePresence initial={false}>
-              {notifications.map((n, i) => {
-                const Icon = TYPE_ICONS[n.type] || Bell;
-                const colorClass = TYPE_COLORS[n.type] || "text-muted-foreground bg-muted";
-                const isUnread = !n.readAt;
+            notifications.map((n) => {
+              const Icon = TYPE_ICONS[n.type] || Bell;
+              const colorClass = TYPE_COLORS[n.type] || "text-muted-foreground bg-muted";
+              const isUnread = !n.readAt;
 
-                return (
-                  <motion.div
-                    key={n.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.2, delay: i * 0.03 }}
-                  >
-                    <button
-                      onClick={(e) => {
-                        if (isUnread) markAsRead(n.id, e);
-                      }}
-                      className={cn(
-                        "flex w-full items-start gap-3 px-4 py-3 text-left transition-all hover:bg-muted/50 group border-b border-border/50 last:border-0",
-                        isUnread && "bg-primary/[0.03]"
-                      )}
-                    >
-                      <div className={cn(
-                        "flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105",
-                        colorClass,
+              return (
+                <button
+                  key={n.id}
+                  onClick={(e) => {
+                    if (isUnread) markAsRead(n.id, e);
+                  }}
+                  className={cn(
+                    "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 group border-b border-border/50 last:border-0",
+                    isUnread && "bg-primary/[0.03]"
+                  )}
+                >
+                  <div className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                    colorClass,
+                  )}>
+                    <Icon className="size-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={cn(
+                        "text-[13px] leading-snug",
+                        isUnread ? "font-medium text-foreground" : "text-muted-foreground"
                       )}>
-                        <Icon className="size-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className={cn(
-                            "text-[13px] leading-snug",
-                            isUnread ? "font-medium text-foreground" : "text-muted-foreground"
-                          )}>
-                            {n.title}
-                          </p>
-                          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                            <span className="text-[10px] text-muted-foreground/50 tabular-nums">
-                              {relativeTime(n.createdAt)}
-                            </span>
-                            {isUnread && (
-                              <motion.span
-                                layoutId={`unread-${n.id}`}
-                                className="size-1.5 rounded-full bg-blue-500"
-                              />
-                            )}
-                          </div>
-                        </div>
-                        {n.body && (
-                          <p className="mt-0.5 text-[11px] text-muted-foreground/70 line-clamp-1">
-                            {n.body}
-                          </p>
+                        {n.title}
+                      </p>
+                      <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                        <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+                          {relativeTime(n.createdAt)}
+                        </span>
+                        {isUnread && (
+                          <span className="size-1.5 rounded-full bg-blue-500" />
                         )}
                       </div>
-                    </button>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+                    </div>
+                    {n.body && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground/70 line-clamp-1">
+                        {n.body}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
 

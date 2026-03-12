@@ -79,6 +79,9 @@ import {
   documentTemplate,
   documentFolder,
   savedReport,
+  type ReportConfig,
+  type WorkflowCondition,
+  type WorkflowAction,
   scheduledPayment,
   workflow,
   revenueSchedule,
@@ -2334,19 +2337,18 @@ async function seed() {
   });
   if (!existingReports) {
     console.log("Creating saved reports...");
-    const reportData = [
-      { name: "Monthly P&L", description: "Profit & Loss report by month", config: { type: "profit_loss", period: "monthly", compareLastYear: true } },
-      { name: "AR Aging Summary", description: "Accounts receivable aging buckets", config: { type: "ar_aging", asOfDate: "today", buckets: [30, 60, 90, 120] } },
-      { name: "Cash Flow Forecast", description: "12-month cash flow projection", config: { type: "cash_flow", period: "monthly", months: 12 } },
-      { name: "Expense by Department", description: "Expenses broken down by cost center", config: { type: "expense_by_cost_center", period: "quarterly", year: 2026 } },
+    const reportData: { name: string; description: string; config: ReportConfig }[] = [
+      { name: "Monthly P&L", description: "Profit & Loss report by month", config: { dataSource: "profit_loss", filters: [], groupBy: ["month"], columns: ["revenue", "expenses", "net"], dateRange: { from: "2026-01-01", to: "2026-12-31" } } },
+      { name: "AR Aging Summary", description: "Accounts receivable aging buckets", config: { dataSource: "ar_aging", filters: [], groupBy: ["contact"], columns: ["current", "30days", "60days", "90days", "120plus"] } },
+      { name: "Cash Flow Forecast", description: "12-month cash flow projection", config: { dataSource: "cash_flow", filters: [], groupBy: ["month"], columns: ["inflows", "outflows", "net"], chartType: "line" } },
+      { name: "Expense by Department", description: "Expenses broken down by cost center", config: { dataSource: "expense_by_cost_center", filters: [], groupBy: ["cost_center"], columns: ["category", "amount", "percentage"], chartType: "bar" } },
     ];
     for (const r of reportData) {
       await db.insert(savedReport).values({
         organizationId: org.id,
         name: r.name,
         description: r.description,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        config: r.config as Record<string, unknown>,
+        config: r.config,
       });
     }
     console.log("  4 saved reports");
@@ -2384,13 +2386,12 @@ async function seed() {
   });
   if (!existingWorkflows) {
     console.log("Creating workflows...");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const workflowData: { name: string; description: string; trigger: "invoice_overdue" | "payment_received" | "inventory_low" | "contact_created"; conditions: Record<string, unknown>[]; actions: Record<string, unknown>[]; isActive: boolean; triggerCount?: number }[] = [
+    const workflowData: { name: string; description: string; trigger: "invoice_overdue" | "payment_received" | "inventory_low" | "contact_created"; conditions: WorkflowCondition[]; actions: WorkflowAction[]; isActive: boolean; triggerCount?: number }[] = [
       {
         name: "Invoice Overdue Notification",
         description: "Send notification when invoice becomes overdue",
         trigger: "invoice_overdue",
-        conditions: [{ field: "amountDue", operator: "greater_than", value: 0 }],
+        conditions: [{ field: "amountDue", operator: "gt", value: "0" }],
         actions: [{ type: "send_notification", config: { title: "Invoice overdue", body: "Invoice {{invoiceNumber}} is now overdue" } }],
         isActive: true,
         triggerCount: 3,

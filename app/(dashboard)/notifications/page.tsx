@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bell,
@@ -14,10 +14,10 @@ import {
   CheckCheck,
   Inbox,
   Settings2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
@@ -109,63 +109,118 @@ function groupByDate(notifications: Notification[]) {
   return groups;
 }
 
+const TABS = [
+  { value: "all", label: "All" },
+  { value: "unread", label: "Unread" },
+] as const;
+
+const PAGE_SIZE = 20;
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState<"all" | "unread">("all");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+  const fetchPage = useCallback(
+    async (pageNum: number, replace: boolean) => {
+      const orgId = localStorage.getItem("activeOrgId");
+      if (!orgId) return;
 
-    const params = new URLSearchParams();
-    if (filter === "unread") params.set("unread", "true");
-    params.set("limit", "100");
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
 
-    fetch(`/api/v1/notifications?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setNotifications(data.data);
+      try {
+        const params = new URLSearchParams();
+        if (filter === "unread") params.set("unread", "true");
+        params.set("limit", String(PAGE_SIZE));
+        params.set("page", String(pageNum));
+
+        const res = await fetch(`/api/v1/notifications?${params}`, {
+          headers: { "x-organization-id": orgId },
+        });
+        const data = await res.json();
+
+        if (data.data) {
+          if (replace) {
+            setNotifications(data.data);
+          } else {
+            setNotifications((prev) => [...prev, ...data.data]);
+          }
+        }
         if (data.unreadCount !== undefined) setUnreadCount(data.unreadCount);
-      })
-      .finally(() => setLoading(false));
-  }, [filter]);
 
+        const total = data.total ?? 0;
+        setHasMore(pageNum * PAGE_SIZE < total);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [filter]
+  );
+
+  // Reset and fetch when filter changes
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    setPage(1);
+    setNotifications([]);
+    setHasMore(true);
+    fetchPage(1, true);
+  }, [fetchPage]);
+
+  // Infinite scroll via IntersectionObserver
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          fetchPage(nextPage, false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, page, fetchPage]);
 
   const markAsRead = async (id: string) => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    await fetch(`/api/v1/notifications/${id}/read`, {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    });
-
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
     );
     setUnreadCount((c) => Math.max(0, c - 1));
+
+    await fetch(`/api/v1/notifications/${id}/read`, {
+      method: "POST",
+      headers: { "x-organization-id": orgId },
+    });
   };
 
   const markAllRead = async () => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    await fetch("/api/v1/notifications/read-all", {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    });
-
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
     );
     setUnreadCount(0);
+
+    await fetch("/api/v1/notifications/read-all", {
+      method: "POST",
+      headers: { "x-organization-id": orgId },
+    });
   };
 
   if (loading) return <BrandLoader />;
@@ -207,122 +262,150 @@ export default function NotificationsPage() {
         </div>
 
         {/* Filter tabs */}
-        <Tabs value={filter} onValueChange={setFilter}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="unread">
-              Unread
-              {unreadCount > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
-                  {unreadCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="relative flex items-center gap-1 rounded-lg bg-muted p-1 w-fit">
+          {TABS.map((tab) => {
+            const isActive = filter === tab.value;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setFilter(tab.value)}
+                className={cn(
+                  "relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
+                )}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="notif-tab-indicator"
+                    className="absolute inset-0 rounded-md bg-background shadow-sm"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+                {tab.value === "unread" && unreadCount > 0 && (
+                  <Badge variant="secondary" className="relative z-10 ml-0.5 h-4 px-1 text-[10px]">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Notification list */}
-        {notifications.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-col items-center justify-center py-24 text-center"
-          >
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
-              <Inbox className="size-8 text-muted-foreground/50" />
-            </div>
-            <h3 className="mt-5 text-sm font-medium">
-              {filter === "unread" ? "No unread notifications" : "No notifications yet"}
-            </h3>
-            <p className="mt-1.5 text-xs text-muted-foreground max-w-[250px]">
-              {filter === "unread"
-                ? "You've read all your notifications. Nice work!"
-                : "When something important happens, you'll see it here."}
-            </p>
-          </motion.div>
-        ) : (
-          <div className="space-y-6">
-            {groups.map((group) => (
-              <div key={group.label}>
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xs font-medium text-muted-foreground">{group.label}</h3>
-                  <div className="flex-1 h-px bg-border" />
+        <div ref={containerRef}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={filter}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
+                    <Inbox className="size-8 text-muted-foreground/50" />
+                  </div>
+                  <h3 className="mt-5 text-sm font-medium">
+                    {filter === "unread" ? "No unread notifications" : "No notifications yet"}
+                  </h3>
+                  <p className="mt-1.5 text-xs text-muted-foreground max-w-[250px]">
+                    {filter === "unread"
+                      ? "You've read all your notifications. Nice work!"
+                      : "When something important happens, you'll see it here."}
+                  </p>
                 </div>
-                <div className="rounded-lg border overflow-hidden divide-y">
-                  <AnimatePresence initial={false}>
-                    {group.items.map((n, i) => {
-                      const Icon = TYPE_ICONS[n.type] || Bell;
-                      const colorClass = TYPE_COLORS[n.type] || "text-muted-foreground bg-muted";
-                      const typeLabel = TYPE_LABELS[n.type] || "Notification";
-                      const isUnread = !n.readAt;
+              ) : (
+                <div className="space-y-6">
+                  {groups.map((group) => (
+                    <div key={group.label}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xs font-medium text-muted-foreground">{group.label}</h3>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                      <div className="rounded-lg border overflow-hidden divide-y">
+                        {group.items.map((n) => {
+                          const Icon = TYPE_ICONS[n.type] || Bell;
+                          const colorClass = TYPE_COLORS[n.type] || "text-muted-foreground bg-muted";
+                          const typeLabel = TYPE_LABELS[n.type] || "Notification";
+                          const isUnread = !n.readAt;
 
-                      return (
-                        <motion.div
-                          key={n.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.3, delay: i * 0.04 }}
-                        >
-                          <button
-                            onClick={() => isUnread && markAsRead(n.id)}
-                            className={cn(
-                              "flex w-full items-start gap-3.5 px-4 py-3.5 text-left transition-all group",
-                              isUnread
-                                ? "bg-primary/[0.02] hover:bg-primary/[0.05]"
-                                : "hover:bg-muted/50"
-                            )}
-                          >
-                            <div className={cn(
-                              "flex size-9 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105",
-                              colorClass,
-                            )}>
-                              <Icon className="size-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className={cn(
-                                      "text-[10px] font-medium uppercase tracking-wider",
-                                      isUnread ? "text-foreground/40" : "text-muted-foreground/40"
-                                    )}>
-                                      {typeLabel}
-                                    </span>
-                                    {isUnread && (
-                                      <motion.span
-                                        layoutId={`dot-${n.id}`}
-                                        className="size-1.5 rounded-full bg-blue-500"
-                                      />
+                          return (
+                            <button
+                              key={n.id}
+                              onClick={() => isUnread && markAsRead(n.id)}
+                              className={cn(
+                                "flex w-full items-start gap-3.5 px-4 py-3.5 text-left transition-all group",
+                                isUnread
+                                  ? "bg-primary/[0.02] hover:bg-primary/[0.05]"
+                                  : "hover:bg-muted/50"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "flex size-9 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105",
+                                  colorClass
+                                )}
+                              >
+                                <Icon className="size-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={cn(
+                                          "text-[10px] font-medium uppercase tracking-wider",
+                                          isUnread ? "text-foreground/40" : "text-muted-foreground/40"
+                                        )}
+                                      >
+                                        {typeLabel}
+                                      </span>
+                                      {isUnread && (
+                                        <span className="size-1.5 rounded-full bg-blue-500" />
+                                      )}
+                                    </div>
+                                    <p
+                                      className={cn(
+                                        "text-[13px] leading-snug mt-0.5",
+                                        isUnread ? "font-medium text-foreground" : "text-foreground/80"
+                                      )}
+                                    >
+                                      {n.title}
+                                    </p>
+                                    {n.body && (
+                                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                        {n.body}
+                                      </p>
                                     )}
                                   </div>
-                                  <p className={cn(
-                                    "text-[13px] leading-snug mt-0.5",
-                                    isUnread ? "font-medium text-foreground" : "text-foreground/80"
-                                  )}>
-                                    {n.title}
-                                  </p>
-                                  {n.body && (
-                                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                                      {n.body}
-                                    </p>
-                                  )}
+                                  <span className="text-[11px] text-muted-foreground/50 tabular-nums shrink-0 pt-3">
+                                    {relativeTime(n.createdAt)}
+                                  </span>
                                 </div>
-                                <span className="text-[11px] text-muted-foreground/50 tabular-nums shrink-0 pt-3">
-                                  {relativeTime(n.createdAt)}
-                                </span>
                               </div>
-                            </div>
-                          </button>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Infinite scroll sentinel */}
+                  <div ref={sentinelRef} className="flex items-center justify-center py-4">
+                    {loadingMore && (
+                      <Loader2 className="size-5 text-muted-foreground animate-spin" />
+                    )}
+                    {!hasMore && notifications.length > 0 && (
+                      <p className="text-xs text-muted-foreground/50">No more notifications</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </ContentReveal>
   );
