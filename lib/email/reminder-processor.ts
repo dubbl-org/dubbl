@@ -8,12 +8,12 @@ import {
   organization,
 } from "@/lib/db/schema";
 import { eq, and, isNull, notInArray } from "drizzle-orm";
-import { sendEmail } from "./smtp-client";
+import { sendOrgEmail } from "./resend-client";
 import { renderTemplate } from "./template-engine";
 import { formatMoney } from "@/lib/money";
 
 export async function processReminders(orgId: string) {
-  // Get SMTP config
+  // Check email config exists and is verified
   const config = await db.query.emailConfig.findFirst({
     where: eq(emailConfig.organizationId, orgId),
   });
@@ -128,7 +128,7 @@ export async function processReminders(orgId: string) {
 
       for (const recipient of recipients) {
         try {
-          await sendEmail(config, { to: recipient, subject, html });
+          await sendOrgEmail(orgId, { to: recipient, subject, html });
           await db.insert(reminderLog).values({
             organizationId: orgId,
             reminderRuleId: rule.id,

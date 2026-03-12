@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { member, apiKey, advisorAccess } from "@/lib/db/schema";
+import { member, apiKey, advisorAccess, customRole } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
 import type { MemberRole } from "@/lib/plans";
@@ -9,8 +9,24 @@ export interface AuthContext {
   userId: string;
   organizationId: string;
   role: MemberRole;
+  customRoleId?: string;
+  permissions?: string[];
   isAdvisor?: boolean;
   advisorRole?: string;
+}
+
+async function resolveCustomRole(
+  mem: { role: string; customRoleId: string | null }
+): Promise<{ customRoleId?: string; permissions?: string[] }> {
+  if (!mem.customRoleId) return {};
+  const role = await db.query.customRole.findFirst({
+    where: eq(customRole.id, mem.customRoleId),
+  });
+  if (!role) return {};
+  return {
+    customRoleId: role.id,
+    permissions: role.permissions as string[],
+  };
 }
 
 export async function getAuthContext(
@@ -47,10 +63,13 @@ export async function getAuthContext(
       ),
     });
 
+    const customRoleInfo = mem ? await resolveCustomRole(mem) : {};
+
     return {
       userId: key.createdBy,
       organizationId: key.organizationId,
-      role: mem?.role ?? "member",
+      role: (mem?.role ?? "member") as MemberRole,
+      ...customRoleInfo,
     };
   }
 
@@ -73,10 +92,13 @@ export async function getAuthContext(
       throw new AuthError("Organization ID required when user belongs to multiple organizations", 400);
     }
 
+    const customRoleInfo = await resolveCustomRole(memberships[0]);
+
     return {
       userId: session.user.id,
       organizationId: memberships[0].organizationId,
       role: memberships[0].role as MemberRole,
+      ...customRoleInfo,
     };
   }
 
@@ -110,10 +132,13 @@ export async function getAuthContext(
     };
   }
 
+  const customRoleInfo = await resolveCustomRole(mem);
+
   return {
     userId: session.user.id,
     organizationId: orgId,
     role: mem.role as MemberRole,
+    ...customRoleInfo,
   };
 }
 

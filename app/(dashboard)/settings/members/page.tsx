@@ -31,12 +31,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ContentReveal } from "@/components/ui/content-reveal";
 
+interface CustomRole {
+  id: string;
+  name: string;
+}
+
 interface Member {
   id: string;
   userId: string;
   userName: string | null;
   userEmail: string;
   role: "owner" | "admin" | "member";
+  customRoleId: string | null;
+  customRoleName?: string | null;
   createdAt: string;
 }
 
@@ -54,6 +61,7 @@ const ROLE_COLORS = {
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -66,11 +74,14 @@ export default function MembersPage() {
     if (!orgId) return;
 
     try {
-      const res = await fetch("/api/v1/members", {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.members) setMembers(data.members);
+      const [membersRes, rolesRes] = await Promise.all([
+        fetch("/api/v1/members", { headers: { "x-organization-id": orgId } }),
+        fetch("/api/v1/roles", { headers: { "x-organization-id": orgId } }),
+      ]);
+      const membersData = await membersRes.json();
+      const rolesData = await rolesRes.json();
+      if (membersData.members) setMembers(membersData.members);
+      if (rolesData.roles) setCustomRoles(rolesData.roles);
     } finally {
       setLoading(false);
     }
@@ -120,6 +131,27 @@ export default function MembersPage() {
       toast.success("Member removed");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to remove");
+    } finally { setActionMemberId(null); }
+  }
+
+  async function assignCustomRole(memberId: string, customRoleId: string | null) {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId || actionMemberId) return;
+    setActionMemberId(memberId);
+    try {
+      const res = await fetch(`/api/v1/members/${memberId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": orgId,
+        },
+        body: JSON.stringify({ customRoleId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      await fetchMembers();
+      toast.success(customRoleId ? "Custom role assigned" : "Custom role removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign role");
     } finally { setActionMemberId(null); }
   }
 
@@ -250,7 +282,7 @@ export default function MembersPage() {
                 <div className="flex items-center gap-3 sm:gap-4">
                   <Badge variant="outline" className={ROLE_COLORS[m.role]}>
                     <RoleIcon className="mr-1 size-3" />
-                    {m.role}
+                    {m.customRoleName || m.role}
                   </Badge>
                   <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
                     <CalendarDays className="size-3" />
@@ -275,6 +307,23 @@ export default function MembersPage() {
                         >
                           Make {m.role === "admin" ? "member" : "admin"}
                         </DropdownMenuItem>
+                        {customRoles.length > 0 && customRoles.map((cr) => (
+                          <DropdownMenuItem
+                            key={cr.id}
+                            onClick={() => assignCustomRole(m.id, cr.id)}
+                            disabled={actionMemberId !== null}
+                          >
+                            Assign: {cr.name}
+                          </DropdownMenuItem>
+                        ))}
+                        {m.customRoleId && (
+                          <DropdownMenuItem
+                            onClick={() => assignCustomRole(m.id, null)}
+                            disabled={actionMemberId !== null}
+                          >
+                            Remove custom role
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => removeMember(m.id)}
                           className="text-red-600"

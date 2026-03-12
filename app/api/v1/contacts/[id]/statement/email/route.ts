@@ -14,7 +14,7 @@ import { eq, and, gte, lte, lt, notInArray, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound, error } from "@/lib/api/response";
 import { formatMoney } from "@/lib/money";
-import { sendEmail } from "@/lib/email/smtp-client";
+import { sendOrgEmail } from "@/lib/email/resend-client";
 
 interface StatementTransaction {
   date: string;
@@ -466,7 +466,7 @@ export async function POST(
 </body>
 </html>`;
 
-    await sendEmail(emailCfg, {
+    await sendOrgEmail(ctx.organizationId, {
       to: c.email,
       subject: `Statement from ${orgName} - ${formatDate(startDate)} to ${formatDate(endDate)}`,
       html: emailHtml,

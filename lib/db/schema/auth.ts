@@ -4,9 +4,11 @@ import {
   uuid,
   timestamp,
   integer,
+  boolean,
   primaryKey,
   uniqueIndex,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -76,6 +78,18 @@ export const verificationTokens = pgTable(
   (table) => [primaryKey({ columns: [table.identifier, table.token] })]
 );
 
+// Custom Roles for fine-grained permissions
+export const customRole = pgTable("custom_role", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
+  isSystem: boolean("is_system").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Organization & Members
 export const organization = pgTable("organization", {
   id: uuid("id")
@@ -133,6 +147,7 @@ export const member = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: memberRoleEnum("role").notNull().default("member"),
+    customRoleId: uuid("custom_role_id").references(() => customRole.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
@@ -152,6 +167,7 @@ export const team = pgTable("team", {
   name: text("name").notNull(),
   description: text("description"),
   color: text("color").notNull().default("#3b82f6"),
+  defaultRoleId: uuid("default_role_id").references(() => customRole.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -199,6 +215,10 @@ export const memberRelations = relations(member, ({ one, many }) => ({
     references: [organization.id],
   }),
   user: one(users, { fields: [member.userId], references: [users.id] }),
+  customRole: one(customRole, {
+    fields: [member.customRoleId],
+    references: [customRole.id],
+  }),
   teamMemberships: many(teamMember),
 }));
 
@@ -216,4 +236,12 @@ export const teamMemberRelations = relations(teamMember, ({ one }) => ({
     fields: [teamMember.memberId],
     references: [member.id],
   }),
+}));
+
+export const customRoleRelations = relations(customRole, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [customRole.organizationId],
+    references: [organization.id],
+  }),
+  members: many(member),
 }));

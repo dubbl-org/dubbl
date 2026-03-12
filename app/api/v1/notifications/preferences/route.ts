@@ -36,6 +36,7 @@ const updateSchema = z.object({
       ]),
       channel: z.enum(["in_app", "email"]).default("in_app"),
       enabled: z.boolean(),
+      digestIntervalMinutes: z.number().int().min(0).optional(),
     })
   ),
 });
@@ -60,7 +61,12 @@ export async function PUT(request: Request) {
       if (existing) {
         await db
           .update(notificationPreference)
-          .set({ enabled: pref.enabled })
+          .set({
+            enabled: pref.enabled,
+            ...(pref.digestIntervalMinutes !== undefined && {
+              digestIntervalMinutes: pref.digestIntervalMinutes,
+            }),
+          })
           .where(eq(notificationPreference.id, existing.id));
       } else {
         await db.insert(notificationPreference).values({
@@ -69,6 +75,7 @@ export async function PUT(request: Request) {
           type: pref.type,
           channel: pref.channel,
           enabled: pref.enabled,
+          digestIntervalMinutes: pref.digestIntervalMinutes ?? 30,
         });
       }
     }

@@ -7,7 +7,8 @@ import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
 
 const updateSchema = z.object({
-  role: z.enum(["admin", "member"]),
+  role: z.enum(["admin", "member"]).optional(),
+  customRoleId: z.string().uuid().nullable().optional(),
 });
 
 export async function PATCH(
@@ -39,9 +40,13 @@ export async function PATCH(
       );
     }
 
+    const updates: Record<string, unknown> = {};
+    if (parsed.role !== undefined) updates.role = parsed.role;
+    if (parsed.customRoleId !== undefined) updates.customRoleId = parsed.customRoleId;
+
     const [updated] = await db
       .update(member)
-      .set({ role: parsed.role })
+      .set(updates)
       .where(eq(member.id, id))
       .returning();
 

@@ -125,10 +125,45 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
   "delete:organization": "owner",
 };
 
+/** All available permissions derived from PERMISSION_REQUIREMENTS keys */
+export const ALL_PERMISSIONS = Object.keys(PERMISSION_REQUIREMENTS);
+
+/** Permission categories for UI grouping */
+export const PERMISSION_CATEGORIES: Record<string, string[]> = {
+  "General": ["view:data"],
+  "Accounting": ["create:entries", "edit:entries", "post:entries", "void:entries", "manage:accounts", "manage:recurring", "manage:period-lock"],
+  "Invoicing": ["manage:invoices", "approve:invoices", "manage:credit-notes", "manage:debit-notes"],
+  "Bills": ["manage:bills", "approve:bills"],
+  "Banking": ["manage:banking", "manage:bank-rules"],
+  "Contacts": ["manage:contacts"],
+  "Payments": ["manage:payments"],
+  "Expenses": ["manage:expenses", "approve:expenses"],
+  "Inventory": ["manage:inventory"],
+  "Payroll": ["manage:payroll", "approve:payroll", "manage:timesheets", "manage:leave", "manage:contractors", "view:payslips", "manage:compensation", "manage:tax-config", "manage:shifts", "self-service:payroll", "view:payroll-reports"],
+  "Projects": ["manage:projects"],
+  "Assets": ["manage:assets"],
+  "Budgets": ["manage:budgets"],
+  "Tax": ["manage:tax-rates"],
+  "Cost Centers": ["manage:cost-centers"],
+  "Admin": ["manage:teams", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
+  "Owner": ["manage:billing", "delete:organization"],
+};
+
+/**
+ * Check permission against a legacy MemberRole or a custom permissions array.
+ * Owners always have all permissions.
+ */
 export function hasPermission(
-  role: MemberRole,
+  roleOrPermissions: MemberRole | string[],
   permission: string
 ): boolean {
+  // Custom permissions array
+  if (Array.isArray(roleOrPermissions)) {
+    return roleOrPermissions.includes(permission);
+  }
+
+  // Legacy role-based check
+  const role = roleOrPermissions;
   const required = PERMISSION_REQUIREMENTS[permission];
   if (!required) return false;
   return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[required];

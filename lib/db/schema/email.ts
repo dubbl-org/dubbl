@@ -13,6 +13,8 @@ import { relations } from "drizzle-orm";
 import { organization } from "./auth";
 
 // Enums
+export const emailProviderEnum = pgEnum("email_provider", ["smtp", "resend"]);
+
 export const reminderTriggerTypeEnum = pgEnum("reminder_trigger_type", [
   "before_due",
   "on_due",
@@ -36,16 +38,24 @@ export const reminderStatusEnum = pgEnum("reminder_status", [
   "skipped",
 ]);
 
-// Email Config - one per org, SMTP settings
+// Email Config - one per org, SMTP or Resend settings
 export const emailConfig = pgTable("email_config", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
-  smtpHost: text("smtp_host").notNull(),
-  smtpPort: integer("smtp_port").notNull().default(587),
-  smtpUsername: text("smtp_username").notNull(),
-  smtpPassword: text("smtp_password").notNull(), // stored encrypted
+  provider: emailProviderEnum("provider").notNull().default("smtp"),
+  // SMTP fields (nullable for Resend-only configs)
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port").default(587),
+  smtpUsername: text("smtp_username"),
+  smtpPassword: text("smtp_password"), // stored encrypted
+  // Resend fields
+  resendApiKey: text("resend_api_key"), // stored encrypted via AES-256-GCM
+  resendDomainId: text("resend_domain_id"),
+  customDomain: text("custom_domain"), // e.g., mail.acme.com
+  domainVerified: boolean("domain_verified").notNull().default(false),
+  // Shared fields
   fromEmail: text("from_email").notNull(),
   fromName: text("from_name"),
   replyTo: text("reply_to"),

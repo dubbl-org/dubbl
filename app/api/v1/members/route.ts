@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     const members = await db.query.member.findMany({
       where: eq(member.organizationId, ctx.organizationId),
-      with: { user: true },
+      with: { user: true, customRole: true },
     });
 
     return NextResponse.json({
@@ -27,6 +27,8 @@ export async function GET(request: Request) {
         userName: m.user?.name || null,
         userEmail: m.user?.email || "",
         role: m.role,
+        customRoleId: m.customRoleId || null,
+        customRoleName: m.customRole?.name || null,
         createdAt: m.createdAt.toISOString(),
       })),
     });
