@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   Users,
   Handshake,
@@ -556,136 +556,113 @@ export default function CRMPage() {
       )}
 
       {/* Deal list */}
-      <AnimatePresence mode="wait">
-        {filtering ? (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <BrandLoader />
-          </motion.div>
-        ) : deals.length === 0 ? (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-                <Handshake className="size-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">No deals found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {hasActiveFilters ? "Try different filters" : "Create your first deal to get started"}
-              </p>
-              {hasActiveFilters && (
-                <Button variant="outline" size="sm" className="mt-3 h-7 text-xs" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              )}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key={`deals-${stageFilter}-${sourceFilter}-${statusFilter}-${debouncedSearch}-${sortBy}-${sortOrder}`}
-            initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {deals.map((deal) => {
-                const stage = getStageInfo(deal.stageId);
-                const isWon = !!deal.wonAt;
-                const isLost = !!deal.lostAt;
+      {filtering ? (
+        <BrandLoader />
+      ) : deals.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
+            <Handshake className="size-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium">No deals found</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {hasActiveFilters ? "Try different filters" : "Create your first deal to get started"}
+          </p>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" className="mt-3 h-7 text-xs" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {deals.map((deal) => {
+              const stage = getStageInfo(deal.stageId);
+              const isWon = !!deal.wonAt;
+              const isLost = !!deal.lostAt;
 
-                return (
-                  <button
-                    key={deal.id}
-                    onClick={() => router.push(`/crm/deals/${deal.id}`)}
-                    className="w-full rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/50 space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{deal.title}</p>
-                        {deal.contact && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <User className="size-3 text-muted-foreground shrink-0" />
-                            <p className="text-[11px] text-muted-foreground truncate">{deal.contact.name}</p>
-                          </div>
-                        )}
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 text-[10px] gap-1"
-                        style={{
-                          borderColor: stage.color + "40",
-                          backgroundColor: stage.color + "10",
-                          color: stage.color,
-                        }}
-                      >
-                        <span className="size-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
-                        {isWon ? "Won" : isLost ? "Lost" : stage.name}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold font-mono tabular-nums tracking-tight">
-                        {formatMoney(deal.valueCents, deal.currency)}
-                      </span>
-                      {deal.probability !== null && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${deal.probability}%`,
-                                backgroundColor:
-                                  deal.probability >= 70 ? "#10b981" : deal.probability >= 40 ? "#f59e0b" : "#94a3b8",
-                              }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
-                            {deal.probability}%
-                          </span>
+              return (
+                <button
+                  key={deal.id}
+                  onClick={() => router.push(`/crm/deals/${deal.id}`)}
+                  className="w-full rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/50 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{deal.title}</p>
+                      {deal.contact && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <User className="size-3 text-muted-foreground shrink-0" />
+                          <p className="text-[11px] text-muted-foreground truncate">{deal.contact.name}</p>
                         </div>
                       )}
                     </div>
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-[10px] gap-1"
+                      style={{
+                        borderColor: stage.color + "40",
+                        backgroundColor: stage.color + "10",
+                        color: stage.color,
+                      }}
+                    >
+                      <span className="size-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                      {isWon ? "Won" : isLost ? "Lost" : stage.name}
+                    </Badge>
+                  </div>
 
-                    <div className="flex items-center gap-3 pt-2 border-t text-[11px] text-muted-foreground">
-                      {deal.expectedCloseDate && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="size-3" />
-                          {new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold font-mono tabular-nums tracking-tight">
+                      {formatMoney(deal.valueCents, deal.currency)}
+                    </span>
+                    {deal.probability !== null && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${deal.probability}%`,
+                              backgroundColor:
+                                deal.probability >= 70 ? "#10b981" : deal.probability >= 40 ? "#f59e0b" : "#94a3b8",
+                            }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
+                          {deal.probability}%
                         </span>
-                      )}
-                      {deal.source && <span className="capitalize">{deal.source.replace("_", " ")}</span>}
-                      {deal.assignedUser && (
-                        <span className="ml-auto truncate max-w-[100px]">{deal.assignedUser.name}</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                      </div>
+                    )}
+                  </div>
 
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="flex items-center justify-center py-4">
-              {loadingMore && <Loader2 className="size-5 text-muted-foreground animate-spin" />}
-              {!hasMore && deals.length > 0 && (
-                <p className="text-xs text-muted-foreground/50">No more deals</p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  <div className="flex items-center gap-3 pt-2 border-t text-[11px] text-muted-foreground">
+                    {deal.expectedCloseDate && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="size-3" />
+                        {new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    )}
+                    {deal.source && <span className="capitalize">{deal.source.replace("_", " ")}</span>}
+                    {deal.assignedUser && (
+                      <span className="ml-auto truncate max-w-[100px]">{deal.assignedUser.name}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="flex items-center justify-center py-4">
+            {loadingMore && <Loader2 className="size-5 text-muted-foreground animate-spin" />}
+            {!hasMore && deals.length > 0 && (
+              <p className="text-xs text-muted-foreground/50">No more deals</p>
+            )}
+          </div>
+        </>
+      )}
     </ContentReveal>
   );
 }
