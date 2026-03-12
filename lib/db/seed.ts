@@ -2345,7 +2345,8 @@ async function seed() {
         organizationId: org.id,
         name: r.name,
         description: r.description,
-        config: r.config as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        config: r.config as Record<string, unknown>,
       });
     }
     console.log("  4 saved reports");
@@ -2383,7 +2384,8 @@ async function seed() {
   });
   if (!existingWorkflows) {
     console.log("Creating workflows...");
-    const workflowData: { name: string; description: string; trigger: "invoice_overdue" | "payment_received" | "inventory_low" | "contact_created"; conditions: any[]; actions: any[]; isActive: boolean; triggerCount?: number }[] = [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const workflowData: { name: string; description: string; trigger: "invoice_overdue" | "payment_received" | "inventory_low" | "contact_created"; conditions: Record<string, unknown>[]; actions: Record<string, unknown>[]; isActive: boolean; triggerCount?: number }[] = [
       {
         name: "Invoice Overdue Notification",
         description: "Send notification when invoice becomes overdue",
