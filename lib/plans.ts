@@ -121,6 +121,10 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
   "change:roles": "admin",
   "remove:members": "admin",
   "manage:api-keys": "admin",
+  "manage:webhooks": "admin",
+  "manage:approvals": "admin",
+  "manage:time-tracking": "member",
+  "manage:reports": "admin",
   "manage:billing": "owner",
   "delete:organization": "owner",
 };
@@ -145,6 +149,9 @@ export const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "Budgets": ["manage:budgets"],
   "Tax": ["manage:tax-rates"],
   "Cost Centers": ["manage:cost-centers"],
+  "Automation": ["manage:webhooks", "manage:approvals"],
+  "Reports": ["manage:reports"],
+  "Time Tracking": ["manage:time-tracking"],
   "Admin": ["manage:teams", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
   "Owner": ["manage:billing", "delete:organization"],
 };
@@ -153,6 +160,36 @@ export const PERMISSION_CATEGORIES: Record<string, string[]> = {
  * Check permission against a legacy MemberRole or a custom permissions array.
  * Owners always have all permissions.
  */
+/**
+ * Get effective limits for an org, respecting admin overrides.
+ * Pass the subscription row (or null for free defaults).
+ */
+export function getEffectiveLimits(sub: {
+  plan: PlanName;
+  overrideMembers?: number | null;
+  overrideStorageMb?: number | null;
+  overrideContacts?: number | null;
+  overrideInvoicesPerMonth?: number | null;
+  overrideProjects?: number | null;
+  overrideBankAccounts?: number | null;
+  overrideCurrencies?: number | null;
+  overrideEntriesPerMonth?: number | null;
+} | null) {
+  const plan = sub?.plan ?? "free";
+  const base = PLAN_LIMITS[plan];
+  return {
+    ...base,
+    members: sub?.overrideMembers ?? base.members,
+    storageMb: sub?.overrideStorageMb ?? base.storageMb,
+    contacts: sub?.overrideContacts ?? base.contacts,
+    invoicesPerMonth: sub?.overrideInvoicesPerMonth ?? base.invoicesPerMonth,
+    projects: sub?.overrideProjects ?? base.projects,
+    bankAccounts: sub?.overrideBankAccounts ?? base.bankAccounts,
+    currencies: sub?.overrideCurrencies ?? base.currencies,
+    entriesPerMonth: sub?.overrideEntriesPerMonth ?? base.entriesPerMonth,
+  };
+}
+
 export function hasPermission(
   roleOrPermissions: MemberRole | string[],
   permission: string

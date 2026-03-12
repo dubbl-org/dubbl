@@ -170,6 +170,8 @@ const LABELS: Record<string, string> = {
   imports: "Imports",
   batches: "Batches",
   docs: "Docs",
+  admin: "Admin",
+  "email-preview": "Email Preview",
 };
 
 function getLabel(segment: string): string {

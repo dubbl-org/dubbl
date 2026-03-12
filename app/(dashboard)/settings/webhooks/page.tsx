@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -494,7 +495,11 @@ export default function WebhooksPage() {
                 onChange={(e) => setFormUrl(e.target.value)}
                 placeholder="https://example.com/webhooks"
                 type="url"
+                className={formUrl.trim() && !/^https?:\/\/.+\..+/.test(formUrl.trim()) ? "border-destructive" : ""}
               />
+              {formUrl.trim() && !/^https?:\/\/.+\..+/.test(formUrl.trim()) && (
+                <p className="text-xs text-destructive">Enter a valid URL starting with http:// or https://</p>
+              )}
             </div>
 
             {/* Description */}
@@ -521,11 +526,9 @@ export default function WebhooksPage() {
                         key={event}
                         className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs cursor-pointer hover:bg-muted transition-colors"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={formEvents.includes(event)}
-                          onChange={() => toggleEvent(event)}
-                          className="size-3.5 rounded border-gray-300"
+                          onCheckedChange={() => toggleEvent(event)}
                         />
                         {event}
                       </label>
@@ -544,7 +547,7 @@ export default function WebhooksPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || !formUrl.trim() || formEvents.length === 0}
+              disabled={saving || !formUrl.trim() || formEvents.length === 0 || !/^https?:\/\/.+\..+/.test(formUrl.trim())}
             >
               {saving
                 ? "Saving..."

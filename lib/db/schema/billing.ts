@@ -42,6 +42,18 @@ export const subscription = pgTable(
       .notNull()
       .default(false),
     seatCount: integer("seat_count").notNull().default(1),
+    // Enterprise / admin overrides (null = use plan defaults)
+    customPlanName: text("custom_plan_name"), // e.g. "Enterprise", "Startup Program"
+    overrideMembers: integer("override_members"),
+    overrideStorageMb: integer("override_storage_mb"),
+    overrideContacts: integer("override_contacts"),
+    overrideInvoicesPerMonth: integer("override_invoices_per_month"),
+    overrideProjects: integer("override_projects"),
+    overrideBankAccounts: integer("override_bank_accounts"),
+    overrideCurrencies: integer("override_currencies"),
+    overrideEntriesPerMonth: integer("override_entries_per_month"),
+    managedBy: text("managed_by").notNull().default("stripe"), // "stripe" or "manual"
+    adminNotes: text("admin_notes"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
