@@ -4,7 +4,7 @@
     "builder": "RAILPACK"
   },
   "deploy": {
-    "startCommand": "npx tsx scripts/cron-digest.ts",
+    "startCommand": "npx tsx scripts/cron-all.ts",
     "cronSchedule": "*/5 * * * *",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3

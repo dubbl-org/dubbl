@@ -3,6 +3,7 @@ import { workflow, workflowExecutionLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import type { WorkflowCondition } from "@/lib/db/schema/workflows";
+import { fireWebhookEvent } from "@/lib/webhooks/fire";
 
 /**
  * Evaluate all active workflows for a given trigger and organization.
@@ -115,6 +116,11 @@ async function executeAction(
       break;
     case "create_invoice":
       // Would create a new invoice
+      break;
+    case "fire_webhook":
+      if (action.config.event && typeof action.config.event === "string") {
+        await fireWebhookEvent(_orgId, action.config.event, _entity);
+      }
       break;
   }
 }

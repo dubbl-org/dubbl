@@ -9,6 +9,11 @@ import { registerBillTools } from "./bills";
 import { registerReportTools } from "./reports";
 import { registerNotificationTools } from "./notifications";
 import { registerRoleTools } from "./roles";
+import { registerTimeTrackingTools } from "./time-tracking";
+import { registerWebhookTools } from "./webhooks";
+import { registerReportScheduleTools } from "./report-schedule-tools";
+import { registerApprovalTools } from "./approvals";
+import { registerBankRuleTools } from "./bank-rules";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -20,4 +25,9 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerReportTools(server, ctx);
   registerNotificationTools(server, ctx);
   registerRoleTools(server, ctx);
+  registerTimeTrackingTools(server, ctx);
+  registerWebhookTools(server, ctx);
+  registerReportScheduleTools(server, ctx);
+  registerApprovalTools(server, ctx);
+  registerBankRuleTools(server, ctx);
 }

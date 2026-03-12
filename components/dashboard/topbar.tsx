@@ -37,6 +37,7 @@ export function useTopbarAction(node: ReactNode) {
 }
 
 const LABELS: Record<string, string> = {
+  // Top-level
   dashboard: "Overview",
   sales: "Sales",
   purchases: "Purchases",
@@ -49,45 +50,84 @@ const LABELS: Record<string, string> = {
   notifications: "Notifications",
   documents: "Documents",
   settings: "Settings",
-  // Sales subtabs
+  tax: "Tax",
+  crm: "CRM",
+  portal: "Portal",
+  consolidation: "Consolidation",
+  // Sales
   invoices: "Invoices",
   quotes: "Quotes",
+  "credit-notes": "Credit Notes",
+  recurring: "Recurring",
+  payments: "Payments",
   new: "New",
-  // Purchases subtabs
+  // Purchases
   bills: "Bills",
   expenses: "Expenses",
   orders: "Purchase Orders",
-  // Accounting subtabs
+  requisitions: "Requisitions",
+  "vendor-spend": "Vendor Spend",
+  // Accounting
   transactions: "Transactions",
   accounts: "Accounts",
   banking: "Banking",
   "fixed-assets": "Fixed Assets",
   budgets: "Budgets",
-  // Settings subtabs
+  reconcile: "Reconcile",
+  // Settings
+  general: "General",
   members: "Members",
+  roles: "Roles",
   billing: "Billing",
+  advisors: "Advisors",
+  pipelines: "Pipelines",
+  "bank-rules": "Bank Rules",
+  "approval-workflows": "Approvals",
+  webhooks: "Webhooks",
   "api-keys": "API Keys",
+  "audit-log": "Audit Log",
+  "cost-centers": "Cost Centers",
+  tags: "Tags",
+  reminders: "Reminders",
+  "document-templates": "Document Templates",
   currencies: "Currencies",
   "tax-rates": "Tax Rates",
-  "audit-log": "Audit Log",
-  "document-templates": "Document Templates",
-  // Payroll sub-pages
+  // Payroll
   employees: "Employees",
   runs: "Pay Runs",
-  // Reports sub-pages
+  contractors: "Contractors",
+  "time-leave": "Time & Leave",
+  compensation: "Compensation",
+  timesheets: "Timesheets",
+  payslips: "Payslips",
+  "tax-forms": "Tax Forms",
+  leave: "Leave",
+  reviews: "Reviews",
+  pay: "Pay",
+  // Reports
   "trial-balance": "Trial Balance",
   "balance-sheet": "Balance Sheet",
+  "comparative-balance-sheet": "Comparative Balance Sheet",
   "income-statement": "Income Statement",
   "profit-and-loss": "Profit & Loss",
+  "pnl-comparison": "P&L Comparison",
   "cash-flow": "Cash Flow",
+  "cash-flow-forecast": "Cash Flow Forecast",
   "general-ledger": "General Ledger",
   "aged-receivables": "Aged Receivables",
   "aged-payables": "Aged Payables",
   "budget-vs-actual": "Budget vs Actual",
+  "financial-ratios": "Financial Ratios",
+  "financial-calendar": "Financial Calendar",
+  "payment-performance": "Payment Performance",
+  "expense-analytics": "Expense Analytics",
+  profitability: "Profitability",
+  "tax-summary": "Tax Summary",
+  forecasting: "Forecasting",
   custom: "Custom Reports",
-  general: "General",
-  time: "Time Tracking",
-  // Inventory subtabs
+  "report-schedules": "Report Schedules",
+  scheduled: "Scheduled",
+  // Inventory
   "stock-takes": "Stock Takes",
   warehouses: "Warehouses",
   valuation: "Valuation",
@@ -98,24 +138,43 @@ const LABELS: Record<string, string> = {
   suppliers: "Suppliers",
   bom: "Bill of Materials",
   assembly: "Assembly Orders",
-  // CRM subtabs
-  crm: "CRM",
+  variants: "Variants",
+  "landed-costs": "Landed Costs",
+  // CRM
   deals: "Deals",
   analytics: "Analytics",
-  pipelines: "Pipelines",
-  // Workflow subtabs
-  workflows: "Workflows",
-  variants: "Variants",
-  // Sales subtabs
-  "credit-notes": "Credit Notes",
-  recurring: "Recurring",
-  payments: "Payments",
-  // Project subtabs
+  "duplicate-detection": "Duplicate Detection",
+  // Projects
   tasks: "Tasks",
   milestones: "Milestones",
   notes: "Notes",
   team: "Team",
+  teams: "Teams",
+  time: "Time Tracking",
+  // Tax
+  "sales-tax": "Sales Tax",
+  "schedule-c": "Schedule C",
+  "vat-return": "VAT Return",
+  bas: "BAS",
+  periods: "Tax Periods",
+  // Workflows
+  workflows: "Workflows",
+  "approval-requests": "Approval Requests",
+  // Signatures
+  signature: "Signature",
+  sign: "Sign",
+  // Misc
+  "scheduled-payments": "Scheduled Payments",
+  "self-service": "Self Service",
+  statements: "Statements",
+  imports: "Imports",
+  batches: "Batches",
+  docs: "Docs",
 };
+
+function getLabel(segment: string): string {
+  return LABELS[segment] || segment;
+}
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
 
@@ -186,28 +245,28 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
   let parentHref: string | null = null;
 
   if (isNestedEntityDetail) {
-    parentLabel = LABELS[segments[1]] || segments[1];
+    parentLabel = getLabel(segments[1]);
     parentHref = `/${segments[0]}/${segments[1]}`;
     if (entityTitle) {
       pageTitle = entityTitle;
     } else {
       const subTab = segments.length > 3 ? segments[segments.length - 1] : null;
-      pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[1]] || segments[1]);
+      pageTitle = subTab ? (getLabel(subTab)) : (getLabel(segments[1]));
       if (!subTab) parentLabel = null;
     }
   } else if (isEntityDetail) {
-    parentLabel = LABELS[segments[0]] || segments[0];
+    parentLabel = getLabel(segments[0]);
     parentHref = `/${segments[0]}`;
     if (entityTitle) {
       pageTitle = entityTitle;
     } else {
       const subTab = segments.length > 2 ? segments[segments.length - 1] : null;
-      pageTitle = subTab ? (LABELS[subTab] || subTab) : (LABELS[segments[0]] || segments[0]);
+      pageTitle = subTab ? (getLabel(subTab)) : (getLabel(segments[0]));
       if (!subTab) parentLabel = null;
     }
   } else {
-    pageTitle = LABELS[effectiveSegments[effectiveSegments.length - 1] || ""] || effectiveSegments[effectiveSegments.length - 1] || "Overview";
-    parentLabel = effectiveSegments.length > 1 ? LABELS[effectiveSegments[0]] || effectiveSegments[0] : null;
+    pageTitle = effectiveSegments[effectiveSegments.length - 1] ? getLabel(effectiveSegments[effectiveSegments.length - 1]) : "Overview";
+    parentLabel = effectiveSegments.length > 1 ? getLabel(effectiveSegments[0]) : null;
   }
 
   const subtabKey = `${segments[0]}/${segments[1]}`;
