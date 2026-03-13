@@ -62,7 +62,8 @@ export async function DELETE(
 }
 
 const patchSchema = z.object({
-  visibility: z.enum(["organization", "private"]),
+  visibility: z.enum(["organization", "private"]).optional(),
+  fileName: z.string().min(1).optional(),
 });
 
 export async function PATCH(
@@ -86,9 +87,13 @@ export async function PATCH(
     if (!doc) return notFound("Document");
     if (doc.uploadedBy !== ctx.userId) return notFound("Document");
 
+    const updates: Record<string, string> = {};
+    if (parsed.visibility) updates.visibility = parsed.visibility;
+    if (parsed.fileName) updates.fileName = parsed.fileName;
+
     const [updated] = await db
       .update(document)
-      .set({ visibility: parsed.visibility })
+      .set(updates)
       .where(eq(document.id, id))
       .returning();
 

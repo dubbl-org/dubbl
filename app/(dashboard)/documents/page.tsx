@@ -19,6 +19,9 @@ import {
   Users,
   ArrowRight,
   ArrowUpDown,
+  Pencil,
+  Check as CheckIcon,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -49,6 +52,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -111,12 +122,17 @@ export default function DocumentsPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadVisibility, setUploadVisibility] = useState<"organization" | "private">("organization");
+  const [uploadNames, setUploadNames] = useState<Record<number, string>>({});
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const isSearching = search !== debouncedSearch;
   const [typeFilter, setTypeFilter] = useState<"all" | "documents" | "images" | "spreadsheets">("all");
   const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
@@ -229,12 +245,14 @@ export default function DocumentsPage() {
     setUploading(true);
     setUploadDialogOpen(false);
     try {
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileName = uploadNames[i]?.trim() || file.name;
         const res = await fetch("/api/v1/documents", {
           method: "POST",
           headers: getHeaders(),
           body: JSON.stringify({
-            fileName: file.name,
+            fileName,
             fileSize: file.size,
             mimeType: file.type || "application/octet-stream",
             folderId: currentFolder,
@@ -259,6 +277,7 @@ export default function DocumentsPage() {
     } finally {
       setUploading(false);
       setPendingFiles([]);
+      setUploadNames({});
     }
   }
 
@@ -270,6 +289,7 @@ export default function DocumentsPage() {
       if (input.files?.length) {
         setPendingFiles(Array.from(input.files));
         setUploadVisibility("organization");
+        setUploadNames({});
         setUploadDialogOpen(true);
       }
     };
@@ -289,9 +309,40 @@ export default function DocumentsPage() {
         throw new Error(data.error || "Failed to update visibility");
       }
       await fetchData();
+      // Update selected doc if it's the same one
+      if (selectedDoc?.id === doc.id) {
+        setSelectedDoc({ ...doc, visibility: newVisibility });
+      }
       toast.success(newVisibility === "private" ? "File set to private" : "File shared with team");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update");
+    }
+  }
+
+  async function handleRename(doc: Doc, newName: string) {
+    if (!newName.trim() || newName === doc.fileName) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    try {
+      const res = await fetch(`/api/v1/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ fileName: newName.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to rename");
+      }
+      await fetchData();
+      setSelectedDoc({ ...doc, fileName: newName.trim() });
+      setEditingName(false);
+      toast.success("File renamed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to rename");
+    } finally {
+      setSavingName(false);
     }
   }
 
@@ -301,6 +352,7 @@ export default function DocumentsPage() {
     if (e.dataTransfer.files.length) {
       setPendingFiles(Array.from(e.dataTransfer.files));
       setUploadVisibility("organization");
+      setUploadNames({});
       setUploadDialogOpen(true);
     }
   }
@@ -364,7 +416,7 @@ export default function DocumentsPage() {
   const uploadDialog = (
     <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
       setUploadDialogOpen(open);
-      if (!open) setPendingFiles([]);
+      if (!open) { setPendingFiles([]); setUploadNames({}); }
     }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
@@ -374,13 +426,26 @@ export default function DocumentsPage() {
           <div className="space-y-1.5">
             {pendingFiles.map((file, i) => {
               const { icon: FIcon, color: fColor } = getFileIcon(file.type);
+              const displayName = uploadNames[i] ?? file.name;
+              const isDuplicate = documents.some((d) => d.fileName === displayName);
               return (
-                <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
-                  <FIcon className={cn("size-4 shrink-0", fColor)} />
-                  <span className="text-[13px] font-medium truncate flex-1">{file.name}</span>
-                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                    {formatFileSize(file.size)}
-                  </span>
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
+                    <FIcon className={cn("size-4 shrink-0", fColor)} />
+                    <Input
+                      value={displayName}
+                      onChange={(e) => setUploadNames((prev) => ({ ...prev, [i]: e.target.value }))}
+                      className="h-auto border-0 p-0 text-[13px] font-medium shadow-none focus-visible:ring-0"
+                    />
+                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                      {formatFileSize(file.size)}
+                    </span>
+                  </div>
+                  {isDuplicate && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 pl-1">
+                      A file with this name already exists and will be kept as a separate copy.
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -409,7 +474,7 @@ export default function DocumentsPage() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setPendingFiles([]); }}>Cancel</Button>
+          <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setPendingFiles([]); setUploadNames({}); }}>Cancel</Button>
           <Button
             onClick={() => handleUpload(pendingFiles, uploadVisibility)}
             disabled={pendingFiles.length === 0 || uploading}
@@ -778,7 +843,11 @@ export default function DocumentsPage() {
                     variants={ROW_VARIANTS}
                     initial="hidden"
                     animate="visible"
-                    className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group"
+                    className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group cursor-pointer"
+                    onClick={() => {
+                      setSelectedDoc(doc);
+                      setEditingName(false);
+                    }}
                   >
                     <FileIcon className={cn("size-5 shrink-0", iconColor)} />
                     <span className="text-sm font-medium truncate min-w-0 flex-1">{doc.fileName}</span>
@@ -794,7 +863,7 @@ export default function DocumentsPage() {
                     <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">
                       {new Date(doc.createdAt).toLocaleDateString()}
                     </span>
-                    <div className="w-16 shrink-0 flex justify-end">
+                    <div className="w-16 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -832,6 +901,150 @@ export default function DocumentsPage() {
         )}
       </AnimatePresence>
 
+      {/* File detail sheet */}
+      <Sheet open={!!selectedDoc} onOpenChange={(open) => { if (!open) { setSelectedDoc(null); setEditingName(false); } }}>
+        <SheetContent>
+          {selectedDoc && (() => {
+            const { icon: SheetFileIcon, color: sheetIconColor } = getFileIcon(selectedDoc.mimeType);
+            return (
+              <>
+                <SheetHeader>
+                  <SheetTitle>File Details</SheetTitle>
+                  <SheetDescription className="sr-only">View and edit file</SheetDescription>
+                </SheetHeader>
+
+                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-5">
+                  {/* Preview area */}
+                  <div className="flex flex-col items-center rounded-xl bg-muted/50 border py-8">
+                    <div className="flex size-16 items-center justify-center rounded-2xl bg-background shadow-sm ring-1 ring-border">
+                      <SheetFileIcon className={cn("size-7", sheetIconColor)} />
+                    </div>
+                    <p className="mt-3 text-[11px] text-muted-foreground font-mono tabular-nums">
+                      {formatFileSize(selectedDoc.fileSize)}
+                    </p>
+                  </div>
+
+                  {/* Editable name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">File name</label>
+                    {editingName ? (
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRename(selectedDoc, editName);
+                            if (e.key === "Escape") setEditingName(false);
+                          }}
+                          className="h-9 text-sm"
+                          autoFocus
+                          disabled={savingName}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-9 shrink-0"
+                          onClick={() => handleRename(selectedDoc, editName)}
+                          disabled={savingName}
+                        >
+                          <CheckIcon className="size-3.5 text-emerald-600" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-9 shrink-0"
+                          onClick={() => setEditingName(false)}
+                          disabled={savingName}
+                        >
+                          <X className="size-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditName(selectedDoc.fileName); setEditingName(true); }}
+                        className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left hover:bg-muted/50 transition-colors group/name"
+                      >
+                        <span className="text-sm font-medium truncate flex-1">{selectedDoc.fileName}</span>
+                        <Pencil className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Visibility */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Visibility</label>
+                    <Select
+                      value={selectedDoc.visibility}
+                      onValueChange={(v) => handleToggleVisibility({ ...selectedDoc, visibility: v === "private" ? "organization" : "private" })}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="organization">
+                          <div className="flex items-center gap-2">
+                            <Users className="size-3.5 text-muted-foreground" />
+                            <span>Shared with team</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="private">
+                          <div className="flex items-center gap-2">
+                            <Lock className="size-3.5 text-muted-foreground" />
+                            <span>Private (only you)</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Metadata */}
+                  <div className="rounded-lg border divide-y">
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Type</span>
+                      <span className="text-xs font-medium">{selectedDoc.mimeType.split("/").pop()?.toUpperCase()}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Size</span>
+                      <span className="text-xs font-medium font-mono tabular-nums">{formatFileSize(selectedDoc.fileSize)}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="text-xs text-muted-foreground">Uploaded</span>
+                      <span className="text-xs font-medium">{new Date(selectedDoc.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      className="flex-1 gap-2 text-xs h-9 bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => handleDownload(selectedDoc)}
+                    >
+                      <Download className="size-3.5" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-xs h-9 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30 dark:border-red-900/50"
+                      onClick={() => {
+                        const doc = selectedDoc;
+                        setSelectedDoc(null);
+                        handleDeleteDoc(doc);
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
+
+      {uploadDialog}
       {folderDialog}
       {confirmDialog}
     </ContentReveal>
