@@ -1,9 +1,10 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { member, apiKey, advisorAccess, customRole } from "@/lib/db/schema";
+import { subscription } from "@/lib/db/schema/billing";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
-import type { MemberRole } from "@/lib/plans";
+import { getEffectiveLimits, type MemberRole } from "@/lib/plans";
 
 export interface AuthContext {
   userId: string;
@@ -46,6 +47,15 @@ export async function getAuthContext(
     if (!key) throw new AuthError("Invalid API key", 401);
     if (key.expiresAt && key.expiresAt < new Date()) {
       throw new AuthError("API key expired", 401);
+    }
+
+    // Check the org still has API access
+    const sub = await db.query.subscription.findFirst({
+      where: eq(subscription.organizationId, key.organizationId),
+    });
+    const limits = getEffectiveLimits(sub ?? null);
+    if (!limits.apiAccess) {
+      throw new AuthError("API access requires a Pro or Business plan", 403);
     }
 
     // Update last used (fire and forget)

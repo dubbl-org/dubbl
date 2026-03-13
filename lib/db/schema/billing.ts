@@ -9,7 +9,7 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { organization } from "./auth";
+import { organization, users } from "./auth";
 
 // Enums
 export const planEnum = pgEnum("plan", ["free", "pro", "business"]);
@@ -79,7 +79,7 @@ export const apiKey = pgTable(
     expiresAt: timestamp("expires_at", { mode: "date" }),
     createdBy: uuid("created_by")
       .notNull()
-      .references(() => organization.id),
+      .references(() => users.id),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [uniqueIndex("api_key_hash_idx").on(table.keyHash)]

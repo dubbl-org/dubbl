@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Key, Copy, Trash2, Loader2, Calendar, Clock } from "lucide-react";
+import { Plus, Key, Copy, Trash2, Loader2, Calendar, Clock, Lock, ArrowUpRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ interface ApiKeyItem {
 }
 
 export default function ApiKeysPage() {
+  const router = useRouter();
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -34,6 +36,8 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [apiAccess, setApiAccess] = useState(true);
+  const [maxKeys, setMaxKeys] = useState(20);
 
   function fetchKeys() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -45,6 +49,8 @@ export default function ApiKeysPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.keys) setKeys(data.keys);
+        if (data.apiAccess !== undefined) setApiAccess(data.apiAccess);
+        if (data.maxKeys) setMaxKeys(data.maxKeys);
       })
       .finally(() => setLoading(false));
   }
@@ -66,8 +72,8 @@ export default function ApiKeysPage() {
         },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create key");
       setNewKey(data.plainKey);
       setName("");
       fetchKeys();
@@ -101,6 +107,28 @@ export default function ApiKeysPage() {
 
   return (
     <ContentReveal className="space-y-8">
+      {/* Pro required banner */}
+      {!apiAccess && !loading && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <Lock className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Pro feature</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+              API keys require a Pro or Business plan.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 text-xs border-amber-200 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-300"
+            onClick={() => router.push("/settings/billing")}
+          >
+            Upgrade
+            <ArrowUpRight className="ml-1 size-3" />
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -109,7 +137,7 @@ export default function ApiKeysPage() {
             Create and manage keys for programmatic access to the dubbl API
             {keys.length > 0 && (
               <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                {keys.length} active
+                {keys.length}/{maxKeys}
               </span>
             )}
           </p>
@@ -120,7 +148,8 @@ export default function ApiKeysPage() {
             setNewKey(null);
             setCreateOpen(true);
           }}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          disabled={!apiAccess || keys.length >= maxKeys}
+          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
         >
           <Plus className="mr-1.5 size-3.5" />
           New Key
@@ -144,7 +173,8 @@ export default function ApiKeysPage() {
               setNewKey(null);
               setCreateOpen(true);
             }}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={!apiAccess}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
           >
             <Plus className="mr-1.5 size-3.5" />
             Create your first key

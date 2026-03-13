@@ -105,7 +105,7 @@ export async function POST() {
 
     await db
       .insert(subscription)
-      .values({ organizationId: org.id, plan: "business", status: "active" })
+      .values({ organizationId: org.id, plan: "free", status: "active" })
       .onConflictDoNothing();
   } else {
     await db
