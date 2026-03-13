@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Settings, Users, CreditCard, Key, ScrollText, Target,
   Bell, BellRing, GitBranch, Tags, Shield, ShieldCheck,
-  ListFilter, Webhook, CheckCircle2,
+  ListFilter, Webhook, CheckCircle2, Zap,
 } from "lucide-react";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,12 @@ const GROUPS: NavGroup[] = [
       { href: "/settings/bank-rules", label: "Bank Rules", icon: ListFilter },
       { href: "/settings/approval-workflows", label: "Approvals", icon: CheckCircle2 },
       { href: "/settings/webhooks", label: "Webhooks", icon: Webhook },
+    ],
+  },
+  {
+    label: "Integrations",
+    items: [
+      { href: "/settings/integrations/stripe", label: "Stripe", icon: Zap },
     ],
   },
   {

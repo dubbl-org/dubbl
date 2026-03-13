@@ -15,6 +15,7 @@ import { registerReportScheduleTools } from "./report-schedule-tools";
 import { registerApprovalTools } from "./approvals";
 import { registerBankRuleTools } from "./bank-rules";
 import { registerDocumentTools } from "./documents";
+import { registerIntegrationTools } from "./integrations";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -32,4 +33,5 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerApprovalTools(server, ctx);
   registerBankRuleTools(server, ctx);
   registerDocumentTools(server, ctx);
+  registerIntegrationTools(server, ctx);
 }
