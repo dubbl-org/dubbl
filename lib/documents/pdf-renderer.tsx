@@ -79,8 +79,8 @@ function getTaxIdLabel(countryCode?: string | null): string {
 
 function getInvoiceTitle(countryCode?: string | null, hasTaxId?: boolean): string {
   const cc = countryCode?.toUpperCase();
-  if ((cc === "AU" || cc === "NZ") && hasTaxId) return "TAX INVOICE";
-  return "INVOICE";
+  if ((cc === "AU" || cc === "NZ") && hasTaxId) return "Tax Invoice";
+  return "Invoice";
 }
 
 function fmtMoney(cents: number, currency: string): string {
@@ -96,52 +96,56 @@ function replacePlaceholders(text: string, vars: Record<string, string>): string
   return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match);
 }
 
+// Colors
+const dark = "#111827";
+const gray = "#6b7280";
+const lightGray = "#e5e7eb";
+
 const s = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
+  page: { paddingTop: 0, paddingBottom: 50, paddingHorizontal: 40, fontSize: 9, fontFamily: "Helvetica", color: dark },
+  // Accent bar
+  accentBar: { height: 4, marginBottom: 30 },
   // Header
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 },
-  invoiceTitle: { fontSize: 22, fontFamily: "Helvetica-Bold", letterSpacing: -0.5 },
-  invoiceNumber: { fontSize: 11, color: "#6b7280", marginTop: 4 },
-  // Meta table (right side)
+  title: { fontSize: 18, fontFamily: "Helvetica-Bold", color: dark, marginBottom: 20 },
+  // Metadata
+  metaBlock: { marginBottom: 20 },
   metaRow: { flexDirection: "row", marginBottom: 2 },
-  metaLabel: { fontSize: 9, color: "#6b7280", width: 65, textAlign: "right", marginRight: 8 },
+  metaLabel: { width: 80, fontSize: 9, color: gray },
   metaValue: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  // From / Bill To
-  partiesRow: { flexDirection: "row", gap: 30, marginBottom: 24 },
-  partyCol: { flex: 1 },
-  partyLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 1.2, color: "#9ca3af", marginBottom: 5 },
-  partyName: { fontSize: 11, fontFamily: "Helvetica-Bold", marginBottom: 2 },
-  partyDetail: { fontSize: 9, color: "#6b7280", marginBottom: 1 },
+  // Parties
+  partiesRow: { flexDirection: "row", marginBottom: 20 },
+  sellerCol: { width: 200, marginRight: 40 },
+  buyerCol: { width: 200 },
+  partyName: { fontSize: 10, fontFamily: "Helvetica-Bold", marginBottom: 3 },
+  partyDetail: { fontSize: 9, color: gray, marginBottom: 1 },
+  billToLabel: { fontSize: 10, fontFamily: "Helvetica-Bold", marginBottom: 3 },
+  // Due summary
+  dueSummary: { fontSize: 14, fontFamily: "Helvetica-Bold", color: dark, marginBottom: 20 },
   // Table
-  table: { marginBottom: 12 },
-  tableHeader: { flexDirection: "row", borderBottomWidth: 1.5, borderBottomColor: "#d1d5db", paddingBottom: 5, marginBottom: 3 },
-  th: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 },
-  tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#e5e7eb", paddingVertical: 5 },
-  cellNum: { width: 24, color: "#9ca3af" },
+  table: { marginBottom: 0 },
+  tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: dark, paddingBottom: 6, marginBottom: 4 },
+  th: { fontSize: 8, color: gray },
+  tableRow: { flexDirection: "row", paddingVertical: 4 },
   cellDesc: { flex: 3 },
-  cellQty: { flex: 0.8, textAlign: "right" },
+  cellQty: { flex: 0.6, textAlign: "right" },
   cellPrice: { flex: 1.2, textAlign: "right" },
-  cellTax: { flex: 1, textAlign: "right" },
-  cellAmount: { flex: 1.2, textAlign: "right" },
+  cellAmount: { flex: 1.3, textAlign: "right" },
   // Totals
-  totalsContainer: { alignItems: "flex-end", marginTop: 6 },
-  totalRow: { flexDirection: "row", width: 200, justifyContent: "space-between", paddingVertical: 2 },
-  totalLabel: { fontSize: 9, color: "#6b7280" },
-  totalValue: { fontSize: 9 },
-  totalDivider: { flexDirection: "row", width: 200, justifyContent: "space-between", paddingVertical: 3, borderTopWidth: 1.5, borderTopColor: "#111827", marginTop: 2 },
-  totalBoldLabel: { fontSize: 10, fontFamily: "Helvetica-Bold" },
-  totalBoldValue: { fontSize: 10, fontFamily: "Helvetica-Bold" },
-  // Amount Due box
-  amountDueBox: { alignItems: "flex-end", marginTop: 12 },
-  amountDueInner: { padding: 10, paddingHorizontal: 16, borderRadius: 4, alignItems: "flex-end" },
-  amountDueLabel: { fontSize: 7, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 1, color: "#6b7280", marginBottom: 2 },
-  amountDueValue: { fontSize: 18, fontFamily: "Helvetica-Bold" },
+  totalsContainer: { flexDirection: "row", justifyContent: "flex-end", marginTop: 20 },
+  totalsBlock: { width: "50%" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, borderTopWidth: 0.5, borderTopColor: lightGray },
+  totalLabel: { fontSize: 9, color: gray },
+  totalValue: { fontSize: 9, color: dark },
+  amountDueRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3, borderTopWidth: 0.5, borderTopColor: lightGray },
+  amountDueLabel: { fontSize: 9, fontFamily: "Helvetica-Bold", color: dark },
+  amountDueValue: { fontSize: 9, fontFamily: "Helvetica-Bold", color: dark },
   // Info sections
-  infoSection: { marginTop: 16, padding: 10, backgroundColor: "#f9fafb", borderRadius: 3 },
-  infoTitle: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#374151", marginBottom: 3 },
-  infoText: { fontSize: 9, color: "#6b7280", lineHeight: 1.4 },
+  infoSection: { marginTop: 20 },
+  infoTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: dark, marginBottom: 3 },
+  infoText: { fontSize: 9, color: gray, lineHeight: 1.4 },
   // Footer
-  footer: { position: "absolute", bottom: 30, left: 40, right: 40, fontSize: 8, color: "#9ca3af", textAlign: "center" },
+  footer: { position: "absolute", bottom: 20, left: 40, right: 40, borderTopWidth: 0.5, borderTopColor: lightGray, paddingTop: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  footerText: { fontSize: 8, color: gray },
 });
 
 interface InvoiceDocProps {
@@ -178,119 +182,110 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        {/* Header: Title + Meta */}
-        <View style={s.header}>
-          <View>
-            <Text style={[s.invoiceTitle, { color: accent }]}>{title}</Text>
-            <Text style={s.invoiceNumber}>{inv.invoiceNumber}</Text>
+        {/* Thin accent bar at top */}
+        <View style={[s.accentBar, { backgroundColor: accent }]} />
+
+        {/* Invoice title */}
+        <Text style={s.title}>{title}</Text>
+
+        {/* Metadata */}
+        <View style={s.metaBlock}>
+          <View style={s.metaRow}>
+            <Text style={[s.metaLabel, { fontFamily: "Helvetica-Bold" }]}>Invoice number</Text>
+            <Text style={s.metaValue}>{inv.invoiceNumber}</Text>
           </View>
-          <View>
-            <View style={s.metaRow}>
-              <Text style={s.metaLabel}>Issue Date</Text>
-              <Text style={s.metaValue}>{inv.issueDate}</Text>
-            </View>
-            <View style={s.metaRow}>
-              <Text style={s.metaLabel}>Due Date</Text>
-              <Text style={s.metaValue}>{inv.dueDate}</Text>
-            </View>
-            {inv.reference && (
-              <View style={s.metaRow}>
-                <Text style={s.metaLabel}>Reference</Text>
-                <Text style={s.metaValue}>{inv.reference}</Text>
-              </View>
-            )}
+          <View style={s.metaRow}>
+            <Text style={s.metaLabel}>Date of issue</Text>
+            <Text style={{ fontSize: 9 }}>{inv.issueDate}</Text>
           </View>
+          <View style={s.metaRow}>
+            <Text style={s.metaLabel}>Date due</Text>
+            <Text style={{ fontSize: 9 }}>{inv.dueDate}</Text>
+          </View>
+          {inv.reference && (
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Reference</Text>
+              <Text style={{ fontSize: 9 }}>{inv.reference}</Text>
+            </View>
+          )}
         </View>
 
-        {/* From / Bill To */}
+        {/* Seller and Buyer */}
         <View style={s.partiesRow}>
-          <View style={s.partyCol}>
-            <Text style={s.partyLabel}>From</Text>
+          <View style={s.sellerCol}>
             <Text style={s.partyName}>{org.name}</Text>
             {org.address && <Text style={s.partyDetail}>{org.address}</Text>}
-            {org.phone && <Text style={s.partyDetail}>{org.phone}</Text>}
             {org.email && <Text style={s.partyDetail}>{org.email}</Text>}
+            {org.phone && <Text style={s.partyDetail}>{org.phone}</Text>}
             {org.taxId && <Text style={s.partyDetail}>{taxLabel}: {org.taxId}</Text>}
             {org.registrationNumber && <Text style={s.partyDetail}>Reg: {org.registrationNumber}</Text>}
           </View>
-          <View style={s.partyCol}>
-            <Text style={s.partyLabel}>Bill To</Text>
-            <Text style={s.partyName}>{contact.name}</Text>
+          <View style={s.buyerCol}>
+            <Text style={s.billToLabel}>Bill to</Text>
+            <Text style={s.partyDetail}>{contact.name}</Text>
             {contact.address && <Text style={s.partyDetail}>{contact.address}</Text>}
             {contact.email && <Text style={s.partyDetail}>{contact.email}</Text>}
-            {contact.taxNumber && <Text style={s.partyDetail}>Tax No: {contact.taxNumber}</Text>}
+            {contact.taxNumber && <Text style={s.partyDetail}>{taxLabel}: {contact.taxNumber}</Text>}
           </View>
         </View>
+
+        {/* Due amount summary */}
+        <Text style={s.dueSummary}>
+          {fmtMoney(amountDue, inv.currencyCode)} due {inv.dueDate}
+        </Text>
 
         {/* Line Items */}
         <View style={s.table}>
           <View style={s.tableHeader}>
-            <Text style={[s.th, s.cellNum]}>#</Text>
             <Text style={[s.th, s.cellDesc]}>Description</Text>
             <Text style={[s.th, s.cellQty]}>Qty</Text>
-            <Text style={[s.th, s.cellPrice]}>Unit Price</Text>
-            {template.showTaxBreakdown !== false && (
-              <Text style={[s.th, s.cellTax]}>Tax</Text>
-            )}
+            <Text style={[s.th, s.cellPrice]}>Unit price</Text>
             <Text style={[s.th, s.cellAmount]}>Amount</Text>
           </View>
           {inv.lines.map((line, i) => (
             <View key={i} style={s.tableRow}>
-              <Text style={[s.cellNum, { fontSize: 9 }]}>{i + 1}</Text>
-              <Text style={s.cellDesc}>{line.description}</Text>
-              <Text style={s.cellQty}>{(line.quantity / 100).toFixed(2)}</Text>
-              <Text style={s.cellPrice}>{fmtMoney(line.unitPrice, inv.currencyCode)}</Text>
-              {template.showTaxBreakdown !== false && (
-                <Text style={s.cellTax}>{fmtMoney(line.taxAmount, inv.currencyCode)}</Text>
-              )}
-              <Text style={s.cellAmount}>{fmtMoney(line.amount, inv.currencyCode)}</Text>
+              <Text style={[s.cellDesc, { fontSize: 10 }]}>{line.description}</Text>
+              <Text style={[s.cellQty, { color: dark }]}>{(line.quantity / 100).toFixed(2)}</Text>
+              <Text style={[s.cellPrice, { color: dark }]}>{fmtMoney(line.unitPrice, inv.currencyCode)}</Text>
+              <Text style={[s.cellAmount, { color: dark }]}>{fmtMoney(line.amount, inv.currencyCode)}</Text>
             </View>
           ))}
         </View>
 
         {/* Totals */}
         <View style={s.totalsContainer}>
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Subtotal</Text>
-            <Text style={s.totalValue}>{fmtMoney(inv.subtotal, inv.currencyCode)}</Text>
-          </View>
-          {template.showTaxBreakdown !== false && inv.taxTotal > 0 && (
+          <View style={s.totalsBlock}>
             <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Tax</Text>
-              <Text style={s.totalValue}>{fmtMoney(inv.taxTotal, inv.currencyCode)}</Text>
+              <Text style={s.totalLabel}>Subtotal</Text>
+              <Text style={s.totalValue}>{fmtMoney(inv.subtotal, inv.currencyCode)}</Text>
             </View>
-          )}
-          <View style={s.totalDivider}>
-            <Text style={s.totalBoldLabel}>Total</Text>
-            <Text style={s.totalBoldValue}>{fmtMoney(inv.total, inv.currencyCode)}</Text>
-          </View>
-          {amountPaid > 0 && (
+            {template.showTaxBreakdown !== false && inv.taxTotal > 0 && (
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>Tax</Text>
+                <Text style={s.totalValue}>{fmtMoney(inv.taxTotal, inv.currencyCode)}</Text>
+              </View>
+            )}
             <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Amount Paid</Text>
-              <Text style={[s.totalValue, { color: "#059669" }]}>{fmtMoney(amountPaid, inv.currencyCode)}</Text>
+              <Text style={s.totalLabel}>Total</Text>
+              <Text style={s.totalValue}>{fmtMoney(inv.total, inv.currencyCode)}</Text>
             </View>
-          )}
-        </View>
-
-        {/* Amount Due box */}
-        <View style={s.amountDueBox}>
-          <View style={[s.amountDueInner, { backgroundColor: `${accent}10` }]}>
-            <Text style={s.amountDueLabel}>Amount Due</Text>
-            <Text style={[s.amountDueValue, { color: accent }]}>{fmtMoney(amountDue, inv.currencyCode)}</Text>
+            {amountPaid > 0 && (
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>Amount paid</Text>
+                <Text style={s.totalValue}>{fmtMoney(amountPaid, inv.currencyCode)}</Text>
+              </View>
+            )}
+            <View style={s.amountDueRow}>
+              <Text style={s.amountDueLabel}>Amount due</Text>
+              <Text style={s.amountDueValue}>{fmtMoney(amountDue, inv.currencyCode)}</Text>
+            </View>
           </View>
         </View>
-
-        {/* Payment terms */}
-        {template.showPaymentTerms !== false && (
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 9, color: "#6b7280" }}>Payment due by {inv.dueDate}</Text>
-          </View>
-        )}
 
         {/* Bank Details */}
         {bankDetailsText && (
           <View style={s.infoSection}>
-            <Text style={s.infoTitle}>Bank Details</Text>
+            <Text style={s.infoTitle}>Bank details</Text>
             <Text style={s.infoText}>{bankDetailsText}</Text>
           </View>
         )}
@@ -298,7 +293,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
         {/* Payment Instructions */}
         {paymentInstructionsText && (
           <View style={s.infoSection}>
-            <Text style={s.infoTitle}>Payment Instructions</Text>
+            <Text style={s.infoTitle}>Payment instructions</Text>
             <Text style={s.infoText}>{paymentInstructionsText}</Text>
           </View>
         )}
@@ -306,21 +301,20 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
         {/* Notes */}
         {notesText && (
           <View style={s.infoSection}>
-            <Text style={s.infoTitle}>Notes</Text>
             <Text style={s.infoText}>{notesText}</Text>
           </View>
         )}
 
-        {/* Custom footer */}
-        {footerText && (
-          <Text style={s.footer}>{footerText}</Text>
-        )}
-
-        {/* dubbl branding */}
-        <View style={{ position: "absolute", bottom: 14, left: 0, right: 0, alignItems: "center" }}>
+        {/* Footer */}
+        <View style={s.footer} fixed>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={s.footerText}>{inv.invoiceNumber}</Text>
+            <Text style={s.footerText}>{fmtMoney(amountDue, inv.currencyCode)} due {inv.dueDate}</Text>
+            {footerText && <Text style={s.footerText}>{footerText}</Text>}
+          </View>
           <Link src="https://dubbl.dev" style={{ textDecoration: "none" }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              <Svg viewBox="0 0 40 32" width={12} height={9.6}>
+              <Svg viewBox="0 0 40 32" width={10} height={8}>
                 <Path d="M18 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10h-8V4z" fill="#d1d5db" />
                 <Path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#9ca3af" />
               </Svg>
