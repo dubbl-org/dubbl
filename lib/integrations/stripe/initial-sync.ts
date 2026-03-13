@@ -1,7 +1,7 @@
-import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { stripeIntegration, stripeSyncLog } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { stripe } from "@/lib/stripe";
 import {
   handleChargeSucceeded,
   handleCustomerCreated,
@@ -15,7 +15,11 @@ export async function runInitialSync(integrationId: string) {
 
   if (!integration) throw new Error("Integration not found");
 
-  const stripe = new Stripe(integration.accessToken, { typescript: true });
+  // Validate account mappings are configured
+  if (!integration.clearingAccountId || !integration.revenueAccountId || !integration.feesAccountId) {
+    throw new Error("Account mappings must be configured before syncing. Go to Settings > Integrations > Stripe to set clearing, revenue, and fees accounts.");
+  }
+
   const days = integration.initialSyncDays;
   const since = Math.floor(Date.now() / 1000) - days * 86400;
 

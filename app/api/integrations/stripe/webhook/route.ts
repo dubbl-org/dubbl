@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { db } from "@/lib/db";
+import { stripe } from "@/lib/stripe";
 import { stripeIntegration, stripeSyncLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -44,7 +45,6 @@ export async function POST(request: Request) {
   // Verify signature using per-integration webhook secret
   let event: Stripe.Event;
   try {
-    const stripe = new Stripe(integration.accessToken, { typescript: true });
     event = stripe.webhooks.constructEvent(body, sig, integration.webhookSecret);
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });

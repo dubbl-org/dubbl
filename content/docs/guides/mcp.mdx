@@ -9,7 +9,7 @@ The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is an open s
 
 ## Prerequisites
 
-- **Pro or Business plan** -- MCP access requires API access, which is only available on paid plans
+- **Pro plan** -- MCP access requires API access, which is only available on the Pro plan
 - Any MCP-compatible client (Claude Desktop, Claude Code, Cursor, Windsurf, Cline, VS Code Copilot, or other MCP-enabled agents)
 
 ## Connecting Your Agent
@@ -290,7 +290,7 @@ To confirm that free plan users are rejected:
 
 1. Create or use an organization on the free plan
 2. Complete the OAuth flow for that org
-3. The token exchange (step 4) should return `403` with `"MCP access requires a Pro or Business plan"`
+3. The token exchange (step 4) should return `403` with `"MCP access requires a Pro plan"`
 
 ### With an MCP Client (local)
 
@@ -328,7 +328,7 @@ Restart your agent and it will initiate the OAuth flow in your browser.
 
 ## Troubleshooting
 
-### "MCP access requires a Pro or Business plan"
+### "MCP access requires a Pro plan"
 Your organization is on the free plan. Upgrade at **Settings > Billing** to enable MCP access.
 
 ### "Invalid access token"

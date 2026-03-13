@@ -314,7 +314,7 @@ async function seed() {
 
     await db.insert(subscription).values({
       organizationId: newOrg.id,
-      plan: "business",
+      plan: "pro",
       status: "active",
     });
   }

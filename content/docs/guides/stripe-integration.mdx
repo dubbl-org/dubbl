@@ -36,23 +36,25 @@ Stripe is treated as a **clearing account** (current asset, code `1350`). This g
 1. Go to **Settings > Integrations > Stripe**
 2. Click **Connect Stripe Account**
 3. Authorize dubbl in the Stripe OAuth flow
-4. Dubbl automatically creates the required chart accounts and begins an initial sync
+4. Configure your account mappings (clearing, revenue, fees, and payout bank account)
+5. Run your first sync
 
 <Callout type="info">
-  The initial sync imports customers and the last 30 days of charges and payouts. You can adjust this in integration settings.
+  You must configure account mappings before running a sync. Dubbl suggests defaults based on your existing chart of accounts, but you should verify they match your accounting setup.
 </Callout>
 
 ### Account Mappings
 
-When you connect, dubbl auto-creates these accounts if they don't exist:
+After connecting, you need to map three accounts from your chart of accounts:
 
-| Account | Code | Type | Purpose |
-|---------|------|------|---------|
-| Stripe Clearing | `1350` | Asset (Current) | Holds funds between charge and payout |
-| Payment Processing Fees | `6150` | Expense | Stripe's per-transaction fees |
-| Revenue | `4100` | Revenue | Where charge amounts are credited (uses existing) |
+| Mapping | Type | Purpose |
+|---------|------|---------|
+| Clearing Account | Asset | Holds funds between charge and payout (acts as a Stripe clearing account) |
+| Fees Account | Expense | Stripe's per-transaction processing fees |
+| Revenue Account | Revenue | Where charge amounts are credited |
+| Payout Bank Account | Bank Account | Where Stripe payouts are deposited |
 
-You can change the account mappings at any time from the integration settings page.
+These mappings use your existing chart of accounts, so they work regardless of your country's accounting standards or numbering conventions. You can change them at any time from the integration settings page.
 
 ### Journal Entries Created
 
@@ -140,7 +142,6 @@ Organization owners manage their subscription from **Settings > Billing**.
 |------|---------|--------|
 | Free | $0 | $0 |
 | Pro | $12/seat/mo | $10/seat/mo (billed annually) |
-| Business | $29/seat/mo | $24/seat/mo (billed annually) |
 
 ### Storage Add-ons
 

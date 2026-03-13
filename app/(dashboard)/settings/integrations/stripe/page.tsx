@@ -292,6 +292,8 @@ export default function StripeIntegrationPage() {
     ? `${data.stripeAccountId.slice(0, 8)}...${data.stripeAccountId.slice(-4)}`
     : "";
 
+  const accountsConfigured = !!(data.clearingAccountId && data.revenueAccountId && data.feesAccountId);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -302,7 +304,7 @@ export default function StripeIntegrationPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing || !accountsConfigured}>
             {syncing ? (
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -351,12 +353,25 @@ export default function StripeIntegrationPage() {
         {data.errorMessage && (
           <p className="text-sm text-destructive">{data.errorMessage}</p>
         )}
-        {!data.initialSyncCompleted && (
+        {!data.initialSyncCompleted && accountsConfigured && (
           <p className="text-sm text-amber-600 dark:text-amber-400">
             Initial sync in progress...
           </p>
         )}
       </div>
+
+      {/* Account mapping warning */}
+      {!accountsConfigured && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <AlertCircle className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Account mappings required</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+              Select a clearing, revenue, and fees account below before running a sync. These accounts depend on your chart of accounts setup.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Account Mappings */}
       <div className="rounded-lg border p-4 space-y-4">

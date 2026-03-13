@@ -30,7 +30,7 @@ export async function resolveToken(bearerToken: string): Promise<AuthContext> {
   const plan = sub?.plan ?? "free";
   if (!PLAN_LIMITS[plan].apiAccess) {
     throw new AuthError(
-      "MCP access requires a Pro or Business plan",
+      "MCP access requires a Pro plan",
       403
     );
   }

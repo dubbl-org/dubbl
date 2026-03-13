@@ -559,13 +559,13 @@ export function Hero() {
 
             {/* Heading */}
             <motion.h1
-              className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.08] text-foreground sm:text-6xl md:text-7xl lg:text-8xl"
+              className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.08] text-foreground text-balance sm:text-6xl md:text-7xl lg:text-8xl"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
             >
               Business management{" "}
-              <span className="inline-block pr-2 italic bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 bg-clip-text text-transparent dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-300">
+              <span className="pr-1 italic bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 bg-clip-text text-transparent dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-300 decoration-clone">
                 for modern
               </span>{" "}
               teams

@@ -146,7 +146,7 @@ async function handleAuthorizationCode(params: Record<string, string>) {
     return corsJson(
       {
         error: "access_denied",
-        error_description: "MCP access requires a Pro or Business plan",
+        error_description: "MCP access requires a Pro plan",
       },
       { status: 403 }
     );
@@ -256,7 +256,7 @@ async function handleRefreshToken(params: Record<string, string>) {
     return corsJson(
       {
         error: "access_denied",
-        error_description: "MCP access requires a Pro or Business plan",
+        error_description: "MCP access requires a Pro plan",
       },
       { status: 403 }
     );

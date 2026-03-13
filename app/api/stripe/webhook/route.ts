@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         }
       } else if (orgId && session.subscription) {
         // Seat plan checkout
-        const plan = session.metadata?.plan as "pro" | "business";
+        const plan = session.metadata?.plan as "pro";
         if (plan) {
           const stripeSubscription = await stripe.subscriptions.retrieve(
             session.subscription as string

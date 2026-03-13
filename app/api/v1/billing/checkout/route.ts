@@ -63,20 +63,13 @@ async function handleSeatCheckout(
   plan: string,
   interval: string
 ) {
-  if (plan !== "pro" && plan !== "business") {
+  if (plan !== "pro") {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  let priceId: string;
-  if (plan === "pro") {
-    priceId = interval === "annual"
-      ? process.env.STRIPE_PRO_ANNUAL_PRICE_ID!
-      : process.env.STRIPE_PRO_PRICE_ID!;
-  } else {
-    priceId = interval === "annual"
-      ? process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID!
-      : process.env.STRIPE_BUSINESS_PRICE_ID!;
-  }
+  const priceId = interval === "annual"
+    ? process.env.STRIPE_PRO_ANNUAL_PRICE_ID!
+    : process.env.STRIPE_PRO_PRICE_ID!;
 
   // If already has an active seat subscription, update it instead of creating new
   if (sub?.stripeSubscriptionId && sub.status === "active") {
@@ -94,7 +87,7 @@ async function handleSeatCheckout(
       await db
         .update(subscription)
         .set({
-          plan: plan as "pro" | "business",
+          plan: plan as "pro",
           stripePriceId: priceId,
           billingInterval: interval,
           updatedAt: new Date(),

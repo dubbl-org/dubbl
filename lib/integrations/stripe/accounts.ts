@@ -1,64 +1,38 @@
 import { db } from "@/lib/db";
 import { chartAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { notDeleted } from "@/lib/db/soft-delete";
 
-async function findOrCreateAccount(
-  organizationId: string,
-  code: string,
-  name: string,
-  type: "asset" | "liability" | "equity" | "revenue" | "expense",
-  subType?: string
-) {
-  const existing = await db.query.chartAccount.findFirst({
+/**
+ * Find candidate accounts for Stripe integration mappings.
+ * Returns the first matching account of each type so the UI can suggest defaults,
+ * but the user must explicitly confirm or choose different accounts.
+ * No accounts are auto-created - every org has its own chart of accounts.
+ */
+export async function suggestStripeAccounts(organizationId: string) {
+  const accounts = await db.query.chartAccount.findMany({
     where: and(
       eq(chartAccount.organizationId, organizationId),
-      eq(chartAccount.code, code)
+      eq(chartAccount.isActive, true),
+      notDeleted(chartAccount.deletedAt)
     ),
+    orderBy: chartAccount.code,
   });
 
-  if (existing) return existing;
-
-  const [created] = await db
-    .insert(chartAccount)
-    .values({
-      organizationId,
-      code,
-      name,
-      type,
-      subType: subType ?? null,
-    })
-    .returning();
-
-  return created;
-}
-
-export async function ensureStripeAccounts(organizationId: string) {
-  const clearingAccount = await findOrCreateAccount(
-    organizationId,
-    "1350",
-    "Stripe Clearing",
-    "asset",
-    "current_asset"
+  // Suggest first asset account as clearing
+  const clearingCandidate = accounts.find(
+    (a) => a.type === "asset" && (a.subType === "current_asset" || !a.subType)
   );
 
-  const feesAccount = await findOrCreateAccount(
-    organizationId,
-    "6150",
-    "Payment Processing Fees",
-    "expense"
-  );
+  // Suggest first revenue account
+  const revenueCandidate = accounts.find((a) => a.type === "revenue");
 
-  // Use existing revenue account (code 4100), don't auto-create
-  const revenueAccount = await db.query.chartAccount.findFirst({
-    where: and(
-      eq(chartAccount.organizationId, organizationId),
-      eq(chartAccount.code, "4100")
-    ),
-  });
+  // Suggest first expense account as fees
+  const feesCandidate = accounts.find((a) => a.type === "expense");
 
   return {
-    clearingAccountId: clearingAccount.id,
-    feesAccountId: feesAccount.id,
-    revenueAccountId: revenueAccount?.id ?? null,
+    clearingAccountId: clearingCandidate?.id ?? null,
+    revenueAccountId: revenueCandidate?.id ?? null,
+    feesAccountId: feesCandidate?.id ?? null,
   };
 }

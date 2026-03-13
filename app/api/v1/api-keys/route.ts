@@ -21,8 +21,8 @@ async function checkApiAccess(orgId: string): Promise<boolean> {
     where: eq(subscription.organizationId, orgId),
   });
   const plan = sub?.plan ?? "free";
-  // Only pro and business get API access
-  return plan === "pro" || plan === "business";
+  // Only pro gets API access
+  return plan === "pro";
 }
 
 export async function GET(request: Request) {
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     const hasAccess = await checkApiAccess(ctx.organizationId);
     if (!hasAccess) {
       return NextResponse.json(
-        { error: "API keys require a Pro or Business plan" },
+        { error: "API keys require a Pro plan" },
         { status: 403 }
       );
     }

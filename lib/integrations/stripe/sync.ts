@@ -1,4 +1,4 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import {
   stripeIntegration,
@@ -6,17 +6,15 @@ import {
   journalEntry,
   journalLine,
   contact,
+  bankAccount,
   bankTransaction,
   payment,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { stripe } from "@/lib/stripe";
 
 type Integration = typeof stripeIntegration.$inferSelect;
-
-function getStripeClient(accessToken: string) {
-  return new Stripe(accessToken, { typescript: true });
-}
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -157,7 +155,6 @@ export async function handleChargeSucceeded(
 
     if (existingPayment) {
       // Already recorded via invoice payment link - only record the fee
-      const stripe = getStripeClient(integration.accessToken);
       const balanceTx = await stripe.balanceTransactions.retrieve(
         charge.balance_transaction as string,
         { stripeAccount: integration.stripeAccountId }
@@ -272,7 +269,6 @@ export async function handleChargeSucceeded(
   );
 
   // Fee journal entry: DR Fees, CR Stripe Clearing
-  const stripe = getStripeClient(integration.accessToken);
   const balanceTx = await stripe.balanceTransactions.retrieve(
     charge.balance_transaction as string,
     { stripeAccount: integration.stripeAccountId }
@@ -382,7 +378,6 @@ export async function handleChargeRefunded(
 
     // Reverse fee if applicable
     if (refund.balance_transaction) {
-      const stripe = getStripeClient(integration.accessToken);
       const balanceTx = await stripe.balanceTransactions.retrieve(
         typeof refund.balance_transaction === "string"
           ? refund.balance_transaction
@@ -442,7 +437,7 @@ export async function handlePayoutPaid(
 
   // Look up the bank account to get its chart account
   const bankAcct = await db.query.bankAccount.findFirst({
-    where: eq(bankTransaction.id, integration.payoutBankAccountId),
+    where: eq(bankAccount.id, integration.payoutBankAccountId),
   });
 
   const payoutDate = new Date(payout.arrival_date * 1000).toISOString().slice(0, 10);

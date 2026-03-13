@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { stripeIntegration } from "@/lib/db/schema";
 import { stripe } from "@/lib/stripe";
-import { ensureStripeAccounts } from "@/lib/integrations/stripe/accounts";
-import { runInitialSync } from "@/lib/integrations/stripe/initial-sync";
+import { suggestStripeAccounts } from "@/lib/integrations/stripe/accounts";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 
@@ -62,8 +61,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // Auto-create chart accounts
-    const accounts = await ensureStripeAccounts(stateData.orgId);
+    // Suggest default account mappings (user can change in settings)
+    const suggestions = await suggestStripeAccounts(stateData.orgId);
 
     // Register webhook on connected account
     const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/stripe/webhook`;
@@ -96,17 +95,15 @@ export async function GET(request: Request) {
         webhookEndpointId: webhookEndpoint.id,
         webhookSecret: webhookEndpoint.secret ?? null,
         status: "active",
-        clearingAccountId: accounts.clearingAccountId,
-        revenueAccountId: accounts.revenueAccountId,
-        feesAccountId: accounts.feesAccountId,
+        clearingAccountId: suggestions.clearingAccountId,
+        revenueAccountId: suggestions.revenueAccountId,
+        feesAccountId: suggestions.feesAccountId,
         connectedBy: stateData.userId,
       })
       .returning();
 
-    // Kick off initial sync (fire-and-forget)
-    runInitialSync(integration.id).catch((err) => {
-      console.error("Initial Stripe sync failed:", err);
-    });
+    // Don't start initial sync automatically - user should confirm account
+    // mappings in settings first, then trigger sync manually.
 
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/settings/integrations/stripe?connected=true`
