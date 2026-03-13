@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine, invoiceSignature, emailConfig } from "@/lib/db/schema";
+import { invoice, invoiceLine, invoiceSignature, emailConfig, organization } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
@@ -13,6 +13,7 @@ import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { sendEmail } from "@/lib/email/smtp-client";
 import { randomBytes } from "crypto";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkInvoiceCompliance } from "@/lib/documents/compliance";
 
 export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -486,6 +487,93 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { success: true, resentTo: sig.signerEmail };
+      })
+  );
+
+  server.tool(
+    "check_invoice_compliance",
+    "Check an invoice for compliance warnings based on the organization's country. Returns an array of warnings with field, message, and severity (error/warning). Does not block invoice creation.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice to check"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+          with: { lines: true, contact: true },
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+
+        const org = await db.query.organization.findFirst({
+          where: eq(organization.id, ctx.organizationId),
+        });
+
+        const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
+          .filter(Boolean)
+          .join(", ");
+
+        const contactAddresses = inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null;
+        let contactAddress: string | null = null;
+        if (contactAddresses) {
+          const billing = contactAddresses.billing || Object.values(contactAddresses)[0];
+          if (billing) {
+            contactAddress = [billing.line1, billing.line2, billing.city, billing.state, billing.postalCode, billing.country]
+              .filter(Boolean)
+              .join(", ");
+          }
+        }
+
+        const warnings = checkInvoiceCompliance(
+          {
+            name: org?.name || null,
+            address: orgAddress || null,
+            taxId: org?.taxId || null,
+            countryCode: org?.countryCode || null,
+          },
+          {
+            name: inv.contact?.name || null,
+            address: contactAddress,
+            taxNumber: inv.contact?.taxNumber || null,
+          },
+          {
+            invoiceNumber: inv.invoiceNumber,
+            issueDate: inv.issueDate,
+            lines: inv.lines,
+          }
+        );
+
+        return { warnings };
+      })
+  );
+
+  server.tool(
+    "get_invoice_pdf",
+    "Get the download URL for an invoice PDF. Returns the URL path to download the generated PDF file.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        return {
+          downloadUrl: `${baseUrl}/api/v1/invoices/${params.invoiceId}/pdf?format=pdf`,
+          invoiceNumber: inv.invoiceNumber,
+        };
       })
   );
 }

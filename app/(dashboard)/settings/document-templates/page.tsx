@@ -9,6 +9,7 @@ import {
   Eye,
   Pencil,
   Star,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ interface Template {
   showTaxBreakdown: boolean;
   showPaymentTerms: boolean;
   notes: string | null;
+  bankDetails: string | null;
+  paymentInstructions: string | null;
   isDefault: boolean;
   createdAt: string;
 }
@@ -70,6 +73,7 @@ export default function DocumentTemplatesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Template | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form state
@@ -79,6 +83,8 @@ export default function DocumentTemplatesPage() {
   const [showTaxBreakdown, setShowTaxBreakdown] = useState(true);
   const [showPaymentTerms, setShowPaymentTerms] = useState(true);
   const [notes, setNotes] = useState("");
+  const [bankDetails, setBankDetails] = useState("");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
   const [isDefault, setIsDefault] = useState(false);
 
   function getHeaders() {
@@ -103,6 +109,8 @@ export default function DocumentTemplatesPage() {
     setShowTaxBreakdown(true);
     setShowPaymentTerms(true);
     setNotes("");
+    setBankDetails("");
+    setPaymentInstructions("");
     setIsDefault(false);
     setDialogOpen(true);
   }
@@ -115,13 +123,15 @@ export default function DocumentTemplatesPage() {
     setShowTaxBreakdown(t.showTaxBreakdown);
     setShowPaymentTerms(t.showPaymentTerms);
     setNotes(t.notes || "");
+    setBankDetails(t.bankDetails || "");
+    setPaymentInstructions(t.paymentInstructions || "");
     setIsDefault(t.isDefault);
     setDialogOpen(true);
   }
 
   async function handleSave() {
     setSaving(true);
-    const payload = { name, type, accentColor, showTaxBreakdown, showPaymentTerms, notes: notes || null, isDefault };
+    const payload = { name, type, accentColor, showTaxBreakdown, showPaymentTerms, notes: notes || null, bankDetails: bankDetails || null, paymentInstructions: paymentInstructions || null, isDefault };
 
     if (editing) {
       await fetch(`/api/v1/document-templates/${editing.id}`, {
@@ -162,12 +172,28 @@ export default function DocumentTemplatesPage() {
   }
 
   async function handlePreview(t: Template) {
+    setPreviewTemplateId(t.id);
     const res = await fetch(`/api/v1/document-templates/${t.id}/preview`, {
       method: "POST",
       headers: getHeaders(),
     });
     const html = await res.text();
     setPreviewHtml(html);
+  }
+
+  async function handleDownloadSamplePdf() {
+    if (!previewTemplateId) return;
+    const res = await fetch(`/api/v1/document-templates/${previewTemplateId}/preview?format=pdf`, {
+      method: "POST",
+      headers: getHeaders(),
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sample-invoice.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   if (loading) return <BrandLoader />;
@@ -304,6 +330,14 @@ export default function DocumentTemplatesPage() {
                 <Switch checked={isDefault} onCheckedChange={setIsDefault} />
               </div>
               <div className="space-y-1.5">
+                <Label>Bank Details</Label>
+                <Textarea value={bankDetails} onChange={(e) => setBankDetails(e.target.value)} placeholder="IBAN: ..., SWIFT/BIC: ..." rows={2} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Payment Instructions</Label>
+                <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} placeholder="Please reference invoice number when making payment..." rows={2} />
+              </div>
+              <div className="space-y-1.5">
                 <Label>Notes / Footer Text</Label>
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Thank you for your business..." rows={3} />
               </div>
@@ -318,10 +352,16 @@ export default function DocumentTemplatesPage() {
         </Dialog>
 
         {/* Preview Dialog */}
-        <Dialog open={!!previewHtml} onOpenChange={() => setPreviewHtml(null)}>
+        <Dialog open={!!previewHtml} onOpenChange={() => { setPreviewHtml(null); setPreviewTemplateId(null); }}>
           <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
             <DialogHeader>
-              <DialogTitle>Template Preview</DialogTitle>
+              <div className="flex items-center justify-between">
+                <DialogTitle>Template Preview</DialogTitle>
+                <Button variant="outline" size="sm" onClick={handleDownloadSamplePdf} className="gap-1.5">
+                  <Download className="size-3.5" />
+                  Download Sample PDF
+                </Button>
+              </div>
             </DialogHeader>
             {previewHtml && (
               <iframe

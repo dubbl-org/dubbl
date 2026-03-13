@@ -8,12 +8,18 @@ interface TemplateSettings {
   showTaxBreakdown?: boolean;
   showPaymentTerms?: boolean;
   notes?: string | null;
+  bankDetails?: string | null;
+  paymentInstructions?: string | null;
 }
 
 interface OrgInfo {
   name: string;
   address?: string | null;
   taxId?: string | null;
+  registrationNumber?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  countryCode?: string | null;
 }
 
 interface LineItem {
@@ -31,6 +37,8 @@ interface InvoiceData {
   status: string;
   contactName: string;
   contactEmail?: string | null;
+  contactAddress?: string | null;
+  contactTaxNumber?: string | null;
   lines: LineItem[];
   subtotal: number;
   taxTotal: number;
@@ -40,18 +48,49 @@ interface InvoiceData {
   notes?: string | null;
 }
 
+function getTaxIdLabel(countryCode?: string | null): string {
+  if (!countryCode) return "Tax ID";
+  const cc = countryCode.toUpperCase();
+  const EU = [
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+    "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
+    "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+  ];
+  if (EU.includes(cc) || cc === "GB") return "VAT";
+  if (cc === "AU") return "ABN";
+  if (cc === "NZ") return "GST";
+  if (cc === "CA") return "GST/HST";
+  return "Tax ID";
+}
+
+function getInvoiceTitle(countryCode?: string | null, hasTaxId?: boolean): string {
+  const cc = countryCode?.toUpperCase();
+  if ((cc === "AU" || cc === "NZ") && hasTaxId) return "TAX INVOICE";
+  return "INVOICE";
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function generateInvoiceHtml(
   invoice: InvoiceData,
   org: OrgInfo,
   template: TemplateSettings
 ): string {
   const accent = template.accentColor || "#10b981";
+  const taxIdLabel = getTaxIdLabel(org.countryCode);
+  const invoiceTitle = getInvoiceTitle(org.countryCode, !!org.taxId);
 
   const linesHtml = invoice.lines
     .map(
       (line) => `
     <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${line.description}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(line.description)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${(line.quantity / 100).toFixed(2)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatMoney(line.unitPrice, invoice.currencyCode)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatMoney(line.amount, invoice.currencyCode)}</td>
@@ -69,9 +108,23 @@ export function generateInvoiceHtml(
       ? `<p style="margin-top:16px;font-size:12px;color:#6b7280;">Due Date: ${invoice.dueDate}</p>`
       : "";
 
+  const bankDetailsSection = template.bankDetails
+    ? `<div style="margin-top:24px;padding:12px;background:#f9fafb;border-radius:4px;">
+        <p style="font-size:11px;font-weight:600;color:#374151;margin:0 0 4px;">Bank Details</p>
+        <p style="font-size:12px;color:#6b7280;margin:0;white-space:pre-wrap;">${escapeHtml(template.bankDetails)}</p>
+      </div>`
+    : "";
+
+  const paymentInstructionsSection = template.paymentInstructions
+    ? `<div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:4px;">
+        <p style="font-size:11px;font-weight:600;color:#374151;margin:0 0 4px;">Payment Instructions</p>
+        <p style="font-size:12px;color:#6b7280;margin:0;white-space:pre-wrap;">${escapeHtml(template.paymentInstructions)}</p>
+      </div>`
+    : "";
+
   const notesSection =
     template.notes || invoice.notes
-      ? `<div style="margin-top:24px;padding:12px;background:#f9fafb;border-radius:4px;font-size:12px;color:#6b7280;">${template.notes || invoice.notes}</div>`
+      ? `<div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:4px;font-size:12px;color:#6b7280;">${escapeHtml(template.notes || invoice.notes || "")}</div>`
       : "";
 
   return `<!DOCTYPE html>
@@ -82,21 +135,26 @@ export function generateInvoiceHtml(
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;">
     <div>
       ${template.logoUrl ? `<img src="${template.logoUrl}" alt="Logo" style="max-height:48px;margin-bottom:8px;" />` : ""}
-      <h2 style="margin:0;color:${accent};">${org.name}</h2>
-      ${org.address ? `<p style="margin:4px 0 0;font-size:12px;color:#6b7280;">${org.address}</p>` : ""}
-      ${org.taxId ? `<p style="margin:2px 0 0;font-size:12px;color:#6b7280;">Tax ID: ${org.taxId}</p>` : ""}
+      <h2 style="margin:0;color:${accent};">${escapeHtml(org.name)}</h2>
+      ${org.address ? `<p style="margin:4px 0 0;font-size:12px;color:#6b7280;">${escapeHtml(org.address)}</p>` : ""}
+      ${org.taxId ? `<p style="margin:2px 0 0;font-size:12px;color:#6b7280;">${taxIdLabel}: ${escapeHtml(org.taxId)}</p>` : ""}
+      ${org.registrationNumber ? `<p style="margin:2px 0 0;font-size:12px;color:#6b7280;">Reg: ${escapeHtml(org.registrationNumber)}</p>` : ""}
+      ${org.phone ? `<p style="margin:2px 0 0;font-size:12px;color:#6b7280;">Phone: ${escapeHtml(org.phone)}</p>` : ""}
+      ${org.email ? `<p style="margin:2px 0 0;font-size:12px;color:#6b7280;">${escapeHtml(org.email)}</p>` : ""}
     </div>
     <div style="text-align:right;">
-      <h1 style="margin:0;font-size:28px;color:${accent};">INVOICE</h1>
+      <h1 style="margin:0;font-size:28px;color:${accent};">${invoiceTitle}</h1>
       <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">${invoice.invoiceNumber}</p>
       <p style="margin:2px 0 0;font-size:12px;color:#6b7280;">Date: ${invoice.issueDate}</p>
     </div>
   </div>
   <div style="margin-bottom:24px;">
     <p style="font-size:12px;color:#6b7280;margin:0;">Bill To</p>
-    <p style="font-size:14px;font-weight:600;margin:4px 0 0;">${invoice.contactName}</p>
-    ${invoice.contactEmail ? `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">${invoice.contactEmail}</p>` : ""}
-    ${invoice.reference ? `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">Ref: ${invoice.reference}</p>` : ""}
+    <p style="font-size:14px;font-weight:600;margin:4px 0 0;">${escapeHtml(invoice.contactName)}</p>
+    ${invoice.contactAddress ? `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">${escapeHtml(invoice.contactAddress)}</p>` : ""}
+    ${invoice.contactTaxNumber ? `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">Tax No: ${escapeHtml(invoice.contactTaxNumber)}</p>` : ""}
+    ${invoice.contactEmail ? `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">${escapeHtml(invoice.contactEmail)}</p>` : ""}
+    ${invoice.reference ? `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">Ref: ${escapeHtml(invoice.reference)}</p>` : ""}
   </div>
   <table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead>
@@ -118,6 +176,8 @@ export function generateInvoiceHtml(
     </tfoot>
   </table>
   ${termsSection}
+  ${bankDetailsSection}
+  ${paymentInstructionsSection}
   ${notesSection}
   ${template.footerHtml || ""}
 </body>

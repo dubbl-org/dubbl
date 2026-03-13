@@ -31,6 +31,8 @@ export const documentTemplate = pgTable("document_template", {
   showTaxBreakdown: boolean("show_tax_breakdown").notNull().default(true),
   showPaymentTerms: boolean("show_payment_terms").notNull().default(true),
   notes: text("notes"),
+  bankDetails: text("bank_details"),
+  paymentInstructions: text("payment_instructions"),
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

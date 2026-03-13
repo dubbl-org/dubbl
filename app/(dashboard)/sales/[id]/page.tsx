@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote } from "lucide-react";
+import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,6 +123,8 @@ export default function InvoiceDetailPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [complianceWarnings, setComplianceWarnings] = useState<{ field: string; message: string; severity: "error" | "warning" }[]>([]);
+  const [complianceDismissed, setComplianceDismissed] = useState(false);
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -138,6 +140,15 @@ export default function InvoiceDetailPage() {
         if (data.payments) setPayments(data.payments);
       })
       .finally(() => setLoading(false));
+
+    fetch(`/api/v1/invoices/${id}/compliance`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.warnings) setComplianceWarnings(data.warnings);
+      })
+      .catch(() => {});
   }, [id, orgId]);
 
   async function handleSend() {
@@ -330,6 +341,11 @@ export default function InvoiceDetailPage() {
                 </DialogContent>
               </Dialog>
             )}
+            <Button variant="outline" size="sm" asChild>
+              <a href={`/api/v1/invoices/${id}/pdf?format=pdf`} download>
+                <Download className="mr-2 size-4" />Download PDF
+              </a>
+            </Button>
             <Button variant="outline" size="sm" onClick={handleDuplicate} loading={duplicating}>
               <Copy className="mr-2 size-4" />Duplicate
             </Button>
@@ -340,6 +356,31 @@ export default function InvoiceDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Compliance warnings */}
+        {complianceWarnings.length > 0 && !complianceDismissed && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Invoice Compliance</p>
+                  <ul className="mt-1.5 space-y-1">
+                    {complianceWarnings.map((w, i) => (
+                      <li key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                        <span className={`inline-block size-1.5 rounded-full ${w.severity === "error" ? "bg-red-500" : "bg-amber-500"}`} />
+                        {w.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <button onClick={() => setComplianceDismissed(true)} className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Invoice document */}
         <div className="rounded-xl border bg-card overflow-hidden">

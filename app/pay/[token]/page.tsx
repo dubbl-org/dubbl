@@ -2,10 +2,20 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { CheckCircle2, CreditCard, FileText, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, FileText, Loader2, AlertCircle, Download } from "lucide-react";
+
+function getLocaleForCurrency(currency: string): string {
+  const map: Record<string, string> = {
+    USD: "en-US", EUR: "de-DE", GBP: "en-GB", JPY: "ja-JP",
+    AUD: "en-AU", CAD: "en-CA", CHF: "de-CH", SEK: "sv-SE",
+    NOK: "nb-NO", DKK: "da-DK", NZD: "en-NZ", SGD: "en-SG",
+    HKD: "en-HK", INR: "en-IN", BRL: "pt-BR", MXN: "es-MX",
+  };
+  return map[currency] || "en-US";
+}
 
 function fmtMoney(cents: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat(getLocaleForCurrency(currency), {
     style: "currency",
     currency,
   }).format(cents / 100);
@@ -249,6 +259,16 @@ function PaymentPageContent() {
             </>
           )}
         </button>
+
+        {/* Download Invoice PDF */}
+        <a
+          href={`/api/pay/${token}/pdf`}
+          download
+          className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium py-2.5 px-4 transition-colors text-sm"
+        >
+          <Download className="h-4 w-4" />
+          Download Invoice
+        </a>
 
         <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
           Secure payment powered by Stripe

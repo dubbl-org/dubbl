@@ -35,6 +35,8 @@ const createSchema = z.object({
   showTaxBreakdown: z.boolean().optional(),
   showPaymentTerms: z.boolean().optional(),
   notes: z.string().nullable().optional(),
+  bankDetails: z.string().nullable().optional(),
+  paymentInstructions: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
 });
 
