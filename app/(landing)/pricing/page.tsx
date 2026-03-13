@@ -80,7 +80,6 @@ const storagePlans = [
 ];
 
 const comparisonRows = [
-  { label: "Organizations", free: fmt(PLAN_LIMITS.free.organizations), pro: fmt(PLAN_LIMITS.pro.organizations) },
   { label: "Team members", free: fmt(PLAN_LIMITS.free.members), pro: fmt(PLAN_LIMITS.pro.members) },
   { label: "Journal entries / month", free: fmt(PLAN_LIMITS.free.entriesPerMonth), pro: fmt(PLAN_LIMITS.pro.entriesPerMonth) },
   { label: "Contacts", free: fmt(PLAN_LIMITS.free.contacts), pro: fmt(PLAN_LIMITS.pro.contacts) },
@@ -244,7 +243,6 @@ export default function PricingPage() {
                 <div className="mt-8 flex-1">
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     {[
-                      `${fmt(PLAN_LIMITS.free.organizations)} organization`,
                       `${fmt(PLAN_LIMITS.free.members)} member (owner)`,
                       `${fmt(PLAN_LIMITS.free.entriesPerMonth)} entries/mo`,
                       `${fmt(PLAN_LIMITS.free.contacts)} contacts`,
@@ -340,12 +338,11 @@ export default function PricingPage() {
                 <div className="mt-8 flex-1">
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     {[
-                      `${fmt(PLAN_LIMITS.pro.organizations)} organizations`,
                       `Up to ${fmt(PLAN_LIMITS.pro.members)} members`,
                       "Unlimited entries",
                       "Unlimited contacts",
-                      `${fmt(PLAN_LIMITS.pro.invoicesPerMonth)} invoices/mo`,
-                      `${fmt(PLAN_LIMITS.pro.bankAccounts)} bank accounts`,
+                      "Unlimited invoices",
+                      "Unlimited bank accounts",
                       `${fmt(PLAN_LIMITS.pro.projects)} projects`,
                       "All standard reports",
                       fmtStorage(PLAN_LIMITS.pro.storageMb) + " storage",

@@ -14,13 +14,13 @@ export const PLAN_LIMITS = {
     auditLogDays: 30,
   },
   pro: {
-    organizations: 3,
+    organizations: 1,
     members: Infinity,
     entriesPerMonth: Infinity,
     multiCurrency: true,
     contacts: Infinity,
-    invoicesPerMonth: 100,
-    bankAccounts: 5,
+    invoicesPerMonth: Infinity,
+    bankAccounts: Infinity,
     projects: 20,
     reports: [
       "trial-balance",
