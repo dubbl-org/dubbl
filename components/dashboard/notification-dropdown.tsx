@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -74,7 +74,7 @@ export function NotificationDropdown() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const hasFetched = useRef(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   const fetchNotifications = useCallback(() => {
     const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -88,7 +88,7 @@ export function NotificationDropdown() {
       .then((data) => {
         if (data.data) setNotifications(data.data);
         if (data.unreadCount !== undefined) setUnreadCount(data.unreadCount);
-        hasFetched.current = true;
+        setHasFetched(true);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -196,7 +196,7 @@ export function NotificationDropdown() {
 
         {/* Notification list */}
         <div className="max-h-[400px] overflow-y-auto overscroll-contain">
-          {loading && !hasFetched.current ? (
+          {loading && !hasFetched ? (
             <div className="flex items-center justify-center py-12">
               <div className="size-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground animate-spin" />
             </div>

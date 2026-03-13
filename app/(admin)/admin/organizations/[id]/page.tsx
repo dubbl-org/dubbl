@@ -644,7 +644,7 @@ export default function AdminOrgDetailPage({
               {hasStripe && <li className="flex items-center gap-2"><AlertTriangle className="size-3 text-amber-500" /> Stripe subscription canceled</li>}
               <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Plan set to Business tier</li>
               <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Billing set to Manual</li>
-              <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Custom name set to "Enterprise"</li>
+              <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Custom name set to &quot;Enterprise&quot;</li>
               <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> You can customize limits after</li>
             </ul>
           </div>

@@ -157,9 +157,9 @@ export default function InviteAcceptPage() {
                 <div className="flex size-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50">
                   <CheckCircle2 className="size-6 text-emerald-600" />
                 </div>
-                <h1 className="mt-4 text-xl font-semibold">You're in!</h1>
+                <h1 className="mt-4 text-xl font-semibold">You&apos;re in!</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  You've joined {info?.orgName || "the organization"} successfully.
+                  You&apos;ve joined {info?.orgName || "the organization"} successfully.
                 </p>
               </div>
               <Button
