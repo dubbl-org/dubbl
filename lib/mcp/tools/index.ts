@@ -14,6 +14,7 @@ import { registerWebhookTools } from "./webhooks";
 import { registerReportScheduleTools } from "./report-schedule-tools";
 import { registerApprovalTools } from "./approvals";
 import { registerBankRuleTools } from "./bank-rules";
+import { registerDocumentTools } from "./documents";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -30,4 +31,5 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerReportScheduleTools(server, ctx);
   registerApprovalTools(server, ctx);
   registerBankRuleTools(server, ctx);
+  registerDocumentTools(server, ctx);
 }

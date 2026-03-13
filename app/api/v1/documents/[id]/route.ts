@@ -23,6 +23,7 @@ export async function GET(
     });
 
     if (!doc) return notFound("Document");
+    if (doc.visibility === "private" && doc.uploadedBy !== ctx.userId) return notFound("Document");
     return ok({ document: doc });
   } catch (err) {
     return handleError(err);
@@ -46,6 +47,7 @@ export async function DELETE(
     });
 
     if (!doc) return notFound("Document");
+    if (doc.visibility === "private" && doc.uploadedBy !== ctx.userId) return notFound("Document");
 
     await db.update(document).set(softDelete()).where(eq(document.id, id));
 

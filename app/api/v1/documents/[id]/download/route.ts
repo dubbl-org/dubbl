@@ -23,6 +23,7 @@ export async function GET(
     });
 
     if (!doc) return notFound("Document");
+    if (doc.visibility === "private" && doc.uploadedBy !== ctx.userId) return notFound("Document");
 
     const downloadUrl = await getDownloadUrl(doc.fileKey);
     return ok({ downloadUrl, fileName: doc.fileName, mimeType: doc.mimeType });
