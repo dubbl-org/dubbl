@@ -64,26 +64,12 @@ export async function GET(request: Request) {
     // Suggest default account mappings (user can change in settings)
     const suggestions = await suggestStripeAccounts(stateData.orgId);
 
-    // Register webhook on connected account
-    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/stripe/webhook`;
-    const webhookEndpoint = await stripe.webhookEndpoints.create(
-      {
-        url: webhookUrl,
-        enabled_events: [
-          "charge.succeeded",
-          "charge.refunded",
-          "payout.paid",
-          "payout.failed",
-          "customer.created",
-          "customer.updated",
-          "account.application.deauthorized",
-        ],
-      },
-      { stripeAccount: response.stripe_user_id }
-    );
+    // No per-account webhook needed. We use a single platform-level Connect
+    // webhook (STRIPE_CONNECT_WEBHOOK_SECRET) that receives events from all
+    // connected accounts. This can't be deleted by the connected user.
 
     // Insert integration record
-    const [integration] = await db
+    await db
       .insert(stripeIntegration)
       .values({
         organizationId: stateData.orgId,
@@ -92,8 +78,6 @@ export async function GET(request: Request) {
         refreshToken: response.refresh_token ?? null,
         livemode: response.livemode ?? false,
         scope: response.scope ?? null,
-        webhookEndpointId: webhookEndpoint.id,
-        webhookSecret: webhookEndpoint.secret ?? null,
         status: "active",
         clearingAccountId: suggestions.clearingAccountId,
         revenueAccountId: suggestions.revenueAccountId,

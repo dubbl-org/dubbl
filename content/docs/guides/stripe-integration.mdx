@@ -90,7 +90,12 @@ To enable Stripe Connect on a self-hosted instance:
 1. Register a [Stripe Connect platform](https://dashboard.stripe.com/settings/connect)
 2. Set `STRIPE_CONNECT_CLIENT_ID` in your environment
 3. Configure the OAuth redirect URI: `https://your-domain.com/api/v1/integrations/stripe/callback`
-4. Connected account webhooks are registered automatically during OAuth
+4. Create a **Connect webhook** in your Stripe dashboard pointing to `https://your-domain.com/api/integrations/stripe/webhook` with the following events: `charge.succeeded`, `charge.refunded`, `payout.paid`, `payout.failed`, `customer.created`, `customer.updated`, `account.application.deauthorized`
+5. Set `STRIPE_CONNECT_WEBHOOK_SECRET` to the signing secret from that webhook
+
+<Callout type="info">
+  Dubbl uses a single platform-level Connect webhook rather than per-account webhooks. This means connected users cannot accidentally break the integration by deleting webhooks from their own Stripe dashboard. Deauthorization events are also always delivered to the platform.
+</Callout>
 
 ### MCP Tools
 

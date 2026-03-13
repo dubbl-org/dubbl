@@ -120,16 +120,6 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
           // Continue even if deauth fails
         }
 
-        if (integration.webhookEndpointId) {
-          try {
-            await stripe.webhookEndpoints.del(integration.webhookEndpointId, {
-              stripeAccount: integration.stripeAccountId,
-            });
-          } catch {
-            // Continue even if webhook deletion fails
-          }
-        }
-
         await db
           .update(stripeIntegration)
           .set({

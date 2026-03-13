@@ -32,17 +32,6 @@ export async function POST(request: Request) {
       console.error("Failed to deauthorize Stripe account:", err);
     }
 
-    // Delete webhook endpoint on connected account
-    if (integration.webhookEndpointId) {
-      try {
-        await stripe.webhookEndpoints.del(integration.webhookEndpointId, {
-          stripeAccount: integration.stripeAccountId,
-        });
-      } catch (err) {
-        console.error("Failed to delete webhook endpoint:", err);
-      }
-    }
-
     // Soft-delete the integration
     await db
       .update(stripeIntegration)

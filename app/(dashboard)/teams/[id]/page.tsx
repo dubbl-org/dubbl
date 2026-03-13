@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Users,
-  Plus,
   Trash2,
   ArrowLeft,
   Mail,
   UserPlus,
   Pencil,
   Loader2,
+  Search,
 } from "lucide-react";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,9 @@ export default function TeamDetailPage() {
   const [editDesc, setEditDesc] = useState("");
   const [editColor, setEditColor] = useState("#3b82f6");
   const [editSaving, setEditSaving] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const debouncedSearch = useDebounce(memberSearch);
+  const [visibleCount, setVisibleCount] = useState(20);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const fetchTeam = useCallback(() => {
@@ -306,6 +310,29 @@ export default function TeamDetailPage() {
     }
   }
 
+  // Reset visible count when search changes
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [debouncedSearch]);
+
+  const filteredMembers = useMemo(() => {
+    if (!team) return [];
+    if (!debouncedSearch.trim()) return team.members;
+    const q = debouncedSearch.toLowerCase();
+    return team.members.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q)
+    );
+  }, [team, debouncedSearch]);
+
+  const visibleMembers = useMemo(
+    () => filteredMembers.slice(0, visibleCount),
+    [filteredMembers, visibleCount]
+  );
+
+  const hasMore = visibleCount < filteredMembers.length;
+
   if (loading) return <BrandLoader />;
 
   if (!team) {
@@ -438,7 +465,8 @@ export default function TeamDetailPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
-            Team Members
+            Team Members{" "}
+            {debouncedSearch && `(${filteredMembers.length} of ${team.members.length})`}
           </p>
           <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
@@ -504,6 +532,18 @@ export default function TeamDetailPage() {
           </Popover>
         </div>
 
+        {team.members.length > 5 && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              placeholder="Search members by name or email..."
+              className="pl-9 h-9 text-sm"
+            />
+          </div>
+        )}
+
         {team.members.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-12 text-center">
             <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
@@ -514,47 +554,69 @@ export default function TeamDetailPage() {
               Add members to this team to get started.
             </p>
           </div>
+        ) : filteredMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-10 text-center">
+            <Search className="size-5 text-muted-foreground" />
+            <p className="mt-3 text-sm font-medium">No members match your search</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Try a different name or email address.
+            </p>
+          </div>
         ) : (
-          <div className="rounded-xl border overflow-hidden">
-            {team.members.map((member, i) => (
-              <div
-                key={member.id}
-                className={cn(
-                  "group flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/20",
-                  i < team.members.length - 1 && "border-b"
-                )}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                    style={{ backgroundColor: teamColor }}
-                  >
-                    {getInitials(member.name)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {member.name || "Unnamed"}
-                    </p>
-                    {member.email && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {member.email}
+          <>
+            <div className="rounded-xl border overflow-hidden">
+              {visibleMembers.map((member, i) => (
+                <div
+                  key={member.id}
+                  className={cn(
+                    "group flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/20",
+                    i < visibleMembers.length - 1 && "border-b"
+                  )}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+                      style={{ backgroundColor: teamColor }}
+                    >
+                      {getInitials(member.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {member.name || "Unnamed"}
                       </p>
-                    )}
+                      {member.email && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {member.email}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 shrink-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    disabled={removingMemberId === member.memberId}
+                    onClick={() => handleRemoveMember(member.memberId)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {hasMore && (
+              <div className="flex justify-center pt-1">
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-8 shrink-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                  disabled={removingMemberId === member.memberId}
-                  onClick={() => handleRemoveMember(member.memberId)}
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => setVisibleCount((c) => c + 20)}
                 >
-                  <Trash2 className="size-3.5" />
+                  Show more ({filteredMembers.length - visibleCount} remaining)
                 </Button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
