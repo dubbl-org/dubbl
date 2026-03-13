@@ -49,6 +49,8 @@ interface Template {
   type: string;
   logoUrl: string | null;
   accentColor: string | null;
+  headerHtml: string | null;
+  footerHtml: string | null;
   showTaxBreakdown: boolean;
   showPaymentTerms: boolean;
   notes: string | null;
@@ -80,6 +82,8 @@ export default function DocumentTemplatesPage() {
   const [name, setName] = useState("");
   const [type, setType] = useState("invoice");
   const [accentColor, setAccentColor] = useState("#10b981");
+  const [headerHtml, setHeaderHtml] = useState("");
+  const [footerHtml, setFooterHtml] = useState("");
   const [showTaxBreakdown, setShowTaxBreakdown] = useState(true);
   const [showPaymentTerms, setShowPaymentTerms] = useState(true);
   const [notes, setNotes] = useState("");
@@ -106,6 +110,8 @@ export default function DocumentTemplatesPage() {
     setName("");
     setType("invoice");
     setAccentColor("#10b981");
+    setHeaderHtml("");
+    setFooterHtml("");
     setShowTaxBreakdown(true);
     setShowPaymentTerms(true);
     setNotes("");
@@ -120,6 +126,8 @@ export default function DocumentTemplatesPage() {
     setName(t.name);
     setType(t.type);
     setAccentColor(t.accentColor || "#10b981");
+    setHeaderHtml(t.headerHtml || "");
+    setFooterHtml(t.footerHtml || "");
     setShowTaxBreakdown(t.showTaxBreakdown);
     setShowPaymentTerms(t.showPaymentTerms);
     setNotes(t.notes || "");
@@ -131,7 +139,7 @@ export default function DocumentTemplatesPage() {
 
   async function handleSave() {
     setSaving(true);
-    const payload = { name, type, accentColor, showTaxBreakdown, showPaymentTerms, notes: notes || null, bankDetails: bankDetails || null, paymentInstructions: paymentInstructions || null, isDefault };
+    const payload = { name, type, accentColor, headerHtml: headerHtml || null, footerHtml: footerHtml || null, showTaxBreakdown, showPaymentTerms, notes: notes || null, bankDetails: bankDetails || null, paymentInstructions: paymentInstructions || null, isDefault };
 
     if (editing) {
       await fetch(`/api/v1/document-templates/${editing.id}`, {
@@ -283,7 +291,7 @@ export default function DocumentTemplatesPage() {
 
         {/* Create/Edit Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editing ? "Edit Template" : "New Template"}</DialogTitle>
             </DialogHeader>
@@ -330,6 +338,14 @@ export default function DocumentTemplatesPage() {
                 <Switch checked={isDefault} onCheckedChange={setIsDefault} />
               </div>
               <div className="space-y-1.5">
+                <Label>Header HTML</Label>
+                <Textarea value={headerHtml} onChange={(e) => setHeaderHtml(e.target.value)} placeholder='<h1 style="color: #10b981;">{{orgName}}</h1>' rows={2} className="font-mono text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Footer HTML</Label>
+                <Textarea value={footerHtml} onChange={(e) => setFooterHtml(e.target.value)} placeholder="{{orgName}} · {{orgAddress}}" rows={2} className="font-mono text-xs" />
+              </div>
+              <div className="space-y-1.5">
                 <Label>Bank Details</Label>
                 <Textarea value={bankDetails} onChange={(e) => setBankDetails(e.target.value)} placeholder="IBAN: ..., SWIFT/BIC: ..." rows={2} />
               </div>
@@ -338,8 +354,21 @@ export default function DocumentTemplatesPage() {
                 <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} placeholder="Please reference invoice number when making payment..." rows={2} />
               </div>
               <div className="space-y-1.5">
-                <Label>Notes / Footer Text</Label>
+                <Label>Notes</Label>
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Thank you for your business..." rows={3} />
+              </div>
+              <div className="rounded-md border bg-muted/30 p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">Template Variables</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "orgName", "orgAddress", "orgTaxId", "orgPhone", "orgEmail",
+                    "invoiceNumber", "issueDate", "dueDate",
+                    "contactName", "contactEmail", "contactAddress",
+                    "subtotal", "taxTotal", "total", "currency",
+                  ].map((v) => (
+                    <code key={v} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">{`{{${v}}}`}</code>
+                  ))}
+                </div>
               </div>
             </div>
             <DialogFooter>

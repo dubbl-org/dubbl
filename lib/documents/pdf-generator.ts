@@ -77,6 +77,13 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function replaceTemplatePlaceholders(
+  text: string,
+  vars: Record<string, string>
+): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match);
+}
+
 export function generateInvoiceHtml(
   invoice: InvoiceData,
   org: OrgInfo,
@@ -85,6 +92,34 @@ export function generateInvoiceHtml(
   const accent = template.accentColor || "#10b981";
   const taxIdLabel = getTaxIdLabel(org.countryCode);
   const invoiceTitle = getInvoiceTitle(org.countryCode, !!org.taxId);
+
+  const templateVars: Record<string, string> = {
+    orgName: org.name,
+    orgAddress: org.address || "",
+    orgTaxId: org.taxId || "",
+    orgPhone: org.phone || "",
+    orgEmail: org.email || "",
+    orgRegistrationNumber: org.registrationNumber || "",
+    invoiceNumber: invoice.invoiceNumber,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    contactName: invoice.contactName,
+    contactEmail: invoice.contactEmail || "",
+    contactAddress: invoice.contactAddress || "",
+    contactTaxNumber: invoice.contactTaxNumber || "",
+    reference: invoice.reference || "",
+    subtotal: formatMoney(invoice.subtotal, invoice.currencyCode),
+    taxTotal: formatMoney(invoice.taxTotal, invoice.currencyCode),
+    total: formatMoney(invoice.total, invoice.currencyCode),
+    currency: invoice.currencyCode,
+  };
+
+  const headerHtml = template.headerHtml
+    ? replaceTemplatePlaceholders(template.headerHtml, templateVars)
+    : "";
+  const footerHtml = template.footerHtml
+    ? replaceTemplatePlaceholders(template.footerHtml, templateVars)
+    : "";
 
   const linesHtml = invoice.lines
     .map(
@@ -108,30 +143,38 @@ export function generateInvoiceHtml(
       ? `<p style="margin-top:16px;font-size:12px;color:#6b7280;">Due Date: ${invoice.dueDate}</p>`
       : "";
 
-  const bankDetailsSection = template.bankDetails
+  const bankDetailsText = template.bankDetails
+    ? replaceTemplatePlaceholders(template.bankDetails, templateVars)
+    : "";
+  const bankDetailsSection = bankDetailsText
     ? `<div style="margin-top:24px;padding:12px;background:#f9fafb;border-radius:4px;">
         <p style="font-size:11px;font-weight:600;color:#374151;margin:0 0 4px;">Bank Details</p>
-        <p style="font-size:12px;color:#6b7280;margin:0;white-space:pre-wrap;">${escapeHtml(template.bankDetails)}</p>
+        <p style="font-size:12px;color:#6b7280;margin:0;white-space:pre-wrap;">${escapeHtml(bankDetailsText)}</p>
       </div>`
     : "";
 
-  const paymentInstructionsSection = template.paymentInstructions
+  const paymentInstructionsText = template.paymentInstructions
+    ? replaceTemplatePlaceholders(template.paymentInstructions, templateVars)
+    : "";
+  const paymentInstructionsSection = paymentInstructionsText
     ? `<div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:4px;">
         <p style="font-size:11px;font-weight:600;color:#374151;margin:0 0 4px;">Payment Instructions</p>
-        <p style="font-size:12px;color:#6b7280;margin:0;white-space:pre-wrap;">${escapeHtml(template.paymentInstructions)}</p>
+        <p style="font-size:12px;color:#6b7280;margin:0;white-space:pre-wrap;">${escapeHtml(paymentInstructionsText)}</p>
       </div>`
     : "";
 
-  const notesSection =
-    template.notes || invoice.notes
-      ? `<div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:4px;font-size:12px;color:#6b7280;">${escapeHtml(template.notes || invoice.notes || "")}</div>`
-      : "";
+  const notesText = template.notes || invoice.notes
+    ? replaceTemplatePlaceholders(template.notes || invoice.notes || "", templateVars)
+    : "";
+  const notesSection = notesText
+    ? `<div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:4px;font-size:12px;color:#6b7280;">${escapeHtml(notesText)}</div>`
+    : "";
 
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>Invoice ${invoice.invoiceNumber}</title></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:40px;color:#111827;">
-  ${template.headerHtml || ""}
+  ${headerHtml}
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;">
     <div>
       ${template.logoUrl ? `<img src="${template.logoUrl}" alt="Logo" style="max-height:48px;margin-bottom:8px;" />` : ""}
@@ -179,7 +222,7 @@ export function generateInvoiceHtml(
   ${bankDetailsSection}
   ${paymentInstructionsSection}
   ${notesSection}
-  ${template.footerHtml || ""}
+  ${footerHtml}
 </body>
 </html>`;
 }

@@ -128,12 +128,44 @@ interface InvoiceDocProps {
   template: PdfTemplateSettings;
 }
 
+function replacePlaceholders(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match);
+}
+
 function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocProps) {
   const accent = template.accentColor || "#10b981";
   const taxLabel = getTaxIdLabel(org.countryCode);
   const title = getInvoiceTitle(org.countryCode, !!org.taxId);
   const amountDue = inv.amountDue ?? inv.total;
   const amountPaid = inv.amountPaid ?? 0;
+
+  const vars: Record<string, string> = {
+    orgName: org.name,
+    orgAddress: org.address || "",
+    orgTaxId: org.taxId || "",
+    orgPhone: org.phone || "",
+    orgEmail: org.email || "",
+    orgRegistrationNumber: org.registrationNumber || "",
+    invoiceNumber: inv.invoiceNumber,
+    issueDate: inv.issueDate,
+    dueDate: inv.dueDate,
+    contactName: contact.name,
+    contactEmail: contact.email || "",
+    contactAddress: contact.address || "",
+    contactTaxNumber: contact.taxNumber || "",
+    reference: inv.reference || "",
+    subtotal: fmtMoney(inv.subtotal, inv.currencyCode),
+    taxTotal: fmtMoney(inv.taxTotal, inv.currencyCode),
+    total: fmtMoney(inv.total, inv.currencyCode),
+    currency: inv.currencyCode,
+  };
+
+  const bankDetailsText = template.bankDetails ? replacePlaceholders(template.bankDetails, vars) : null;
+  const paymentInstructionsText = template.paymentInstructions ? replacePlaceholders(template.paymentInstructions, vars) : null;
+  const notesText = (template.notes || inv.notes) ? replacePlaceholders(template.notes || inv.notes || "", vars) : null;
+  const footerText = template.footerHtml
+    ? replacePlaceholders(template.footerHtml, vars).replace(/<[^>]*>/g, "")
+    : null;
 
   return (
     <Document>
@@ -228,32 +260,32 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
         )}
 
         {/* Bank Details */}
-        {template.bankDetails && (
+        {bankDetailsText && (
           <View style={styles.infoSection}>
             <Text style={styles.infoTitle}>Bank Details</Text>
-            <Text style={styles.infoText}>{template.bankDetails}</Text>
+            <Text style={styles.infoText}>{bankDetailsText}</Text>
           </View>
         )}
 
         {/* Payment Instructions */}
-        {template.paymentInstructions && (
+        {paymentInstructionsText && (
           <View style={styles.infoSection}>
             <Text style={styles.infoTitle}>Payment Instructions</Text>
-            <Text style={styles.infoText}>{template.paymentInstructions}</Text>
+            <Text style={styles.infoText}>{paymentInstructionsText}</Text>
           </View>
         )}
 
         {/* Notes */}
-        {(template.notes || inv.notes) && (
+        {notesText && (
           <View style={styles.infoSection}>
             <Text style={styles.infoTitle}>Notes</Text>
-            <Text style={styles.infoText}>{template.notes || inv.notes}</Text>
+            <Text style={styles.infoText}>{notesText}</Text>
           </View>
         )}
 
         {/* Footer */}
-        {template.footerHtml && (
-          <Text style={styles.footer}>{template.footerHtml.replace(/<[^>]*>/g, "")}</Text>
+        {footerText && (
+          <Text style={styles.footer}>{footerText}</Text>
         )}
       </Page>
     </Document>

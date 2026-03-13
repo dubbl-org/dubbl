@@ -151,6 +151,28 @@ export default function InvoiceDetailPage() {
       .catch(() => {});
   }, [id, orgId]);
 
+  async function handleDownloadPdf() {
+    if (!orgId) return;
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/pdf?format=pdf`, {
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) {
+        toast.error("Failed to download PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${inv?.invoiceNumber || id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to download PDF");
+    }
+  }
+
   async function handleSend() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/invoices/${id}/send`, {
@@ -341,10 +363,8 @@ export default function InvoiceDetailPage() {
                 </DialogContent>
               </Dialog>
             )}
-            <Button variant="outline" size="sm" asChild>
-              <a href={`/api/v1/invoices/${id}/pdf?format=pdf`} download>
-                <Download className="mr-2 size-4" />Download PDF
-              </a>
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+              <Download className="mr-2 size-4" />Download PDF
             </Button>
             <Button variant="outline" size="sm" onClick={handleDuplicate} loading={duplicating}>
               <Copy className="mr-2 size-4" />Duplicate
