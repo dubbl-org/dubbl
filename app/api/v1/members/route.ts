@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { member, users, organization } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { subscription } from "@/lib/db/schema/billing";
+import { eq, and, count } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
+import { getEffectiveLimits } from "@/lib/plans";
 import { z } from "zod";
 import { render } from "@react-email/render";
 import { createElement } from "react";
@@ -75,6 +77,38 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "User is already a member" },
         { status: 409 }
+      );
+    }
+
+    // Enforce billing status
+    const sub = await db.query.subscription.findFirst({
+      where: eq(subscription.organizationId, ctx.organizationId),
+    });
+    const billingStatus = sub?.status ?? "active";
+    if (billingStatus === "past_due" || billingStatus === "incomplete") {
+      return NextResponse.json(
+        { error: "Your billing is past due. Update your payment method to invite members." },
+        { status: 402 }
+      );
+    }
+
+    // Enforce member limit
+    const [memberCountResult] = await db
+      .select({ count: count() })
+      .from(member)
+      .where(eq(member.organizationId, ctx.organizationId));
+    const limits = getEffectiveLimits(sub ?? null);
+    if (memberCountResult.count >= limits.members) {
+      const plan = sub?.plan ?? "free";
+      if (plan === "free") {
+        return NextResponse.json(
+          { error: "Free plan is limited to 1 member. Upgrade to Pro to invite your team." },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json(
+        { error: `You've reached your plan's limit of ${limits.members} members. Upgrade your plan or contact support.` },
+        { status: 403 }
       );
     }
 

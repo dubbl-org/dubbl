@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User, Loader2, CalendarDays } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Shield, ShieldCheck, User, Loader2, CalendarDays, AlertTriangle, ArrowUpRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,16 @@ interface Member {
   createdAt: string;
 }
 
+interface Capacity {
+  current: number;
+  max: number | null;
+  plan: string;
+  seatCount: number;
+  status: string;
+  canInvite: boolean;
+  reason: string | null;
+}
+
 const ROLE_ICONS = {
   owner: Shield,
   admin: ShieldCheck,
@@ -60,8 +71,10 @@ const ROLE_COLORS = {
 };
 
 export default function MembersPage() {
+  const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -69,19 +82,27 @@ export default function MembersPage() {
   const [saving, setSaving] = useState(false);
   const [actionMemberId, setActionMemberId] = useState<string | null>(null);
 
+  function getHeaders() {
+    const orgId = localStorage.getItem("activeOrgId") || "";
+    return { "x-organization-id": orgId, "Content-Type": "application/json" };
+  }
+
   async function fetchMembers() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
     try {
-      const [membersRes, rolesRes] = await Promise.all([
+      const [membersRes, rolesRes, capacityRes] = await Promise.all([
         fetch("/api/v1/members", { headers: { "x-organization-id": orgId } }),
         fetch("/api/v1/roles", { headers: { "x-organization-id": orgId } }),
+        fetch("/api/v1/members/capacity", { headers: { "x-organization-id": orgId } }),
       ]);
       const membersData = await membersRes.json();
       const rolesData = await rolesRes.json();
+      const capacityData = await capacityRes.json();
       if (membersData.members) setMembers(membersData.members);
       if (rolesData.roles) setCustomRoles(rolesData.roles);
+      if (capacityData.current !== undefined) setCapacity(capacityData);
     } finally {
       setLoading(false);
     }
@@ -180,18 +201,63 @@ export default function MembersPage() {
   const adminCount = members.filter((m) => m.role === "admin").length;
   const memberCount = members.filter((m) => m.role === "member").length;
 
+  const isBillingBad = capacity && (capacity.status === "past_due" || capacity.status === "incomplete");
+  const isAtLimit = capacity && !capacity.canInvite && !isBillingBad;
+  const usagePercent = capacity && capacity.max ? Math.min((capacity.current / capacity.max) * 100, 100) : 0;
+
   return (
     <ContentReveal className="space-y-6">
-      {/* Stats row */}
+      {/* Billing warning banner */}
+      {isBillingBad && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+          <AlertTriangle className="size-4 text-red-600 dark:text-red-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">Billing past due</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+              Update your payment method to continue inviting members.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 text-xs border-red-200 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-300"
+            onClick={() => router.push("/settings/billing")}
+          >
+            Update Billing
+            <ArrowUpRight className="ml-1 size-3" />
+          </Button>
+        </div>
+      )}
+
+      {/* Seat usage + stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
         <div>
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
             <Users className="size-3 text-muted-foreground" />
-            Total Members
+            Seats Used
           </p>
           <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
-            {members.length}
+            {capacity ? capacity.current : members.length}
+            {capacity?.max && (
+              <span className="text-sm font-normal text-muted-foreground">
+                {" / "}{capacity.max}
+              </span>
+            )}
+            {capacity && !capacity.max && (
+              <span className="text-sm font-normal text-muted-foreground"> / unlimited</span>
+            )}
           </p>
+          {capacity?.max && (
+            <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${usagePercent}%`,
+                  backgroundColor: usagePercent >= 100 ? "#ef4444" : usagePercent >= 80 ? "#f59e0b" : "#10b981",
+                }}
+              />
+            </div>
+          )}
         </div>
         <div>
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -222,6 +288,28 @@ export default function MembersPage() {
         </div>
       </div>
 
+      {/* At-limit banner */}
+      {isAtLimit && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Member limit reached</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+              {capacity?.reason || "Upgrade your plan to add more members."}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 text-xs border-amber-200 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-300"
+            onClick={() => router.push("/settings/billing")}
+          >
+            Upgrade
+            <ArrowUpRight className="ml-1 size-3" />
+          </Button>
+        </div>
+      )}
+
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div>
@@ -233,7 +321,8 @@ export default function MembersPage() {
         <Button
           size="sm"
           onClick={() => setInviteOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          disabled={capacity ? !capacity.canInvite : false}
+          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
         >
           <Plus className="mr-1.5 size-3.5" />
           Add Member
@@ -380,6 +469,15 @@ export default function MembersPage() {
             <SheetTitle>Add Member</SheetTitle>
           </SheetHeader>
           <div className="space-y-4 px-4 py-4">
+            {/* Seat info in invite sheet */}
+            {capacity && (
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-xs text-muted-foreground">
+                  {capacity.current} of {capacity.max ?? "unlimited"} seats used
+                  <span className="ml-1 capitalize">({capacity.plan} plan)</span>
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Email</Label>
               <Input
@@ -388,6 +486,9 @@ export default function MembersPage() {
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="colleague@company.com"
               />
+              <p className="text-[11px] text-muted-foreground">
+                The user must have a dubbl account before they can be invited.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
