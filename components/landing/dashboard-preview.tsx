@@ -87,7 +87,7 @@ export function DashboardPreview() {
         <SectionHeader
           badge="Product"
           title="Your finances at a glance"
-          subtitle="A real-time dashboard that gives you clarity on revenue, expenses, and cash flow — all in one place."
+          subtitle="A real-time dashboard for your finances, projects, inventory, and team - all in one place."
         />
 
         <ScrollReveal>

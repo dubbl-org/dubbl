@@ -37,7 +37,7 @@ const faqs = [
   {
     question: "Is there an API?",
     answer:
-      "dubbl is API-first. Every feature available in the UI is also accessible via our REST API. We provide SDKs for Python, Node.js, and Go, plus comprehensive OpenAPI documentation.",
+      "dubbl is API-first. Every feature available in the UI is also accessible via our REST API. We provide SDKs for Python, Node.js, and Go, plus comprehensive OpenAPI documentation. dubbl also supports the Model Context Protocol (MCP), allowing AI assistants to interact with your business data directly.",
   },
   {
     question: "How do I contribute to dubbl?",
@@ -47,7 +47,12 @@ const faqs = [
   {
     question: "Is dubbl suitable for enterprise use?",
     answer:
-      "Yes. dubbl includes features like audit trails, role-based access control, SSO/SAML support, and multi-tenant architecture. Many companies use dubbl in production for their core accounting needs.",
+      "Yes. dubbl includes features like audit trails, role-based access control, SSO/SAML support, and multi-tenant architecture. Beyond accounting, dubbl covers inventory management, project management, payroll, and CRM. Many companies use dubbl in production as their core business platform.",
+  },
+  {
+    question: "What is MCP support?",
+    answer:
+      "MCP (Model Context Protocol) is an open standard that lets AI assistants interact with external tools and data. dubbl ships with 15 built-in MCP tool modules covering contacts, invoices, inventory, projects, and more. This means AI agents like Claude can read, create, and manage your business data directly through a structured protocol.",
   },
 ];
 

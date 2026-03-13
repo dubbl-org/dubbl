@@ -623,9 +623,9 @@ const secondaryFeatures = [
     iconColor: "bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400",
   },
   {
-    title: "Bank Integrations",
+    title: "MCP Protocol",
     description:
-      "Import global bank statement formats today and layer live bank connections in later without changing your reconciliation workflow.",
+      "Connect AI assistants directly to your business data. 15 built-in tool modules let AI agents manage contacts, invoices, inventory, and more.",
     icon: Plug,
     iconColor: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400",
   },
@@ -642,7 +642,7 @@ export function BentoFeatures() {
         <SectionHeader
           badge="Features"
           title="Powerful features for modern teams"
-          subtitle="Everything your finance team needs — from double-entry bookkeeping to real-time reporting."
+          subtitle="From double-entry bookkeeping and inventory to project management and AI integrations."
         />
 
         {/* ---- 2x2 Main Feature Cards ---- */}

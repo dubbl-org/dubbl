@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github, Twitter, MessageCircle, ShieldCheck } from "lucide-react";
+import { Github, Twitter, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Container } from "@/components/shared/container";
 import { Separator } from "@/components/ui/separator";
@@ -32,8 +32,7 @@ const footerLinks = {
 
 const socialLinks = [
   { icon: Github, href: "https://github.com/dubbl-org/dubbl", label: "GitHub" },
-  { icon: Twitter, href: "#", label: "X" },
-  { icon: MessageCircle, href: "#", label: "Discord" },
+  { icon: Twitter, href: "https://x.com/DubblHQ", label: "X" },
 ];
 
 export function Footer() {
@@ -51,7 +50,7 @@ export function Footer() {
               </span>
             </div>
             <p className="mt-3 max-w-[220px] text-sm leading-relaxed text-white/50">
-              Open source double-entry bookkeeping for modern teams.
+              Open source business management platform for modern teams.
             </p>
             <div className="mt-5 flex items-center gap-2.5">
               {socialLinks.map((link) => (
