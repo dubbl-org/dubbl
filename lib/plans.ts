@@ -3,8 +3,8 @@ export const PLAN_LIMITS = {
     organizations: 1,
     members: 1,
     entriesPerMonth: 500,
-    currencies: 1,
-    contacts: 50,
+    multiCurrency: false,
+    contacts: 200,
     invoicesPerMonth: 10,
     bankAccounts: 1,
     projects: 2,
@@ -17,8 +17,8 @@ export const PLAN_LIMITS = {
     organizations: 3,
     members: Infinity,
     entriesPerMonth: Infinity,
-    currencies: 5,
-    contacts: 500,
+    multiCurrency: true,
+    contacts: Infinity,
     invoicesPerMonth: 100,
     bankAccounts: 5,
     projects: 20,
@@ -41,7 +41,7 @@ export const PLAN_LIMITS = {
     organizations: Infinity,
     members: Infinity,
     entriesPerMonth: Infinity,
-    currencies: Infinity,
+    multiCurrency: true,
     contacts: Infinity,
     invoicesPerMonth: Infinity,
     bankAccounts: Infinity,
@@ -65,13 +65,24 @@ export const PLAN_LIMITS = {
   },
 } as const;
 
+export const STORAGE_PLANS = {
+  free: { filesMb: 5120, emailsPerMonth: 100, price: 0 },
+  starter: { filesMb: 25600, emailsPerMonth: 500, price: 15 },
+  growth: { filesMb: 76800, emailsPerMonth: 3000, price: 45 },
+  scale: { filesMb: 307200, emailsPerMonth: 10000, price: 120 },
+} as const;
+
+export type StoragePlanName = keyof typeof STORAGE_PLANS;
+
 export type PlanName = keyof typeof PLAN_LIMITS;
 
 export const PLAN_PRICES = {
-  free: 0,
-  pro: 12,
-  business: 29,
+  free: { monthly: 0, annual: 0 },
+  pro: { monthly: 12, annual: 10 },
+  business: { monthly: 29, annual: 24 }, // not shown on pricing page yet
 } as const;
+
+export type BillingInterval = "monthly" | "annual";
 
 // RBAC permissions
 const ROLE_HIERARCHY = { owner: 3, admin: 2, member: 1 } as const;
@@ -172,7 +183,7 @@ export function getEffectiveLimits(sub: {
   overrideInvoicesPerMonth?: number | null;
   overrideProjects?: number | null;
   overrideBankAccounts?: number | null;
-  overrideCurrencies?: number | null;
+  overrideMultiCurrency?: boolean | null;
   overrideEntriesPerMonth?: number | null;
 } | null) {
   const plan = sub?.plan ?? "free";
@@ -185,7 +196,7 @@ export function getEffectiveLimits(sub: {
     invoicesPerMonth: sub?.overrideInvoicesPerMonth ?? base.invoicesPerMonth,
     projects: sub?.overrideProjects ?? base.projects,
     bankAccounts: sub?.overrideBankAccounts ?? base.bankAccounts,
-    currencies: sub?.overrideCurrencies ?? base.currencies,
+    multiCurrency: sub?.overrideMultiCurrency ?? base.multiCurrency,
     entriesPerMonth: sub?.overrideEntriesPerMonth ?? base.entriesPerMonth,
   };
 }

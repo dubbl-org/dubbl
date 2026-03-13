@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { subscription, document } from "@/lib/db/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
+import { STORAGE_PLANS, type StoragePlanName } from "@/lib/plans";
 
 export async function GET(request: Request) {
   try {
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
 
     const storageUsedBytes = Number(storageResult[0]?.totalBytes ?? 0);
 
+    const storagePlan = (sub?.storagePlan ?? "free") as StoragePlanName;
+    const storagePlanLimits = STORAGE_PLANS[storagePlan];
+
     return NextResponse.json({
       billing: sub
         ? {
@@ -33,6 +37,10 @@ export async function GET(request: Request) {
             seatCount: sub.seatCount,
             currentPeriodEnd: sub.currentPeriodEnd?.toISOString() || null,
             cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+            billingInterval: sub.billingInterval || "monthly",
+            storagePlan,
+            storageFilesMb: storagePlanLimits.filesMb,
+            emailsPerMonth: storagePlanLimits.emailsPerMonth,
             storageUsedBytes,
           }
         : {
@@ -41,6 +49,10 @@ export async function GET(request: Request) {
             seatCount: 1,
             currentPeriodEnd: null,
             cancelAtPeriodEnd: false,
+            billingInterval: "monthly" as const,
+            storagePlan: "free" as const,
+            storageFilesMb: STORAGE_PLANS.free.filesMb,
+            emailsPerMonth: STORAGE_PLANS.free.emailsPerMonth,
             storageUsedBytes,
           },
     });

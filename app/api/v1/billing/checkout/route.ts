@@ -8,7 +8,9 @@ import { stripe } from "@/lib/stripe";
 import { z } from "zod";
 
 const checkoutSchema = z.object({
-  plan: z.enum(["pro", "business"]),
+  type: z.enum(["seats", "storage"]).default("seats"),
+  plan: z.string().min(1),
+  interval: z.enum(["monthly", "annual"]).default("monthly"),
 });
 
 export async function POST(request: Request) {
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
     requireRole(ctx, "manage:billing");
 
     const body = await request.json();
-    const { plan } = checkoutSchema.parse(body);
+    const { type, plan, interval } = checkoutSchema.parse(body);
 
     const org = await db.query.organization.findFirst({
       where: eq(organization.id, ctx.organizationId),
@@ -41,10 +43,43 @@ export async function POST(request: Request) {
       customerId = customer.id;
     }
 
-    const priceId =
-      plan === "pro"
-        ? process.env.STRIPE_PRO_PRICE_ID!
-        : process.env.STRIPE_BUSINESS_PRICE_ID!;
+    let priceId: string;
+    let metadata: Record<string, string>;
+
+    if (type === "storage") {
+      const storagePriceMap: Record<string, string | undefined> = {
+        starter: process.env.STRIPE_STORAGE_STARTER_PRICE_ID,
+        growth: process.env.STRIPE_STORAGE_GROWTH_PRICE_ID,
+        scale: process.env.STRIPE_STORAGE_SCALE_PRICE_ID,
+      };
+      const storagePriceId = storagePriceMap[plan];
+      if (!storagePriceId) {
+        return NextResponse.json({ error: "Invalid storage plan" }, { status: 400 });
+      }
+      priceId = storagePriceId;
+      metadata = {
+        organizationId: ctx.organizationId,
+        type: "storage",
+        storagePlan: plan,
+      };
+    } else {
+      if (plan !== "pro" && plan !== "business") {
+        return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+      }
+      if (plan === "pro") {
+        priceId = interval === "annual"
+          ? process.env.STRIPE_PRO_ANNUAL_PRICE_ID!
+          : process.env.STRIPE_PRO_PRICE_ID!;
+      } else {
+        priceId = process.env.STRIPE_BUSINESS_PRICE_ID!;
+      }
+      metadata = {
+        organizationId: ctx.organizationId,
+        type: "seats",
+        plan,
+        interval,
+      };
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -52,10 +87,7 @@ export async function POST(request: Request) {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing`,
-      metadata: {
-        organizationId: ctx.organizationId,
-        plan,
-      },
+      metadata,
     });
 
     return NextResponse.json({ url: session.url });

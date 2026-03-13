@@ -38,9 +38,11 @@ export async function POST(request: Request) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const orgId = session.metadata?.organizationId;
-      const plan = session.metadata?.plan as "pro" | "business";
+      const checkoutType = session.metadata?.type;
 
-      if (orgId && plan && session.subscription) {
+      if (orgId && checkoutType === "storage" && session.subscription) {
+        // Storage add-on checkout
+        const storagePlan = session.metadata?.storagePlan as "starter" | "growth" | "scale";
         const stripeSubscription = await stripe.subscriptions.retrieve(
           session.subscription as string
         );
@@ -49,30 +51,65 @@ export async function POST(request: Request) {
           where: eq(subscription.organizationId, orgId),
         });
 
-        const period = getItemPeriod(stripeSubscription);
-
-        const data = {
+        const storageData = {
+          storagePlan,
+          stripeStorageSubscriptionId: stripeSubscription.id,
+          stripeStoragePriceId: stripeSubscription.items.data[0].price.id,
           stripeCustomerId: session.customer as string,
-          stripeSubscriptionId: stripeSubscription.id,
-          stripePriceId: stripeSubscription.items.data[0].price.id,
-          plan,
-          status: "active" as const,
-          currentPeriodStart: period.start,
-          currentPeriodEnd: period.end,
-          seatCount: stripeSubscription.items.data[0].quantity || 1,
           updatedAt: new Date(),
         };
 
         if (existing) {
           await db
             .update(subscription)
-            .set(data)
+            .set(storageData)
             .where(eq(subscription.id, existing.id));
         } else {
           await db.insert(subscription).values({
             organizationId: orgId,
-            ...data,
+            ...storageData,
           });
+        }
+      } else if (orgId && session.subscription) {
+        // Seat plan checkout
+        const plan = session.metadata?.plan as "pro" | "business";
+        if (plan) {
+          const stripeSubscription = await stripe.subscriptions.retrieve(
+            session.subscription as string
+          );
+
+          const existing = await db.query.subscription.findFirst({
+            where: eq(subscription.organizationId, orgId),
+          });
+
+          const period = getItemPeriod(stripeSubscription);
+
+          const billingInterval = session.metadata?.interval === "annual" ? "annual" : "monthly";
+
+          const data = {
+            stripeCustomerId: session.customer as string,
+            stripeSubscriptionId: stripeSubscription.id,
+            stripePriceId: stripeSubscription.items.data[0].price.id,
+            plan,
+            status: "active" as const,
+            currentPeriodStart: period.start,
+            currentPeriodEnd: period.end,
+            seatCount: stripeSubscription.items.data[0].quantity || 1,
+            billingInterval,
+            updatedAt: new Date(),
+          };
+
+          if (existing) {
+            await db
+              .update(subscription)
+              .set(data)
+              .where(eq(subscription.id, existing.id));
+          } else {
+            await db.insert(subscription).values({
+              organizationId: orgId,
+              ...data,
+            });
+          }
         }
       }
 
@@ -128,30 +165,71 @@ export async function POST(request: Request) {
     case "customer.subscription.updated": {
       const sub = event.data.object as Stripe.Subscription;
       const period = getItemPeriod(sub);
-      await db
-        .update(subscription)
-        .set({
-          status: sub.status === "active" ? "active" : sub.status === "past_due" ? "past_due" : "canceled",
-          currentPeriodStart: period.start,
-          currentPeriodEnd: period.end,
-          cancelAtPeriodEnd: sub.cancel_at_period_end,
-          seatCount: sub.items.data[0].quantity || 1,
-          updatedAt: new Date(),
-        })
-        .where(eq(subscription.stripeSubscriptionId, sub.id));
+
+      // Check if this is a storage subscription
+      const storageMatch = await db.query.subscription.findFirst({
+        where: eq(subscription.stripeStorageSubscriptionId, sub.id),
+      });
+
+      if (storageMatch) {
+        // Storage subscription update - just track status
+        const storageStatus = sub.status === "active" ? "active" : "canceled";
+        if (storageStatus === "canceled") {
+          await db
+            .update(subscription)
+            .set({
+              storagePlan: "free",
+              stripeStorageSubscriptionId: null,
+              stripeStoragePriceId: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(subscription.id, storageMatch.id));
+        }
+      } else {
+        // Seat subscription update
+        await db
+          .update(subscription)
+          .set({
+            status: sub.status === "active" ? "active" : sub.status === "past_due" ? "past_due" : "canceled",
+            currentPeriodStart: period.start,
+            currentPeriodEnd: period.end,
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            seatCount: sub.items.data[0].quantity || 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(subscription.stripeSubscriptionId, sub.id));
+      }
       break;
     }
 
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
-      await db
-        .update(subscription)
-        .set({
-          status: "canceled",
-          plan: "free",
-          updatedAt: new Date(),
-        })
-        .where(eq(subscription.stripeSubscriptionId, sub.id));
+
+      // Check if this is a storage subscription
+      const storageMatch = await db.query.subscription.findFirst({
+        where: eq(subscription.stripeStorageSubscriptionId, sub.id),
+      });
+
+      if (storageMatch) {
+        await db
+          .update(subscription)
+          .set({
+            storagePlan: "free",
+            stripeStorageSubscriptionId: null,
+            stripeStoragePriceId: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(subscription.id, storageMatch.id));
+      } else {
+        await db
+          .update(subscription)
+          .set({
+            status: "canceled",
+            plan: "free",
+            updatedAt: new Date(),
+          })
+          .where(eq(subscription.stripeSubscriptionId, sub.id));
+      }
       break;
     }
   }

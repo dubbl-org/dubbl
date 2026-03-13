@@ -20,6 +20,12 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "trialing",
   "incomplete",
 ]);
+export const storagePlanEnum = pgEnum("storage_plan", [
+  "free",
+  "starter",
+  "growth",
+  "scale",
+]);
 
 // Subscription
 export const subscription = pgTable(
@@ -42,6 +48,7 @@ export const subscription = pgTable(
       .notNull()
       .default(false),
     seatCount: integer("seat_count").notNull().default(1),
+    billingInterval: text("billing_interval").notNull().default("monthly"),
     // Enterprise / admin overrides (null = use plan defaults)
     customPlanName: text("custom_plan_name"), // e.g. "Enterprise", "Startup Program"
     overrideMembers: integer("override_members"),
@@ -50,8 +57,11 @@ export const subscription = pgTable(
     overrideInvoicesPerMonth: integer("override_invoices_per_month"),
     overrideProjects: integer("override_projects"),
     overrideBankAccounts: integer("override_bank_accounts"),
-    overrideCurrencies: integer("override_currencies"),
+    overrideMultiCurrency: boolean("override_multi_currency"),
     overrideEntriesPerMonth: integer("override_entries_per_month"),
+    storagePlan: storagePlanEnum("storage_plan").notNull().default("free"),
+    stripeStorageSubscriptionId: text("stripe_storage_subscription_id"),
+    stripeStoragePriceId: text("stripe_storage_price_id"),
     managedBy: text("managed_by").notNull().default("stripe"), // "stripe" or "manual"
     adminNotes: text("admin_notes"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

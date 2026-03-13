@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "motion/react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Check,
   Minus,
@@ -11,6 +12,8 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import { GrainGradient } from "@paper-design/shaders-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/shared/container";
 import { cn } from "@/lib/utils";
@@ -144,6 +147,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 /* ------------------------------------------------------------------ */
 
 export default function PricingPage() {
+  const [interval, setInterval] = useState<"monthly" | "annual">("annual");
+  const price = (plan: keyof typeof PLAN_PRICES) =>
+    interval === "annual" ? PLAN_PRICES[plan].annual : PLAN_PRICES[plan].monthly;
+
   return (
     <div className="relative">
       <Container className="relative pt-32 pb-24">
@@ -170,6 +177,34 @@ export default function PricingPage() {
             Two simple plans. Storage add-ons when you need them. Self-host for
             free with zero limits.
           </p>
+
+          <div className="relative mt-8 grid grid-cols-2 rounded-full border bg-muted/50 p-1 w-fit mx-auto">
+            <motion.div
+              className="absolute inset-y-1 w-[calc(50%-2px)] rounded-full bg-background shadow-sm"
+              initial={false}
+              animate={{ x: interval === "monthly" ? 4 : "calc(100% + 4px)" }}
+              transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+            />
+            <button
+              onClick={() => setInterval("monthly")}
+              className={cn(
+                "relative z-10 rounded-full px-5 py-2 text-sm font-medium transition-colors",
+                interval === "monthly" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setInterval("annual")}
+              className={cn(
+                "relative z-10 rounded-full px-5 py-2 text-sm font-medium transition-colors",
+                interval === "annual" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Annual
+              <span className="ml-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Save 17%</span>
+            </button>
+          </div>
         </motion.div>
 
         {/* Seat Plans */}
@@ -197,7 +232,7 @@ export default function PricingPage() {
 
                 <div className="mt-8 flex items-baseline gap-2">
                   <span className="font-mono text-6xl font-bold tracking-tighter text-foreground">
-                    ${PLAN_PRICES.free}
+                    $0
                   </span>
                   <span className="text-sm text-muted-foreground">forever</span>
                 </div>
@@ -262,14 +297,41 @@ export default function PricingPage() {
                 </div>
 
                 <div className="mt-8 flex items-baseline gap-2">
-                  <span className="font-mono text-6xl font-bold tracking-tighter text-foreground">
-                    ${PLAN_PRICES.pro}
-                  </span>
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={interval}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="font-mono text-6xl font-bold tracking-tighter text-foreground"
+                    >
+                      ${price("pro")}
+                    </motion.span>
+                  </AnimatePresence>
                   <span className="text-sm text-muted-foreground">/seat/mo</span>
+                  {interval === "annual" && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-sm text-muted-foreground line-through"
+                    >
+                      ${PLAN_PRICES.pro.monthly}
+                    </motion.span>
+                  )}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground/70">
-                  1st member free, then ${PLAN_PRICES.pro}/additional seat
-                </p>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={interval}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="mt-1 text-xs text-muted-foreground/70"
+                  >
+                    {interval === "annual" ? `Billed as $${price("pro") * 12}/seat/year` : "Billed monthly per seat"}
+                  </motion.p>
+                </AnimatePresence>
 
                 <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                   Advanced reports, API access, multi-currency, and team collaboration.
@@ -487,7 +549,7 @@ export default function PricingPage() {
                         Pro
                       </span>
                       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-                        ${PLAN_PRICES.pro}/seat
+                        ${price("pro")}/seat
                       </span>
                     </div>
                   </th>
@@ -591,7 +653,7 @@ export default function PricingPage() {
               },
               {
                 q: "How does seat pricing work?",
-                a: "First member is always free. On Pro, each additional team member is $12/month.",
+                a: "Every member counts as a seat. Pro is $12/seat/month or $10/seat/month billed annually.",
               },
             ].map((faq, i) => (
               <motion.div
@@ -617,33 +679,47 @@ export default function PricingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <div className="rounded-2xl border border-border bg-muted/20 px-8 py-16 text-center lg:px-16 lg:py-20">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold text-foreground sm:text-4xl lg:text-5xl">
-              Ready to get started?
-            </h2>
-            <p className="mx-auto mt-4 max-w-md text-muted-foreground">
-              Join teams using dubbl for modern double-entry bookkeeping.
-              Start free, upgrade when you need more.
-            </p>
-            <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button
-                size="lg"
-                className="h-13 px-8 bg-emerald-600 text-white hover:bg-emerald-500 transition-colors font-semibold"
-                asChild
-              >
-                <a href="/sign-up">
-                  Start for Free
-                  <ArrowRight className="ml-2 size-4" />
-                </a>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-13 px-8"
-                asChild
-              >
-                <a href="/contact">Talk to Sales</a>
-              </Button>
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 px-8 py-16 text-center lg:px-16 lg:py-20">
+            <GrainGradient
+              className="pointer-events-none !absolute !inset-0 !rounded-none"
+              width="100%"
+              height="100%"
+              colors={["#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#34d399", "#a7f3d0"]}
+              colorBack="#10b981"
+              softness={1}
+              intensity={0.8}
+              noise={0.9}
+              shape="wave"
+              scale={3.5}
+              speed={0.2}
+            />
+
+            <div className="relative">
+              <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
+                Start managing your books today
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-lg text-white/60">
+                Self-host in minutes, extend via API, and own your financial
+                data. Forever free.
+              </p>
+              <p className="mt-6 text-sm text-white/40">
+                Open source &middot; Self-hostable &middot; Free forever
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/sign-up"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-8 text-sm font-medium text-emerald-700 transition-colors hover:bg-white/90"
+                >
+                  Get Started
+                  <ArrowRight className="size-4" />
+                </Link>
+                <Link
+                  href="/contact"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/20 px-8 text-sm font-medium text-white transition-colors hover:bg-white/5"
+                >
+                  Contact Sales
+                </Link>
+              </div>
             </div>
           </div>
         </motion.div>

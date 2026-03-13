@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { Check, Users, HardDrive, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ interface BillingInfo {
   seatCount: number;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  billingInterval: "monthly" | "annual";
   storagePlan: "free" | "starter" | "growth" | "scale";
   storageUsedBytes: number;
 }
@@ -27,13 +29,14 @@ function formatStorageSize(bytes: number) {
 }
 
 const STORAGE_LIMITS: Record<string, number> = {
-  free: 5 * 1024 * 1024 * 1024,
-  starter: 25 * 1024 * 1024 * 1024,
-  growth: 100 * 1024 * 1024 * 1024,
-  scale: 500 * 1024 * 1024 * 1024,
+  free: 5120 * 1024 * 1024,
+  starter: 25600 * 1024 * 1024,
+  growth: 76800 * 1024 * 1024,
+  scale: 307200 * 1024 * 1024,
 };
 
-const SEAT_PRICE = 12;
+const SEAT_PRICE_MONTHLY = 12;
+const SEAT_PRICE_ANNUAL = 10;
 
 const storagePlans = [
   {
@@ -55,7 +58,7 @@ const storagePlans = [
   {
     id: "growth",
     name: "Growth",
-    storage: "100 GB",
+    storage: "75 GB",
     price: "$45",
     period: "/mo",
     description: "For established businesses",
@@ -63,7 +66,7 @@ const storagePlans = [
   {
     id: "scale",
     name: "Scale",
-    storage: "500 GB",
+    storage: "300 GB",
     price: "$120",
     period: "/mo",
     description: "For large organizations",
@@ -75,6 +78,7 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -102,7 +106,7 @@ export default function BillingPage() {
           "Content-Type": "application/json",
           "x-organization-id": orgId,
         },
-        body: JSON.stringify({ type, plan }),
+        body: JSON.stringify({ type, plan, interval }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -146,9 +150,31 @@ export default function BillingPage() {
           <Users className="size-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Team seats</h3>
         </div>
-        <p className="text-xs text-muted-foreground mb-4">
-          Your first member is always free. Additional seats are ${SEAT_PRICE}/seat/month.
+        <p className="text-xs text-muted-foreground mb-2">
+          Per-seat pricing for your team.
         </p>
+
+        <div className="flex items-center gap-1 mb-4 rounded-lg border bg-muted/50 p-1 w-fit">
+          <button
+            onClick={() => setInterval("monthly")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              interval === "monthly" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setInterval("annual")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              interval === "annual" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Annual
+            <span className="ml-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Save 17%</span>
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Free tier */}
@@ -206,11 +232,42 @@ export default function BillingPage() {
                 </Badge>
               )}
             </div>
-            <div className="mt-3">
-              <span className="text-3xl font-bold tracking-tight">${SEAT_PRICE}</span>
+            <div className="mt-3 flex items-baseline gap-1">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={interval}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-3xl font-bold tracking-tight"
+                >
+                  ${interval === "annual" ? SEAT_PRICE_ANNUAL : SEAT_PRICE_MONTHLY}
+                </motion.span>
+              </AnimatePresence>
               <span className="text-sm text-muted-foreground">/seat/mo</span>
+              {interval === "annual" && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="ml-1 text-xs text-muted-foreground line-through"
+                >
+                  ${SEAT_PRICE_MONTHLY}
+                </motion.span>
+              )}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">1st member free, then ${SEAT_PRICE}/additional seat</p>
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={interval}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="mt-2 text-xs text-muted-foreground"
+              >
+                {interval === "annual" ? `Billed as $${SEAT_PRICE_ANNUAL * 12}/seat/year` : "Billed monthly per seat"}
+              </motion.p>
+            </AnimatePresence>
             <ul className="mt-4 flex-1 space-y-2">
               <li className="flex items-center gap-2 text-[13px]">
                 <Check className="size-3.5 shrink-0 text-emerald-600" />
@@ -271,7 +328,7 @@ export default function BillingPage() {
           <h3 className="text-sm font-semibold">Organization storage</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Storage covers all your organization data: transactions, documents, attachments, and more. 5 GB is included free.
+          Storage covers all your organization data: documents, attachments, and more. 5 GB is included free.
         </p>
 
         {/* Storage usage bar */}
