@@ -21,10 +21,23 @@ export async function GET(request: Request) {
 
     const limits = getEffectiveLimits(sub ?? null);
     const current = memberCountResult.count;
-    const max = limits.members;
     const plan = sub?.plan ?? "free";
     const status = sub?.status ?? "active";
     const seatCount = sub?.seatCount ?? 1;
+
+    // Determine effective member cap:
+    // - overrideMembers (enterprise override) takes priority
+    // - Free: hard limit from plan (1)
+    // - Pro: per-seat model, use seatCount from subscription
+    // - Business: unlimited
+    let max: number;
+    if (sub?.overrideMembers != null) {
+      max = sub.overrideMembers;
+    } else if (plan === "pro") {
+      max = seatCount;
+    } else {
+      max = limits.members;
+    }
 
     const isBillingOk = status === "active" || status === "trialing";
     const canInvite = isBillingOk && current < max;
@@ -35,6 +48,8 @@ export async function GET(request: Request) {
     } else if (current >= max) {
       if (plan === "free") {
         reason = "Free plan is limited to 1 member. Upgrade to Pro to invite your team.";
+      } else if (plan === "pro") {
+        reason = `You've used all ${seatCount} seats. Add more seats in billing settings.`;
       } else {
         reason = `You've reached your plan's limit of ${max} members. Upgrade your plan or contact support.`;
       }

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { member, users, organization } from "@/lib/db/schema";
+import { invitation, member, users, organization } from "@/lib/db/schema";
 import { subscription } from "@/lib/db/schema/billing";
 import { eq, and, count } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { getEffectiveLimits } from "@/lib/plans";
 import { z } from "zod";
+import { randomBytes } from "crypto";
 import { render } from "@react-email/render";
 import { createElement } from "react";
 import { MemberInviteEmail } from "@/lib/email/templates/member-invite";
@@ -21,21 +22,22 @@ export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
 
-    const members = await db.query.member.findMany({
-      where: eq(member.organizationId, ctx.organizationId),
-      with: { user: true, customRole: true },
+    const invitations = await db.query.invitation.findMany({
+      where: eq(invitation.organizationId, ctx.organizationId),
+      with: { invitedBy: true },
+      orderBy: (inv, { desc }) => [desc(inv.createdAt)],
     });
 
     return NextResponse.json({
-      members: members.map((m) => ({
-        id: m.id,
-        userId: m.userId,
-        userName: m.user?.name || null,
-        userEmail: m.user?.email || "",
-        role: m.role,
-        customRoleId: m.customRoleId || null,
-        customRoleName: m.customRole?.name || null,
-        createdAt: m.createdAt.toISOString(),
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        status: inv.status,
+        invitedByName: inv.invitedBy?.name || inv.invitedBy?.email || "Unknown",
+        expiresAt: inv.expiresAt.toISOString(),
+        acceptedAt: inv.acceptedAt?.toISOString() || null,
+        createdAt: inv.createdAt.toISOString(),
       })),
     });
   } catch (err) {
@@ -54,33 +56,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = inviteSchema.parse(body);
 
-    // Find user by email
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, parsed.email),
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found. They must sign up first." },
-        { status: 404 }
-      );
-    }
-
-    // Check not already a member
-    const existing = await db.query.member.findFirst({
-      where: and(
-        eq(member.organizationId, ctx.organizationId),
-        eq(member.userId, user.id)
-      ),
-    });
-    if (existing) {
-      return NextResponse.json(
-        { error: "User is already a member" },
-        { status: 409 }
-      );
-    }
-
-    // Enforce billing status
+    // Check billing status
     const sub = await db.query.subscription.findFirst({
       where: eq(subscription.organizationId, ctx.organizationId),
     });
@@ -92,20 +68,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Enforce member limit
+    // Enforce member limit (count current members + pending invitations)
     const [memberCountResult] = await db
       .select({ count: count() })
       .from(member)
       .where(eq(member.organizationId, ctx.organizationId));
+
+    const [pendingCount] = await db
+      .select({ count: count() })
+      .from(invitation)
+      .where(
+        and(
+          eq(invitation.organizationId, ctx.organizationId),
+          eq(invitation.status, "pending")
+        )
+      );
+
+    const totalUsed = memberCountResult.count + pendingCount.count;
     const limits = getEffectiveLimits(sub ?? null);
     const plan = sub?.plan ?? "free";
     const seatCount = sub?.seatCount ?? 1;
 
-    // Determine effective member cap:
-    // - overrideMembers (enterprise override) takes priority
-    // - Free: hard limit from plan (1)
-    // - Pro: per-seat model, use seatCount from subscription
-    // - Business: unlimited
     let memberMax: number;
     if (sub?.overrideMembers != null) {
       memberMax = sub.overrideMembers;
@@ -115,7 +98,7 @@ export async function POST(request: Request) {
       memberMax = limits.members;
     }
 
-    if (memberCountResult.count >= memberMax) {
+    if (totalUsed >= memberMax) {
       if (plan === "free") {
         return NextResponse.json(
           { error: "Free plan is limited to 1 member. Upgrade to Pro to invite your team." },
@@ -129,21 +112,56 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json(
-        { error: `You've reached your plan's limit of ${memberMax} members. Upgrade your plan or contact support.` },
+        { error: `You've reached your limit of ${memberMax} members.` },
         { status: 403 }
       );
     }
 
-    const [newMember] = await db
-      .insert(member)
+    // Check if already a member
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.email, parsed.email),
+    });
+    if (existingUser) {
+      const existingMember = await db.query.member.findFirst({
+        where: and(
+          eq(member.organizationId, ctx.organizationId),
+          eq(member.userId, existingUser.id)
+        ),
+      });
+      if (existingMember) {
+        return NextResponse.json({ error: "User is already a member" }, { status: 409 });
+      }
+    }
+
+    // Check if already has a pending invitation
+    const existingInvite = await db.query.invitation.findFirst({
+      where: and(
+        eq(invitation.organizationId, ctx.organizationId),
+        eq(invitation.email, parsed.email),
+        eq(invitation.status, "pending")
+      ),
+    });
+    if (existingInvite) {
+      return NextResponse.json({ error: "An invitation is already pending for this email" }, { status: 409 });
+    }
+
+    // Create invitation
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    const [inv] = await db
+      .insert(invitation)
       .values({
         organizationId: ctx.organizationId,
-        userId: user.id,
+        email: parsed.email,
         role: parsed.role,
+        token,
+        invitedById: ctx.userId,
+        expiresAt,
       })
       .returning();
 
-    // Send invite email (fire and forget)
+    // Send invite email
     const inviter = await db.query.users.findFirst({
       where: eq(users.id, ctx.userId),
     });
@@ -151,23 +169,35 @@ export async function POST(request: Request) {
       where: eq(organization.id, ctx.organizationId),
     });
     if (inviter && org) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
-      render(createElement(MemberInviteEmail, {
-        inviterName: inviter.name || "A team member",
-        orgName: org.name,
-        role: parsed.role,
-        loginUrl: `${appUrl}/sign-in`,
-      }))
-        .then((html) => sendPlatformEmail({ to: user.email, subject: `You've been invited to ${org.name}`, html }))
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev";
+      const acceptUrl = `${appUrl}/invite/${token}`;
+      render(
+        createElement(MemberInviteEmail, {
+          inviterName: inviter.name || "A team member",
+          orgName: org.name,
+          role: parsed.role,
+          loginUrl: acceptUrl,
+        })
+      )
+        .then((html) =>
+          sendPlatformEmail({
+            to: parsed.email,
+            subject: `You've been invited to ${org.name} on dubbl`,
+            html,
+          })
+        )
         .catch(() => {});
     }
 
     return NextResponse.json(
       {
-        member: {
-          ...newMember,
-          userName: user.name,
-          userEmail: user.email,
+        invitation: {
+          id: inv.id,
+          email: inv.email,
+          role: inv.role,
+          status: inv.status,
+          expiresAt: inv.expiresAt.toISOString(),
+          createdAt: inv.createdAt.toISOString(),
         },
       },
       { status: 201 }

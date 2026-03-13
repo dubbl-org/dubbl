@@ -35,3 +35,4 @@ export * from "./advisor";
 export * from "./mcp";
 export * from "./webhooks";
 export * from "./approvals";
+export * from "./invitations";

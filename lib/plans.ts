@@ -15,7 +15,7 @@ export const PLAN_LIMITS = {
   },
   pro: {
     organizations: 3,
-    members: 10,
+    members: Infinity,
     entriesPerMonth: Infinity,
     currencies: 5,
     contacts: 500,
