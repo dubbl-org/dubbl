@@ -8,22 +8,47 @@ The Documents module provides centralized file storage for your organization. Na
 ## Features
 
 - Upload and store business documents (contracts, receipts, statements)
-- Organize files by type or category
-- Attach documents to transactions, invoices, bills, and expenses
-- Search and filter your document library
+- Organize files into nested folders
+- Set document visibility (shared with team or private)
+- Attach documents to contacts, transactions, invoices, and expenses
+- Search, filter by type, and sort your document library
+- Drag and drop file uploads
 
 ## Uploading Documents
 
-Click **Upload** on the documents page to add files. Supported formats include PDF, images (PNG, JPG), and common office formats.
+Click **Upload Files** on the documents page or drag and drop files into the browser. When uploading, you can choose the visibility:
+
+- **Shared with team** - All organization members can view, download, and delete the file
+- **Private (only you)** - Only you can see the file. Other members will not see it in their document list
+
+You can change visibility later from the file's context menu (three-dot icon).
+
+## Folders
+
+Create folders and subfolders to organize your documents. Use the **New Folder** button to create a folder in the current location. Navigate between folders using the breadcrumb trail at the top.
 
 ## Document Attachments
 
 Documents can be attached to:
 
+- **Contacts** - Store contracts, agreements, or correspondence per contact
 - **Invoices and quotes** - Attach supporting documents for customers
 - **Bills and expenses** - Store receipts and supplier documents
 - **Journal entries** - Attach source documents for audit purposes
 
-## Storage
+## Storage Limits
+
+Storage is metered per organization. Your plan determines how much storage is available:
+
+| Plan | Storage | Emails/mo |
+|------|---------|-----------|
+| Free | 5 GB | 100 |
+| Starter | 25 GB | 500 |
+| Growth | 75 GB | 3,000 |
+| Scale | 300 GB | 10,000 |
+
+Check your current usage in **Settings > Billing**. When storage is nearly full, you will see a warning.
+
+## Storage Backend
 
 Documents are stored in S3-compatible storage. See [Getting Started](/docs/getting-started) for S3 configuration.

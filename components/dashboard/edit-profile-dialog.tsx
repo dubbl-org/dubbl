@@ -552,9 +552,6 @@ function SecurityTab({
             ))}
           </div>
         )}
-        <p className="mt-3 text-[10px] text-muted-foreground/50">
-          IP addresses are hashed and never stored in plain text.
-        </p>
       </div>
     </div>
   );

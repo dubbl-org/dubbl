@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   LogOut,
   ChevronsUpDown,
@@ -25,6 +26,7 @@ export function UserMenu() {
   const user = session?.user;
   const [accountOpen, setAccountOpen] = useState(false);
   const isMobile = useIsMobile();
+  const router = useRouter();
 
   const initials = user?.name
     ? user.name
@@ -92,13 +94,7 @@ export function UserMenu() {
               Account
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => {
-                setAccountOpen(true);
-                // Small delay so dialog opens first, then switch tab
-                setTimeout(() => {
-                  document.querySelector<HTMLButtonElement>('[data-account-tab="security"]')?.click();
-                }, 50);
-              }}
+              onClick={() => router.push("/settings/billing")}
               className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px]"
             >
               <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />

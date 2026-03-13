@@ -39,10 +39,10 @@ const SEAT_PRICE_MONTHLY = 12;
 const SEAT_PRICE_ANNUAL = 10;
 
 const storagePlans = [
-  { id: "free", name: "Free", storage: "5 GB", monthly: 0, annual: 0, description: "Included with every organization" },
-  { id: "starter", name: "Starter", storage: "25 GB", monthly: 15, annual: 13, description: "For growing teams with more data" },
-  { id: "growth", name: "Growth", storage: "75 GB", monthly: 45, annual: 38, description: "For established businesses" },
-  { id: "scale", name: "Scale", storage: "300 GB", monthly: 120, annual: 100, description: "For large organizations" },
+  { id: "free", name: "Free", storage: "5 GB", monthly: 0, annual: 0, emails: 100, description: "Included with every organization" },
+  { id: "starter", name: "Starter", storage: "25 GB", monthly: 15, annual: 13, emails: 500, description: "For growing teams with more data" },
+  { id: "growth", name: "Growth", storage: "75 GB", monthly: 45, annual: 38, emails: 3000, description: "For established businesses" },
+  { id: "scale", name: "Scale", storage: "300 GB", monthly: 120, annual: 100, emails: 10000, description: "For large organizations" },
 ];
 
 export default function BillingPage() {
@@ -303,7 +303,7 @@ export default function BillingPage() {
           <h3 className="text-sm font-semibold">Organization storage</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Storage covers all your organization data: documents, attachments, and more. 5 GB is included free.
+          Storage and email plans for your organization. Each plan includes file storage and customer email sending. 5 GB and 100 emails/mo included free.
         </p>
 
         {/* Storage usage bar */}
@@ -385,7 +385,17 @@ export default function BillingPage() {
                     <span className="text-xs text-muted-foreground line-through">${plan.monthly}</span>
                   )}
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground flex-1">{plan.description}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground">{plan.description}</p>
+                <ul className="mt-3 flex-1 space-y-1.5">
+                  <li className="flex items-center gap-2 text-[12px]">
+                    <Check className="size-3 shrink-0 text-emerald-600" />
+                    {plan.storage} file storage
+                  </li>
+                  <li className="flex items-center gap-2 text-[12px]">
+                    <Check className="size-3 shrink-0 text-emerald-600" />
+                    {plan.emails.toLocaleString()} emails/mo
+                  </li>
+                </ul>
                 <div className="mt-4">
                   {isCurrent ? (
                     <Button variant="outline" size="sm" className="w-full text-xs" disabled>

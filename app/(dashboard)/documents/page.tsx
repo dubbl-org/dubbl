@@ -69,6 +69,8 @@ interface Doc {
   fileSize: number;
   mimeType: string;
   folderId: string | null;
+  visibility: "organization" | "private";
+  uploadedBy: string;
   createdAt: string;
 }
 
@@ -106,6 +108,9 @@ export default function DocumentsPage() {
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadVisibility, setUploadVisibility] = useState<"organization" | "private">("organization");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const isSearching = search !== debouncedSearch;
@@ -219,12 +224,12 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleUpload(files: FileList | File[]) {
-    const fileArray = Array.from(files);
-    if (fileArray.length === 0) return;
+  async function handleUpload(files: File[], visibility: "organization" | "private" = "organization") {
+    if (files.length === 0) return;
     setUploading(true);
+    setUploadDialogOpen(false);
     try {
-      for (const file of fileArray) {
+      for (const file of files) {
         const res = await fetch("/api/v1/documents", {
           method: "POST",
           headers: getHeaders(),
@@ -233,6 +238,7 @@ export default function DocumentsPage() {
             fileSize: file.size,
             mimeType: file.type || "application/octet-stream",
             folderId: currentFolder,
+            visibility,
           }),
         });
         if (!res.ok) {
@@ -247,28 +253,56 @@ export default function DocumentsPage() {
         });
       }
       await fetchData();
-      toast.success(fileArray.length === 1 ? "File uploaded" : `${fileArray.length} files uploaded`);
+      toast.success(files.length === 1 ? "File uploaded" : `${files.length} files uploaded`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
+      setPendingFiles([]);
     }
   }
 
   function handleFileInput() {
-    const input = document.createElement("input");
+    const input = window.document.createElement("input");
     input.type = "file";
     input.multiple = true;
     input.onchange = () => {
-      if (input.files?.length) handleUpload(input.files);
+      if (input.files?.length) {
+        setPendingFiles(Array.from(input.files));
+        setUploadVisibility("organization");
+        setUploadDialogOpen(true);
+      }
     };
     input.click();
+  }
+
+  async function handleToggleVisibility(doc: Doc) {
+    const newVisibility = doc.visibility === "organization" ? "private" : "organization";
+    try {
+      const res = await fetch(`/api/v1/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ visibility: newVisibility }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update visibility");
+      }
+      await fetchData();
+      toast.success(newVisibility === "private" ? "File set to private" : "File shared with team");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update");
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
-    if (e.dataTransfer.files.length) handleUpload(e.dataTransfer.files);
+    if (e.dataTransfer.files.length) {
+      setPendingFiles(Array.from(e.dataTransfer.files));
+      setUploadVisibility("organization");
+      setUploadDialogOpen(true);
+    }
   }
 
   const currentFolderObj = folders.find((f) => f.id === currentFolder);
@@ -326,6 +360,67 @@ export default function DocumentsPage() {
 
   // Empty state when no folders and no documents at root level
   const isRootEmpty = !currentFolder && folders.length === 0 && documents.length === 0;
+
+  const uploadDialog = (
+    <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+      setUploadDialogOpen(open);
+      if (!open) setPendingFiles([]);
+    }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Upload {pendingFiles.length === 1 ? "File" : `${pendingFiles.length} Files`}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            {pendingFiles.map((file, i) => {
+              const { icon: FIcon, color: fColor } = getFileIcon(file.type);
+              return (
+                <div key={i} className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
+                  <FIcon className={cn("size-4 shrink-0", fColor)} />
+                  <span className="text-[13px] font-medium truncate flex-1">{file.name}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                    {formatFileSize(file.size)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Visibility</label>
+            <Select value={uploadVisibility} onValueChange={(v) => setUploadVisibility(v as "organization" | "private")}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="organization">
+                  <div className="flex items-center gap-2">
+                    <Users className="size-3.5 text-muted-foreground" />
+                    <span>Shared with team</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="private">
+                  <div className="flex items-center gap-2">
+                    <Lock className="size-3.5 text-muted-foreground" />
+                    <span>Private (only you)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setPendingFiles([]); }}>Cancel</Button>
+          <Button
+            onClick={() => handleUpload(pendingFiles, uploadVisibility)}
+            disabled={pendingFiles.length === 0 || uploading}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   const folderDialog = (
     <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
@@ -457,6 +552,7 @@ export default function DocumentsPage() {
           </div>
         </div>
 
+        {uploadDialog}
         {folderDialog}
         {confirmDialog}
       </ContentReveal>
@@ -686,19 +782,48 @@ export default function DocumentsPage() {
                   >
                     <FileIcon className={cn("size-5 shrink-0", iconColor)} />
                     <span className="text-sm font-medium truncate min-w-0 flex-1">{doc.fileName}</span>
+                    {doc.visibility === "private" && (
+                      <Badge variant="outline" className="shrink-0 text-[10px] gap-1 px-1.5 py-0 h-5 border-amber-200 text-amber-700 dark:border-amber-800 dark:text-amber-400">
+                        <Lock className="size-2.5" />
+                        Private
+                      </Badge>
+                    )}
                     <span className="text-[11px] text-muted-foreground tabular-nums w-20 text-right hidden sm:block">
                       {formatFileSize(doc.fileSize)}
                     </span>
                     <span className="text-[11px] text-muted-foreground w-24 text-right hidden sm:block">
                       {new Date(doc.createdAt).toLocaleDateString()}
                     </span>
-                    <div className="w-16 shrink-0 flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => handleDownload(doc)}>
-                        <Download className="size-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="size-7 p-0 text-destructive" onClick={() => handleDeleteDoc(doc)}>
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                    <div className="w-16 shrink-0 flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="size-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <MoreHorizontal className="size-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDownload(doc)}>
+                            <Download className="size-4" /> Download
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleVisibility(doc)}>
+                            {doc.visibility === "private" ? (
+                              <><Users className="size-4" /> Share with team</>
+                            ) : (
+                              <><Lock className="size-4" /> Make private</>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => handleDeleteDoc(doc)}
+                          >
+                            <Trash2 className="size-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </motion.div>
                 );
