@@ -85,6 +85,8 @@ export async function GET(
       subtotal: inv.subtotal,
       taxTotal: inv.taxTotal,
       total: inv.total,
+      amountPaid: inv.amountPaid,
+      amountDue: inv.amountDue,
       currencyCode: inv.currencyCode,
       reference: inv.reference,
       notes: inv.notes,

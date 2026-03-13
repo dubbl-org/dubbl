@@ -52,6 +52,8 @@ export async function POST(
       subtotal: 30000,
       taxTotal: 3000,
       total: 33000,
+      amountPaid: 0,
+      amountDue: 33000,
       currencyCode: "USD",
       reference: "PO-123",
       notes: null,
