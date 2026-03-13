@@ -11,6 +11,7 @@ import { getNextNumber } from "@/lib/api/numbering";
 import { processRecurringTemplates } from "@/lib/api/recurring-generate";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -107,6 +108,8 @@ export async function POST(request: Request) {
     const parsed = createSchema.parse(body);
 
     await assertNotLocked(ctx.organizationId, parsed.issueDate);
+    await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
+    await checkMultiCurrency(ctx.organizationId, parsed.currencyCode);
 
     const invoiceNumber = await getNextNumber(ctx.organizationId, "invoice", "invoice_number", "INV");
 

@@ -49,7 +49,7 @@ export async function GET(
       overrideInvoicesPerMonth: sub.overrideInvoicesPerMonth,
       overrideProjects: sub.overrideProjects,
       overrideBankAccounts: sub.overrideBankAccounts,
-      overrideCurrencies: sub.overrideCurrencies,
+      overrideMultiCurrency: sub.overrideMultiCurrency,
       overrideEntriesPerMonth: sub.overrideEntriesPerMonth,
     } : null);
 
@@ -99,21 +99,30 @@ export async function PATCH(
     if (typeof body.adminNotes === "string") subFields.adminNotes = body.adminNotes || null;
 
     // Override fields (null to reset to plan default)
-    const overrideKeys = [
+    const numericOverrideKeys = [
       "overrideMembers",
       "overrideStorageMb",
       "overrideContacts",
       "overrideInvoicesPerMonth",
       "overrideProjects",
       "overrideBankAccounts",
-      "overrideCurrencies",
       "overrideEntriesPerMonth",
     ] as const;
 
-    for (const key of overrideKeys) {
+    for (const key of numericOverrideKeys) {
       if (key in body) {
         subFields[key] = body[key] === null || body[key] === "" ? null : Number(body[key]);
       }
+    }
+
+    // Boolean override
+    if ("overrideMultiCurrency" in body) {
+      subFields.overrideMultiCurrency = body.overrideMultiCurrency === null ? null : Boolean(body.overrideMultiCurrency);
+    }
+
+    // Storage plan override (for manually managed orgs)
+    if (body.storagePlan && ["free", "starter", "growth", "scale"].includes(body.storagePlan)) {
+      subFields.storagePlan = body.storagePlan;
     }
 
     if (Object.keys(subFields).length > 0) {

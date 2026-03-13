@@ -7,6 +7,7 @@ import { NotificationDigestEmail } from "@/lib/email/templates/notification-dige
 import { WelcomeEmail } from "@/lib/email/templates/welcome";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { MemberInviteEmail } from "@/lib/email/templates/member-invite";
+import { LoginAlertEmail } from "@/lib/email/templates/login-alert";
 
 const TEMPLATES: Record<string, { name: string; component: () => React.ReactElement }> = {
   "notification-digest": {
@@ -56,6 +57,18 @@ const TEMPLATES: Record<string, { name: string; component: () => React.ReactElem
         orgName: "Acme Corp",
         role: "admin",
         loginUrl: "https://dubbl.dev/sign-in",
+      }),
+  },
+  "login-alert": {
+    name: "Login Alert",
+    component: () =>
+      createElement(LoginAlertEmail, {
+        userName: "John",
+        ipAddress: "203.0.113.42",
+        userAgent: "Chrome 120 on macOS",
+        provider: "Google",
+        timestamp: "March 13, 2026 at 2:30 PM",
+        securityUrl: "https://dubbl.dev/settings",
       }),
   },
 };

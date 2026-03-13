@@ -9,6 +9,7 @@ import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { wrapTool } from "@/lib/mcp/errors";
+import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { sendEmail } from "@/lib/email/smtp-client";
 import { randomBytes } from "crypto";
 import type { AuthContext } from "@/lib/api/auth-context";
@@ -170,6 +171,8 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
         requireRole(ctx, "manage:invoices");
 
         await assertNotLocked(ctx.organizationId, params.issueDate);
+        await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode ?? "USD");
 
         const invoiceNumber = await getNextNumber(
           ctx.organizationId,

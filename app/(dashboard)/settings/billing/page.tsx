@@ -39,38 +39,10 @@ const SEAT_PRICE_MONTHLY = 12;
 const SEAT_PRICE_ANNUAL = 10;
 
 const storagePlans = [
-  {
-    id: "free",
-    name: "Free",
-    storage: "5 GB",
-    price: "$0",
-    period: "",
-    description: "Included with every organization",
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    storage: "25 GB",
-    price: "$15",
-    period: "/mo",
-    description: "For growing teams with more data",
-  },
-  {
-    id: "growth",
-    name: "Growth",
-    storage: "75 GB",
-    price: "$45",
-    period: "/mo",
-    description: "For established businesses",
-  },
-  {
-    id: "scale",
-    name: "Scale",
-    storage: "300 GB",
-    price: "$120",
-    period: "/mo",
-    description: "For large organizations",
-  },
+  { id: "free", name: "Free", storage: "5 GB", monthly: 0, annual: 0, description: "Included with every organization" },
+  { id: "starter", name: "Starter", storage: "25 GB", monthly: 15, annual: 13, description: "For growing teams with more data" },
+  { id: "growth", name: "Growth", storage: "75 GB", monthly: 45, annual: 38, description: "For established businesses" },
+  { id: "scale", name: "Scale", storage: "300 GB", monthly: 120, annual: 100, description: "For large organizations" },
 ];
 
 export default function BillingPage() {
@@ -110,7 +82,10 @@ export default function BillingPage() {
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
-      else throw new Error(typeof data.error === "string" ? data.error : "Failed to start checkout");
+      else if (data.updated) {
+        toast.success("Plan updated successfully");
+        window.location.reload();
+      } else throw new Error(typeof data.error === "string" ? data.error : "Failed to start checkout");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to start checkout");
       setCheckoutLoading(null);
@@ -370,6 +345,7 @@ export default function BillingPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {storagePlans.map((plan) => {
             const isCurrent = plan.id === currentStorage;
+            const currentPrice = interval === "annual" ? plan.annual : plan.monthly;
             return (
               <div
                 key={plan.id}
@@ -391,9 +367,23 @@ export default function BillingPage() {
                 <div className="mt-2">
                   <span className="text-2xl font-bold tracking-tight">{plan.storage}</span>
                 </div>
-                <div className="mt-1">
-                  <span className="text-lg font-semibold">{plan.price}</span>
-                  <span className="text-xs text-muted-foreground">{plan.period}</span>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={interval}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.15 }}
+                      className="text-lg font-semibold"
+                    >
+                      ${currentPrice}
+                    </motion.span>
+                  </AnimatePresence>
+                  {currentPrice > 0 && <span className="text-xs text-muted-foreground">/mo</span>}
+                  {interval === "annual" && plan.monthly > 0 && (
+                    <span className="text-xs text-muted-foreground line-through">${plan.monthly}</span>
+                  )}
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground flex-1">{plan.description}</p>
                 <div className="mt-4">

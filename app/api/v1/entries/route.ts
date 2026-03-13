@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import { centsToDecimal } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { checkMonthlyLimit } from "@/lib/api/check-limit";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
     const parsed = createSchema.parse(body);
 
     await assertNotLocked(ctx.organizationId, parsed.date);
+    await checkMonthlyLimit(ctx.organizationId, journalEntry, journalEntry.organizationId, journalEntry.createdAt, "entriesPerMonth");
 
     // Validate balance
     const totalDebit = parsed.lines.reduce((sum, l) => sum + l.debitAmount, 0);

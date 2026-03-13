@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { member, apiKey, advisorAccess, customRole } from "@/lib/db/schema";
+import { member, apiKey, advisorAccess, customRole, users } from "@/lib/db/schema";
 import { subscription } from "@/lib/db/schema/billing";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
@@ -86,6 +86,19 @@ export async function getAuthContext(
   // Session auth
   const session = await auth();
   if (!session?.user?.id) throw new AuthError("Not authenticated", 401);
+
+  // Check if session was revoked (sign out all devices)
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.user.id),
+    columns: { sessionRevokedAt: true },
+  });
+  if (user?.sessionRevokedAt) {
+    // JWT iat is in seconds, sessionRevokedAt is a Date
+    const tokenIat = (session as unknown as { iat?: number }).iat;
+    if (tokenIat && tokenIat < Math.floor(user.sessionRevokedAt.getTime() / 1000)) {
+      throw new AuthError("Session expired. Please sign in again.", 401);
+    }
+  }
 
   const orgId = organizationId || request.headers.get("x-organization-id");
 

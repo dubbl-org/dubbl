@@ -172,9 +172,16 @@ export async function POST(request: Request) {
       });
 
       if (storageMatch) {
-        // Storage subscription update - just track status
-        const storageStatus = sub.status === "active" ? "active" : "canceled";
-        if (storageStatus === "canceled") {
+        if (sub.status === "active") {
+          // Storage subscription updated (upgrade/downgrade) - update price ID
+          await db
+            .update(subscription)
+            .set({
+              stripeStoragePriceId: sub.items.data[0]?.price.id || null,
+              updatedAt: new Date(),
+            })
+            .where(eq(subscription.id, storageMatch.id));
+        } else if (sub.status === "canceled") {
           await db
             .update(subscription)
             .set({

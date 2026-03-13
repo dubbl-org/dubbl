@@ -69,9 +69,15 @@ volumes:
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `AUTH_SECRET` | Yes | Random secret for JWT signing |
-| `AUTH_URL` | Yes | Public URL of your instance |
+| `NEXT_PUBLIC_APP_URL` | Yes | Public URL of your instance |
+| `AUTH_GOOGLE_ID` | No | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | No | Google OAuth client secret |
+| `AUTH_APPLE_ID` | No | Apple Sign In service ID |
+| `AUTH_APPLE_SECRET` | No | Apple Sign In private key |
 | `STRIPE_SECRET_KEY` | No | Stripe API key for billing |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
+| `RESEND_API_KEY` | No | Resend API key for platform emails |
+| `CRON_SECRET` | No | Secret for protecting cron endpoints |
 | `S3_BUCKET` | No | S3 bucket for file uploads |
 | `S3_REGION` | No | S3 region |
 | `S3_ACCESS_KEY_ID` | No | S3 access key |
@@ -79,8 +85,34 @@ volumes:
 | `S3_ENDPOINT` | No | Custom S3 endpoint (for MinIO, etc.) |
 
 <Callout type="warn">
-  Always set a strong, unique `AUTH_SECRET` in production. Never reuse the default value.
+  Always set a strong, unique `AUTH_SECRET` in production. Generate one with `openssl rand -base64 32`.
 </Callout>
+
+## Authentication
+
+Dubbl supports three authentication methods:
+
+- **Email & Password** - Works out of the box, no additional setup needed
+- **Google OAuth** - Requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+- **Apple Sign In** - Requires `AUTH_APPLE_ID` and `AUTH_APPLE_SECRET` from [Apple Developer](https://developer.apple.com)
+
+For OAuth providers, set the callback URL to `https://your-domain.com/api/auth/callback/google` (or `/apple`).
+
+## Billing (Stripe)
+
+Billing is fully optional. Without Stripe configured, all users get the free plan. Site admins can override plan limits per organization from `/admin/organizations`.
+
+To enable paid plans, see the [Billing & Stripe Setup](/docs/settings/billing) guide for full instructions on creating products, prices, and configuring webhooks.
+
+<Callout type="info">
+  Self-hosted instances don't need Stripe. Use admin overrides to grant Pro/Business features to any organization.
+</Callout>
+
+## Email
+
+Platform emails (welcome, invitations, login alerts, notification digests) use [Resend](https://resend.com). Set `RESEND_API_KEY` to enable these. Without it, platform emails are silently skipped.
+
+Organization-level emails (invoices, reminders, statements) use per-org SMTP configuration set up in Settings > Email.
 
 ## Database
 

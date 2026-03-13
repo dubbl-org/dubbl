@@ -2,6 +2,7 @@
   "pages": [
     "index",
     "organization",
+    "billing",
     "cost-centers",
     "tags",
     "reminders",

@@ -17,7 +17,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/shared/container";
 import { cn } from "@/lib/utils";
-import { PLAN_LIMITS, PLAN_PRICES } from "@/lib/plans";
+import { PLAN_LIMITS, PLAN_PRICES, STORAGE_PLANS } from "@/lib/plans";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -44,39 +44,11 @@ function fmtAudit(days: number): string {
 /*  Data                                                               */
 /* ------------------------------------------------------------------ */
 
-const storagePlans = [
-  {
-    name: "Free",
-    files: "5 GB",
-    price: 0,
-    emails: "100/mo",
-    description: "Included with every org",
-    example: "Documents, receipts, and invoice attachments",
-  },
-  {
-    name: "Starter",
-    files: "25 GB",
-    price: 15,
-    emails: "500/mo",
-    description: "For growing teams",
-    example: "Bulk document uploads, years of receipts",
-  },
-  {
-    name: "Growth",
-    files: "75 GB",
-    price: 45,
-    emails: "3,000/mo",
-    description: "For established businesses",
-    example: "Large file archives with full attachment history",
-  },
-  {
-    name: "Scale",
-    files: "300 GB",
-    price: 120,
-    emails: "10,000/mo",
-    description: "For large organizations",
-    example: "Enterprise-grade document archival",
-  },
+const storagePlansMeta = [
+  { key: "free" as const, name: "Free", description: "Included with every org", example: "Documents, receipts, and invoice attachments" },
+  { key: "starter" as const, name: "Starter", description: "For growing teams", example: "Bulk document uploads, years of receipts" },
+  { key: "growth" as const, name: "Growth", description: "For established businesses", example: "Large file archives with full attachment history" },
+  { key: "scale" as const, name: "Scale", description: "For large organizations", example: "Enterprise-grade document archival" },
 ];
 
 const comparisonRows = [
@@ -396,80 +368,105 @@ export default function PricingPage() {
           </div>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {storagePlans.map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 + i * 0.08 }}
-                className="group relative flex flex-col rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-black/5 hover:border-emerald-500/30"
-              >
-                <div className="flex flex-1 flex-col p-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">{plan.name}</h3>
-                    {i === 0 && (
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        Included
-                      </span>
-                    )}
-                  </div>
+            {storagePlansMeta.map((meta, i) => {
+              const plan = STORAGE_PLANS[meta.key];
+              const currentPrice = interval === "annual" ? plan.annual : plan.monthly;
+              const files = fmtStorage(plan.filesMb);
+              const emails = `${plan.emailsPerMonth.toLocaleString()}/mo`;
 
-                  <div className="mt-3 flex items-baseline gap-1">
-                    {plan.price === 0 ? (
-                      <span className="font-mono text-3xl font-bold tracking-tighter">$0</span>
-                    ) : (
-                      <>
-                        <span className="font-mono text-3xl font-bold tracking-tighter">
-                          ${plan.price}
+              return (
+                <motion.div
+                  key={meta.name}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 + i * 0.08 }}
+                  className="group relative flex flex-col rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-black/5 hover:border-emerald-500/30"
+                >
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">{meta.name}</h3>
+                      {i === 0 && (
+                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          Included
                         </span>
-                        <span className="text-xs text-muted-foreground">/mo</span>
-                      </>
-                    )}
-                  </div>
-
-                  <p className="mt-2 text-xs text-muted-foreground">{plan.description}</p>
-
-                  {/* Stats */}
-                  <div className="mt-5 space-y-3 flex-1">
-                    <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <FileBox className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-xs text-muted-foreground">Files</span>
-                      </div>
-                      <span className="font-mono text-sm font-semibold tabular-nums">{plan.files}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <Mail className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-xs text-muted-foreground">Emails</span>
-                      </div>
-                      <span className="font-mono text-sm font-semibold tabular-nums">{plan.emails}</span>
+                      )}
                     </div>
 
-                    <p className="text-[11px] leading-relaxed text-muted-foreground/70 px-1">
-                      {plan.example}
-                    </p>
-                  </div>
+                    <div className="mt-3 flex items-baseline gap-1">
+                      {currentPrice === 0 ? (
+                        <span className="font-mono text-3xl font-bold tracking-tighter">$0</span>
+                      ) : (
+                        <>
+                          <AnimatePresence mode="wait">
+                            <motion.span
+                              key={interval}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ duration: 0.2 }}
+                              className="font-mono text-3xl font-bold tracking-tighter"
+                            >
+                              ${currentPrice}
+                            </motion.span>
+                          </AnimatePresence>
+                          <span className="text-xs text-muted-foreground">/mo</span>
+                          {interval === "annual" && plan.monthly > 0 && (
+                            <motion.span
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="text-sm text-muted-foreground line-through"
+                            >
+                              ${plan.monthly}
+                            </motion.span>
+                          )}
+                        </>
+                      )}
+                    </div>
 
-                  <div className="mt-6">
-                    {i === 0 ? (
-                      <Button variant="outline" size="sm" className="w-full text-xs" disabled>
-                        Included
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs group-hover:border-emerald-500/40 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
-                        asChild
-                      >
-                        <a href="/sign-up">Add {plan.name}</a>
-                      </Button>
-                    )}
+                    <p className="mt-2 text-xs text-muted-foreground">{meta.description}</p>
+
+                    {/* Stats */}
+                    <div className="mt-5 space-y-3 flex-1">
+                      <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <FileBox className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-xs text-muted-foreground">Files</span>
+                        </div>
+                        <span className="font-mono text-sm font-semibold tabular-nums">{files}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Mail className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-xs text-muted-foreground">Emails</span>
+                        </div>
+                        <span className="font-mono text-sm font-semibold tabular-nums">{emails}</span>
+                      </div>
+
+                      <p className="text-[11px] leading-relaxed text-muted-foreground/70 px-1">
+                        {meta.example}
+                      </p>
+                    </div>
+
+                    <div className="mt-6">
+                      {i === 0 ? (
+                        <Button variant="outline" size="sm" className="w-full text-xs" disabled>
+                          Included
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs group-hover:border-emerald-500/40 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
+                          asChild
+                        >
+                          <a href="/sign-up">Add {meta.name}</a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
 

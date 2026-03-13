@@ -66,10 +66,10 @@ export const PLAN_LIMITS = {
 } as const;
 
 export const STORAGE_PLANS = {
-  free: { filesMb: 5120, emailsPerMonth: 100, price: 0 },
-  starter: { filesMb: 25600, emailsPerMonth: 500, price: 15 },
-  growth: { filesMb: 76800, emailsPerMonth: 3000, price: 45 },
-  scale: { filesMb: 307200, emailsPerMonth: 10000, price: 120 },
+  free: { filesMb: 5120, emailsPerMonth: 100, monthly: 0, annual: 0 },
+  starter: { filesMb: 25600, emailsPerMonth: 500, monthly: 15, annual: 13 },
+  growth: { filesMb: 76800, emailsPerMonth: 3000, monthly: 45, annual: 38 },
+  scale: { filesMb: 307200, emailsPerMonth: 10000, monthly: 120, annual: 100 },
 } as const;
 
 export type StoragePlanName = keyof typeof STORAGE_PLANS;

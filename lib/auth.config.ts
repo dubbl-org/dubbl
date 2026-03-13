@@ -45,6 +45,7 @@ export const authConfig: NextAuthConfig = {
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.iat = Math.floor(Date.now() / 1000);
       }
       return token;
     },
@@ -52,6 +53,9 @@ export const authConfig: NextAuthConfig = {
       if (session.user && token.id) {
         session.user.id = token.id as string;
       }
+      // Pass token issued-at to session for revocation checks
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (session as any).iat = token.iat;
       return session;
     },
   },

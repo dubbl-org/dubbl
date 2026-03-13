@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { isValidBusinessType } from "@/lib/data/business-types";
+import { checkOrganizationLimit, LimitExceededError } from "@/lib/api/check-limit";
 import { render } from "@react-email/render";
 import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
@@ -121,6 +122,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
+    // Check org limit
+    await checkOrganizationLimit(session.user.id);
+
     // Check slug uniqueness
     const existing = await db.query.organization.findFirst({
       where: eq(organization.slug, parsed.slug),
@@ -163,6 +167,9 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    if (err instanceof LimitExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
     }
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues[0].message }, { status: 400 });

@@ -36,7 +36,6 @@ import {
   CreditCard,
   Zap,
   AlertTriangle,
-  ArrowRightLeft,
   Check,
   Gauge,
   StickyNote,
@@ -73,7 +72,8 @@ interface Sub {
   overrideInvoicesPerMonth?: number | null;
   overrideProjects?: number | null;
   overrideBankAccounts?: number | null;
-  overrideCurrencies?: number | null;
+  overrideMultiCurrency?: boolean | null;
+  storagePlan?: string;
   overrideEntriesPerMonth?: number | null;
 }
 
@@ -93,7 +93,7 @@ interface Limits {
   invoicesPerMonth: number;
   projects: number;
   bankAccounts: number;
-  currencies: number;
+  multiCurrency: boolean;
   entriesPerMonth: number;
   [key: string]: number | boolean | string[];
 }
@@ -131,7 +131,6 @@ const LIMIT_FIELDS = [
   { key: "overrideInvoicesPerMonth", defaultKey: "invoicesPerMonth", label: "Invoices / mo", icon: CreditCard },
   { key: "overrideProjects", defaultKey: "projects", label: "Projects", icon: Building2 },
   { key: "overrideBankAccounts", defaultKey: "bankAccounts", label: "Bank Accounts", icon: CreditCard },
-  { key: "overrideCurrencies", defaultKey: "currencies", label: "Currencies", icon: ArrowRightLeft },
   { key: "overrideEntriesPerMonth", defaultKey: "entriesPerMonth", label: "Entries / mo", icon: StickyNote },
 ] as const;
 
