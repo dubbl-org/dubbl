@@ -6,7 +6,6 @@ import {
   Minus,
   ArrowRight,
   Mail,
-  Database,
   FileBox,
   Github,
   Sparkles,
@@ -45,39 +44,35 @@ function fmtAudit(days: number): string {
 const storagePlans = [
   {
     name: "Free",
-    files: "2 GB",
-    db: "500 MB",
+    files: "5 GB",
     price: 0,
     emails: "100/mo",
     description: "Included with every org",
-    example: "~10,000 transactions, 200 invoices with attachments",
+    example: "Documents, receipts, and invoice attachments",
   },
   {
     name: "Starter",
-    files: "20 GB",
-    db: "3 GB",
+    files: "25 GB",
     price: 15,
     emails: "500/mo",
     description: "For growing teams",
-    example: "~75k transactions, bulk document uploads",
+    example: "Bulk document uploads, years of receipts",
   },
   {
     name: "Growth",
-    files: "60 GB",
-    db: "15 GB",
+    files: "75 GB",
     price: 45,
     emails: "3,000/mo",
     description: "For established businesses",
-    example: "~400k transactions, years of history with attachments",
+    example: "Large file archives with full attachment history",
   },
   {
     name: "Scale",
-    files: "250 GB",
-    db: "60 GB",
+    files: "300 GB",
     price: 120,
     emails: "10,000/mo",
     description: "For large organizations",
-    example: "1.5M+ transactions, enterprise-grade archival",
+    example: "Enterprise-grade document archival",
   },
 ];
 
@@ -85,7 +80,6 @@ const comparisonRows = [
   { label: "Organizations", free: fmt(PLAN_LIMITS.free.organizations), pro: fmt(PLAN_LIMITS.pro.organizations) },
   { label: "Team members", free: fmt(PLAN_LIMITS.free.members), pro: fmt(PLAN_LIMITS.pro.members) },
   { label: "Journal entries / month", free: fmt(PLAN_LIMITS.free.entriesPerMonth), pro: fmt(PLAN_LIMITS.pro.entriesPerMonth) },
-  { label: "Currencies", free: fmt(PLAN_LIMITS.free.currencies), pro: fmt(PLAN_LIMITS.pro.currencies) },
   { label: "Contacts", free: fmt(PLAN_LIMITS.free.contacts), pro: fmt(PLAN_LIMITS.pro.contacts) },
   { label: "Invoices / month", free: fmt(PLAN_LIMITS.free.invoicesPerMonth), pro: fmt(PLAN_LIMITS.pro.invoicesPerMonth) },
   { label: "Bank accounts", free: fmt(PLAN_LIMITS.free.bankAccounts), pro: fmt(PLAN_LIMITS.pro.bankAccounts) },
@@ -151,25 +145,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function PricingPage() {
   return (
-    <div className="relative overflow-hidden">
-      {/* ─── Background ─── */}
-      <div className="pointer-events-none absolute inset-0">
-        {/* Grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#10b98112_1px,transparent_1px),linear-gradient(to_bottom,#10b98112_1px,transparent_1px)] bg-[size:48px_48px] dark:bg-[linear-gradient(to_right,#10b98106_1px,transparent_1px),linear-gradient(to_bottom,#10b98106_1px,transparent_1px)]" />
-
-        {/* Radial glows */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_30%,rgba(16,185,129,0.08),transparent_70%)] dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_30%,rgba(16,185,129,0.04),transparent_70%)]" />
-
-        {/* Secondary glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_70%_60%,rgba(16,185,129,0.05),transparent)] dark:bg-[radial-gradient(ellipse_40%_30%_at_70%_60%,rgba(16,185,129,0.03),transparent)]" />
-
-        {/* Edge fades */}
-        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-background to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
-      </div>
-
+    <div className="relative">
       <Container className="relative pt-32 pb-24">
-        {/* ─── Hero ─── */}
+        {/* Hero */}
         <motion.div
           className="mx-auto max-w-3xl text-center"
           initial={{ opacity: 0, y: 24 }}
@@ -194,7 +172,7 @@ export default function PricingPage() {
           </p>
         </motion.div>
 
-        {/* ─── Seat Plans ─── */}
+        {/* Seat Plans */}
         <motion.div
           className="mt-20"
           initial={{ opacity: 0, y: 32 }}
@@ -204,11 +182,8 @@ export default function PricingPage() {
           <SectionLabel>Team plans</SectionLabel>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
-            {/* ── Free ── */}
-            <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-lg hover:shadow-black/5">
-              {/* Top accent */}
-              <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-
+            {/* Free */}
+            <div className="group relative flex flex-col rounded-2xl border border-border bg-card transition-shadow hover:shadow-lg hover:shadow-black/5">
               <div className="flex flex-1 flex-col p-8 lg:p-10">
                 <div className="flex items-center gap-3">
                   <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
@@ -237,11 +212,11 @@ export default function PricingPage() {
                       `${fmt(PLAN_LIMITS.free.organizations)} organization`,
                       `${fmt(PLAN_LIMITS.free.members)} member (owner)`,
                       `${fmt(PLAN_LIMITS.free.entriesPerMonth)} entries/mo`,
-                      `${fmt(PLAN_LIMITS.free.currencies)} currency`,
                       `${fmt(PLAN_LIMITS.free.contacts)} contacts`,
                       `${fmt(PLAN_LIMITS.free.invoicesPerMonth)} invoices/mo`,
                       `${fmt(PLAN_LIMITS.free.bankAccounts)} bank account`,
                       `${fmt(PLAN_LIMITS.free.projects)} projects`,
+                      "Single currency",
                       "Trial balance & GL",
                       fmtStorage(PLAN_LIMITS.free.storageMb) + " storage",
                       `${fmtAudit(PLAN_LIMITS.free.auditLogDays)} audit log`,
@@ -263,49 +238,40 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {/* ── Pro ── */}
-            <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950 to-[#0a0d0b] text-emerald-50 shadow-2xl shadow-emerald-950/30 transition-shadow hover:shadow-emerald-950/50 dark:border-emerald-500/20">
-              {/* Top accent glow */}
-              <div className="h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
-
+            {/* Pro */}
+            <div className="group relative flex flex-col rounded-2xl border-2 border-emerald-500/40 bg-card transition-shadow hover:shadow-lg hover:shadow-emerald-500/10 dark:border-emerald-500/30">
               {/* Badge */}
               <div className="absolute right-6 top-6">
-                <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1">
-                  <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+                <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 dark:border-emerald-800 dark:bg-emerald-950">
+                  <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                     Popular
                   </span>
                 </div>
               </div>
 
-              {/* Background decoration */}
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_70%_-10%,rgba(16,185,129,0.15),transparent)]" />
-              <div className="pointer-events-none absolute inset-0 blueprint-hash opacity-[0.03]" />
-
-              <div className="relative flex flex-1 flex-col p-8 lg:p-10">
+              <div className="flex flex-1 flex-col p-8 lg:p-10">
                 <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/20">
-                    <Zap className="size-5 text-emerald-400" />
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950">
+                    <Zap className="size-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Pro</h3>
-                    <p className="text-xs text-emerald-300/70">For teams</p>
+                    <h3 className="text-lg font-semibold">Pro</h3>
+                    <p className="text-xs text-muted-foreground">For teams</p>
                   </div>
                 </div>
 
                 <div className="mt-8 flex items-baseline gap-2">
-                  <span className="font-mono text-6xl font-bold tracking-tighter text-white">
+                  <span className="font-mono text-6xl font-bold tracking-tighter text-foreground">
                     ${PLAN_PRICES.pro}
                   </span>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-emerald-300/70">/seat/mo</span>
-                  </div>
+                  <span className="text-sm text-muted-foreground">/seat/mo</span>
                 </div>
-                <p className="mt-1 text-xs text-emerald-300/50">
+                <p className="mt-1 text-xs text-muted-foreground/70">
                   1st member free, then ${PLAN_PRICES.pro}/additional seat
                 </p>
 
-                <p className="mt-4 text-sm leading-relaxed text-emerald-100/70">
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                   Advanced reports, API access, multi-currency, and team collaboration.
                 </p>
 
@@ -315,8 +281,7 @@ export default function PricingPage() {
                       `${fmt(PLAN_LIMITS.pro.organizations)} organizations`,
                       `Up to ${fmt(PLAN_LIMITS.pro.members)} members`,
                       "Unlimited entries",
-                      `${fmt(PLAN_LIMITS.pro.currencies)} currencies`,
-                      `${fmt(PLAN_LIMITS.pro.contacts)} contacts`,
+                      "Unlimited contacts",
                       `${fmt(PLAN_LIMITS.pro.invoicesPerMonth)} invoices/mo`,
                       `${fmt(PLAN_LIMITS.pro.bankAccounts)} bank accounts`,
                       `${fmt(PLAN_LIMITS.pro.projects)} projects`,
@@ -328,8 +293,8 @@ export default function PricingPage() {
                       "Priority support",
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-2 text-[13px]">
-                        <Check className="size-3.5 shrink-0 text-emerald-400" />
-                        <span className="text-emerald-100/80">{f}</span>
+                        <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-muted-foreground">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -337,7 +302,7 @@ export default function PricingPage() {
 
                 <div className="mt-10">
                   <Button
-                    className="w-full h-12 text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/25 transition-all"
+                    className="w-full h-12 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
                     asChild
                   >
                     <a href="/sign-up?plan=pro">
@@ -351,7 +316,7 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {/* ─── Storage Add-ons ─── */}
+        {/* Storage Add-ons */}
         <motion.div
           className="mt-32"
           initial={{ opacity: 0, y: 32 }}
@@ -365,9 +330,9 @@ export default function PricingPage() {
               Add storage as you grow
             </h2>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-              File storage for documents and receipts. Database storage for
-              transactions and records. Customer emails for invoices and
-              reminders. Upgrade independently from your team plan.
+              File storage for documents, receipts, and attachments. Customer
+              emails for invoices and reminders. Unlimited transactions and
+              records. Upgrade independently from your team plan.
             </p>
           </div>
 
@@ -378,23 +343,8 @@ export default function PricingPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 + i * 0.08 }}
-                className={cn(
-                  "group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition-all hover:shadow-lg hover:shadow-black/5",
-                  i === 0
-                    ? "border-border"
-                    : "border-border hover:border-emerald-500/30"
-                )}
+                className="group relative flex flex-col rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-black/5 hover:border-emerald-500/30"
               >
-                {/* Top line */}
-                <div
-                  className={cn(
-                    "h-px",
-                    i === 0
-                      ? "bg-gradient-to-r from-transparent via-border to-transparent"
-                      : "bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"
-                  )}
-                />
-
                 <div className="flex flex-1 flex-col p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">{plan.name}</h3>
@@ -431,25 +381,15 @@ export default function PricingPage() {
                     </div>
                     <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <Database className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-xs text-muted-foreground">Database</span>
-                      </div>
-                      <span className="font-mono text-sm font-semibold tabular-nums">{plan.db}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                      <div className="flex items-center gap-2">
                         <Mail className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span className="text-xs text-muted-foreground">Emails</span>
                       </div>
                       <span className="font-mono text-sm font-semibold tabular-nums">{plan.emails}</span>
                     </div>
 
-                    {/* Example callout */}
-                    <div className="relative rounded-lg border border-dashed border-border px-3 py-2.5">
-                      <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        {plan.example}
-                      </p>
-                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground/70 px-1">
+                      {plan.example}
+                    </p>
                   </div>
 
                   <div className="mt-6">
@@ -474,29 +414,26 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {/* ─── Self-hosting callout ─── */}
+        {/* Self-hosting callout */}
         <motion.div
           className="mt-20"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950 to-[#0a0d0b] px-8 py-8 lg:px-12">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_50%_80%_at_20%_50%,rgba(16,185,129,0.1),transparent)]" />
-            <div className="pointer-events-none absolute inset-0 blueprint-hash opacity-[0.04]" />
-
-            <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="rounded-2xl border border-border bg-muted/30 px-8 py-8 lg:px-12">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="max-w-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <Github className="size-5 text-emerald-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  <Github className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                     Open Source
                   </span>
                 </div>
-                <h3 className="text-xl font-semibold text-white">
+                <h3 className="text-xl font-semibold text-foreground">
                   Self-host with zero limits
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-emerald-100/60">
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   dubbl is Apache 2.0 licensed. Self-hosted instances unlock
                   every feature with no user caps and no telemetry. Cloud plans
                   fund development.
@@ -504,7 +441,6 @@ export default function PricingPage() {
               </div>
               <Button
                 variant="outline"
-                className="shrink-0 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/10 hover:text-emerald-100 hover:border-emerald-500/50"
                 asChild
               >
                 <a
@@ -520,7 +456,7 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {/* ─── Comparison Table ─── */}
+        {/* Comparison Table */}
         <motion.div
           className="mt-32"
           initial={{ opacity: 0, y: 32 }}
@@ -616,7 +552,7 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {/* ─── FAQ ─── */}
+        {/* FAQ */}
         <motion.div
           className="mt-32"
           initial={{ opacity: 0, y: 32 }}
@@ -674,50 +610,40 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {/* ─── Bottom CTA ─── */}
+        {/* Bottom CTA */}
         <motion.div
           className="mt-32"
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <div className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] px-8 py-16 text-center lg:px-16 lg:py-20">
-            {/* Decorations */}
-            <div className="pointer-events-none absolute inset-0 blueprint-hash opacity-[0.04]" />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(16,185,129,0.08),transparent)]" />
-
-            {/* Corner dashes */}
-            <div className="pointer-events-none absolute left-6 top-6 size-16 rounded-lg border border-dashed border-emerald-500/20" />
-            <div className="pointer-events-none absolute right-6 bottom-6 size-16 rounded-lg border border-dashed border-emerald-500/20" />
-
-            <div className="relative">
-              <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold text-white sm:text-4xl lg:text-5xl">
-                Ready to get started?
-              </h2>
-              <p className="mx-auto mt-4 max-w-md text-emerald-100/60">
-                Join teams using dubbl for modern double-entry bookkeeping.
-                Start free, upgrade when you need more.
-              </p>
-              <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Button
-                  size="lg"
-                  className="h-13 px-8 bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/25 transition-all font-semibold"
-                  asChild
-                >
-                  <a href="/sign-up">
-                    Start for Free
-                    <ArrowRight className="ml-2 size-4" />
-                  </a>
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="h-13 px-8 border-white/20 text-white hover:bg-white/10 hover:border-white/30"
-                  asChild
-                >
-                  <a href="/contact">Talk to Sales</a>
-                </Button>
-              </div>
+          <div className="rounded-2xl border border-border bg-muted/20 px-8 py-16 text-center lg:px-16 lg:py-20">
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold text-foreground sm:text-4xl lg:text-5xl">
+              Ready to get started?
+            </h2>
+            <p className="mx-auto mt-4 max-w-md text-muted-foreground">
+              Join teams using dubbl for modern double-entry bookkeeping.
+              Start free, upgrade when you need more.
+            </p>
+            <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <Button
+                size="lg"
+                className="h-13 px-8 bg-emerald-600 text-white hover:bg-emerald-500 transition-colors font-semibold"
+                asChild
+              >
+                <a href="/sign-up">
+                  Start for Free
+                  <ArrowRight className="ml-2 size-4" />
+                </a>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-13 px-8"
+                asChild
+              >
+                <a href="/contact">Talk to Sales</a>
+              </Button>
             </div>
           </div>
         </motion.div>
