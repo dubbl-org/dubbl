@@ -27,12 +27,12 @@ export async function getUploadUrl(key: string, contentType: string) {
   return getSignedUrl(s3, command, { expiresIn: 3600 });
 }
 
-export async function getDownloadUrl(key: string) {
+export async function getDownloadUrl(key: string, expiresIn = 300) {
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key,
   });
-  return getSignedUrl(s3, command, { expiresIn: 3600 });
+  return getSignedUrl(s3, command, { expiresIn });
 }
 
 export async function deleteObject(key: string) {
