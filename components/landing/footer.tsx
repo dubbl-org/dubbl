@@ -4,29 +4,24 @@ import { Logo } from "@/components/shared/logo";
 import { Container } from "@/components/shared/container";
 import { Separator } from "@/components/ui/separator";
 
-const footerLinks = {
+type FooterLink = {
+  label: string;
+  href: string;
+  external?: boolean;
+};
+
+const footerLinks: Record<string, FooterLink[]> = {
   Product: [
-    { label: "Features", href: "/features" },
     { label: "Pricing", href: "/pricing" },
-    { label: "Self-Hosting", href: "/self-hosting" },
-    { label: "Changelog", href: "/changelog" },
+    { label: "Documentation", href: "/docs" },
   ],
   Developers: [
-    { label: "Documentation", href: "/docs" },
-    { label: "API Reference", href: "/docs/api" },
-    { label: "SDKs", href: "/docs/sdks" },
-    { label: "Status", href: "/status" },
-  ],
-  Company: [
-    { label: "About", href: "/about" },
-    { label: "Blog", href: "/blog" },
-    { label: "Careers", href: "/careers" },
-    { label: "Contact", href: "/contact" },
+    { label: "Status", href: "https://status.dubbl.dev", external: true },
+    { label: "GitHub", href: "https://github.com/dubbl-org/dubbl", external: true },
   ],
   Legal: [
     { label: "Privacy Policy", href: "/privacy" },
     { label: "Terms of Service", href: "/terms" },
-    { label: "Security", href: "/security" },
   ],
 };
 
@@ -40,7 +35,7 @@ export function Footer() {
     <footer className="bg-[#0a0a0a] pt-16 pb-8 text-white">
       <Container>
         {/* Top section */}
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-5 md:gap-8">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-4 md:gap-8">
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2">
@@ -77,12 +72,23 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-white/40 transition-colors hover:text-white/70"
-                    >
-                      {link.label}
-                    </Link>
+                    {link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-white/40 transition-colors hover:text-white/70"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        className="text-sm text-white/40 transition-colors hover:text-white/70"
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

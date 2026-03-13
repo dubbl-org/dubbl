@@ -618,7 +618,7 @@ const secondaryFeatures = [
   {
     title: "API-First",
     description:
-      "Every feature accessible via REST API. Build custom integrations and automations in minutes.",
+      "Every feature accessible via REST API. Built-in Stripe integration for payments. Build custom integrations in minutes.",
     icon: Code2,
     iconColor: "bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400",
   },

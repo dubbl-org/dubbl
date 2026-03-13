@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/accordion";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import Link from "next/link";
 
 const faqs = [
   {
@@ -32,7 +31,7 @@ const faqs = [
   {
     question: "Can I migrate from QuickBooks or Xero?",
     answer:
-      "Yes. dubbl includes import tools for QuickBooks, Xero, FreshBooks, and CSV/Excel files. Most migrations can be completed in under an hour.",
+      "Yes. dubbl supports importing from 12 standard banking formats including CSV, OFX, QFX, QBO, MT940, and CAMT.053. Most banks export in at least one of these formats, so migration is straightforward.",
   },
   {
     question: "Is there an API?",
@@ -70,13 +69,15 @@ export function FAQ() {
               className="mb-6"
             />
             <p className="text-sm text-muted-foreground">
-              Can&apos;t find what you&apos;re looking for?{" "}
-              <Link
-                href="/contact"
+              Can&apos;t find what you&apos;re looking for? Reach out on{" "}
+              <a
+                href="https://github.com/dubbl-org/dubbl/discussions"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-emerald-600 underline underline-offset-4 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
               >
-                Contact us
-              </Link>
+                GitHub Discussions
+              </a>
               .
             </p>
           </div>
