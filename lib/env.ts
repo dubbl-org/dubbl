@@ -7,6 +7,7 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
   STRIPE_PRO_PRICE_ID: z.string().min(1),
+  STRIPE_PRO_ANNUAL_PRICE_ID: z.string().min(1),
   STRIPE_BUSINESS_PRICE_ID: z.string().min(1),
   S3_ENDPOINT: z.string().url(),
   S3_REGION: z.string().default("us-east-1"),

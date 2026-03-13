@@ -59,8 +59,13 @@ import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
 
+interface DrawerInitialData {
+  contactId?: string;
+  contactName?: string;
+}
+
 interface CreateDrawerContextValue {
-  open: (type: DrawerType) => void;
+  open: (type: DrawerType, initialData?: DrawerInitialData) => void;
   close: () => void;
 }
 
@@ -74,9 +79,13 @@ export function useCreateDrawer() {
 
 export function CreateDrawerProvider({ children }: { children: React.ReactNode }) {
   const [activeType, setActiveType] = useState<DrawerType | null>(null);
+  const [initialData, setInitialData] = useState<DrawerInitialData | undefined>();
 
-  const open = useCallback((type: DrawerType) => setActiveType(type), []);
-  const close = useCallback(() => setActiveType(null), []);
+  const open = useCallback((type: DrawerType, data?: DrawerInitialData) => {
+    setInitialData(data);
+    setActiveType(type);
+  }, []);
+  const close = useCallback(() => { setActiveType(null); setInitialData(undefined); }, []);
 
   return (
     <CreateDrawerContext.Provider value={{ open, close }}>
@@ -102,7 +111,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <CategoryDrawer open={activeType === "category"} onClose={close} />
       <TransferDrawer open={activeType === "transfer"} onClose={close} />
       <ContractorDrawer open={activeType === "contractor"} onClose={close} />
-      <DealDrawer open={activeType === "deal"} onClose={close} />
+      <DealDrawer open={activeType === "deal"} onClose={close} initialData={initialData} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -3134,7 +3143,7 @@ interface DealPipeline {
   isDefault: boolean;
 }
 
-function DealDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: () => void; initialData?: DrawerInitialData }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [pipelines, setPipelines] = useState<DealPipeline[]>([]);
@@ -3146,6 +3155,13 @@ function DealDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [expectedClose, setExpectedClose] = useState<string | undefined>();
   const [source, setSource] = useState<string>("");
   const [dirty, setDirty] = useState(false);
+
+  // Pre-fill contactId from initialData
+  useEffect(() => {
+    if (open && initialData?.contactId) {
+      setContactId(initialData.contactId);
+    }
+  }, [open, initialData]);
 
   // Fetch pipelines when drawer opens
   useEffect(() => {

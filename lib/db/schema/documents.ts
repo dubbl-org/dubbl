@@ -31,6 +31,7 @@ export const document = pgTable("document", {
   mimeType: text("mime_type").notNull(),
   entityType: text("entity_type"),
   entityId: uuid("entity_id"),
+  visibility: text("visibility").notNull().default("organization"),
   uploadedBy: uuid("uploaded_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),

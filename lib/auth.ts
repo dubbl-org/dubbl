@@ -9,6 +9,8 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
+import { headers } from "next/headers";
+import { trackLogin } from "./auth/track-login";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -52,4 +54,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  events: {
+    async signIn({ user, account }) {
+      // Track OAuth logins (credentials tracked in route handler)
+      if (account?.provider && account.provider !== "credentials" && user.id) {
+        const hdrs = await headers();
+        const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim()
+          || hdrs.get("x-real-ip")
+          || "unknown";
+        const ua = hdrs.get("user-agent");
+        trackLogin({
+          userId: user.id,
+          ipAddress: ip,
+          userAgent: ua,
+          provider: account.provider,
+        });
+      }
+    },
+  },
 });

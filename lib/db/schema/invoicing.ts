@@ -189,6 +189,34 @@ export const creditNoteLine = pgTable("credit_note_line", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+// Signature
+export const signatureStatusEnum = pgEnum("signature_status", [
+  "pending", "signed", "declined", "expired",
+]);
+
+export const invoiceSignature = pgTable("invoice_signature", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoice.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  signerName: text("signer_name").notNull(),
+  signerEmail: text("signer_email").notNull(),
+  signatureDataUrl: text("signature_data_url"),
+  status: signatureStatusEnum("status").notNull().default("pending"),
+  signedAt: timestamp("signed_at", { mode: "date" }),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const invoiceSignatureRelations = relations(invoiceSignature, ({ one }) => ({
+  invoice: one(invoice, {
+    fields: [invoiceSignature.invoiceId],
+    references: [invoice.id],
+  }),
+}));
+
 // Relations
 export const invoiceRelations = relations(invoice, ({ one, many }) => ({
   organization: one(organization, {
@@ -209,6 +237,7 @@ export const invoiceRelations = relations(invoice, ({ one, many }) => ({
   }),
   lines: many(invoiceLine),
   creditNotes: many(creditNote),
+  signatures: many(invoiceSignature),
 }));
 
 export const invoiceLineRelations = relations(invoiceLine, ({ one }) => ({

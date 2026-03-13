@@ -1,0 +1,141 @@
+---
+title: Billing & Stripe Setup
+description: Configure Stripe for subscription billing, storage plans, and payment processing.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+## Overview
+
+Dubbl uses Stripe for subscription billing. There are two independent subscription types per organization:
+
+- **Seat plan** - Pro ($12/seat/mo or $10/seat/mo annual) for team access, reports, API, and multi-currency
+- **Storage add-on** - Starter, Growth, or Scale tiers for file storage and email sending limits
+
+Both subscriptions are managed separately in Stripe and can be upgraded or downgraded independently.
+
+## Stripe Setup
+
+<Steps>
+  <Step>
+    ### Create a Stripe account
+
+    Sign up at [stripe.com](https://stripe.com) and complete onboarding. For testing, use Stripe's test mode.
+  </Step>
+  <Step>
+    ### Create products and prices
+
+    In the Stripe Dashboard, create the following products with recurring prices:
+
+    **Seat Plans:**
+    | Product | Price (monthly) | Price (annual) |
+    |---------|----------------|----------------|
+    | Pro | $12/seat/month | $120/seat/year ($10/mo effective) |
+    | Business | $29/seat/month | $288/seat/year ($24/mo effective) |
+
+    **Storage Add-ons:**
+    | Product | Price (monthly) | Price (annual) |
+    |---------|----------------|----------------|
+    | Starter (25 GB) | $15/month | $156/year ($13/mo effective) |
+    | Growth (75 GB) | $45/month | $456/year ($38/mo effective) |
+    | Scale (300 GB) | $120/month | $1,200/year ($100/mo effective) |
+  </Step>
+  <Step>
+    ### Configure environment variables
+
+    Copy each price ID from the Stripe Dashboard and add them to your `.env.local`:
+
+    ```bash
+    # Stripe API keys
+    STRIPE_SECRET_KEY="sk_test_..."
+    STRIPE_WEBHOOK_SECRET="whsec_..."
+
+    # Seat plan price IDs
+    STRIPE_PRO_PRICE_ID="price_..."
+    STRIPE_PRO_ANNUAL_PRICE_ID="price_..."
+    STRIPE_BUSINESS_PRICE_ID="price_..."
+    STRIPE_BUSINESS_ANNUAL_PRICE_ID="price_..."
+
+    # Storage add-on price IDs (monthly)
+    STRIPE_STORAGE_STARTER_PRICE_ID="price_..."
+    STRIPE_STORAGE_GROWTH_PRICE_ID="price_..."
+    STRIPE_STORAGE_SCALE_PRICE_ID="price_..."
+
+    # Storage add-on price IDs (annual)
+    STRIPE_STORAGE_STARTER_ANNUAL_PRICE_ID="price_..."
+    STRIPE_STORAGE_GROWTH_ANNUAL_PRICE_ID="price_..."
+    STRIPE_STORAGE_SCALE_ANNUAL_PRICE_ID="price_..."
+    ```
+  </Step>
+  <Step>
+    ### Set up the webhook
+
+    Create a webhook endpoint in Stripe pointing to:
+
+    ```
+    https://your-domain.com/api/stripe/webhook
+    ```
+
+    Subscribe to these events:
+    - `checkout.session.completed`
+    - `customer.subscription.updated`
+    - `customer.subscription.deleted`
+
+    Copy the webhook signing secret to `STRIPE_WEBHOOK_SECRET`.
+  </Step>
+</Steps>
+
+## How Upgrades Work
+
+When a user upgrades or changes their plan:
+
+1. If they already have an active subscription, Dubbl calls `stripe.subscriptions.update()` with the new price ID
+2. Stripe automatically prorates the charge for the remaining billing period
+3. The local database is updated immediately
+4. No duplicate subscriptions are created
+
+For new subscriptions, a Stripe Checkout session is created and the user is redirected to complete payment.
+
+## Testing with Stripe CLI
+
+For local development, use the Stripe CLI to forward webhook events:
+
+```bash
+# Install Stripe CLI
+brew install stripe/stripe-cli/stripe
+
+# Login to your Stripe account
+stripe login
+
+# Forward events to your local server
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+The CLI will output a webhook signing secret starting with `whsec_`. Use this as your `STRIPE_WEBHOOK_SECRET` for local testing.
+
+### Test Card Numbers
+
+| Card Number | Result |
+|-------------|--------|
+| `4242 4242 4242 4242` | Successful payment |
+| `4000 0000 0000 3220` | 3D Secure authentication required |
+| `4000 0000 0000 9995` | Declined (insufficient funds) |
+
+Use any future expiration date and any 3-digit CVC.
+
+## Customer Portal
+
+Users can manage their billing (update payment method, cancel, view invoices) via the Stripe Customer Portal. To enable it:
+
+1. Go to Stripe Dashboard > Settings > Customer Portal
+2. Enable the features you want (invoice history, cancel subscription, etc.)
+3. The portal is accessed from Settings > Billing > "Manage Billing" button
+
+## Self-Hosting Without Stripe
+
+Billing is optional. Without Stripe configured, all organizations default to the free plan. Site admins can manually override plan limits per organization from the admin panel at `/admin/organizations`.
+
+<Callout type="info">
+  Self-hosted instances can set plan overrides (unlimited members, storage, etc.) without needing Stripe at all.
+</Callout>

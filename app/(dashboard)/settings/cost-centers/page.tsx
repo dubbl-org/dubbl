@@ -373,7 +373,7 @@ export default function CostCentersPage() {
               {editing ? "Edit Cost Center" : "New Cost Center"}
             </SheetTitle>
           </SheetHeader>
-          <form onSubmit={handleSave} className="space-y-4 px-4">
+          <form onSubmit={handleSave} className="space-y-4 px-4 py-4">
             <div className="space-y-2">
               <Label>Code</Label>
               <Input
@@ -445,7 +445,7 @@ export default function CostCentersPage() {
           <SheetHeader>
             <SheetTitle>Delete Cost Center</SheetTitle>
           </SheetHeader>
-          <div className="space-y-4 px-4">
+          <div className="space-y-4 px-4 py-4">
             <p className="text-sm text-muted-foreground">
               Are you sure you want to delete{" "}
               <span className="font-medium text-foreground">

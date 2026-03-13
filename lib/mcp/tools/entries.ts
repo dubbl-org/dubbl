@@ -6,6 +6,7 @@ import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { wrapTool } from "@/lib/mcp/errors";
+import { checkMonthlyLimit } from "@/lib/api/check-limit";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerEntryTools(server: McpServer, ctx: AuthContext) {
@@ -193,6 +194,7 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
         requireRole(ctx, "create:entries");
 
         await assertNotLocked(ctx.organizationId, params.date);
+        await checkMonthlyLimit(ctx.organizationId, journalEntry, journalEntry.organizationId, journalEntry.createdAt, "entriesPerMonth");
 
         const totalDebit = params.lines.reduce(
           (sum, l) => sum + l.debitAmount,

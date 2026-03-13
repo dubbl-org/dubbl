@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -91,6 +92,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    await checkResourceLimit(ctx.organizationId, contact, contact.organizationId, "contacts", contact.deletedAt);
+    await checkMultiCurrency(ctx.organizationId, parsed.currencyCode);
 
     const [created] = await db
       .insert(contact)

@@ -1,29 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   LogOut,
-  Settings,
-  UserPen,
+  ChevronsUpDown,
+  Sparkles,
+  User,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
-import { EditProfileDialog } from "./edit-profile-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { AccountDialog } from "./edit-profile-dialog";
 
 export function UserMenu() {
   const { data: session } = useSession();
   const user = session?.user;
-  const [editOpen, setEditOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const router = useRouter();
 
   const initials = user?.name
     ? user.name
@@ -42,9 +45,9 @@ export function UserMenu() {
             size="lg"
             className="data-[state=open]:bg-sidebar-accent"
           >
-            <Avatar className="size-7">
+            <Avatar className="size-7 ring-1 ring-border">
               <AvatarImage src={user?.image || undefined} />
-              <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
+              <AvatarFallback className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -56,57 +59,66 @@ export function UserMenu() {
                 {user?.email}
               </span>
             </div>
+            <ChevronsUpDown className="ml-auto size-4 text-sidebar-foreground/30" />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
-          align="start"
-          side="top"
+          className="w-64 rounded-xl p-0"
+          align="end"
+          side={isMobile ? "top" : "right"}
+          sideOffset={8}
         >
-          <div className="px-2 py-2">
-            <div className="flex items-center gap-2.5">
-              <Avatar className="size-8">
+          <div className="p-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="size-10 ring-1 ring-border">
                 <AvatarImage src={user?.image || undefined} />
-                <AvatarFallback className="text-xs bg-muted text-muted-foreground">
+                <AvatarFallback className="text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{user?.name || "User"}</p>
+                <p className="truncate text-[13px] font-semibold">{user?.name || "User"}</p>
                 <p className="truncate text-[11px] text-muted-foreground">{user?.email}</p>
               </div>
             </div>
           </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
+
+          <DropdownMenuSeparator className="my-0" />
+
+          <div className="p-1">
             <DropdownMenuItem
-              onClick={() => setEditOpen(true)}
-              className="gap-2"
+              onClick={() => setAccountOpen(true)}
+              className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px]"
             >
-              <UserPen className="size-4" />
-              Edit Profile
+              <User className="size-4 text-muted-foreground" />
+              Account
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/settings" className="gap-2">
-                <Settings className="size-4" />
-                Settings
-              </Link>
+            <DropdownMenuItem
+              onClick={() => router.push("/settings/billing")}
+              className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px]"
+            >
+              <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
+              Upgrade to Pro
             </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="gap-2"
-          >
-            <LogOut className="size-4" />
-            Sign out
-          </DropdownMenuItem>
+          </div>
+
+          <DropdownMenuSeparator className="my-0" />
+
+          <div className="p-1">
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+            >
+              <LogOut className="size-4" />
+              Sign out
+            </DropdownMenuItem>
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <EditProfileDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
+      <AccountDialog
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
         user={user || null}
       />
     </>

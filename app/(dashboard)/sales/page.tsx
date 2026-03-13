@@ -22,6 +22,7 @@ import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ErrorState } from "@/components/dashboard/error-state";
 import { ContentReveal } from "@/components/ui/content-reveal";
 
 interface Invoice {
@@ -181,6 +182,7 @@ export default function InvoicesPage() {
   const debouncedSearch = useDebounce(search);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const PAGE_SIZE = 50;
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -217,6 +219,7 @@ export default function InvoicesPage() {
         setTotalCount(data.pagination?.total || 0);
       })
       .then(() => devDelay())
+      .catch(() => { if (!cancelled) setError("Failed to load invoices. Please check your connection."); })
       .finally(() => { if (!cancelled) { setInitialLoad(false); setRefetching(false); setFetchKey((k) => k + 1); } });
 
     return () => { cancelled = true; };
@@ -320,6 +323,8 @@ export default function InvoicesPage() {
   const agingTotal = (aging.current?.amount || 0) + (aging["1-30"]?.amount || 0) + (aging["31-60"]?.amount || 0) + (aging["60+"]?.amount || 0);
 
   if (initialLoad) return <BrandLoader />;
+
+  if (error) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
 
   if (!initialLoad && !refetching && invoices.length === 0 && statusFilter === "all" && !hasFilters) {
     return (

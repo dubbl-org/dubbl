@@ -1,22 +1,36 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiKey } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { subscription } from "@/lib/db/schema/billing";
+import { eq, count } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { nanoid } from "nanoid";
 import { createHash } from "crypto";
 import { z } from "zod";
 
+const MAX_API_KEYS = 20;
+
 const createSchema = z.object({
   name: z.string().min(1),
   expiresAt: z.string().datetime().nullable().optional(),
 });
 
+async function checkApiAccess(orgId: string): Promise<boolean> {
+  const sub = await db.query.subscription.findFirst({
+    where: eq(subscription.organizationId, orgId),
+  });
+  const plan = sub?.plan ?? "free";
+  // Only pro and business get API access
+  return plan === "pro" || plan === "business";
+}
+
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:api-keys");
+
+    const hasAccess = await checkApiAccess(ctx.organizationId);
 
     const keys = await db.query.apiKey.findMany({
       where: eq(apiKey.organizationId, ctx.organizationId),
@@ -32,6 +46,8 @@ export async function GET(request: Request) {
         expiresAt: k.expiresAt?.toISOString() || null,
         createdAt: k.createdAt.toISOString(),
       })),
+      apiAccess: hasAccess,
+      maxKeys: MAX_API_KEYS,
     });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -45,6 +61,27 @@ export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:api-keys");
+
+    // Check plan allows API access
+    const hasAccess = await checkApiAccess(ctx.organizationId);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "API keys require a Pro or Business plan" },
+        { status: 403 }
+      );
+    }
+
+    // Check key count limit
+    const [keyCount] = await db
+      .select({ count: count() })
+      .from(apiKey)
+      .where(eq(apiKey.organizationId, ctx.organizationId));
+    if (keyCount.count >= MAX_API_KEYS) {
+      return NextResponse.json(
+        { error: `Maximum of ${MAX_API_KEYS} API keys per organization` },
+        { status: 400 }
+      );
+    }
 
     const body = await request.json();
     const parsed = createSchema.parse(body);

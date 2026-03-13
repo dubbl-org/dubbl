@@ -33,3 +33,7 @@ export * from "./consolidation";
 export * from "./bulk";
 export * from "./advisor";
 export * from "./mcp";
+export * from "./webhooks";
+export * from "./approvals";
+export * from "./invitations";
+export * from "./login-history";

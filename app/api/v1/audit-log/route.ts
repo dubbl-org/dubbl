@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { getOrgPlanLimits } from "@/lib/api/check-limit";
 
 export async function GET(request: Request) {
   try {
@@ -22,7 +23,16 @@ export async function GET(request: Request) {
     const startDate = url.searchParams.get("startDate");
     const endDate = url.searchParams.get("endDate");
 
+    // Clamp date range based on plan's auditLogDays
+    const { limits } = await getOrgPlanLimits(ctx.organizationId);
+    const minDate = limits.auditLogDays === Infinity
+      ? null
+      : new Date(Date.now() - limits.auditLogDays * 24 * 60 * 60 * 1000);
+
     const conditions = [eq(auditLog.organizationId, ctx.organizationId)];
+    if (minDate) {
+      conditions.push(gte(auditLog.createdAt, minDate));
+    }
 
     if (entityType) {
       conditions.push(eq(auditLog.entityType, entityType));

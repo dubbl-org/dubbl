@@ -6,6 +6,7 @@ import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
+import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerContactTools(server: McpServer, ctx: AuthContext) {
@@ -139,6 +140,9 @@ export function registerContactTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:contacts");
+
+        await checkResourceLimit(ctx.organizationId, contact, contact.organizationId, "contacts", contact.deletedAt);
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode ?? "USD");
 
         const [created] = await db
           .insert(contact)

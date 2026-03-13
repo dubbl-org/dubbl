@@ -13,7 +13,7 @@ import { renderTemplate } from "./template-engine";
 import { formatMoney } from "@/lib/money";
 
 export async function processReminders(orgId: string) {
-  // Get SMTP config
+  // Check email config exists and is verified
   const config = await db.query.emailConfig.findFirst({
     where: eq(emailConfig.organizationId, orgId),
   });

@@ -284,6 +284,7 @@ export function AppSidebar() {
       .catch(() => {});
   }, []);
 
+
   const badgeMap: Record<string, number> = {
     "/sales": overdueCounts.sales,
     "/purchases": overdueCounts.purchases,

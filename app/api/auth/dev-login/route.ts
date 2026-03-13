@@ -64,6 +64,14 @@ export async function POST() {
     where: eq(users.email, DEV_USER.email),
   });
 
+  if (user && !user.isSiteAdmin) {
+    await db
+      .update(users)
+      .set({ isSiteAdmin: true })
+      .where(eq(users.id, user.id));
+    user = { ...user, isSiteAdmin: true };
+  }
+
   if (!user) {
     const passwordHash = await bcrypt.hash(DEV_USER.password, 12);
     const [created] = await db
@@ -72,6 +80,7 @@ export async function POST() {
         name: DEV_USER.name,
         email: DEV_USER.email,
         passwordHash,
+        isSiteAdmin: true,
       })
       .returning();
     user = created;
@@ -96,7 +105,7 @@ export async function POST() {
 
     await db
       .insert(subscription)
-      .values({ organizationId: org.id, plan: "business", status: "active" })
+      .values({ organizationId: org.id, plan: "free", status: "active" })
       .onConflictDoNothing();
   } else {
     await db
