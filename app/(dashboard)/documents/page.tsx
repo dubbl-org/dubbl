@@ -22,6 +22,7 @@ import {
   Pencil,
   Check as CheckIcon,
   X,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,8 @@ export default function DocumentsPage() {
   const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState("");
   const [savingName, setSavingName] = useState(false);
@@ -318,6 +321,32 @@ export default function DocumentsPage() {
       toast.error(err instanceof Error ? err.message : "Failed to update");
     }
   }
+
+  const isPreviewable = useCallback((mimeType: string) => {
+    return mimeType.startsWith("image/") || mimeType === "application/pdf";
+  }, []);
+
+  const openFileSheet = useCallback(async (doc: Doc) => {
+    setSelectedDoc(doc);
+    setEditingName(false);
+    setPreviewUrl(null);
+
+    if (isPreviewable(doc.mimeType)) {
+      setPreviewLoading(true);
+      try {
+        const orgId = localStorage.getItem("activeOrgId") || "";
+        const res = await fetch(`/api/v1/documents/${doc.id}/download`, {
+          headers: { "x-organization-id": orgId },
+        });
+        const data = await res.json();
+        if (data.downloadUrl) setPreviewUrl(data.downloadUrl);
+      } catch {
+        // preview not available, that's ok
+      } finally {
+        setPreviewLoading(false);
+      }
+    }
+  }, [isPreviewable]);
 
   async function handleRename(doc: Doc, newName: string) {
     if (!newName.trim() || newName === doc.fileName) {
@@ -844,10 +873,7 @@ export default function DocumentsPage() {
                     initial="hidden"
                     animate="visible"
                     className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 hover:bg-muted/50 transition-colors group cursor-pointer"
-                    onClick={() => {
-                      setSelectedDoc(doc);
-                      setEditingName(false);
-                    }}
+                    onClick={() => openFileSheet(doc)}
                   >
                     <FileIcon className={cn("size-5 shrink-0", iconColor)} />
                     <span className="text-sm font-medium truncate min-w-0 flex-1">{doc.fileName}</span>
@@ -902,7 +928,7 @@ export default function DocumentsPage() {
       </AnimatePresence>
 
       {/* File detail sheet */}
-      <Sheet open={!!selectedDoc} onOpenChange={(open) => { if (!open) { setSelectedDoc(null); setEditingName(false); } }}>
+      <Sheet open={!!selectedDoc} onOpenChange={(open) => { if (!open) { setSelectedDoc(null); setEditingName(false); setPreviewUrl(null); } }}>
         <SheetContent>
           {selectedDoc && (() => {
             const { icon: SheetFileIcon, color: sheetIconColor } = getFileIcon(selectedDoc.mimeType);
@@ -915,14 +941,51 @@ export default function DocumentsPage() {
 
                 <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-5">
                   {/* Preview area */}
-                  <div className="flex flex-col items-center rounded-xl bg-muted/50 border py-8">
-                    <div className="flex size-16 items-center justify-center rounded-2xl bg-background shadow-sm ring-1 ring-border">
-                      <SheetFileIcon className={cn("size-7", sheetIconColor)} />
+                  {previewLoading ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl bg-muted/50 border py-12">
+                      <div className="size-6 border-2 border-muted-foreground/20 border-t-muted-foreground rounded-full animate-spin" />
+                      <p className="mt-3 text-[11px] text-muted-foreground">Loading preview...</p>
                     </div>
-                    <p className="mt-3 text-[11px] text-muted-foreground font-mono tabular-nums">
-                      {formatFileSize(selectedDoc.fileSize)}
-                    </p>
-                  </div>
+                  ) : previewUrl && selectedDoc.mimeType.startsWith("image/") ? (
+                    <button
+                      onClick={() => window.open(previewUrl, "_blank")}
+                      className="rounded-xl border overflow-hidden bg-[repeating-conic-gradient(#80808015_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] group/preview relative cursor-pointer"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewUrl}
+                        alt={selectedDoc.fileName}
+                        className="w-full max-h-64 object-contain"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/preview:bg-black/40 transition-colors">
+                        <ExternalLink className="size-5 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity" />
+                      </div>
+                    </button>
+                  ) : previewUrl && selectedDoc.mimeType === "application/pdf" ? (
+                    <div className="rounded-xl border overflow-hidden relative group/preview">
+                      <iframe
+                        src={previewUrl}
+                        className="w-full h-64 border-0"
+                        title={selectedDoc.fileName}
+                      />
+                      <button
+                        onClick={() => window.open(previewUrl, "_blank")}
+                        className="absolute top-2 right-2 flex items-center gap-1.5 rounded-lg bg-background/90 backdrop-blur-sm border shadow-sm px-2.5 py-1.5 text-[11px] font-medium opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-background"
+                      >
+                        <ExternalLink className="size-3" />
+                        Open
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center rounded-xl bg-muted/50 border py-8">
+                      <div className="flex size-16 items-center justify-center rounded-2xl bg-background shadow-sm ring-1 ring-border">
+                        <SheetFileIcon className={cn("size-7", sheetIconColor)} />
+                      </div>
+                      <p className="mt-3 text-[11px] text-muted-foreground font-mono tabular-nums">
+                        {formatFileSize(selectedDoc.fileSize)}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Editable name */}
                   <div className="space-y-1.5">
@@ -1016,12 +1079,32 @@ export default function DocumentsPage() {
                   {/* Actions */}
                   <div className="flex gap-2 pt-1">
                     <Button
+                      variant="outline"
                       size="sm"
-                      className="flex-1 gap-2 text-xs h-9 bg-emerald-600 hover:bg-emerald-700"
+                      className="flex-1 gap-2 text-xs h-9"
                       onClick={() => handleDownload(selectedDoc)}
                     >
                       <Download className="size-3.5" />
                       Download
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 gap-2 text-xs h-9 bg-emerald-600 hover:bg-emerald-700"
+                      onClick={async () => {
+                        if (previewUrl) {
+                          window.open(previewUrl, "_blank");
+                        } else {
+                          const orgId = localStorage.getItem("activeOrgId") || "";
+                          const res = await fetch(`/api/v1/documents/${selectedDoc.id}/download`, {
+                            headers: { "x-organization-id": orgId },
+                          });
+                          const data = await res.json();
+                          if (data.downloadUrl) window.open(data.downloadUrl, "_blank");
+                        }
+                      }}
+                    >
+                      <ExternalLink className="size-3.5" />
+                      Open
                     </Button>
                     <Button
                       variant="outline"
