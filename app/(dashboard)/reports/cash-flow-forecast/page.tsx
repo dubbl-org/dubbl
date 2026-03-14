@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
@@ -28,12 +31,13 @@ interface ForecastWeek {
 }
 
 export default function CashFlowForecastPage() {
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [weeksAhead, setWeeksAhead] = useState(12);
   const [weeks, setWeeks] = useState<ForecastWeek[]>([]);
   const [totalInflows, setTotalInflows] = useState(0);
   const [totalOutflows, setTotalOutflows] = useState(0);
   const [netForecast, setNetForecast] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -53,7 +57,10 @@ export default function CashFlowForecastPage() {
         setNetForecast(data.netForecast || 0);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
       });
     return () => { cancelled = true; };
   }, [weeksAhead]);
@@ -65,8 +72,14 @@ export default function CashFlowForecastPage() {
     cumulative: w.cumulativeNet / 100,
   }));
 
+  if (initialLoad) return <BrandLoader />;
+
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Cash Flow Forecast"
         description="Forward-looking projection based on outstanding invoices, bills, and recurring templates."
@@ -108,89 +121,90 @@ export default function CashFlowForecastPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
-          <div className="h-[300px] rounded-lg bg-muted/50 animate-pulse" />
-          <div className="h-64 rounded-lg bg-muted/50 animate-pulse" />
-        </div>
+        <BrandLoader className="h-48" />
       ) : weeks.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-12 text-center">
-          <p className="text-sm text-muted-foreground">No forecast data available. Create invoices, bills, or recurring templates to see projections.</p>
-        </div>
+        <ContentReveal>
+          <div className="rounded-xl border border-dashed py-12 text-center">
+            <p className="text-sm text-muted-foreground">No forecast data available. Create invoices, bills, or recurring templates to see projections.</p>
+          </div>
+        </ContentReveal>
       ) : (
-        <>
+        <ContentReveal>
           {/* Cumulative Net Chart */}
-          <div>
-            <p className="text-sm font-medium mb-3">Cumulative Cash Flow</p>
-            <div className="rounded-lg border p-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                    formatter={(value) => [`$${Number(value).toFixed(2)}`]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
-                  <Area type="monotone" dataKey="inflows" name="Inflows" stroke="#10b981" fill="none" strokeWidth={1.5} />
-                  <Area type="monotone" dataKey="outflows" name="Outflows" stroke="#ef4444" fill="none" strokeWidth={1.5} />
-                  <Area type="monotone" dataKey="cumulative" name="Cumulative Net" stroke="#3b82f6" fill="url(#cumGrad)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
+          <div className="space-y-6">
+            <div>
+              <p className="text-sm font-medium mb-3">Cumulative Cash Flow</p>
+              <div className="rounded-lg border p-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                      formatter={(value) => [`$${Number(value).toFixed(2)}`]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                    <Area type="monotone" dataKey="inflows" name="Inflows" stroke="#10b981" fill="none" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="outflows" name="Outflows" stroke="#ef4444" fill="none" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="cumulative" name="Cumulative Net" stroke="#3b82f6" fill="url(#cumGrad)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
 
-          {/* Weekly Breakdown Table */}
-          <div>
-            <p className="text-sm font-medium mb-3">Weekly Breakdown</p>
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Week Of</th>
-                    <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Inflows</th>
-                    <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Outflows</th>
-                    <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Net</th>
-                    <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Cumulative</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {weeks.map((w) => (
-                    <tr key={w.weekOf} className="border-b last:border-b-0">
-                      <td className="px-4 py-2">{w.weekOf}</td>
-                      <td className="px-4 py-2 text-right font-mono tabular-nums text-emerald-600">
-                        {w.inflows > 0 ? formatMoney(w.inflows) : "-"}
-                      </td>
-                      <td className="px-4 py-2 text-right font-mono tabular-nums text-red-600">
-                        {w.outflows > 0 ? formatMoney(w.outflows) : "-"}
-                      </td>
-                      <td className={cn(
-                        "px-4 py-2 text-right font-mono tabular-nums font-medium",
-                        w.net >= 0 ? "text-emerald-600" : "text-red-600"
-                      )}>
-                        {formatMoney(w.net)}
-                      </td>
-                      <td className={cn(
-                        "px-4 py-2 text-right font-mono tabular-nums",
-                        w.cumulativeNet >= 0 ? "text-blue-600" : "text-red-600"
-                      )}>
-                        {formatMoney(w.cumulativeNet)}
-                      </td>
+            {/* Weekly Breakdown Table */}
+            <div>
+              <p className="text-sm font-medium mb-3">Weekly Breakdown</p>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Week Of</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Inflows</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Outflows</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Net</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Cumulative</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {weeks.map((w) => (
+                      <tr key={w.weekOf} className="border-b last:border-b-0">
+                        <td className="px-4 py-2">{w.weekOf}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums text-emerald-600">
+                          {w.inflows > 0 ? formatMoney(w.inflows) : "-"}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums text-red-600">
+                          {w.outflows > 0 ? formatMoney(w.outflows) : "-"}
+                        </td>
+                        <td className={cn(
+                          "px-4 py-2 text-right font-mono tabular-nums font-medium",
+                          w.net >= 0 ? "text-emerald-600" : "text-red-600"
+                        )}>
+                          {formatMoney(w.net)}
+                        </td>
+                        <td className={cn(
+                          "px-4 py-2 text-right font-mono tabular-nums",
+                          w.cumulativeNet >= 0 ? "text-blue-600" : "text-red-600"
+                        )}>
+                          {formatMoney(w.cumulativeNet)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </>
+        </ContentReveal>
       )}
-    </div>
+    </ContentReveal>
   );
 }

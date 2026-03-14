@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { DollarSign } from "lucide-react";
+import { ArrowLeft, DollarSign } from "lucide-react";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -33,30 +36,47 @@ const columns: Column<InvoiceRow>[] = [
 ];
 
 export default function AgedReceivablesPage() {
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [buckets, setBuckets] = useState<AgingBucket[]>([]);
   const [grandTotal, setGrandTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
     fetch("/api/v1/reports/aged-receivables", {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         setBuckets(data.buckets || []);
         setGrandTotal(data.grandTotal || 0);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const allInvoices = buckets.flatMap((b) =>
     b.invoices.map((inv) => ({ ...inv, bucket: b.label }))
   );
 
+  if (initialLoad) return <BrandLoader />;
+
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Aged Receivables"
         description="Outstanding invoices grouped by aging buckets."
@@ -68,29 +88,37 @@ export default function AgedReceivablesPage() {
         />
       </PageHeader>
 
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        {buckets.map((b) => (
-          <StatCard
-            key={b.label}
-            title={b.label}
-            value={formatMoney(b.total)}
-            change={`${b.count} invoices`}
-            icon={DollarSign}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <BrandLoader className="h-48" />
+      ) : (
+        <ContentReveal>
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            {buckets.map((b) => (
+              <StatCard
+                key={b.label}
+                title={b.label}
+                value={formatMoney(b.total)}
+                change={`${b.count} invoices`}
+                icon={DollarSign}
+              />
+            ))}
+          </div>
 
-      <div className="rounded-lg border bg-card p-3 sm:p-4">
-        <p className="text-sm font-medium text-muted-foreground mb-1">Total Outstanding</p>
-        <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(grandTotal)}</p>
-      </div>
+          <div className="rounded-lg border bg-card p-3 sm:p-4 mt-4">
+            <p className="text-sm font-medium text-muted-foreground mb-1">Total Outstanding</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(grandTotal)}</p>
+          </div>
 
-      <DataTable
-        columns={columns}
-        data={allInvoices}
-        loading={loading}
-        emptyMessage="No outstanding receivables."
-      />
-    </div>
+          <div className="mt-4">
+            <DataTable
+              columns={columns}
+              data={allInvoices}
+              loading={loading}
+              emptyMessage="No outstanding receivables."
+            />
+          </div>
+        </ContentReveal>
+      )}
+    </ContentReveal>
   );
 }

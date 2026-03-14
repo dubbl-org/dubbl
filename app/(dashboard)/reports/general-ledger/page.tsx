@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen } from "lucide-react";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
@@ -40,15 +43,18 @@ const entryColumns: Column<LedgerEntry>[] = [
 
 export default function GeneralLedgerPage() {
   const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [accounts, setAccounts] = useState<AccountLedger[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/general-ledger?${params}`, {
       headers: { "x-organization-id": orgId },
@@ -57,12 +63,23 @@ export default function GeneralLedgerPage() {
       .then((data) => {
         if (!cancelled) setAccounts(data.accounts || []);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [startDate, endDate]);
 
+  if (initialLoad) return <BrandLoader />;
+
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="General Ledger"
         description="All journal lines grouped by account with running balance."
@@ -75,39 +92,45 @@ export default function GeneralLedgerPage() {
       />
 
       {loading ? (
-        <DataTable columns={entryColumns} data={[]} loading={true} />
+        <BrandLoader className="h-48" />
       ) : accounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
-          <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
-            <BookOpen className="size-6 text-muted-foreground" />
+        <ContentReveal>
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
+              <BookOpen className="size-6 text-muted-foreground" />
+            </div>
+            <h3 className="mt-4 text-sm font-semibold">No entries found</h3>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              No posted journal entries in the selected date range.
+            </p>
           </div>
-          <h3 className="mt-4 text-sm font-semibold">No entries found</h3>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            No posted journal entries in the selected date range.
-          </p>
-        </div>
+        </ContentReveal>
       ) : (
-        accounts.map((acct) => (
-          <div key={acct.accountId} className="space-y-2">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-sm sm:text-base font-semibold">
-                <span className="font-mono text-xs sm:text-sm text-muted-foreground mr-2">{acct.accountCode}</span>
-                {acct.accountName}
-              </h2>
-              <span className="text-xs sm:text-sm text-muted-foreground capitalize">{acct.accountType}</span>
-            </div>
-            <DataTable columns={entryColumns} data={acct.entries} emptyMessage="No entries." />
-            <div className="flex flex-col gap-1 sm:flex-row sm:justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
-              <span>Account Total</span>
-              <div className="flex gap-3 sm:gap-6 font-mono tabular-nums text-xs sm:text-sm">
-                <span>Dr: {formatMoney(acct.totalDebit)}</span>
-                <span>Cr: {formatMoney(acct.totalCredit)}</span>
-                <span>Bal: {formatMoney(acct.balance)}</span>
+        <ContentReveal>
+          <div className="space-y-6">
+            {accounts.map((acct) => (
+              <div key={acct.accountId} className="space-y-2">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-sm sm:text-base font-semibold">
+                    <span className="font-mono text-xs sm:text-sm text-muted-foreground mr-2">{acct.accountCode}</span>
+                    {acct.accountName}
+                  </h2>
+                  <span className="text-xs sm:text-sm text-muted-foreground capitalize">{acct.accountType}</span>
+                </div>
+                <DataTable columns={entryColumns} data={acct.entries} emptyMessage="No entries." />
+                <div className="flex flex-col gap-1 sm:flex-row sm:justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
+                  <span>Account Total</span>
+                  <div className="flex gap-3 sm:gap-6 font-mono tabular-nums text-xs sm:text-sm">
+                    <span>Dr: {formatMoney(acct.totalDebit)}</span>
+                    <span>Cr: {formatMoney(acct.totalCredit)}</span>
+                    <span>Bal: {formatMoney(acct.balance)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))
+        </ContentReveal>
       )}
-    </div>
+    </ContentReveal>
   );
 }

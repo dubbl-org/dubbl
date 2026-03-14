@@ -1,14 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import {
+  ArrowLeft,
   Building2,
   Plus,
   Trash2,
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -16,6 +17,8 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -97,10 +100,11 @@ function apiFetch(url: string, options: RequestInit = {}) {
 
 export default function ConsolidationPage() {
   const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<ConsolidationGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [report, setReport] = useState<ConsolidatedReport | null>(null);
-  const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [tab, setTab] = useState<"pnl" | "balance-sheet">("pnl");
 
@@ -123,6 +127,7 @@ export default function ConsolidationPage() {
       });
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, []);
 
@@ -198,16 +203,14 @@ export default function ConsolidationPage() {
   const pnl = report?.consolidatedPnL;
   const bs = report?.consolidatedBalanceSheet;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (initialLoad) return <BrandLoader />;
 
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Consolidation"
         description="Combined financial statements across multiple entities."
@@ -371,11 +374,9 @@ export default function ConsolidationPage() {
           </div>
 
           {reportLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
+            <BrandLoader className="h-48" />
           ) : (
-            <>
+            <ContentReveal>
               {/* P&L Tab */}
               {tab === "pnl" && pnl && (
                 <div className="space-y-6">
@@ -492,11 +493,11 @@ export default function ConsolidationPage() {
                   />
                 </div>
               )}
-            </>
+            </ContentReveal>
           )}
         </>
       )}
-    </div>
+    </ContentReveal>
   );
 }
 

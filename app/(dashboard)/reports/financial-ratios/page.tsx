@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Gauge } from "lucide-react";
+import { ArrowLeft, Gauge } from "lucide-react";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
@@ -92,11 +95,12 @@ const ratioInfo: Record<string, { label: string; description: string; format: (v
 
 export default function FinancialRatiosPage() {
   const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [ratios, setRatios] = useState<Ratios | null>(null);
   const [balances, setBalances] = useState<Balances | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -115,13 +119,22 @@ export default function FinancialRatiosPage() {
         setBalances(data.balances || null);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
       });
     return () => { cancelled = true; };
   }, [startDate, endDate]);
 
+  if (initialLoad) return <BrandLoader />;
+
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Financial Ratios & KPIs"
         description="Key financial metrics and performance indicators."
@@ -134,17 +147,15 @@ export default function FinancialRatiosPage() {
       />
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-28 rounded-lg bg-muted/50 animate-pulse" />
-          ))}
-        </div>
+        <BrandLoader className="h-48" />
       ) : !ratios ? (
-        <div className="rounded-xl border border-dashed py-12 text-center">
-          <p className="text-sm text-muted-foreground">No financial data available.</p>
-        </div>
+        <ContentReveal>
+          <div className="rounded-xl border border-dashed py-12 text-center">
+            <p className="text-sm text-muted-foreground">No financial data available.</p>
+          </div>
+        </ContentReveal>
       ) : (
-        <>
+        <ContentReveal>
           {/* Ratio Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(ratioInfo).map(([key, info]) => {
@@ -171,7 +182,7 @@ export default function FinancialRatiosPage() {
 
           {/* Underlying Balances */}
           {balances && (
-            <div>
+            <div className="mt-4">
               <p className="text-sm font-medium mb-3">Underlying Balances</p>
               <div className="rounded-lg border overflow-hidden">
                 <table className="w-full text-sm">
@@ -201,8 +212,8 @@ export default function FinancialRatiosPage() {
               </div>
             </div>
           )}
-        </>
+        </ContentReveal>
       )}
-    </div>
+    </ContentReveal>
   );
 }

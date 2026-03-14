@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { PieChart, TrendingDown } from "lucide-react";
+import { ArrowLeft, PieChart, TrendingDown } from "lucide-react";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
@@ -46,13 +49,14 @@ const CATEGORY_COLORS = [
 
 export default function ExpenseAnalyticsPage() {
   const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [categories, setCategories] = useState<Category[]>([]);
   const [monthlyTrend, setMonthlyTrend] = useState<MonthlyPoint[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [monthlyAverage, setMonthlyAverage] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -73,7 +77,10 @@ export default function ExpenseAnalyticsPage() {
         setMonthlyAverage(data.monthlyAverage || 0);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
       });
     return () => { cancelled = true; };
   }, [startDate, endDate]);
@@ -83,8 +90,14 @@ export default function ExpenseAnalyticsPage() {
     expenses: m.total / 100,
   }));
 
+  if (initialLoad) return <BrandLoader />;
+
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Expense Analytics"
         description="Spending breakdown by category with trends over time."
@@ -96,31 +109,28 @@ export default function ExpenseAnalyticsPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard
-          title="Total Expenses"
-          value={formatMoney(totalExpenses)}
-          icon={TrendingDown}
-          changeType="negative"
-        />
-        <StatCard
-          title="Monthly Average"
-          value={formatMoney(monthlyAverage)}
-          icon={PieChart}
-          changeType="neutral"
-        />
-      </div>
-
       {loading ? (
-        <div className="space-y-4">
-          <div className="h-[240px] rounded-lg bg-muted/50 animate-pulse" />
-          <div className="h-64 rounded-lg bg-muted/50 animate-pulse" />
-        </div>
+        <BrandLoader className="h-48" />
       ) : (
-        <>
+        <ContentReveal>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <StatCard
+              title="Total Expenses"
+              value={formatMoney(totalExpenses)}
+              icon={TrendingDown}
+              changeType="negative"
+            />
+            <StatCard
+              title="Monthly Average"
+              value={formatMoney(monthlyAverage)}
+              icon={PieChart}
+              changeType="neutral"
+            />
+          </div>
+
           {/* Monthly Trend */}
           {chartData.length > 1 && (
-            <div>
+            <div className="mt-4">
               <p className="text-sm font-medium mb-3">Monthly Spending Trend</p>
               <div className="rounded-lg border p-4">
                 <ResponsiveContainer width="100%" height={240}>
@@ -147,7 +157,7 @@ export default function ExpenseAnalyticsPage() {
 
           {/* Category Breakdown */}
           {categories.length > 0 ? (
-            <div>
+            <div className="mt-4">
               <p className="text-sm font-medium mb-3">By Category</p>
 
               {/* Stacked bar visualization */}
@@ -183,12 +193,12 @@ export default function ExpenseAnalyticsPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed py-12 text-center">
+            <div className="rounded-xl border border-dashed py-12 text-center mt-4">
               <p className="text-sm text-muted-foreground">No expense data for this period.</p>
             </div>
           )}
-        </>
+        </ContentReveal>
       )}
-    </div>
+    </ContentReveal>
   );
 }
