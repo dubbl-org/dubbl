@@ -612,6 +612,51 @@ export async function handlePayoutFailed(
     .where(eq(stripeIntegration.id, integration.id));
 }
 
+export async function handlePayoutCanceled(
+  integration: Integration,
+  payout: Stripe.Payout
+) {
+  if (await isDuplicate(integration.organizationId, "payout_canceled", payout.id)) return;
+
+  // Look up the original payout entity map
+  const mapped = await db.query.stripeEntityMap.findFirst({
+    where: and(
+      eq(stripeEntityMap.organizationId, integration.organizationId),
+      eq(stripeEntityMap.stripeEntityType, "payout"),
+      eq(stripeEntityMap.stripeEntityId, payout.id)
+    ),
+  });
+
+  if (!mapped) return;
+
+  // Void the linked journal entry
+  await db
+    .update(journalEntry)
+    .set({
+      status: "void",
+      voidReason: "Stripe payout canceled",
+      updatedAt: new Date(),
+    })
+    .where(eq(journalEntry.id, mapped.dubblEntityId));
+
+  // Exclude the bank transaction (it didn't happen)
+  await db
+    .update(bankTransaction)
+    .set({
+      status: "excluded",
+    })
+    .where(eq(bankTransaction.journalEntryId, mapped.dubblEntityId));
+
+  await insertEntityMap(
+    integration.organizationId,
+    "payout_canceled",
+    payout.id,
+    "journal_entry",
+    mapped.dubblEntityId,
+    { voidedAt: new Date().toISOString() }
+  );
+}
+
 export async function handleDisputeCreated(
   integration: Integration,
   dispute: Stripe.Dispute
@@ -829,6 +874,25 @@ export async function handleInvoicePaid(
   // Check if we already processed this invoice
   if (await isDuplicate(integration.organizationId, "stripe_invoice", invoiceId)) return;
 
+  // Prevent double-booking: if this invoice's charge was already processed by handleChargeSucceeded, skip.
+  // The Stripe webhook payload includes charge/payment_intent fields even if the SDK types don't expose them.
+  const invoiceRaw = stripeInvoice as unknown as Record<string, unknown>;
+  const invoiceChargeId = typeof invoiceRaw.charge === "string" ? invoiceRaw.charge : null;
+  if (invoiceChargeId && await isDuplicate(integration.organizationId, "charge", invoiceChargeId)) return;
+
+  // Fallback: check via payment_intent if charge field isn't present
+  if (!invoiceChargeId) {
+    const invoicePIRaw = invoiceRaw.payment_intent;
+    const invoicePIId = typeof invoicePIRaw === "string" ? invoicePIRaw : null;
+    if (invoicePIId) {
+      const pi = await stripe.paymentIntents.retrieve(invoicePIId, { stripeAccount: integration.stripeAccountId });
+      const latestChargeId = typeof pi.latest_charge === "string"
+        ? pi.latest_charge
+        : (pi.latest_charge as { id?: string } | null)?.id ?? null;
+      if (latestChargeId && await isDuplicate(integration.organizationId, "charge", latestChargeId)) return;
+    }
+  }
+
   if (
     !integration.clearingAccountId ||
     !integration.revenueAccountId ||
@@ -968,6 +1032,43 @@ export async function handleInvoicePaid(
     entry.id,
     { amount: amountPaid, currency: currencyCode }
   );
+}
+
+export async function handleInvoiceVoided(
+  integration: Integration,
+  stripeInvoice: Stripe.Invoice
+) {
+  // Look up entity map for this invoice
+  const mapped = await db.query.stripeEntityMap.findFirst({
+    where: and(
+      eq(stripeEntityMap.organizationId, integration.organizationId),
+      eq(stripeEntityMap.stripeEntityType, "stripe_invoice"),
+      eq(stripeEntityMap.stripeEntityId, stripeInvoice.id)
+    ),
+  });
+
+  if (!mapped) return;
+
+  // Void the linked journal entry
+  await db
+    .update(journalEntry)
+    .set({
+      status: "void",
+      voidReason: "Stripe invoice voided",
+      updatedAt: new Date(),
+    })
+    .where(eq(journalEntry.id, mapped.dubblEntityId));
+
+  // Update entity map metadata
+  await db
+    .update(stripeEntityMap)
+    .set({
+      metadata: {
+        ...(mapped.metadata as Record<string, unknown> ?? {}),
+        voided: true,
+      },
+    })
+    .where(eq(stripeEntityMap.id, mapped.id));
 }
 
 export async function handleCustomerCreated(
@@ -1791,6 +1892,11 @@ export async function processStripeEvent(
       await handlePayoutFailed(integration, payout);
       return { action: "payout_failed" };
     }
+    case "payout.canceled": {
+      const payout = event.data.object as Stripe.Payout;
+      await handlePayoutCanceled(integration, payout);
+      return { action: "payout_canceled" };
+    }
     case "customer.created": {
       const customer = event.data.object as Stripe.Customer;
       await handleCustomerCreated(integration, customer);
@@ -1810,6 +1916,11 @@ export async function processStripeEvent(
       const inv = event.data.object as Stripe.Invoice;
       await handleInvoicePaymentFailed(integration, inv);
       return { action: "invoice_payment_failed" };
+    }
+    case "invoice.voided": {
+      const inv = event.data.object as Stripe.Invoice;
+      await handleInvoiceVoided(integration, inv);
+      return { action: "invoice_voided" };
     }
     case "payment_intent.payment_failed": {
       const pi = event.data.object as Stripe.PaymentIntent;
