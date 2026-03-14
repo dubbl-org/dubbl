@@ -2,12 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Send, Paperclip, Eye, Pencil, Mail, Loader2 } from "lucide-react";
+import { Send, Paperclip, Eye, Pencil, Mail, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -70,12 +77,32 @@ export function SendDocumentDialog({
   const [previewing, setPreviewing] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [includePaymentLink, setIncludePaymentLink] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState<boolean | null>(null);
 
   const typeLabel = documentTypeLabels[documentType] || "Document";
   const showAttachPdf = documentType === "invoice";
+  const isInvoice = documentType === "invoice";
   const amountFormatted = amountDue != null ? formatMoney(amountDue) : undefined;
   const dueDateFormatted = formatDateDisplay(dueDate);
   const issueDateFormatted = formatDateDisplay(issueDate);
+
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  // Check Stripe connection status for invoices
+  useEffect(() => {
+    if (open && isInvoice && orgId && stripeConnected === null) {
+      fetch("/api/v1/integrations/stripe/status", {
+        headers: { "x-organization-id": orgId },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setStripeConnected(data.connected === true);
+          if (data.connected) setIncludePaymentLink(true);
+        })
+        .catch(() => setStripeConnected(false));
+    }
+  }, [open, isInvoice, orgId, stripeConnected]);
 
   useEffect(() => {
     if (open) {
@@ -87,9 +114,25 @@ export function SendDocumentDialog({
     }
   }, [open, contactEmail, documentType]);
 
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  // Reset stripe status when dialog closes so it re-fetches next time
+  useEffect(() => {
+    if (!open) {
+      setStripeConnected(null);
+      setIncludePaymentLink(false);
+    }
+  }, [open]);
 
-  const buildTemplateProps = useCallback(() => ({
+  const getPreviewButton = useCallback(() => {
+    if (isInvoice && includePaymentLink) {
+      return { viewUrl: "#", buttonLabel: "Pay invoice" };
+    }
+    if (documentType === "quote") {
+      return { viewUrl: "#", buttonLabel: "View quote" };
+    }
+    return {};
+  }, [isInvoice, includePaymentLink, documentType]);
+
+  const buildTemplateProps = useCallback((forPreview = false) => ({
     organizationName,
     contactName: contactName || "there",
     documentType,
@@ -98,7 +141,8 @@ export function SendDocumentDialog({
     amountFormatted,
     dueDateFormatted,
     issueDateFormatted,
-  }), [organizationName, contactName, documentType, documentNumber, personalMessage, amountFormatted, dueDateFormatted, issueDateFormatted]);
+    ...(forPreview ? getPreviewButton() : {}),
+  }), [organizationName, contactName, documentType, documentNumber, personalMessage, amountFormatted, dueDateFormatted, issueDateFormatted, getPreviewButton]);
 
   async function handlePreview() {
     if (!orgId) return;
@@ -111,7 +155,7 @@ export function SendDocumentDialog({
           "Content-Type": "application/json",
           "x-organization-id": orgId,
         },
-        body: JSON.stringify(buildTemplateProps()),
+        body: JSON.stringify(buildTemplateProps(true)),
       });
       if (res.ok) {
         const data = await res.json();
@@ -148,6 +192,7 @@ export function SendDocumentDialog({
           subject: `${typeLabel} ${documentNumber} from ${organizationName}`,
           templateProps: buildTemplateProps(),
           attachPdf,
+          ...(isInvoice ? { includePaymentLink } : {}),
         }),
       });
 
@@ -216,12 +261,20 @@ export function SendDocumentDialog({
                   <Loader2 className="size-5 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto bg-[#f4f7fa] dark:bg-muted/20">
+                <div className="flex-1 overflow-y-auto bg-[#f4f7fa] dark:bg-muted/20 p-4">
                   <iframe
                     srcDoc={previewHtml}
-                    className="w-full h-full min-h-[600px] border-0"
+                    className="w-full border-0 rounded-lg"
+                    style={{ minHeight: 700 }}
                     title="Email preview"
                     sandbox="allow-same-origin"
+                    onLoad={(e) => {
+                      const frame = e.currentTarget;
+                      const doc = frame.contentDocument;
+                      if (doc?.body) {
+                        frame.style.height = doc.body.scrollHeight + "px";
+                      }
+                    }}
                   />
                 </div>
               )}
@@ -297,6 +350,38 @@ export function SendDocumentDialog({
                   This message will appear above the document details in the email.
                 </p>
               </div>
+
+              {/* Payment option (invoices only) */}
+              {isInvoice && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Payment</Label>
+                  <Select
+                    value={includePaymentLink ? "stripe" : "none"}
+                    onValueChange={(v) => setIncludePaymentLink(v === "stripe")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No payment link</SelectItem>
+                      <SelectItem value="stripe" disabled={stripeConnected === false}>
+                        <span className="flex items-center gap-2">
+                          <CreditCard className="size-3.5" />
+                          Online payment (Stripe)
+                          {stripeConnected === false && (
+                            <span className="text-muted-foreground"> - not connected</span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {includePaymentLink && (
+                    <p className="text-[11px] text-muted-foreground">
+                      A "Pay invoice" button will be included in the email, linking to a Stripe checkout page.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Options */}
               <div className="space-y-3">

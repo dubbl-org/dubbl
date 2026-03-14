@@ -59,6 +59,7 @@ const comparisonRows = [
   { label: "Bank accounts", free: fmt(PLAN_LIMITS.free.bankAccounts), pro: fmt(PLAN_LIMITS.pro.bankAccounts) },
   { label: "Projects", free: fmt(PLAN_LIMITS.free.projects), pro: fmt(PLAN_LIMITS.pro.projects) },
   { label: "Storage (included)", free: fmtStorage(PLAN_LIMITS.free.storageMb), pro: fmtStorage(PLAN_LIMITS.pro.storageMb) },
+  { label: "Emails / month", free: fmt(PLAN_LIMITS.free.emailsPerMonth), pro: fmt(PLAN_LIMITS.pro.emailsPerMonth) },
   { label: "Audit log retention", free: fmtAudit(PLAN_LIMITS.free.auditLogDays), pro: fmtAudit(PLAN_LIMITS.pro.auditLogDays) },
 ];
 
@@ -221,6 +222,7 @@ export default function PricingPage() {
                       `${fmt(PLAN_LIMITS.free.invoicesPerMonth)} invoices/mo`,
                       `${fmt(PLAN_LIMITS.free.bankAccounts)} bank account`,
                       `${fmt(PLAN_LIMITS.free.projects)} projects`,
+                      `${fmt(PLAN_LIMITS.free.emailsPerMonth)} emails/mo`,
                       "Single currency",
                       "Trial balance & GL",
                       fmtStorage(PLAN_LIMITS.free.storageMb) + " storage",
@@ -316,6 +318,7 @@ export default function PricingPage() {
                       "Unlimited invoices",
                       "Unlimited bank accounts",
                       `${fmt(PLAN_LIMITS.pro.projects)} projects`,
+                      `${fmt(PLAN_LIMITS.pro.emailsPerMonth)} emails/mo`,
                       "All standard reports",
                       fmtStorage(PLAN_LIMITS.pro.storageMb) + " storage",
                       `${fmtAudit(PLAN_LIMITS.pro.auditLogDays)} audit log`,

@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { subscription, document } from "@/lib/db/schema";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { subscription, document, documentEmailLog } from "@/lib/db/schema";
+import { eq, and, isNull, sql, gte } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
-import { STORAGE_PLANS, type StoragePlanName } from "@/lib/plans";
+import { PLAN_LIMITS, STORAGE_PLANS, type PlanName, type StoragePlanName } from "@/lib/plans";
 
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
 
-    const [sub, storageResult] = await Promise.all([
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [sub, storageResult, emailCountResult] = await Promise.all([
       db.query.subscription.findFirst({
         where: eq(subscription.organizationId, ctx.organizationId),
       }),
@@ -22,12 +25,28 @@ export async function GET(request: Request) {
             isNull(document.deletedAt)
           )
         ),
+      db
+        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .from(documentEmailLog)
+        .where(
+          and(
+            eq(documentEmailLog.organizationId, ctx.organizationId),
+            eq(documentEmailLog.status, "sent"),
+            gte(documentEmailLog.sentAt, monthStart)
+          )
+        ),
     ]);
 
     const storageUsedBytes = Number(storageResult[0]?.totalBytes ?? 0);
+    const emailsSentThisMonth = emailCountResult[0]?.count ?? 0;
 
+    const plan = (sub?.plan ?? "free") as PlanName;
     const storagePlan = (sub?.storagePlan ?? "free") as StoragePlanName;
-    const storagePlanLimits = STORAGE_PLANS[storagePlan];
+
+    // Email limit: storage plan overrides if not on free storage, otherwise use team plan limit
+    const emailsPerMonth = storagePlan !== "free"
+      ? STORAGE_PLANS[storagePlan].emailsPerMonth
+      : PLAN_LIMITS[plan].emailsPerMonth;
 
     return NextResponse.json({
       billing: sub
@@ -39,12 +58,13 @@ export async function GET(request: Request) {
             cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
             billingInterval: sub.billingInterval || "monthly",
             storagePlan,
-            storageFilesMb: storagePlanLimits.filesMb,
-            emailsPerMonth: storagePlanLimits.emailsPerMonth,
+            storageFilesMb: STORAGE_PLANS[storagePlan].filesMb,
+            emailsPerMonth,
+            emailsSentThisMonth,
             storageUsedBytes,
           }
         : {
-            plan: "free",
+            plan: "free" as const,
             status: "active",
             seatCount: 1,
             currentPeriodEnd: null,
@@ -52,7 +72,8 @@ export async function GET(request: Request) {
             billingInterval: "monthly" as const,
             storagePlan: "free" as const,
             storageFilesMb: STORAGE_PLANS.free.filesMb,
-            emailsPerMonth: STORAGE_PLANS.free.emailsPerMonth,
+            emailsPerMonth,
+            emailsSentThisMonth,
             storageUsedBytes,
           },
     });

@@ -28,9 +28,13 @@ const documentTypeLabels: Record<string, string> = {
   debit_note: "Debit Note",
 };
 
+function getHeading(typeLabel: string, organizationName: string) {
+  const article = /^[aeiou]/i.test(typeLabel) ? "an" : "a";
+  return `${article} ${typeLabel.toLowerCase()} from ${organizationName}`;
+}
+
 export function DocumentSentEmail({
   organizationName = "Your Company",
-  contactName = "there",
   documentType = "invoice",
   documentNumber = "",
   personalMessage,
@@ -49,38 +53,38 @@ export function DocumentSentEmail({
   return (
     <EmailLayout preview={preview}>
       <Section style={content}>
+        {/* Heading */}
         <Text style={heading}>
-          {organizationName} sent you {typeLabel.toLowerCase()} {documentNumber}
+          You have {getHeading(typeLabel, organizationName)}
         </Text>
+
+        {/* Document number */}
+        <Text style={docNumber}>{documentNumber}</Text>
 
         {personalMessage && (
           <Text style={message}>{personalMessage}</Text>
         )}
 
+        {/* Amount block */}
         {amountFormatted && (
-          <>
-            <Text style={label}>{amountLabel}</Text>
-            <Text style={amount}>{amountFormatted}</Text>
-          </>
+          <Section style={amountBlock}>
+            <Text style={amountLabelStyle}>{amountLabel}</Text>
+            <Text style={amountValue}>{amountFormatted}</Text>
+          </Section>
         )}
 
+        {/* Meta row */}
         {(issueDateFormatted || dueDateFormatted) && (
-          <table cellPadding="0" cellSpacing="0" role="presentation" style={{ width: "100%", marginTop: "16px" }}>
+          <table cellPadding="0" cellSpacing="0" role="presentation" style={metaTable}>
             <tr>
               {issueDateFormatted && (
-                <td>
+                <td style={metaCell}>
                   <Text style={metaLabel}>Issued</Text>
                   <Text style={metaValue}>{issueDateFormatted}</Text>
                 </td>
               )}
-              {dueDateFormatted && documentType !== "quote" && (
-                <td>
-                  <Text style={metaLabel}>{dateLabel}</Text>
-                  <Text style={metaValue}>{dueDateFormatted}</Text>
-                </td>
-              )}
-              {dueDateFormatted && documentType === "quote" && (
-                <td>
+              {dueDateFormatted && (
+                <td style={metaCell}>
                   <Text style={metaLabel}>{dateLabel}</Text>
                   <Text style={metaValue}>{dueDateFormatted}</Text>
                 </td>
@@ -89,6 +93,7 @@ export function DocumentSentEmail({
           </table>
         )}
 
+        {/* CTA button */}
         {viewUrl && (
           <Section style={buttonWrap}>
             <Button style={button} href={viewUrl}>
@@ -114,10 +119,17 @@ const content: React.CSSProperties = {
 };
 
 const heading: React.CSSProperties = {
-  fontSize: "16px",
+  fontSize: "20px",
   color: "#1a1a1a",
-  lineHeight: "24px",
-  margin: "0 0 20px",
+  lineHeight: "28px",
+  margin: "0 0 4px",
+  fontWeight: 500,
+};
+
+const docNumber: React.CSSProperties = {
+  fontSize: "14px",
+  color: "#8898aa",
+  margin: "0 0 24px",
   fontWeight: 400,
 };
 
@@ -129,19 +141,35 @@ const message: React.CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
-const label: React.CSSProperties = {
+const amountBlock: React.CSSProperties = {
+  backgroundColor: "#f8f9fb",
+  borderRadius: "8px",
+  padding: "20px 24px",
+  marginBottom: "4px",
+};
+
+const amountLabelStyle: React.CSSProperties = {
   fontSize: "13px",
   color: "#8898aa",
   margin: "0 0 4px",
   fontWeight: 400,
 };
 
-const amount: React.CSSProperties = {
-  fontSize: "28px",
+const amountValue: React.CSSProperties = {
+  fontSize: "32px",
   fontWeight: 600,
   color: "#1a1a1a",
-  margin: "0 0 4px",
+  margin: 0,
   letterSpacing: "-0.5px",
+};
+
+const metaTable: React.CSSProperties = {
+  width: "100%",
+  marginTop: "20px",
+};
+
+const metaCell: React.CSSProperties = {
+  paddingRight: "24px",
 };
 
 const metaLabel: React.CSSProperties = {
@@ -171,7 +199,7 @@ const button: React.CSSProperties = {
   fontWeight: 500,
   textDecoration: "none",
   textAlign: "center" as const,
-  padding: "10px 24px",
+  padding: "12px 32px",
   display: "inline-block",
 };
 

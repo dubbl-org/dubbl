@@ -32,6 +32,7 @@ const sendBodySchema = z.object({
   subject: z.string().min(1),
   templateProps: templatePropsSchema,
   attachPdf: z.boolean().default(true),
+  includePaymentLink: z.boolean().default(false),
 });
 
 export async function POST(
@@ -65,23 +66,23 @@ export async function POST(
     const emailParsed = sendBodySchema.safeParse(rawBody);
 
     // Send email if requested
-    // Generate payment link token if not present
-    let paymentLinkToken = found.paymentLinkToken;
-    if (!paymentLinkToken) {
-      paymentLinkToken = randomBytes(24).toString("hex");
-      await db
-        .update(invoice)
-        .set({ paymentLinkToken, updatedAt: new Date() })
-        .where(eq(invoice.id, id));
-    }
-
     if (emailParsed.success) {
-      const { recipientEmail, subject, templateProps, attachPdf } = emailParsed.data;
+      const { recipientEmail, subject, templateProps, attachPdf, includePaymentLink } = emailParsed.data;
 
-      // Inject payment link URL and button label
-      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      templateProps.viewUrl = `${APP_URL}/pay/${paymentLinkToken}`;
-      templateProps.buttonLabel = "Pay invoice";
+      // Generate payment link if requested
+      if (includePaymentLink) {
+        let paymentLinkToken = found.paymentLinkToken;
+        if (!paymentLinkToken) {
+          paymentLinkToken = randomBytes(24).toString("hex");
+          await db
+            .update(invoice)
+            .set({ paymentLinkToken, updatedAt: new Date() })
+            .where(eq(invoice.id, id));
+        }
+        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        templateProps.viewUrl = `${APP_URL}/pay/${paymentLinkToken}`;
+        templateProps.buttonLabel = "Pay invoice";
+      }
 
       // Render the structured email template to HTML
       const html = await renderDocumentEmailHtml(templateProps);
