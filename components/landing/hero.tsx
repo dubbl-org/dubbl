@@ -559,13 +559,13 @@ export function Hero() {
 
             {/* Heading */}
             <motion.h1
-              className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.08] text-foreground sm:text-6xl md:text-7xl lg:text-8xl"
+              className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.08] text-foreground text-balance sm:text-6xl md:text-7xl lg:text-8xl"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
             >
-              Bookkeeping{" "}
-              <span className="inline-block pr-2 italic bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 bg-clip-text text-transparent dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-300">
+              Business management{" "}
+              <span className="pr-1 italic bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 bg-clip-text text-transparent dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-300 decoration-clone">
                 for modern
               </span>{" "}
               teams
@@ -579,8 +579,9 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            Double-entry accounting that developers love. Self-host, extend
-            via API, and own your financial data. Forever free.
+            Accounting, projects, inventory, payroll, and CRM in one
+            platform. Self-host, extend via API and MCP, and own your
+            data. Forever free.
           </motion.p>
 
           {/* CTA */}
@@ -651,7 +652,7 @@ export function Hero() {
               {[
                 { icon: "Apache-2.0", label: "Licensed" },
                 { icon: "Self-host", label: "Ready" },
-                { icon: "API-first", label: "Design" },
+                { icon: "MCP-ready", label: "AI-native" },
               ].map((item, i) => (
                 <div key={item.icon} className="flex items-center gap-2">
                   {i > 0 && (

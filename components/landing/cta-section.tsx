@@ -46,10 +46,10 @@ export function CTASection() {
         <ScrollReveal>
           <div className="text-center">
             <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
-              Start managing your books today
+              Start managing your business today
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-white/60">
-              Self-host in minutes, extend via API, and own your financial
+              Self-host in minutes, extend via API and MCP, and own your
               data. Forever free.
             </p>
             <p className="mt-6 text-sm text-white/40">

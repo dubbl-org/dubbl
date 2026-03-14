@@ -113,7 +113,7 @@ See the [Self-Hosting Guide](https://dubbl.dev/docs/self-hosting) for instructio
 
 ## MCP Server
 
-dubbl includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) server that lets any MCP-compatible AI agent interact with your accounting data. The MCP server uses Streamable HTTP transport with OAuth 2.1 authentication and is available on Pro and Business plans.
+dubbl includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) server that lets any MCP-compatible AI agent interact with your accounting data. The MCP server uses Streamable HTTP transport with OAuth 2.1 authentication and is available on the Pro plan.
 
 Works with Claude Desktop, Claude Code, Cursor, Windsurf, VS Code Copilot, and any other MCP-enabled agent. Just point your client at:
 

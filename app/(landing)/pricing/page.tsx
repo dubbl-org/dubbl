@@ -59,6 +59,7 @@ const comparisonRows = [
   { label: "Bank accounts", free: fmt(PLAN_LIMITS.free.bankAccounts), pro: fmt(PLAN_LIMITS.pro.bankAccounts) },
   { label: "Projects", free: fmt(PLAN_LIMITS.free.projects), pro: fmt(PLAN_LIMITS.pro.projects) },
   { label: "Storage (included)", free: fmtStorage(PLAN_LIMITS.free.storageMb), pro: fmtStorage(PLAN_LIMITS.pro.storageMb) },
+  { label: "Emails / month", free: fmt(PLAN_LIMITS.free.emailsPerMonth), pro: fmt(PLAN_LIMITS.pro.emailsPerMonth) },
   { label: "Audit log retention", free: fmtAudit(PLAN_LIMITS.free.auditLogDays), pro: fmtAudit(PLAN_LIMITS.pro.auditLogDays) },
 ];
 
@@ -221,6 +222,7 @@ export default function PricingPage() {
                       `${fmt(PLAN_LIMITS.free.invoicesPerMonth)} invoices/mo`,
                       `${fmt(PLAN_LIMITS.free.bankAccounts)} bank account`,
                       `${fmt(PLAN_LIMITS.free.projects)} projects`,
+                      `${fmt(PLAN_LIMITS.free.emailsPerMonth)} emails/mo`,
                       "Single currency",
                       "Trial balance & GL",
                       fmtStorage(PLAN_LIMITS.free.storageMb) + " storage",
@@ -316,6 +318,7 @@ export default function PricingPage() {
                       "Unlimited invoices",
                       "Unlimited bank accounts",
                       `${fmt(PLAN_LIMITS.pro.projects)} projects`,
+                      `${fmt(PLAN_LIMITS.pro.emailsPerMonth)} emails/mo`,
                       "All standard reports",
                       fmtStorage(PLAN_LIMITS.pro.storageMb) + " storage",
                       `${fmtAudit(PLAN_LIMITS.pro.auditLogDays)} audit log`,
@@ -690,10 +693,10 @@ export default function PricingPage() {
 
             <div className="relative">
               <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
-                Start managing your books today
+                Start managing your business today
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-lg text-white/60">
-                Self-host in minutes, extend via API, and own your financial
+                Self-host in minutes, extend via API and MCP, and own your
                 data. Forever free.
               </p>
               <p className="mt-6 text-sm text-white/40">

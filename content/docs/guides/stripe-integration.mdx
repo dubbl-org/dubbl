@@ -1,0 +1,196 @@
+---
+title: Stripe Integration
+description: Connect your Stripe account to sync charges, fees, refunds, and payouts into your accounting automatically.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Overview
+
+Dubbl integrates with Stripe in three ways:
+
+- **Stripe Connect** - Connect your own Stripe account to automatically sync charges, fees, refunds, payouts, and customers into your accounting
+- **Subscription billing** - Seat plans and storage add-ons for your organization
+- **Invoice payments** - One-time payment links so your customers can pay invoices via card
+
+Both billing flows use Stripe Checkout for secure payment collection and webhooks to automatically sync payment status back to dubbl.
+
+## Stripe Connect (Account Sync)
+
+Connect your Stripe account from **Settings > Integrations > Stripe** to automatically import all your Stripe activity into dubbl's accounting system.
+
+### How It Works
+
+Dubbl uses the standard GAAP/IFRS-compliant gross method:
+
+- **Every charge** is recorded at its full amount (gross revenue)
+- **Stripe fees** are tracked as separate expenses
+- **Refunds** reverse the original revenue entry
+- **Payouts** reconcile from the Stripe clearing account to your bank
+- **Customers** sync as contacts in your contact book
+
+Stripe is treated as a **clearing account** (current asset, code `1350`). This gives you a complete, audit-ready picture of your Stripe activity.
+
+### Connecting Your Account
+
+1. Go to **Settings > Integrations > Stripe**
+2. Click **Connect Stripe Account**
+3. Authorize dubbl in the Stripe OAuth flow
+4. Configure your account mappings (clearing, revenue, fees, and payout bank account)
+5. Run your first sync
+
+<Callout type="info">
+  You must configure account mappings before running a sync. Dubbl suggests defaults based on your existing chart of accounts, but you should verify they match your accounting setup.
+</Callout>
+
+### Account Mappings
+
+After connecting, you need to map three accounts from your chart of accounts:
+
+| Mapping | Type | Purpose |
+|---------|------|---------|
+| Clearing Account | Asset | Holds funds between charge and payout (acts as a Stripe clearing account) |
+| Fees Account | Expense | Stripe's per-transaction processing fees |
+| Revenue Account | Revenue | Where charge amounts are credited |
+| Payout Bank Account | Bank Account | Where Stripe payouts are deposited |
+
+These mappings use your existing chart of accounts, so they work regardless of your country's accounting standards or numbering conventions. You can change them at any time from the integration settings page.
+
+### Journal Entries Created
+
+**On each charge:**
+- DR Stripe Clearing (charge amount)
+- CR Revenue (charge amount)
+- DR Payment Processing Fees (Stripe fee)
+- CR Stripe Clearing (Stripe fee)
+
+**On each refund:**
+- DR Revenue (refund amount)
+- CR Stripe Clearing (refund amount)
+
+**On each payout:**
+- DR Bank Account (payout amount)
+- CR Stripe Clearing (payout amount)
+
+### Webhook Events (Connected Account)
+
+| Event | What it does |
+|-------|-------------|
+| `charge.succeeded` | Records revenue and fee journal entries |
+| `charge.refunded` | Reverses revenue entries for each refund |
+| `payout.paid` | Records bank transfer and creates bank transaction |
+| `customer.created` | Creates or links a contact |
+| `customer.updated` | Updates the linked contact |
+| `account.application.deauthorized` | Marks integration as disconnected |
+
+### Self-Hosting Setup
+
+To enable Stripe Connect on a self-hosted instance:
+
+1. Register a [Stripe Connect platform](https://dashboard.stripe.com/settings/connect)
+2. Set `STRIPE_CONNECT_CLIENT_ID` in your environment
+3. Configure the OAuth redirect URI: `https://your-domain.com/api/v1/integrations/stripe/callback`
+4. Create a **Connect webhook** in your Stripe dashboard pointing to `https://your-domain.com/api/integrations/stripe/webhook` with the following events: `charge.succeeded`, `charge.refunded`, `payout.paid`, `payout.failed`, `customer.created`, `customer.updated`, `account.application.deauthorized`
+5. Set `STRIPE_CONNECT_WEBHOOK_SECRET` to the signing secret from that webhook
+
+<Callout type="info">
+  Dubbl uses a single platform-level Connect webhook rather than per-account webhooks. This means connected users cannot accidentally break the integration by deleting webhooks from their own Stripe dashboard. Deauthorization events are also always delivered to the platform.
+</Callout>
+
+### MCP Tools
+
+The following MCP tools are available for AI agents:
+
+| Tool | Description |
+|------|-------------|
+| `get_stripe_integration_status` | Check connection status, account mappings, and last sync time |
+| `connect_stripe` | Generate an OAuth URL to connect a Stripe account |
+| `disconnect_stripe` | Disconnect the Stripe account (requires confirmation) |
+| `trigger_stripe_sync` | Start a manual sync for the last N days (1-90) |
+| `list_stripe_sync_log` | View recent sync history with status and errors |
+
+## Connecting Stripe (Self-Hosting)
+
+If you're self-hosting dubbl, you need to connect your own Stripe account. The basic steps are:
+
+1. Create a [Stripe account](https://stripe.com) and complete onboarding
+2. Create products and prices for seat plans and storage add-ons
+3. Set environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and price IDs)
+4. Configure a webhook endpoint pointing to `https://your-domain.com/api/stripe/webhook`
+
+<Callout type="info">
+  See [Billing & Stripe Setup](/docs/settings/billing) for the full list of environment variables, price configurations, and testing instructions.
+</Callout>
+
+## Invoice Payment Links
+
+When you send an invoice to a customer, dubbl generates a Stripe-powered payment link they can use to pay by card.
+
+**How it works:**
+
+1. Create an invoice and add line items
+2. Send the invoice to your customer - it includes a payment link
+3. The customer clicks the link and is taken to a Stripe Checkout page
+4. They enter their card details and complete payment
+5. Stripe fires a `checkout.session.completed` webhook
+6. Dubbl automatically marks the invoice as paid and creates a journal entry (DR Bank, CR Accounts Receivable)
+
+The entire flow is automatic after sending - no manual reconciliation needed.
+
+## Subscription Billing
+
+Organization owners manage their subscription from **Settings > Billing**.
+
+### Seat Plans
+
+| Plan | Monthly | Annual |
+|------|---------|--------|
+| Free | $0 | $0 |
+| Pro | $12/seat/mo | $10/seat/mo (billed annually) |
+
+### Storage Add-ons
+
+| Tier | Storage | Monthly | Annual |
+|------|---------|---------|--------|
+| Free | 5 GB | $0 | $0 |
+| Starter | 25 GB | $15/mo | $13/mo (billed annually) |
+| Growth | 75 GB | $45/mo | $38/mo (billed annually) |
+| Scale | 300 GB | $120/mo | $100/mo (billed annually) |
+
+### Plan Changes
+
+- **Upgrades** are prorated - you only pay the difference for the remaining billing period
+- **Downgrades** take effect at the end of the current billing period
+- Seat and storage subscriptions are managed independently
+
+### Customer Portal
+
+Click **Manage Billing** in Settings > Billing to open the Stripe Customer Portal, where you can:
+
+- Update your payment method
+- View and download past invoices
+- Cancel your subscription
+
+## Webhook Events
+
+Dubbl listens for three Stripe webhook events:
+
+| Event | What it does |
+|-------|-------------|
+| `checkout.session.completed` | Processes new subscriptions and invoice payments. Links the Stripe customer to the org or marks the invoice as paid. |
+| `customer.subscription.updated` | Syncs plan changes, updates renewal dates, and handles cancellation scheduling. |
+| `customer.subscription.deleted` | Reverts the organization to the free plan when a subscription ends. |
+
+All webhook events are verified using the `STRIPE_WEBHOOK_SECRET` signing secret before processing.
+
+## Without Stripe
+
+Stripe is optional for self-hosted instances. Without it configured:
+
+- All organizations default to the free plan
+- Invoice payment links are not available
+- Site admins can manually override plan limits (members, storage, features) from `/admin/organizations`
+
+<Callout type="info">
+  Self-hosted instances can grant unlimited access to all features without Stripe by using admin overrides.
+</Callout>

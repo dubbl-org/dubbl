@@ -99,6 +99,7 @@ export const billLine = pgTable("bill_line", {
   unitPrice: integer("unit_price").notNull().default(0),
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),

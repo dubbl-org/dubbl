@@ -121,7 +121,6 @@ const STATUS_COLORS: Record<string, string> = {
 const PLAN_COLORS: Record<string, string> = {
   free: "border-zinc-200 dark:border-zinc-700",
   pro: "border-blue-200 dark:border-blue-800",
-  business: "border-emerald-200 dark:border-emerald-800",
 };
 
 const LIMIT_FIELDS = [
@@ -265,7 +264,7 @@ export default function AdminOrgDetailPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          plan: "business",
+          plan: "pro",
           status: "active",
           managedBy: "manual",
           customPlanName: "Enterprise",
@@ -386,28 +385,28 @@ export default function AdminOrgDetailPage({
             <div>
               <Label className="text-xs text-muted-foreground mb-3 block">Plan Tier</Label>
               <div className="grid grid-cols-3 gap-3">
-                {(["free", "pro", "business"] as const).map((p) => (
+                {(["free", "pro"] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => { setEditPlan(p); markDirty(); }}
                     className={cn(
                       "relative rounded-lg border-2 p-3 text-left transition-all hover:shadow-sm",
                       editPlan === p
-                        ? `${PLAN_COLORS[p]} ring-2 ring-offset-2 ring-offset-background ${p === "free" ? "ring-zinc-400" : p === "pro" ? "ring-blue-500" : "ring-emerald-500"}`
+                        ? `${PLAN_COLORS[p]} ring-2 ring-offset-2 ring-offset-background ${p === "free" ? "ring-zinc-400" : "ring-blue-500"}`
                         : "border-border hover:border-muted-foreground/30"
                     )}
                   >
                     {editPlan === p && (
                       <div className={cn(
                         "absolute top-2 right-2 size-4 rounded-full flex items-center justify-center",
-                        p === "free" ? "bg-zinc-500" : p === "pro" ? "bg-blue-500" : "bg-emerald-500"
+                        p === "free" ? "bg-zinc-500" : "bg-blue-500"
                       )}>
                         <Check className="size-2.5 text-white" />
                       </div>
                     )}
                     <p className="text-sm font-semibold capitalize">{p}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {p === "free" ? "$0/mo" : p === "pro" ? "$12/seat/mo" : "$29/seat/mo"}
+                      {p === "free" ? "$0/mo" : "$12/seat/mo"}
                     </p>
                   </button>
                 ))}

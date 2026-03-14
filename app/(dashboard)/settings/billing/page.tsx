@@ -19,6 +19,8 @@ interface BillingInfo {
   billingInterval: "monthly" | "annual";
   storagePlan: "free" | "starter" | "growth" | "scale";
   storageUsedBytes: number;
+  emailsPerMonth: number;
+  emailsSentThisMonth: number;
 }
 
 function formatStorageSize(bytes: number) {
@@ -178,6 +180,10 @@ export default function BillingPage() {
               </li>
               <li className="flex items-center gap-2 text-[13px]">
                 <Check className="size-3.5 shrink-0 text-emerald-600" />
+                25 emails/mo
+              </li>
+              <li className="flex items-center gap-2 text-[13px]">
+                <Check className="size-3.5 shrink-0 text-emerald-600" />
                 All core features
               </li>
               <li className="flex items-center gap-2 text-[13px]">
@@ -247,6 +253,10 @@ export default function BillingPage() {
               <li className="flex items-center gap-2 text-[13px]">
                 <Check className="size-3.5 shrink-0 text-emerald-600" />
                 Unlimited team members
+              </li>
+              <li className="flex items-center gap-2 text-[13px]">
+                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                100 emails/mo
               </li>
               <li className="flex items-center gap-2 text-[13px]">
                 <Check className="size-3.5 shrink-0 text-emerald-600" />
@@ -336,6 +346,45 @@ export default function BillingPage() {
               {isCritical && (
                 <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">
                   Storage almost full. Consider upgrading your plan.
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Email usage bar */}
+        {(() => {
+          const sent = billing?.emailsSentThisMonth || 0;
+          const limit = billing?.emailsPerMonth || 25;
+          const pct = Math.min((sent / limit) * 100, 100);
+          const isHigh = pct > 80;
+          const isCritical = pct > 95;
+          return (
+            <div className="rounded-lg border bg-card p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Mail className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium">Emails sent this month</span>
+                </div>
+                <span className={cn(
+                  "text-xs font-mono tabular-nums",
+                  isCritical ? "text-red-600 dark:text-red-400" : isHigh ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+                )}>
+                  {sent} / {limit}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500",
+                    isCritical ? "bg-red-500" : isHigh ? "bg-amber-500" : "bg-emerald-500"
+                  )}
+                  style={{ width: `${Math.max(pct, 0.5)}%` }}
+                />
+              </div>
+              {isCritical && (
+                <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">
+                  Email limit almost reached. Upgrade your storage plan for more.
                 </p>
               )}
             </div>

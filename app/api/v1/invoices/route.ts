@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine } from "@/lib/db/schema";
+import { invoice, invoiceLine, contact, organization } from "@/lib/db/schema";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -8,10 +8,10 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
-import { processRecurringTemplates } from "@/lib/api/recurring-generate";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -20,12 +20,13 @@ const lineSchema = z.object({
   unitPrice: z.number().default(0),
   accountId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),
+  discountPercent: z.number().int().min(0).max(10000).default(0),
 });
 
 const createSchema = z.object({
   contactId: z.string().min(1),
   issueDate: z.string().min(1),
-  dueDate: z.string().min(1),
+  dueDate: z.string().optional(),
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   currencyCode: z.string().default("USD"),
@@ -53,9 +54,6 @@ export async function GET(request: Request) {
     const to = url.searchParams.get("to");
     const sortBy = url.searchParams.get("sortBy") || "created";
     const sortOrder = url.searchParams.get("sortOrder") || "desc";
-
-    // Generate any due recurring invoices before listing
-    await processRecurringTemplates(ctx.organizationId);
 
     const conditions = [
       eq(invoice.organizationId, ctx.organizationId),
@@ -111,26 +109,56 @@ export async function POST(request: Request) {
     await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
     await checkMultiCurrency(ctx.organizationId, parsed.currencyCode);
 
+    // Auto-calculate due date if not provided
+    let dueDate = parsed.dueDate;
+    if (!dueDate) {
+      const contactRecord = await db.query.contact.findFirst({
+        where: eq(contact.id, parsed.contactId),
+        columns: { paymentTermsDays: true },
+      });
+      let termsDays = contactRecord?.paymentTermsDays;
+      if (termsDays == null) {
+        const org = await db.query.organization.findFirst({
+          where: eq(organization.id, ctx.organizationId),
+          columns: { defaultPaymentTerms: true },
+        });
+        termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+      }
+      const d = new Date(parsed.issueDate + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + (termsDays || 30));
+      dueDate = d.toISOString().split("T")[0];
+    }
+
     const invoiceNumber = await getNextNumber(ctx.organizationId, "invoice", "invoice_number", "INV");
+
+    // Preload tax rates
+    const taxRateIds = parsed.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+    const ratesMap = await preloadTaxRates(taxRateIds);
 
     // Calculate totals
     let subtotal = 0;
     const processedLines = parsed.lines.map((l, i) => {
-      const amount = decimalToCents(l.quantity * l.unitPrice);
+      const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+      const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+      const amount = grossAmount - discountAmount;
       subtotal += amount;
+      const taxRateId = l.taxRateId || null;
+      const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
         unitPrice: decimalToCents(l.unitPrice),
         accountId: l.accountId || null,
-        taxRateId: l.taxRateId || null,
-        taxAmount: 0,
+        taxRateId,
+        discountPercent: l.discountPercent,
+        taxAmount,
         amount,
         sortOrder: i,
       };
     });
 
-    const total = subtotal;
+    const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+    const total = subtotal + taxTotal;
 
     const [created] = await db
       .insert(invoice)
@@ -139,11 +167,11 @@ export async function POST(request: Request) {
         contactId: parsed.contactId,
         invoiceNumber,
         issueDate: parsed.issueDate,
-        dueDate: parsed.dueDate,
+        dueDate,
         reference: parsed.reference || null,
         notes: parsed.notes || null,
         subtotal,
-        taxTotal: 0,
+        taxTotal,
         total,
         amountPaid: 0,
         amountDue: total,

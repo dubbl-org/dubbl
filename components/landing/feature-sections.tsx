@@ -180,15 +180,15 @@ function ProblemSection() {
                 </span>
               </div>
               <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
-                You&apos;re making decisions on{" "}
+                You&apos;re managing your business across{" "}
                 <span className="text-red-950">
-                  incomplete financial data
+                  too many disconnected tools
                 </span>
               </h2>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-red-100">
-                Messy spreadsheets. Manual reconciliation. Scattered tools that
-                never talk to each other. Your financial data is spread across
-                dozens of disconnected sources.
+                Separate tools for accounting, project tracking, inventory,
+                payroll, and CRM. Context switching kills productivity and data
+                never lines up.
               </p>
             </div>
           </div>
@@ -726,8 +726,8 @@ const capabilities = [
     icon: Building2,
   },
   {
-    headline: "40+ Currencies",
-    description: "Multi-currency support with real-time exchange rate conversion.",
+    headline: "15 MCP Tool Modules",
+    description: "Let AI agents manage your business data through the Model Context Protocol.",
     icon: Globe,
   },
 ];
@@ -760,15 +760,15 @@ function SolutionSection() {
                 </span>
               </div>
               <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
-                One unified view of{" "}
+                One unified platform for{" "}
                 <span className="text-emerald-950">
-                  your entire financial picture
+                  your entire business
                 </span>
               </h2>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-emerald-100">
-                dubbl brings invoicing, expenses, statement imports, and reporting
-                into one place. Automated bookkeeping that keeps your
-                finances organized and tax-ready.
+                dubbl brings accounting, invoicing, inventory, project management,
+                payroll, and CRM into one place. AI-ready with built-in MCP
+                support.
               </p>
             </div>
           </div>

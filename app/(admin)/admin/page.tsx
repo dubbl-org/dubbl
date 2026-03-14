@@ -24,13 +24,11 @@ interface Stats {
 const PLAN_COLORS: Record<string, string> = {
   free: "bg-zinc-200 dark:bg-zinc-700",
   pro: "bg-blue-500",
-  business: "bg-emerald-500",
 };
 
 const PLAN_LABELS: Record<string, string> = {
   free: "Free",
   pro: "Pro",
-  business: "Business",
 };
 
 export default function AdminDashboardPage() {
@@ -120,7 +118,7 @@ export default function AdminDashboardPage() {
           <div className="flex h-3 rounded-full overflow-hidden bg-muted">
             {stats.planBreakdown
               .sort((a, b) => {
-                const order = ["free", "pro", "business"];
+                const order = ["free", "pro"];
                 return order.indexOf(a.plan) - order.indexOf(b.plan);
               })
               .map((r) => (
@@ -136,7 +134,7 @@ export default function AdminDashboardPage() {
           <div className="flex flex-wrap gap-4">
             {stats.planBreakdown
               .sort((a, b) => {
-                const order = ["free", "pro", "business"];
+                const order = ["free", "pro"];
                 return order.indexOf(a.plan) - order.indexOf(b.plan);
               })
               .map((r) => (

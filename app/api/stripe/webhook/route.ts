@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { subscription, invoice, payment, paymentAllocation } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         }
       } else if (orgId && session.subscription) {
         // Seat plan checkout
-        const plan = session.metadata?.plan as "pro" | "business";
+        const plan = session.metadata?.plan as "pro";
         if (plan) {
           const stripeSubscription = await stripe.subscriptions.retrieve(
             session.subscription as string
@@ -121,6 +121,18 @@ export async function POST(request: Request) {
         });
 
         if (inv && inv.status !== "paid") {
+          // Idempotency: skip if a payment already exists for this PI
+          const piId = (session.payment_intent as string) || null;
+          if (piId) {
+            const existingPayment = await db.query.payment.findFirst({
+              where: and(
+                eq(payment.organizationId, inv.organizationId),
+                eq(payment.stripePaymentIntentId, piId)
+              ),
+            });
+            if (existingPayment) break;
+          }
+
           const paymentNumber = `PMT-${Date.now().toString(36).toUpperCase()}`;
 
           const [newPayment] = await db
@@ -135,8 +147,7 @@ export async function POST(request: Request) {
               method: "card",
               reference: `Stripe: ${session.payment_intent || session.id}`,
               currencyCode: inv.currencyCode,
-              stripePaymentIntentId:
-                (session.payment_intent as string) || null,
+              stripePaymentIntentId: piId,
             })
             .returning();
 

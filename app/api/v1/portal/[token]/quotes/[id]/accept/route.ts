@@ -33,6 +33,11 @@ export async function POST(
       return NextResponse.json({ error: "Quote not found or not in sent status" }, { status: 404 });
     }
 
+    const today = new Date().toISOString().split("T")[0];
+    if (existing.expiryDate < today) {
+      return NextResponse.json({ error: "This quote has expired" }, { status: 400 });
+    }
+
     const [updated] = await db
       .update(quote)
       .set({ status: "accepted", updatedAt: new Date() })

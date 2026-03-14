@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 
@@ -118,6 +119,14 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
               .string()
               .optional()
               .describe("Tax rate UUID"),
+            discountPercent: z
+              .number()
+              .int()
+              .min(0)
+              .max(10000)
+              .optional()
+              .default(0)
+              .describe("Discount in basis points (1000 = 10%)"),
           })
         )
         .min(1)
@@ -136,23 +145,32 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
           "BILL"
         );
 
+        const taxRateIds = params.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+        const ratesMap = await preloadTaxRates(taxRateIds);
+
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
-          const amount = decimalToCents(l.quantity * l.unitPrice);
+          const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+          const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+          const amount = grossAmount - discountAmount;
           subtotal += amount;
+          const taxRateId = l.taxRateId ?? null;
+          const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
           return {
             description: l.description,
             quantity: Math.round(l.quantity * 100),
             unitPrice: decimalToCents(l.unitPrice),
             accountId: l.accountId ?? null,
-            taxRateId: l.taxRateId ?? null,
-            taxAmount: 0,
+            taxRateId,
+            discountPercent: l.discountPercent,
+            taxAmount,
             amount,
             sortOrder: i,
           };
         });
 
-        const total = subtotal;
+        const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+        const total = subtotal + taxTotal;
 
         const [created] = await db
           .insert(bill)
@@ -165,7 +183,7 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
             reference: params.reference ?? null,
             notes: params.notes ?? null,
             subtotal,
-            taxTotal: 0,
+            taxTotal,
             total,
             amountPaid: 0,
             amountDue: total,

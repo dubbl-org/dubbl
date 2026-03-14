@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/accordion";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import Link from "next/link";
 
 const faqs = [
   {
@@ -32,12 +31,12 @@ const faqs = [
   {
     question: "Can I migrate from QuickBooks or Xero?",
     answer:
-      "Yes. dubbl includes import tools for QuickBooks, Xero, FreshBooks, and CSV/Excel files. Most migrations can be completed in under an hour.",
+      "Yes. dubbl supports importing from 12 standard banking formats including CSV, OFX, QFX, QBO, MT940, and CAMT.053. Most banks export in at least one of these formats, so migration is straightforward.",
   },
   {
     question: "Is there an API?",
     answer:
-      "dubbl is API-first. Every feature available in the UI is also accessible via our REST API. We provide SDKs for Python, Node.js, and Go, plus comprehensive OpenAPI documentation.",
+      "dubbl is API-first. Every feature available in the UI is also accessible via our REST API. We provide SDKs for Python, Node.js, and Go, plus comprehensive OpenAPI documentation. dubbl also supports the Model Context Protocol (MCP), allowing AI assistants to interact with your business data directly.",
   },
   {
     question: "How do I contribute to dubbl?",
@@ -47,7 +46,12 @@ const faqs = [
   {
     question: "Is dubbl suitable for enterprise use?",
     answer:
-      "Yes. dubbl includes features like audit trails, role-based access control, SSO/SAML support, and multi-tenant architecture. Many companies use dubbl in production for their core accounting needs.",
+      "Yes. dubbl includes features like audit trails, role-based access control, SSO/SAML support, and multi-tenant architecture. Beyond accounting, dubbl covers inventory management, project management, payroll, and CRM. Many companies use dubbl in production as their core business platform.",
+  },
+  {
+    question: "What is MCP support?",
+    answer:
+      "MCP (Model Context Protocol) is an open standard that lets AI assistants interact with external tools and data. dubbl ships with 15 built-in MCP tool modules covering contacts, invoices, inventory, projects, and more. This means AI agents like Claude can read, create, and manage your business data directly through a structured protocol.",
   },
 ];
 
@@ -65,13 +69,15 @@ export function FAQ() {
               className="mb-6"
             />
             <p className="text-sm text-muted-foreground">
-              Can&apos;t find what you&apos;re looking for?{" "}
-              <Link
-                href="/contact"
+              Can&apos;t find what you&apos;re looking for? Reach out on{" "}
+              <a
+                href="https://github.com/dubbl-org/dubbl/discussions"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-emerald-600 underline underline-offset-4 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
               >
-                Contact us
-              </Link>
+                GitHub Discussions
+              </a>
               .
             </p>
           </div>

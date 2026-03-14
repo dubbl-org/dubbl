@@ -70,6 +70,7 @@ export const recurringTemplateLine = pgTable("recurring_template_line", {
   unitPrice: integer("unit_price").notNull().default(0), // cents
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });

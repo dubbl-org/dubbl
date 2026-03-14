@@ -114,7 +114,7 @@ export default function ApiKeysPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Pro feature</p>
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-              API keys require a Pro or Business plan.
+              API keys require a Pro plan.
             </p>
           </div>
           <Button

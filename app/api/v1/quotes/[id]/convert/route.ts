@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { quote, invoice, invoiceLine } from "@/lib/db/schema";
+import { quote, invoice, invoiceLine, contact, organization } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -36,6 +36,24 @@ export async function POST(
 
     const invoiceNumber = await getNextNumber(ctx.organizationId, "invoice", "invoice_number", "INV");
 
+    // Calculate due date from contact payment terms
+    const today = new Date().toISOString().split("T")[0];
+    const contactRecord = await db.query.contact.findFirst({
+      where: eq(contact.id, found.contactId),
+      columns: { paymentTermsDays: true },
+    });
+    let termsDays = contactRecord?.paymentTermsDays;
+    if (termsDays == null) {
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, ctx.organizationId),
+        columns: { defaultPaymentTerms: true },
+      });
+      termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+    }
+    const dueDateObj = new Date(today + "T00:00:00Z");
+    dueDateObj.setUTCDate(dueDateObj.getUTCDate() + (termsDays || 30));
+    const dueDate = dueDateObj.toISOString().split("T")[0];
+
     // Create invoice from quote
     const [createdInvoice] = await db
       .insert(invoice)
@@ -43,8 +61,8 @@ export async function POST(
         organizationId: ctx.organizationId,
         contactId: found.contactId,
         invoiceNumber,
-        issueDate: found.issueDate,
-        dueDate: found.expiryDate,
+        issueDate: today,
+        dueDate,
         reference: found.reference,
         notes: found.notes,
         subtotal: found.subtotal,
@@ -67,6 +85,7 @@ export async function POST(
           unitPrice: l.unitPrice,
           accountId: l.accountId,
           taxRateId: l.taxRateId,
+          discountPercent: l.discountPercent,
           taxAmount: l.taxAmount,
           amount: l.amount,
           sortOrder: l.sortOrder,

@@ -6,6 +6,7 @@ export const PLAN_LIMITS = {
     multiCurrency: false,
     contacts: 200,
     invoicesPerMonth: 10,
+    emailsPerMonth: 25,
     bankAccounts: 1,
     projects: 2,
     reports: ["trial-balance", "general-ledger"] as string[],
@@ -20,6 +21,7 @@ export const PLAN_LIMITS = {
     multiCurrency: true,
     contacts: Infinity,
     invoicesPerMonth: Infinity,
+    emailsPerMonth: 100,
     bankAccounts: Infinity,
     projects: 20,
     reports: [
@@ -37,32 +39,6 @@ export const PLAN_LIMITS = {
     apiAccess: true,
     auditLogDays: 365,
   },
-  business: {
-    organizations: Infinity,
-    members: Infinity,
-    entriesPerMonth: Infinity,
-    multiCurrency: true,
-    contacts: Infinity,
-    invoicesPerMonth: Infinity,
-    bankAccounts: Infinity,
-    projects: Infinity,
-    reports: [
-      "trial-balance",
-      "general-ledger",
-      "balance-sheet",
-      "income-statement",
-      "profit-and-loss",
-      "aged-receivables",
-      "aged-payables",
-      "cash-flow",
-      "account-transactions",
-      "budget-vs-actual",
-      "custom",
-    ] as string[],
-    storageMb: 51200,
-    apiAccess: true,
-    auditLogDays: Infinity,
-  },
 } as const;
 
 export const STORAGE_PLANS = {
@@ -79,7 +55,6 @@ export type PlanName = keyof typeof PLAN_LIMITS;
 export const PLAN_PRICES = {
   free: { monthly: 0, annual: 0 },
   pro: { monthly: 12, annual: 10 },
-  business: { monthly: 29, annual: 24 }, // not shown on pricing page yet
 } as const;
 
 export type BillingInterval = "monthly" | "annual";

@@ -1,18 +1,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine, invoiceSignature, emailConfig } from "@/lib/db/schema";
+import { invoice, invoiceLine, invoiceSignature, emailConfig, organization, contact } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { sendEmail } from "@/lib/email/smtp-client";
 import { randomBytes } from "crypto";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkInvoiceCompliance } from "@/lib/documents/compliance";
 
 export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -128,7 +130,10 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
     {
       contactId: z.string().describe("Customer contact UUID"),
       issueDate: z.string().describe("Issue date (YYYY-MM-DD)"),
-      dueDate: z.string().describe("Due date (YYYY-MM-DD)"),
+      dueDate: z
+        .string()
+        .optional()
+        .describe("Due date (YYYY-MM-DD). If omitted, auto-calculated from contact payment terms or org default."),
       reference: z
         .string()
         .optional()
@@ -161,6 +166,14 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
               .string()
               .optional()
               .describe("Tax rate UUID"),
+            discountPercent: z
+              .number()
+              .int()
+              .min(0)
+              .max(10000)
+              .optional()
+              .default(0)
+              .describe("Discount in basis points (1000 = 10%)"),
           })
         )
         .min(1)
@@ -174,6 +187,26 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
         await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
         await checkMultiCurrency(ctx.organizationId, params.currencyCode ?? "USD");
 
+        // Auto-calculate due date if not provided
+        let dueDate = params.dueDate;
+        if (!dueDate) {
+          const contactRecord = await db.query.contact.findFirst({
+            where: eq(contact.id, params.contactId),
+            columns: { paymentTermsDays: true },
+          });
+          let termsDays = contactRecord?.paymentTermsDays;
+          if (termsDays == null) {
+            const org = await db.query.organization.findFirst({
+              where: eq(organization.id, ctx.organizationId),
+              columns: { defaultPaymentTerms: true },
+            });
+            termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+          }
+          const d = new Date(params.issueDate + "T00:00:00Z");
+          d.setUTCDate(d.getUTCDate() + (termsDays || 30));
+          dueDate = d.toISOString().split("T")[0];
+        }
+
         const invoiceNumber = await getNextNumber(
           ctx.organizationId,
           "invoice",
@@ -181,23 +214,32 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
           "INV"
         );
 
+        const taxRateIds = params.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+        const ratesMap = await preloadTaxRates(taxRateIds);
+
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
-          const amount = decimalToCents(l.quantity * l.unitPrice);
+          const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+          const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+          const amount = grossAmount - discountAmount;
           subtotal += amount;
+          const taxRateId = l.taxRateId ?? null;
+          const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
           return {
             description: l.description,
             quantity: Math.round(l.quantity * 100),
             unitPrice: decimalToCents(l.unitPrice),
             accountId: l.accountId ?? null,
-            taxRateId: l.taxRateId ?? null,
-            taxAmount: 0,
+            taxRateId,
+            discountPercent: l.discountPercent,
+            taxAmount,
             amount,
             sortOrder: i,
           };
         });
 
-        const total = subtotal;
+        const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+        const total = subtotal + taxTotal;
 
         const [created] = await db
           .insert(invoice)
@@ -206,11 +248,11 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
             contactId: params.contactId,
             invoiceNumber,
             issueDate: params.issueDate,
-            dueDate: params.dueDate,
+            dueDate,
             reference: params.reference ?? null,
             notes: params.notes ?? null,
             subtotal,
-            taxTotal: 0,
+            taxTotal,
             total,
             amountPaid: 0,
             amountDue: total,
@@ -486,6 +528,179 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { success: true, resentTo: sig.signerEmail };
+      })
+  );
+
+  server.tool(
+    "check_invoice_compliance",
+    "Check an invoice for compliance warnings based on the organization's country. Returns an array of warnings with field, message, and severity (error/warning). Does not block invoice creation.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice to check"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+          with: { lines: true, contact: true },
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+
+        const org = await db.query.organization.findFirst({
+          where: eq(organization.id, ctx.organizationId),
+        });
+
+        const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
+          .filter(Boolean)
+          .join(", ");
+
+        const contactAddresses = inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null;
+        let contactAddress: string | null = null;
+        if (contactAddresses) {
+          const billing = contactAddresses.billing || Object.values(contactAddresses)[0];
+          if (billing) {
+            contactAddress = [billing.line1, billing.line2, billing.city, billing.state, billing.postalCode, billing.country]
+              .filter(Boolean)
+              .join(", ");
+          }
+        }
+
+        const warnings = checkInvoiceCompliance(
+          {
+            name: org?.name || null,
+            address: orgAddress || null,
+            taxId: org?.taxId || null,
+            countryCode: org?.countryCode || null,
+          },
+          {
+            name: inv.contact?.name || null,
+            address: contactAddress,
+            taxNumber: inv.contact?.taxNumber || null,
+          },
+          {
+            invoiceNumber: inv.invoiceNumber,
+            issueDate: inv.issueDate,
+            lines: inv.lines,
+          }
+        );
+
+        return { warnings };
+      })
+  );
+
+  server.tool(
+    "get_invoice_pdf",
+    "Get the download URL for an invoice PDF. Returns the URL path to download the generated PDF file.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        return {
+          downloadUrl: `${baseUrl}/api/v1/invoices/${params.invoiceId}/pdf?format=pdf`,
+          invoiceNumber: inv.invoiceNumber,
+        };
+      })
+  );
+
+  server.tool(
+    "get_invoice_snapshot",
+    "Get the frozen sender/recipient details for a finalized invoice. These are the org and contact details captured at send time. Returns null for draft invoices.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+
+        return {
+          sender: inv.senderSnapshot || null,
+          recipient: inv.recipientSnapshot || null,
+        };
+      })
+  );
+
+  server.tool(
+    "update_invoice_snapshot",
+    "Correct the sender or recipient details on a finalized invoice. Use this to fix typos or wrong addresses on sent/paid invoices. Only pass the fields you want to change. Cannot be used on draft invoices.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice"),
+      sender: z.object({
+        name: z.string().optional().describe("Organization name"),
+        address: z.string().nullable().optional().describe("Organization address"),
+        taxId: z.string().nullable().optional().describe("Tax ID / VAT number"),
+        registrationNumber: z.string().nullable().optional().describe("Business registration number"),
+        phone: z.string().nullable().optional().describe("Phone number"),
+        email: z.string().nullable().optional().describe("Email address"),
+        countryCode: z.string().nullable().optional().describe("Two-letter country code"),
+      }).optional().describe("Sender (organization) fields to update"),
+      recipient: z.object({
+        name: z.string().optional().describe("Contact name"),
+        email: z.string().nullable().optional().describe("Contact email"),
+        address: z.string().nullable().optional().describe("Contact address"),
+        taxNumber: z.string().nullable().optional().describe("Contact tax / VAT number"),
+      }).optional().describe("Recipient (contact) fields to update"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+        if (inv.status === "draft") throw new Error("Draft invoices don't have snapshots, edit the invoice directly");
+
+        const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+        if (params.sender) {
+          const existing = (inv.senderSnapshot || {}) as Record<string, unknown>;
+          updates.senderSnapshot = { ...existing, ...params.sender };
+        }
+
+        if (params.recipient) {
+          const existing = (inv.recipientSnapshot || {}) as Record<string, unknown>;
+          updates.recipientSnapshot = { ...existing, ...params.recipient };
+        }
+
+        const [updated] = await db
+          .update(invoice)
+          .set(updates)
+          .where(eq(invoice.id, params.invoiceId))
+          .returning();
+
+        return {
+          sender: updated.senderSnapshot,
+          recipient: updated.recipientSnapshot,
+        };
       })
   );
 }

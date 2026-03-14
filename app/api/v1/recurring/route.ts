@@ -7,7 +7,6 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
-import { processRecurringTemplates } from "@/lib/api/recurring-generate";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -50,9 +49,6 @@ export async function GET(request: Request) {
     const frequency = url.searchParams.get("frequency");
     const sortBy = url.searchParams.get("sortBy") || "created";
     const sortOrder = url.searchParams.get("sortOrder") || "desc";
-
-    // Process any due templates before listing
-    await processRecurringTemplates(ctx.organizationId);
 
     const conditions = [
       eq(recurringTemplate.organizationId, ctx.organizationId),

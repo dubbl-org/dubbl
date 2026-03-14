@@ -160,6 +160,7 @@ function SDKCard() {
 const badges = [
   "TypeScript SDK",
   "REST API",
+  "MCP Protocol",
   "Webhooks",
   "Self-hostable",
   "Apache 2.0",
@@ -176,7 +177,7 @@ export function Testimonials() {
         <SectionHeader
           badge="Developer Experience"
           title="Built API-first"
-          subtitle="Every feature accessible via REST API. Self-host, extend, and integrate with anything."
+          subtitle="REST API, MCP protocol, and self-hosting. Extend and integrate with anything."
         />
 
         <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">

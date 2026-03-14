@@ -413,13 +413,13 @@ const steps = [
   {
     step: 2,
     title: "Categorize",
-    subtitle: "Classify every transaction with smart double-entry bookkeeping.",
+    subtitle: "Organize your data across accounting, inventory, projects, and more.",
     visual: <CategorizeVisual />,
   },
   {
     step: 3,
     title: "Insights",
-    subtitle: "See your finances clearly with real-time dashboards and reports.",
+    subtitle: "See your entire business clearly with real-time dashboards and reports.",
     visual: <InsightsVisual />,
   },
 ];
@@ -473,7 +473,7 @@ export function HowItWorks() {
       <Container>
         <SectionHeader
           badge="How it works"
-          title="Three steps to clarity"
+          title="Three steps to get started"
           subtitle="From connection to insight in minutes, not months."
         />
 

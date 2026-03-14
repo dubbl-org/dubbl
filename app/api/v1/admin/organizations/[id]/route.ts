@@ -85,7 +85,7 @@ export async function PATCH(
 
     // Update subscription fields
     const subFields: Record<string, unknown> = {};
-    if (body.plan && ["free", "pro", "business"].includes(body.plan)) {
+    if (body.plan && ["free", "pro"].includes(body.plan)) {
       subFields.plan = body.plan;
     }
     if (body.status && ["active", "canceled", "past_due", "trialing", "incomplete"].includes(body.status)) {

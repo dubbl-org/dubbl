@@ -6,6 +6,7 @@ import {
   integer,
   date,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
@@ -60,6 +61,8 @@ export const invoice = pgTable("invoice", {
   amountPaid: integer("amount_paid").notNull().default(0),
   amountDue: integer("amount_due").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
+  senderSnapshot: jsonb("sender_snapshot"),
+  recipientSnapshot: jsonb("recipient_snapshot"),
   paymentLinkToken: text("payment_link_token").unique(),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   sentAt: timestamp("sent_at", { mode: "date" }),
@@ -84,8 +87,9 @@ export const invoiceLine = pgTable("invoice_line", {
   unitPrice: integer("unit_price").notNull().default(0), // cents
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
-  amount: integer("amount").notNull().default(0), // qty * unitPrice (before tax)
+  amount: integer("amount").notNull().default(0), // qty * unitPrice - discount (before tax)
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
@@ -132,6 +136,7 @@ export const quoteLine = pgTable("quote_line", {
   unitPrice: integer("unit_price").notNull().default(0),
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
@@ -183,6 +188,7 @@ export const creditNoteLine = pgTable("credit_note_line", {
   unitPrice: integer("unit_price").notNull().default(0),
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
