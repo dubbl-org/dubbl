@@ -94,8 +94,7 @@ export default function GeneralLedgerPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : accounts.length === 0 ? (
-        <ContentReveal>
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
             <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
               <BookOpen className="size-6 text-muted-foreground" />
             </div>
@@ -104,9 +103,8 @@ export default function GeneralLedgerPage() {
               No posted journal entries in the selected date range.
             </p>
           </div>
-        </ContentReveal>
       ) : (
-        <ContentReveal>
+        <div>
           <div className="space-y-6">
             {accounts.map((acct) => (
               <div key={acct.accountId} className="space-y-2">
@@ -129,7 +127,7 @@ export default function GeneralLedgerPage() {
               </div>
             ))}
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

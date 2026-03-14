@@ -99,7 +99,7 @@ export default function FinancialCalendarPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <ContentReveal>
+        <div>
           <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
             {/* Calendar Grid */}
             <div className="rounded-lg border overflow-hidden">
@@ -227,7 +227,7 @@ export default function FinancialCalendarPage() {
               )}
             </div>
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

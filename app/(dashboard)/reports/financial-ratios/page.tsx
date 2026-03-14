@@ -149,13 +149,13 @@ export default function FinancialRatiosPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : !ratios ? (
-        <ContentReveal>
+        <div>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No financial data available.</p>
           </div>
-        </ContentReveal>
+        </div>
       ) : (
-        <ContentReveal>
+        <div>
           {/* Ratio Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(ratioInfo).map(([key, info]) => {
@@ -212,7 +212,7 @@ export default function FinancialRatiosPage() {
               </div>
             </div>
           )}
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

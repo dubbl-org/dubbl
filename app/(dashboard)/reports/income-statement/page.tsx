@@ -74,7 +74,7 @@ export default function IncomeStatementPage() {
       ) : !data ? (
         <p className="text-muted-foreground">No data available.</p>
       ) : (
-        <ContentReveal>
+        <div>
           <div className="space-y-6">
             {[
               { label: "Revenue", section: data.revenue },
@@ -126,7 +126,7 @@ export default function IncomeStatementPage() {
               </div>
             </div>
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

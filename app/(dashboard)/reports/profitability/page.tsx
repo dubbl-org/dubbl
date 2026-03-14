@@ -111,13 +111,13 @@ export default function ProfitabilityPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : entries.length === 0 ? (
-        <ContentReveal>
+        <div>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No profitability data. Create invoices and bills to see per-contact profitability.</p>
           </div>
-        </ContentReveal>
+        </div>
       ) : (
-        <ContentReveal>
+        <div>
           <div className="rounded-lg border overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -176,7 +176,7 @@ export default function ProfitabilityPage() {
               </tfoot>
             </table>
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

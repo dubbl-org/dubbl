@@ -84,7 +84,7 @@ export default function PaymentPerformancePage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <ContentReveal>
+        <div>
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard title="Avg Days to Collect" value={`${avgCollect}d`} icon={TrendingDown} changeType={avgCollect <= 30 ? "positive" : "negative"} />
             <StatCard title="Avg Days to Pay" value={`${avgPay}d`} icon={TrendingUp} changeType={avgPay <= 30 ? "positive" : "neutral"} />
@@ -119,7 +119,7 @@ export default function PaymentPerformancePage() {
               <p className="text-sm text-muted-foreground">No payment data for this period. Pay or collect invoices/bills to see performance.</p>
             </div>
           )}
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

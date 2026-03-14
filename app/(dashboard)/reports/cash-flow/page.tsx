@@ -95,7 +95,7 @@ export default function CashFlowPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <ContentReveal>
+        <div>
           <div className="space-y-6">
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
               {sections.map((s) => (
@@ -131,7 +131,7 @@ export default function CashFlowPage() {
               <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
             </div>
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

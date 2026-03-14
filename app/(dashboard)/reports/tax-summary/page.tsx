@@ -85,7 +85,7 @@ export default function TaxSummaryPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <ContentReveal>
+        <div>
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-3">
               <StatCard
@@ -166,7 +166,7 @@ export default function TaxSummaryPage() {
               </div>
             )}
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

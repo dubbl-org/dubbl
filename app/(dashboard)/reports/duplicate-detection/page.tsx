@@ -69,8 +69,7 @@ export default function DuplicateDetectionPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : groups.length === 0 ? (
-        <ContentReveal>
-          <div className="rounded-xl border border-dashed py-12 text-center">
+        <div className="rounded-xl border border-dashed py-12 text-center">
             <div className="flex justify-center mb-3">
               <div className="size-10 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <AlertTriangle className="size-5 text-emerald-600" />
@@ -79,9 +78,8 @@ export default function DuplicateDetectionPage() {
             <p className="text-sm font-medium">No duplicates detected</p>
             <p className="text-xs text-muted-foreground mt-1">All invoices and bills look clean.</p>
           </div>
-        </ContentReveal>
       ) : (
-        <ContentReveal>
+        <div>
           <div className="space-y-4">
             <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3">
               <div className="flex items-center gap-2">
@@ -121,7 +119,7 @@ export default function DuplicateDetectionPage() {
               </div>
             ))}
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );

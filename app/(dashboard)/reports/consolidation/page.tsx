@@ -11,7 +11,6 @@ import {
   TrendingDown,
   DollarSign,
   ChevronsUpDown,
-  Check,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -500,12 +499,11 @@ export default function ConsolidationPage() {
 
           {reportLoading ? (
             <BrandLoader className="h-48" />
-          ) : (
-            <ContentReveal>
+          ) : report ? (
+            <div className="space-y-6">
               {/* P&L Tab */}
               {tab === "pnl" && pnl && (
-                <div className="space-y-6">
-                  {/* Stats */}
+                <>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <StatCard title="Total Revenue" value={formatMoney(pnl.totalRevenue)} icon={TrendingUp} changeType="positive" />
                     <StatCard title="Total Expenses" value={formatMoney(pnl.totalExpenses)} icon={TrendingDown} changeType="negative" />
@@ -542,7 +540,7 @@ export default function ConsolidationPage() {
                             </TableCell>
                           </TableRow>
                         ))}
-                        <TableRow className="bg-muted/30 font-semibold">
+                        <TableRow className="bg-muted/30 font-semibold hover:bg-muted/30">
                           <TableCell className="px-4 py-3">Total</TableCell>
                           <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalRevenue)}</TableCell>
                           <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalExpenses)}</TableCell>
@@ -554,19 +552,17 @@ export default function ConsolidationPage() {
                     </Table>
                   </div>
 
-                  {/* Account Detail */}
                   <AccountDetailTable
                     title="Account Detail"
                     accounts={pnl.accounts}
-                    members={report!.members}
+                    members={report.members}
                   />
-                </div>
+                </>
               )}
 
               {/* Balance Sheet Tab */}
               {tab === "balance-sheet" && bs && (
-                <div className="space-y-6">
-                  {/* Stats */}
+                <>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <StatCard title="Total Assets" value={formatMoney(bs.totalAssets)} icon={TrendingUp} changeType="positive" />
                     <StatCard title="Total Liabilities" value={formatMoney(bs.totalLiabilities)} icon={TrendingDown} changeType="negative" />
@@ -596,7 +592,7 @@ export default function ConsolidationPage() {
                             <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.equity)}</TableCell>
                           </TableRow>
                         ))}
-                        <TableRow className="bg-muted/30 font-semibold">
+                        <TableRow className="bg-muted/30 font-semibold hover:bg-muted/30">
                           <TableCell className="px-4 py-3">Total</TableCell>
                           <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalAssets)}</TableCell>
                           <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalLiabilities)}</TableCell>
@@ -606,16 +602,15 @@ export default function ConsolidationPage() {
                     </Table>
                   </div>
 
-                  {/* Account Detail */}
                   <AccountDetailTable
                     title="Account Detail"
                     accounts={bs.accounts}
-                    members={report!.members}
+                    members={report.members}
                   />
-                </div>
+                </>
               )}
-            </ContentReveal>
-          )}
+            </div>
+          ) : null}
         </>
       )}
     </ContentReveal>

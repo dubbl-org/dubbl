@@ -130,13 +130,13 @@ export default function ComparativeBalanceSheetPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : periods.length === 0 ? (
-        <ContentReveal>
+        <div>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No balance sheet data available.</p>
           </div>
-        </ContentReveal>
+        </div>
       ) : (
-        <ContentReveal>
+        <div>
           <div className="rounded-lg border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -206,7 +206,7 @@ export default function ComparativeBalanceSheetPage() {
               </tbody>
             </table>
           </div>
-        </ContentReveal>
+        </div>
       )}
     </ContentReveal>
   );
