@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X } from "lucide-react";
+import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
@@ -125,6 +133,20 @@ export default function InvoiceDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [complianceWarnings, setComplianceWarnings] = useState<{ field: string; message: string; severity: "error" | "warning" }[]>([]);
   const [complianceDismissed, setComplianceDismissed] = useState(false);
+  const [snapshotSheetOpen, setSnapshotSheetOpen] = useState(false);
+  const [snapshotSaving, setSnapshotSaving] = useState(false);
+  const [senderName, setSenderName] = useState("");
+  const [senderAddress, setSenderAddress] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [senderTaxId, setSenderTaxId] = useState("");
+  const [senderReg, setSenderReg] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientAddress, setRecipientAddress] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [recipientTaxNumber, setRecipientTaxNumber] = useState("");
+  const [senderSnapshot, setSenderSnapshot] = useState<Record<string, string | null> | null>(null);
+  const [recipientSnapshot, setRecipientSnapshot] = useState<Record<string, string | null> | null>(null);
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -149,7 +171,69 @@ export default function InvoiceDetailPage() {
         if (data.warnings) setComplianceWarnings(data.warnings);
       })
       .catch(() => {});
+
+    fetch(`/api/v1/invoices/${id}/snapshot`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.sender) setSenderSnapshot(data.sender);
+        if (data.recipient) setRecipientSnapshot(data.recipient);
+      })
+      .catch(() => {});
   }, [id, orgId]);
+
+  function openSnapshotEdit() {
+    setSenderName(senderSnapshot?.name || "");
+    setSenderAddress(senderSnapshot?.address || "");
+    setSenderEmail(senderSnapshot?.email || "");
+    setSenderPhone(senderSnapshot?.phone || "");
+    setSenderTaxId(senderSnapshot?.taxId || "");
+    setSenderReg(senderSnapshot?.registrationNumber || "");
+    setRecipientName(recipientSnapshot?.name || inv?.contact?.name || "");
+    setRecipientAddress(recipientSnapshot?.address || "");
+    setRecipientEmail(recipientSnapshot?.email || inv?.contact?.email || "");
+    setRecipientTaxNumber(recipientSnapshot?.taxNumber || "");
+    setSnapshotSheetOpen(true);
+  }
+
+  async function handleSaveSnapshot() {
+    if (!orgId) return;
+    setSnapshotSaving(true);
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/snapshot`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          sender: {
+            name: senderName,
+            address: senderAddress || null,
+            email: senderEmail || null,
+            phone: senderPhone || null,
+            taxId: senderTaxId || null,
+            registrationNumber: senderReg || null,
+          },
+          recipient: {
+            name: recipientName,
+            email: recipientEmail || null,
+            address: recipientAddress || null,
+            taxNumber: recipientTaxNumber || null,
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSenderSnapshot(data.sender);
+        setRecipientSnapshot(data.recipient);
+        setSnapshotSheetOpen(false);
+        toast.success("Invoice details updated");
+      } else {
+        toast.error("Failed to update details");
+      }
+    } finally {
+      setSnapshotSaving(false);
+    }
+  }
 
   async function handleDownloadPdf() {
     if (!orgId) return;
@@ -558,6 +642,102 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Document Details (snapshot) */}
+        {inv.status !== "draft" && (
+          <div className="rounded-xl border bg-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Document Details</p>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={openSnapshotEdit}>
+                <Pencil className="size-3" />
+                Edit
+              </Button>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] text-muted-foreground mb-1">From</p>
+                <p className="text-sm font-medium">{senderSnapshot?.name || "-"}</p>
+                {senderSnapshot?.address && <p className="text-xs text-muted-foreground">{senderSnapshot.address}</p>}
+                {senderSnapshot?.email && <p className="text-xs text-muted-foreground">{senderSnapshot.email}</p>}
+                {senderSnapshot?.phone && <p className="text-xs text-muted-foreground">{senderSnapshot.phone}</p>}
+                {senderSnapshot?.taxId && <p className="text-xs text-muted-foreground">Tax ID: {senderSnapshot.taxId}</p>}
+                {senderSnapshot?.registrationNumber && <p className="text-xs text-muted-foreground">Reg: {senderSnapshot.registrationNumber}</p>}
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground mb-1">Bill to</p>
+                <p className="text-sm font-medium">{recipientSnapshot?.name || inv.contact?.name || "-"}</p>
+                {(recipientSnapshot?.address) && <p className="text-xs text-muted-foreground">{recipientSnapshot.address}</p>}
+                {(recipientSnapshot?.email || inv.contact?.email) && <p className="text-xs text-muted-foreground">{recipientSnapshot?.email || inv.contact?.email}</p>}
+                {recipientSnapshot?.taxNumber && <p className="text-xs text-muted-foreground">Tax: {recipientSnapshot.taxNumber}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Snapshot Edit Sheet */}
+        <Sheet open={snapshotSheetOpen} onOpenChange={setSnapshotSheetOpen}>
+          <SheetContent side="right" className="sm:max-w-md w-full overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Edit Document Details</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 space-y-4 px-4 pb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 pt-2">From (Sender)</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Name</Label>
+                <Input value={senderName} onChange={(e) => setSenderName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Address</Label>
+                <Textarea value={senderAddress} onChange={(e) => setSenderAddress(e.target.value)} rows={2} className="text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Email</Label>
+                <Input value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Phone</Label>
+                <Input value={senderPhone} onChange={(e) => setSenderPhone(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tax ID / VAT</Label>
+                <Input value={senderTaxId} onChange={(e) => setSenderTaxId(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Registration Number</Label>
+                <Input value={senderReg} onChange={(e) => setSenderReg(e.target.value)} />
+              </div>
+
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 pt-2">Bill to (Recipient)</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Name</Label>
+                <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Address</Label>
+                <Textarea value={recipientAddress} onChange={(e) => setRecipientAddress(e.target.value)} rows={2} className="text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Email</Label>
+                <Input value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tax Number</Label>
+                <Input value={recipientTaxNumber} onChange={(e) => setRecipientTaxNumber(e.target.value)} />
+              </div>
+            </div>
+            <SheetFooter>
+              <Button variant="outline" onClick={() => setSnapshotSheetOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleSaveSnapshot}
+                disabled={snapshotSaving || !senderName.trim()}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {snapshotSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                Save
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
 
         {/* Payment History */}
         {payments.length > 0 && (
