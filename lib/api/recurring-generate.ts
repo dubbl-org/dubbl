@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
-import { recurringTemplate, invoice, invoiceLine, bill, billLine, expenseClaim, expenseItem } from "@/lib/db/schema";
+import { recurringTemplate, invoice, invoiceLine, bill, billLine, expenseClaim, expenseItem, contact } from "@/lib/db/schema";
 import { eq, and, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { getNextNumber } from "@/lib/api/numbering";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 
 /**
  * Advance a date by the given frequency.
@@ -70,25 +71,42 @@ export async function processRecurringTemplates(organizationId: string): Promise
 
       if (tmpl.type === "bill") {
         const billNumber = await getNextNumber(organizationId, "bill", "bill_number", "BILL");
+
+        // Use contact payment terms for due date
+        const contactRecord = await db.query.contact.findFirst({
+          where: eq(contact.id, tmpl.contactId),
+          columns: { paymentTermsDays: true },
+        });
+        const termsDays = contactRecord?.paymentTermsDays ?? 30;
         const dueDateBill = new Date(nextRun + "T00:00:00Z");
-        dueDateBill.setUTCDate(dueDateBill.getUTCDate() + 30);
+        dueDateBill.setUTCDate(dueDateBill.getUTCDate() + termsDays);
         const dueDateBillStr = dueDateBill.toISOString().split("T")[0];
+
+        const billTaxRateIds = tmpl.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+        const billRatesMap = await preloadTaxRates(billTaxRateIds);
 
         let billSubtotal = 0;
         const billLines = tmpl.lines.map((l, i) => {
-          const amt = Math.round((l.quantity / 100) * l.unitPrice);
+          const grossAmt = Math.round((l.quantity / 100) * l.unitPrice);
+          const discountAmt = l.discountPercent ? Math.round(grossAmt * l.discountPercent / 10000) : 0;
+          const amt = grossAmt - discountAmt;
           billSubtotal += amt;
+          const taxAmount = l.taxRateId ? calcTax(amt, billRatesMap.get(l.taxRateId) ?? 0) : 0;
           return {
             description: l.description,
             quantity: l.quantity,
             unitPrice: l.unitPrice,
             accountId: l.accountId,
             taxRateId: l.taxRateId,
-            taxAmount: 0,
+            discountPercent: l.discountPercent,
+            taxAmount,
             amount: amt,
             sortOrder: l.sortOrder ?? i,
           };
         });
+
+        const billTaxTotal = billLines.reduce((sum, l) => sum + l.taxAmount, 0);
+        const billTotal = billSubtotal + billTaxTotal;
 
         const [createdBill] = await db
           .insert(bill)
@@ -101,10 +119,10 @@ export async function processRecurringTemplates(organizationId: string): Promise
             reference: tmpl.reference,
             notes: tmpl.notes,
             subtotal: billSubtotal,
-            taxTotal: 0,
-            total: billSubtotal,
+            taxTotal: billTaxTotal,
+            total: billTotal,
             amountPaid: 0,
-            amountDue: billSubtotal,
+            amountDue: billTotal,
             currencyCode: tmpl.currencyCode,
             createdBy: tmpl.createdBy,
           })
@@ -169,29 +187,43 @@ export async function processRecurringTemplates(organizationId: string): Promise
 
       const invoiceNumber = await getNextNumber(organizationId, "invoice", "invoice_number", "INV");
 
-      // Calculate due date (30 days from issue)
+      // Use contact payment terms for due date
+      const invContact = await db.query.contact.findFirst({
+        where: eq(contact.id, tmpl.contactId),
+        columns: { paymentTermsDays: true },
+      });
+      const invTermsDays = invContact?.paymentTermsDays ?? 30;
       const dueDate = new Date(nextRun + "T00:00:00Z");
-      dueDate.setUTCDate(dueDate.getUTCDate() + 30);
+      dueDate.setUTCDate(dueDate.getUTCDate() + invTermsDays);
       const dueDateStr = dueDate.toISOString().split("T")[0];
+
+      // Preload tax rates
+      const invTaxRateIds = tmpl.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+      const invRatesMap = await preloadTaxRates(invTaxRateIds);
 
       // Calculate totals from template lines
       let subtotal = 0;
       const processedLines = tmpl.lines.map((l, i) => {
-        const amount = Math.round((l.quantity / 100) * l.unitPrice);
+        const grossAmount = Math.round((l.quantity / 100) * l.unitPrice);
+        const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+        const amount = grossAmount - discountAmount;
         subtotal += amount;
+        const taxAmount = l.taxRateId ? calcTax(amount, invRatesMap.get(l.taxRateId) ?? 0) : 0;
         return {
           description: l.description,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
           accountId: l.accountId,
           taxRateId: l.taxRateId,
-          taxAmount: 0,
+          discountPercent: l.discountPercent,
+          taxAmount,
           amount,
           sortOrder: l.sortOrder ?? i,
         };
       });
 
-      const total = subtotal;
+      const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+      const total = subtotal + taxTotal;
 
       const [created] = await db
         .insert(invoice)
@@ -204,7 +236,7 @@ export async function processRecurringTemplates(organizationId: string): Promise
           reference: tmpl.reference,
           notes: tmpl.notes,
           subtotal,
-          taxTotal: 0,
+          taxTotal,
           total,
           amountPaid: 0,
           amountDue: total,

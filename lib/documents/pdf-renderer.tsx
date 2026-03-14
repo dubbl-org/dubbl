@@ -33,6 +33,7 @@ export interface PdfLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  discountPercent?: number;
   taxAmount: number;
   amount: number;
 }
@@ -129,6 +130,7 @@ const s = StyleSheet.create({
   cellDesc: { flex: 3 },
   cellQty: { flex: 0.6, textAlign: "right" },
   cellPrice: { flex: 1.2, textAlign: "right" },
+  cellDiscount: { flex: 0.8, textAlign: "right" },
   cellAmount: { flex: 1.3, textAlign: "right" },
   // Totals
   totalsContainer: { flexDirection: "row", justifyContent: "flex-end", marginTop: 20 },
@@ -161,6 +163,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
   const title = getInvoiceTitle(org.countryCode, !!org.taxId);
   const amountDue = inv.amountDue ?? inv.total;
   const amountPaid = inv.amountPaid ?? 0;
+  const hasDiscount = inv.lines.some((l) => l.discountPercent && l.discountPercent > 0);
 
   const vars: Record<string, string> = {
     orgName: org.name, orgAddress: org.address || "", orgTaxId: org.taxId || "",
@@ -240,6 +243,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
             <Text style={[s.th, s.cellDesc]}>Description</Text>
             <Text style={[s.th, s.cellQty]}>Qty</Text>
             <Text style={[s.th, s.cellPrice]}>Unit price</Text>
+            {hasDiscount && <Text style={[s.th, s.cellDiscount]}>Discount</Text>}
             <Text style={[s.th, s.cellAmount]}>Amount</Text>
           </View>
           {inv.lines.map((line, i) => (
@@ -247,6 +251,11 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
               <Text style={[s.cellDesc, { fontSize: 10 }]}>{line.description}</Text>
               <Text style={[s.cellQty, { color: dark }]}>{(line.quantity / 100).toFixed(2)}</Text>
               <Text style={[s.cellPrice, { color: dark }]}>{fmtMoney(line.unitPrice, inv.currencyCode)}</Text>
+              {hasDiscount && (
+                <Text style={[s.cellDiscount, { color: dark }]}>
+                  {line.discountPercent ? `${(line.discountPercent / 100).toFixed(2)}%` : "-"}
+                </Text>
+              )}
               <Text style={[s.cellAmount, { color: dark }]}>{fmtMoney(line.amount, inv.currencyCode)}</Text>
             </View>
           ))}

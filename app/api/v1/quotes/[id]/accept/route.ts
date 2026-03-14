@@ -32,6 +32,14 @@ export async function POST(
       );
     }
 
+    const today = new Date().toISOString().split("T")[0];
+    if (found.expiryDate < today) {
+      return NextResponse.json(
+        { error: "This quote has expired" },
+        { status: 400 }
+      );
+    }
+
     const [updated] = await db
       .update(quote)
       .set({

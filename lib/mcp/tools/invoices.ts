@@ -1,13 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine, invoiceSignature, emailConfig, organization } from "@/lib/db/schema";
+import { invoice, invoiceLine, invoiceSignature, emailConfig, organization, contact } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { sendEmail } from "@/lib/email/smtp-client";
@@ -129,7 +130,10 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
     {
       contactId: z.string().describe("Customer contact UUID"),
       issueDate: z.string().describe("Issue date (YYYY-MM-DD)"),
-      dueDate: z.string().describe("Due date (YYYY-MM-DD)"),
+      dueDate: z
+        .string()
+        .optional()
+        .describe("Due date (YYYY-MM-DD). If omitted, auto-calculated from contact payment terms or org default."),
       reference: z
         .string()
         .optional()
@@ -162,6 +166,14 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
               .string()
               .optional()
               .describe("Tax rate UUID"),
+            discountPercent: z
+              .number()
+              .int()
+              .min(0)
+              .max(10000)
+              .optional()
+              .default(0)
+              .describe("Discount in basis points (1000 = 10%)"),
           })
         )
         .min(1)
@@ -175,6 +187,26 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
         await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
         await checkMultiCurrency(ctx.organizationId, params.currencyCode ?? "USD");
 
+        // Auto-calculate due date if not provided
+        let dueDate = params.dueDate;
+        if (!dueDate) {
+          const contactRecord = await db.query.contact.findFirst({
+            where: eq(contact.id, params.contactId),
+            columns: { paymentTermsDays: true },
+          });
+          let termsDays = contactRecord?.paymentTermsDays;
+          if (termsDays == null) {
+            const org = await db.query.organization.findFirst({
+              where: eq(organization.id, ctx.organizationId),
+              columns: { defaultPaymentTerms: true },
+            });
+            termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+          }
+          const d = new Date(params.issueDate + "T00:00:00Z");
+          d.setUTCDate(d.getUTCDate() + (termsDays || 30));
+          dueDate = d.toISOString().split("T")[0];
+        }
+
         const invoiceNumber = await getNextNumber(
           ctx.organizationId,
           "invoice",
@@ -182,23 +214,32 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
           "INV"
         );
 
+        const taxRateIds = params.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+        const ratesMap = await preloadTaxRates(taxRateIds);
+
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
-          const amount = decimalToCents(l.quantity * l.unitPrice);
+          const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+          const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+          const amount = grossAmount - discountAmount;
           subtotal += amount;
+          const taxRateId = l.taxRateId ?? null;
+          const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
           return {
             description: l.description,
             quantity: Math.round(l.quantity * 100),
             unitPrice: decimalToCents(l.unitPrice),
             accountId: l.accountId ?? null,
-            taxRateId: l.taxRateId ?? null,
-            taxAmount: 0,
+            taxRateId,
+            discountPercent: l.discountPercent,
+            taxAmount,
             amount,
             sortOrder: i,
           };
         });
 
-        const total = subtotal;
+        const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+        const total = subtotal + taxTotal;
 
         const [created] = await db
           .insert(invoice)
@@ -207,11 +248,11 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
             contactId: params.contactId,
             invoiceNumber,
             issueDate: params.issueDate,
-            dueDate: params.dueDate,
+            dueDate,
             reference: params.reference ?? null,
             notes: params.notes ?? null,
             subtotal,
-            taxTotal: 0,
+            taxTotal,
             total,
             amountPaid: 0,
             amountDue: total,

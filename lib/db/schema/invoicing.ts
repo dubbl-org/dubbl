@@ -87,8 +87,9 @@ export const invoiceLine = pgTable("invoice_line", {
   unitPrice: integer("unit_price").notNull().default(0), // cents
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
-  amount: integer("amount").notNull().default(0), // qty * unitPrice (before tax)
+  amount: integer("amount").notNull().default(0), // qty * unitPrice - discount (before tax)
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
@@ -135,6 +136,7 @@ export const quoteLine = pgTable("quote_line", {
   unitPrice: integer("unit_price").notNull().default(0),
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
@@ -186,6 +188,7 @@ export const creditNoteLine = pgTable("credit_note_line", {
   unitPrice: integer("unit_price").notNull().default(0),
   accountId: uuid("account_id").references(() => chartAccount.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),

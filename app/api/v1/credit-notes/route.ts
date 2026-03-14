@@ -10,6 +10,7 @@ import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -18,6 +19,7 @@ const lineSchema = z.object({
   unitPrice: z.number().default(0),
   accountId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),
+  discountPercent: z.number().int().min(0).max(10000).default(0),
 });
 
 const createSchema = z.object({
@@ -107,24 +109,34 @@ export async function POST(request: Request) {
 
     const creditNoteNumber = await getNextNumber(ctx.organizationId, "credit_note", "credit_note_number", "CN");
 
+    // Preload tax rates
+    const taxRateIds = parsed.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+    const ratesMap = await preloadTaxRates(taxRateIds);
+
     // Calculate totals
     let subtotal = 0;
     const processedLines = parsed.lines.map((l, i) => {
-      const amount = decimalToCents(l.quantity * l.unitPrice);
+      const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+      const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+      const amount = grossAmount - discountAmount;
       subtotal += amount;
+      const taxRateId = l.taxRateId || null;
+      const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
         unitPrice: decimalToCents(l.unitPrice),
         accountId: l.accountId || null,
-        taxRateId: l.taxRateId || null,
-        taxAmount: 0,
+        taxRateId,
+        discountPercent: l.discountPercent,
+        taxAmount,
         amount,
         sortOrder: i,
       };
     });
 
-    const total = subtotal;
+    const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+    const total = subtotal + taxTotal;
 
     const [created] = await db
       .insert(creditNote)
@@ -137,7 +149,7 @@ export async function POST(request: Request) {
         reference: parsed.reference || null,
         notes: parsed.notes || null,
         subtotal,
-        taxTotal: 0,
+        taxTotal,
         total,
         amountApplied: 0,
         amountRemaining: 0,

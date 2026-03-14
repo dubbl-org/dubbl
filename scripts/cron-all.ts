@@ -26,6 +26,7 @@ const ENDPOINTS = [
   "/api/cron/notification-digest",
   "/api/cron/webhook-retries",
   "/api/cron/report-schedules",
+  "/api/cron/invoicing",
 ];
 
 const headers = { Authorization: `Bearer ${CRON_SECRET}` };
