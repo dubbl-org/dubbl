@@ -22,6 +22,7 @@ const templatePropsSchema = z.object({
   dueDateFormatted: z.string().optional(),
   issueDateFormatted: z.string().optional(),
   viewUrl: z.string().optional(),
+  buttonLabel: z.string().optional(),
 });
 
 const sendBodySchema = z.object({

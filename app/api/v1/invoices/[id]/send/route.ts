@@ -10,6 +10,7 @@ import { createInvoiceJournalEntry } from "@/lib/api/journal-automation";
 import { buildSenderSnapshot, buildRecipientSnapshot } from "@/lib/documents/snapshots";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
+import { randomBytes } from "crypto";
 import { z } from "zod";
 
 const templatePropsSchema = z.object({
@@ -22,6 +23,7 @@ const templatePropsSchema = z.object({
   dueDateFormatted: z.string().optional(),
   issueDateFormatted: z.string().optional(),
   viewUrl: z.string().optional(),
+  buttonLabel: z.string().optional(),
 });
 
 const sendBodySchema = z.object({
@@ -63,8 +65,23 @@ export async function POST(
     const emailParsed = sendBodySchema.safeParse(rawBody);
 
     // Send email if requested
+    // Generate payment link token if not present
+    let paymentLinkToken = found.paymentLinkToken;
+    if (!paymentLinkToken) {
+      paymentLinkToken = randomBytes(24).toString("hex");
+      await db
+        .update(invoice)
+        .set({ paymentLinkToken, updatedAt: new Date() })
+        .where(eq(invoice.id, id));
+    }
+
     if (emailParsed.success) {
       const { recipientEmail, subject, templateProps, attachPdf } = emailParsed.data;
+
+      // Inject payment link URL and button label
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      templateProps.viewUrl = `${APP_URL}/pay/${paymentLinkToken}`;
+      templateProps.buttonLabel = "Pay invoice";
 
       // Render the structured email template to HTML
       const html = await renderDocumentEmailHtml(templateProps);

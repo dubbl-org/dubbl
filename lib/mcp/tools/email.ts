@@ -52,6 +52,10 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
         .boolean()
         .default(false)
         .describe("Whether to attach a PDF (only supported for invoices)"),
+      buttonLabel: z
+        .string()
+        .optional()
+        .describe("Custom label for the CTA button in the email (e.g. 'Pay invoice', 'View quote'). Falls back to 'View {type}'"),
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -75,6 +79,7 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
           amountFormatted: params.amountCents != null ? formatMoney(params.amountCents) : undefined,
           dueDateFormatted: fmtDate(params.dueDate),
           issueDateFormatted: fmtDate(params.issueDate),
+          buttonLabel: params.buttonLabel,
         });
 
         let pdfBuffer: Buffer | undefined;

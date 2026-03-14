@@ -17,6 +17,7 @@ export interface DocumentSentEmailProps {
   dueDateFormatted?: string;
   issueDateFormatted?: string;
   viewUrl?: string;
+  buttonLabel?: string;
 }
 
 const documentTypeLabels: Record<string, string> = {
@@ -37,88 +38,69 @@ export function DocumentSentEmail({
   dueDateFormatted,
   issueDateFormatted,
   viewUrl,
+  buttonLabel,
 }: DocumentSentEmailProps) {
   const typeLabel = documentTypeLabels[documentType] || "Document";
   const preview = `${typeLabel} ${documentNumber} from ${organizationName}`;
 
+  const amountLabel = documentType === "quote" ? "Total" : "Amount due";
+  const dateLabel = documentType === "quote" ? "Valid until" : "Due date";
+
   return (
     <EmailLayout preview={preview}>
       <Section style={content}>
-        {/* Greeting */}
-        <Text style={greeting}>Hi {contactName},</Text>
+        <Text style={heading}>
+          {organizationName} sent you {typeLabel.toLowerCase()} {documentNumber}
+        </Text>
 
-        {/* Personal message from the sender */}
         {personalMessage && (
-          <Text style={messageText}>{personalMessage}</Text>
+          <Text style={message}>{personalMessage}</Text>
         )}
 
-        {/* Document summary card */}
-        <table cellPadding="0" cellSpacing="0" role="presentation" style={{ width: "100%" }}>
-          <tr>
-            <td style={cardOuter}>
-              <div style={card}>
-                {/* Document header */}
-                <table cellPadding="0" cellSpacing="0" role="presentation" style={{ width: "100%" }}>
-                  <tr>
-                    <td>
-                      <Text style={cardLabel}>{typeLabel}</Text>
-                      <Text style={cardNumber}>{documentNumber}</Text>
-                    </td>
-                    <td style={{ textAlign: "right", verticalAlign: "top" }}>
-                      <Text style={fromLabel}>From</Text>
-                      <Text style={fromName}>{organizationName}</Text>
-                    </td>
-                  </tr>
-                </table>
+        {amountFormatted && (
+          <>
+            <Text style={label}>{amountLabel}</Text>
+            <Text style={amount}>{amountFormatted}</Text>
+          </>
+        )}
 
-                {/* Divider */}
-                <div style={cardDivider} />
+        {(issueDateFormatted || dueDateFormatted) && (
+          <table cellPadding="0" cellSpacing="0" role="presentation" style={{ width: "100%", marginTop: "16px" }}>
+            <tr>
+              {issueDateFormatted && (
+                <td>
+                  <Text style={metaLabel}>Issued</Text>
+                  <Text style={metaValue}>{issueDateFormatted}</Text>
+                </td>
+              )}
+              {dueDateFormatted && documentType !== "quote" && (
+                <td>
+                  <Text style={metaLabel}>{dateLabel}</Text>
+                  <Text style={metaValue}>{dueDateFormatted}</Text>
+                </td>
+              )}
+              {dueDateFormatted && documentType === "quote" && (
+                <td>
+                  <Text style={metaLabel}>{dateLabel}</Text>
+                  <Text style={metaValue}>{dueDateFormatted}</Text>
+                </td>
+              )}
+            </tr>
+          </table>
+        )}
 
-                {/* Document details */}
-                <table cellPadding="0" cellSpacing="0" role="presentation" style={{ width: "100%" }}>
-                  <tr>
-                    {amountFormatted && (
-                      <td style={detailCell}>
-                        <Text style={detailLabel}>
-                          {documentType === "quote" ? "Total" : "Amount Due"}
-                        </Text>
-                        <Text style={detailValue}>{amountFormatted}</Text>
-                      </td>
-                    )}
-                    {issueDateFormatted && (
-                      <td style={detailCell}>
-                        <Text style={detailLabel}>
-                          {documentType === "quote" ? "Valid Until" : "Issue Date"}
-                        </Text>
-                        <Text style={detailValue}>{issueDateFormatted}</Text>
-                      </td>
-                    )}
-                    {dueDateFormatted && documentType !== "quote" && (
-                      <td style={detailCell}>
-                        <Text style={detailLabel}>Due Date</Text>
-                        <Text style={detailValue}>{dueDateFormatted}</Text>
-                      </td>
-                    )}
-                  </tr>
-                </table>
-              </div>
-            </td>
-          </tr>
-        </table>
-
-        {/* CTA Button */}
         {viewUrl && (
-          <Section style={buttonSection}>
+          <Section style={buttonWrap}>
             <Button style={button} href={viewUrl}>
-              View {typeLabel}
+              {buttonLabel || `View ${typeLabel.toLowerCase()}`}
             </Button>
           </Section>
         )}
 
         <Hr style={hr} />
 
-        <Text style={signoff}>
-          Thanks,{"\n"}{organizationName}
+        <Text style={footer}>
+          {organizationName}
         </Text>
       </Section>
     </EmailLayout>
@@ -127,121 +109,79 @@ export function DocumentSentEmail({
 
 export default DocumentSentEmail;
 
-const content: React.CSSProperties = { padding: "24px 40px 32px" };
-
-const greeting: React.CSSProperties = {
-  fontSize: "16px",
-  fontWeight: 600,
-  color: "#111827",
-  margin: "0 0 12px",
+const content: React.CSSProperties = {
+  padding: "32px 40px 36px",
 };
 
-const messageText: React.CSSProperties = {
-  fontSize: "15px",
-  color: "#374151",
+const heading: React.CSSProperties = {
+  fontSize: "16px",
+  color: "#1a1a1a",
   lineHeight: "24px",
+  margin: "0 0 20px",
+  fontWeight: 400,
+};
+
+const message: React.CSSProperties = {
+  fontSize: "14px",
+  color: "#525f7f",
+  lineHeight: "22px",
   margin: "0 0 24px",
   whiteSpace: "pre-wrap",
 };
 
-const cardOuter: React.CSSProperties = {
-  paddingBottom: "24px",
+const label: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#8898aa",
+  margin: "0 0 4px",
+  fontWeight: 400,
 };
 
-const card: React.CSSProperties = {
-  backgroundColor: "#f9fafb",
-  borderRadius: "10px",
-  padding: "20px 24px",
-  border: "1px solid #e5e7eb",
-};
-
-const cardLabel: React.CSSProperties = {
-  fontSize: "11px",
+const amount: React.CSSProperties = {
+  fontSize: "28px",
   fontWeight: 600,
-  color: "#9ca3af",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
+  color: "#1a1a1a",
+  margin: "0 0 4px",
+  letterSpacing: "-0.5px",
+};
+
+const metaLabel: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#8898aa",
   margin: "0 0 2px",
+  fontWeight: 400,
 };
 
-const cardNumber: React.CSSProperties = {
-  fontSize: "18px",
-  fontWeight: 700,
-  color: "#111827",
-  margin: 0,
-};
-
-const fromLabel: React.CSSProperties = {
-  fontSize: "11px",
-  fontWeight: 600,
-  color: "#9ca3af",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  margin: "0 0 2px",
-  textAlign: "right" as const,
-};
-
-const fromName: React.CSSProperties = {
+const metaValue: React.CSSProperties = {
   fontSize: "14px",
-  fontWeight: 600,
-  color: "#374151",
+  color: "#1a1a1a",
   margin: 0,
-  textAlign: "right" as const,
+  fontWeight: 500,
 };
 
-const cardDivider: React.CSSProperties = {
-  height: "1px",
-  backgroundColor: "#e5e7eb",
-  margin: "14px 0",
-};
-
-const detailCell: React.CSSProperties = {
-  verticalAlign: "top",
-  paddingRight: "16px",
-};
-
-const detailLabel: React.CSSProperties = {
-  fontSize: "11px",
-  fontWeight: 600,
-  color: "#9ca3af",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  margin: "0 0 2px",
-};
-
-const detailValue: React.CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 700,
-  color: "#111827",
-  margin: 0,
-  fontFamily: "monospace",
-};
-
-const buttonSection: React.CSSProperties = {
-  textAlign: "center" as const,
-  marginBottom: "24px",
+const buttonWrap: React.CSSProperties = {
+  marginTop: "28px",
+  marginBottom: "4px",
 };
 
 const button: React.CSSProperties = {
-  backgroundColor: "#059669",
-  borderRadius: "8px",
+  backgroundColor: "#1a1a1a",
+  borderRadius: "6px",
   color: "#fff",
   fontSize: "14px",
-  fontWeight: 600,
+  fontWeight: 500,
   textDecoration: "none",
   textAlign: "center" as const,
-  padding: "12px 32px",
+  padding: "10px 24px",
+  display: "inline-block",
 };
 
 const hr: React.CSSProperties = {
-  borderColor: "#e5e7eb",
-  margin: "0 0 16px",
+  borderColor: "#e6ebf1",
+  margin: "28px 0 16px",
 };
 
-const signoff: React.CSSProperties = {
-  fontSize: "14px",
-  color: "#6b7280",
-  lineHeight: "20px",
+const footer: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#8898aa",
   margin: 0,
-  whiteSpace: "pre-wrap",
 };
