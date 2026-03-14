@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowUpDown } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
@@ -87,24 +88,26 @@ export default function PnlComparisonPage() {
       />
 
       <div className="flex items-center gap-3">
-        <select
-          value={compareType}
-          onChange={(e) => setCompareType(e.target.value)}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm"
-        >
-          <option value="monthly">Monthly</option>
-          <option value="quarterly">Quarterly</option>
-          <option value="yearly">Yearly</option>
-        </select>
-        <select
-          value={periodsCount}
-          onChange={(e) => setPeriodsCount(Number(e.target.value))}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm"
-        >
-          {[3, 4, 6, 8, 12].map((n) => (
-            <option key={n} value={n}>{n} periods</option>
-          ))}
-        </select>
+        <Select value={compareType} onValueChange={setCompareType}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="monthly">Monthly</SelectItem>
+            <SelectItem value="quarterly">Quarterly</SelectItem>
+            <SelectItem value="yearly">Yearly</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={String(periodsCount)} onValueChange={(v) => setPeriodsCount(Number(v))}>
+          <SelectTrigger className="w-[130px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[3, 4, 6, 8, 12].map((n) => (
+              <SelectItem key={n} value={String(n)}>{n} periods</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (

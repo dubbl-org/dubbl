@@ -10,6 +10,7 @@ import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 
 interface Budget {
@@ -137,15 +138,16 @@ export default function BudgetVsActualPage() {
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="text-sm font-medium">Budget:</label>
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border bg-background px-3 text-sm"
-          value={selectedBudgetId}
-          onChange={(e) => setSelectedBudgetId(e.target.value)}
-        >
-          {budgets.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
+        <Select value={selectedBudgetId} onValueChange={setSelectedBudgetId}>
+          <SelectTrigger className="h-9 w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {budgets.map((b) => (
+              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

@@ -126,7 +126,7 @@ export default function VendorSpendPage() {
                         <td className="px-4 py-2.5 text-right font-mono tabular-nums font-medium">{formatMoney(v.totalSpend)}</td>
                         <td className="px-4 py-2.5 text-right text-muted-foreground">{v.billCount}</td>
                         <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(v.avgBillAmount)}</td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground">{v.lastBillDate}</td>
+                        <td className="px-4 py-2.5 text-right text-muted-foreground">{new Date(v.lastBillDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
                         <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">{v.percentage}%</td>
                       </tr>
                     ))}

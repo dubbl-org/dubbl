@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
@@ -86,17 +87,18 @@ export default function CashFlowForecastPage() {
       />
 
       <div className="flex items-center gap-3">
-        <select
-          value={weeksAhead}
-          onChange={(e) => setWeeksAhead(Number(e.target.value))}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm"
-        >
-          <option value={4}>4 weeks</option>
-          <option value={8}>8 weeks</option>
-          <option value={12}>12 weeks</option>
-          <option value={26}>26 weeks</option>
-          <option value={52}>52 weeks</option>
-        </select>
+        <Select value={String(weeksAhead)} onValueChange={(v) => setWeeksAhead(Number(v))}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="4">4 weeks</SelectItem>
+            <SelectItem value="8">8 weeks</SelectItem>
+            <SelectItem value="12">12 weeks</SelectItem>
+            <SelectItem value="26">26 weeks</SelectItem>
+            <SelectItem value="52">52 weeks</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

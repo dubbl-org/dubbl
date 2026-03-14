@@ -9,6 +9,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AccountBalance {
   code: string;
@@ -115,16 +116,17 @@ export default function ComparativeBalanceSheetPage() {
       </PageHeader>
 
       <div className="flex items-center gap-3">
-        <select
-          value={compareMonths}
-          onChange={(e) => setCompareMonths(Number(e.target.value))}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm"
-        >
-          <option value={2}>2 periods</option>
-          <option value={3}>3 periods</option>
-          <option value={4}>4 periods</option>
-          <option value={6}>6 periods</option>
-        </select>
+        <Select value={String(compareMonths)} onValueChange={(v) => setCompareMonths(Number(v))}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="2">2 periods</SelectItem>
+            <SelectItem value="3">3 periods</SelectItem>
+            <SelectItem value="4">4 periods</SelectItem>
+            <SelectItem value="6">6 periods</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (
@@ -195,7 +197,7 @@ export default function ComparativeBalanceSheetPage() {
                         {periods.map((p) => {
                           const total = section === "Assets" ? p.assets.total : section === "Liabilities" ? p.liabilities.total : p.equity.total;
                           return (
-                            <td key={p.label} className="px-4 py-2 text-right font-mono tabular-nums font-semibold">{formatMoney(typeof total === 'number' ? total * 100 : 0)}</td>
+                            <td key={p.label} className="px-4 py-2 text-right font-mono tabular-nums font-semibold">{formatMoney(Math.round(parseFloat(String(total)) * 100))}</td>
                           );
                         })}
                         {periods.length >= 2 && <td />}

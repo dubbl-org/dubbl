@@ -32,7 +32,7 @@ interface AccountLedger {
 }
 
 const entryColumns: Column<LedgerEntry>[] = [
-  { key: "date", header: "Date", className: "w-28", render: (r) => <span className="text-sm">{r.date}</span> },
+  { key: "date", header: "Date", className: "w-28", render: (r) => <span className="text-sm">{new Date(r.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span> },
   { key: "entry", header: "Entry #", className: "w-24", render: (r) => <span className="font-mono text-sm">{r.entryNumber}</span> },
   { key: "desc", header: "Description", render: (r) => <span className="text-sm">{r.description}</span> },
   { key: "ref", header: "Reference", className: "w-28", render: (r) => <span className="text-sm text-muted-foreground">{r.reference || "-"}</span> },

@@ -112,7 +112,7 @@ export default function DuplicateDetectionPage() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-mono text-xs text-muted-foreground">{item.number}</span>
-                        <span>{item.date}</span>
+                        <span>{new Date(item.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                       </div>
                       <Badge variant="outline" className="text-[10px]">{item.status}</Badge>
                     </button>

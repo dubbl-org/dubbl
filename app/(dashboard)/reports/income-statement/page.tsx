@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { formatMoney } from "@/lib/money";
 import { ArrowLeft } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -99,14 +100,14 @@ export default function IncomeStatementPage() {
                           <TableCell className="font-mono text-sm">{a.code}</TableCell>
                           <TableCell>{a.name}</TableCell>
                           <TableCell className="text-right font-mono tabular-nums">
-                            {parseFloat(a.balance).toFixed(2)}
+                            {formatMoney(parseFloat(a.balance) * 100)}
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="bg-muted/30 font-bold">
                         <TableCell colSpan={2}>Total {s.label}</TableCell>
                         <TableCell className="text-right font-mono tabular-nums">
-                          {parseFloat(s.section.total).toFixed(2)}
+                          {formatMoney(parseFloat(s.section.total) * 100)}
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -121,7 +122,7 @@ export default function IncomeStatementPage() {
                   Net Income
                 </span>
                 <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
-                  {parseFloat(data.netIncome).toFixed(2)}
+                  {formatMoney(parseFloat(data.netIncome) * 100)}
                 </span>
               </div>
             </div>

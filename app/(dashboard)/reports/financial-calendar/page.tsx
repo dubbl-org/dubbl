@@ -107,7 +107,12 @@ export default function FinancialCalendarPage() {
                 <Button variant="ghost" size="icon" className="size-7" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}>
                   <ChevronLeft className="size-4" />
                 </Button>
-                <p className="text-sm font-medium">{monthName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">{monthName}</p>
+                  <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => { const now = new Date(); setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1)); }}>
+                    Today
+                  </Button>
+                </div>
                 <Button variant="ghost" size="icon" className="size-7" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}>
                   <ChevronRight className="size-4" />
                 </Button>
@@ -121,7 +126,7 @@ export default function FinancialCalendarPage() {
                 </div>
                 <div className="grid grid-cols-7">
                   {Array.from({ length: startDay }).map((_, i) => (
-                    <div key={`empty-${i}`} className="h-20 border-t border-r last:border-r-0" />
+                    <div key={`empty-${i}`} className="h-24 border-t border-r last:border-r-0" />
                   ))}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const day = i + 1;
@@ -135,9 +140,9 @@ export default function FinancialCalendarPage() {
                         key={day}
                         onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
                         className={cn(
-                          "h-20 border-t border-r p-1 text-left transition-colors hover:bg-muted/50",
+                          "h-24 border-t border-r p-1 text-left transition-colors hover:bg-muted/50",
                           (startDay + i + 1) % 7 === 0 && "border-r-0",
-                          isSelected && "bg-muted"
+                          isSelected && "ring-2 ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20"
                         )}
                       >
                         <span className={cn(
@@ -154,7 +159,7 @@ export default function FinancialCalendarPage() {
                             </div>
                           ))}
                           {dayEvents.length > 3 && (
-                            <span className="text-[9px] text-muted-foreground">+{dayEvents.length - 3} more</span>
+                            <span className="text-[10px] text-muted-foreground bg-muted/80 rounded px-1 py-0.5">+{dayEvents.length - 3} more</span>
                           )}
                         </div>
                       </button>
@@ -177,7 +182,7 @@ export default function FinancialCalendarPage() {
 
               {selectedDate ? (
                 <div>
-                  <p className="text-sm font-medium mb-2">{selectedDate}</p>
+                  <p className="text-sm font-medium mb-2">{new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
                   {selectedEvents.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No events on this date.</p>
                   ) : (
@@ -214,7 +219,7 @@ export default function FinancialCalendarPage() {
                       <div key={i} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 text-xs">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={cn("size-1.5 rounded-full shrink-0", typeColors[e.type]?.dot)} />
-                          <span className="text-muted-foreground w-16 shrink-0">{e.date}</span>
+                          <span className="text-muted-foreground w-16 shrink-0">{new Date(e.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                           <span className="truncate">{e.title}</span>
                         </div>
                         {e.amount !== undefined && (
