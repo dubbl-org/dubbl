@@ -17,11 +17,15 @@ export async function GET(request: Request) {
       );
     }
 
+    const reqUrl = new URL(request.url);
+    const label = reqUrl.searchParams.get("label") || "Default";
+
     const nonce = crypto.randomBytes(16).toString("hex");
     const statePayload = JSON.stringify({
       orgId: ctx.organizationId,
       userId: ctx.userId,
       nonce,
+      label,
     });
     const state = Buffer.from(statePayload).toString("base64url");
 

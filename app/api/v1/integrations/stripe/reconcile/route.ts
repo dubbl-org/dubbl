@@ -13,8 +13,15 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:integrations");
 
+    const body = await request.json();
+    const integrationId = body.integrationId;
+    if (!integrationId) {
+      return NextResponse.json({ error: "integrationId is required" }, { status: 400 });
+    }
+
     const integration = await db.query.stripeIntegration.findFirst({
       where: and(
+        eq(stripeIntegration.id, integrationId),
         eq(stripeIntegration.organizationId, ctx.organizationId),
         notDeleted(stripeIntegration.deletedAt)
       ),
@@ -22,7 +29,6 @@ export async function POST(request: Request) {
 
     if (!integration) return notFound("Stripe integration");
 
-    const body = await request.json();
     const days = Math.min(Math.max(body.days ?? 30, 1), 90);
 
     const result = await reconcileStripeBalance(

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
 
     // Decode state
-    let stateData: { orgId: string; userId: string; nonce: string };
+    let stateData: { orgId: string; userId: string; nonce: string; label?: string };
     try {
       stateData = JSON.parse(Buffer.from(state, "base64url").toString());
     } catch {
@@ -47,17 +47,17 @@ export async function GET(request: Request) {
       );
     }
 
-    // Check for existing active integration
-    const existing = await db.query.stripeIntegration.findFirst({
+    // Check if this specific Stripe account is already connected
+    const existingAccount = await db.query.stripeIntegration.findFirst({
       where: and(
-        eq(stripeIntegration.organizationId, stateData.orgId),
+        eq(stripeIntegration.stripeAccountId, response.stripe_user_id),
         notDeleted(stripeIntegration.deletedAt)
       ),
     });
 
-    if (existing) {
+    if (existingAccount) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/settings/integrations/stripe?error=already_connected`
+        `${process.env.NEXT_PUBLIC_APP_URL}/settings/integrations/stripe?error=account_already_connected`
       );
     }
 
@@ -74,6 +74,7 @@ export async function GET(request: Request) {
       .values({
         organizationId: stateData.orgId,
         stripeAccountId: response.stripe_user_id,
+        label: stateData.label || "Default",
         accessToken: response.access_token,
         refreshToken: response.refresh_token ?? null,
         livemode: response.livemode ?? false,

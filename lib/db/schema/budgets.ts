@@ -23,6 +23,7 @@ export const budget = pgTable("budget", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   periodType: text("period_type").notNull().default("monthly"),
+  varianceThresholdPct: integer("variance_threshold_pct").default(100),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

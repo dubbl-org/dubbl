@@ -21,18 +21,24 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:integrations");
 
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    const type = formData.get("type") as string | null;
+    const integrationId = formData.get("integrationId") as string | null;
+
+    if (!integrationId) {
+      return NextResponse.json({ error: "integrationId is required" }, { status: 400 });
+    }
+
     const integration = await db.query.stripeIntegration.findFirst({
       where: and(
+        eq(stripeIntegration.id, integrationId),
         eq(stripeIntegration.organizationId, ctx.organizationId),
         notDeleted(stripeIntegration.deletedAt)
       ),
     });
 
     if (!integration) return notFound("Stripe integration");
-
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const type = formData.get("type") as string | null;
 
     if (!file) {
       return NextResponse.json({ error: "Missing file" }, { status: 400 });

@@ -81,6 +81,7 @@ export const bankAccount = pgTable("bank_account", {
   color: text("color").notNull().default("#0f766e"),
   chartAccountId: uuid("chart_account_id").references(() => chartAccount.id),
   balance: integer("balance").notNull().default(0),
+  lowBalanceThreshold: integer("low_balance_threshold"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),

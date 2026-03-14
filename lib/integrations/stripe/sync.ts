@@ -571,12 +571,13 @@ export async function handlePayoutPaid(
     },
   ]);
 
-  // Create bank transaction
+  // Create bank transaction (auto-reconciled since we create journal entry + bank tx together)
   await db.insert(bankTransaction).values({
     bankAccountId: integration.payoutBankAccountId,
     date: payoutDate,
     description: `Stripe payout ${payout.id}`,
     amount: payout.amount,
+    status: "reconciled",
     sourceType: "stripe",
     externalTransactionId: payout.id,
     currencyCode,
@@ -1028,6 +1029,110 @@ export async function handleCustomerUpdated(
 }
 
 // ──────────────────────────────────────────────────
+// Subscription lifecycle handlers
+// ──────────────────────────────────────────────────
+
+export async function handleSubscriptionCreated(
+  integration: Integration,
+  subscription: Stripe.Subscription
+) {
+  if (await isDuplicate(integration.organizationId, "subscription", subscription.id)) return;
+
+  const customerId = typeof subscription.customer === "string"
+    ? subscription.customer
+    : subscription.customer?.id ?? null;
+
+  const contactId = await resolveContact(integration, customerId, null, null);
+
+  await insertEntityMap(
+    integration.organizationId,
+    "subscription",
+    subscription.id,
+    "contact",
+    contactId ?? subscription.id,
+    {
+      status: subscription.status,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      items: subscription.items?.data?.map((item) => ({
+        priceId: item.price?.id,
+        amount: item.price?.unit_amount,
+        interval: item.price?.recurring?.interval,
+        quantity: item.quantity,
+      })),
+    }
+  );
+}
+
+export async function handleSubscriptionUpdated(
+  integration: Integration,
+  subscription: Stripe.Subscription
+) {
+  const existing = await db.query.stripeEntityMap.findFirst({
+    where: and(
+      eq(stripeEntityMap.organizationId, integration.organizationId),
+      eq(stripeEntityMap.stripeEntityType, "subscription"),
+      eq(stripeEntityMap.stripeEntityId, subscription.id)
+    ),
+  });
+
+  if (existing) {
+    await db
+      .update(stripeEntityMap)
+      .set({
+        metadata: {
+          ...(existing.metadata as Record<string, unknown> ?? {}),
+          status: subscription.status,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          items: subscription.items?.data?.map((item) => ({
+            priceId: item.price?.id,
+            amount: item.price?.unit_amount,
+            interval: item.price?.recurring?.interval,
+            quantity: item.quantity,
+          })),
+        },
+      })
+      .where(eq(stripeEntityMap.id, existing.id));
+  } else {
+    await handleSubscriptionCreated(integration, subscription);
+  }
+}
+
+export async function handleSubscriptionDeleted(
+  integration: Integration,
+  subscription: Stripe.Subscription
+) {
+  const existing = await db.query.stripeEntityMap.findFirst({
+    where: and(
+      eq(stripeEntityMap.organizationId, integration.organizationId),
+      eq(stripeEntityMap.stripeEntityType, "subscription"),
+      eq(stripeEntityMap.stripeEntityId, subscription.id)
+    ),
+  });
+
+  if (existing) {
+    await db
+      .update(stripeEntityMap)
+      .set({
+        metadata: {
+          ...(existing.metadata as Record<string, unknown> ?? {}),
+          status: "canceled",
+          canceledAt: subscription.canceled_at,
+        },
+      })
+      .where(eq(stripeEntityMap.id, existing.id));
+  } else {
+    await insertEntityMap(
+      integration.organizationId,
+      "subscription",
+      subscription.id,
+      "contact",
+      subscription.id,
+      { status: "canceled", canceledAt: subscription.canceled_at }
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────
 // Unified event processor
 // ──────────────────────────────────────────────────
 
@@ -1080,6 +1185,21 @@ export async function processStripeEvent(
       const inv = event.data.object as Stripe.Invoice;
       await handleInvoicePaid(integration, inv);
       return { action: "invoice_paid" };
+    }
+    case "customer.subscription.created": {
+      const sub = event.data.object as Stripe.Subscription;
+      await handleSubscriptionCreated(integration, sub);
+      return { action: "subscription_created" };
+    }
+    case "customer.subscription.updated": {
+      const sub = event.data.object as Stripe.Subscription;
+      await handleSubscriptionUpdated(integration, sub);
+      return { action: "subscription_updated" };
+    }
+    case "customer.subscription.deleted": {
+      const sub = event.data.object as Stripe.Subscription;
+      await handleSubscriptionDeleted(integration, sub);
+      return { action: "subscription_deleted" };
     }
     default:
       return { action: "skipped" };

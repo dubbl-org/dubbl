@@ -18,6 +18,9 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "approval_needed",
   "system_alert",
   "task_assigned",
+  "webhook_exhausted",
+  "budget_exceeded",
+  "low_bank_balance",
 ]);
 
 export const notificationChannelEnum = pgEnum("notification_channel", [

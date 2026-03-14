@@ -13,8 +13,15 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:integrations");
 
+    const body = await request.json().catch(() => ({}));
+    const integrationId = body.integrationId;
+    if (!integrationId) {
+      return NextResponse.json({ error: "integrationId is required" }, { status: 400 });
+    }
+
     const integration = await db.query.stripeIntegration.findFirst({
       where: and(
+        eq(stripeIntegration.id, integrationId),
         eq(stripeIntegration.organizationId, ctx.organizationId),
         notDeleted(stripeIntegration.deletedAt)
       ),

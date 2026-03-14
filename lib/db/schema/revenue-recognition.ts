@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
-import { journalEntry } from "./bookkeeping";
+import { chartAccount, journalEntry } from "./bookkeeping";
 import { invoice, invoiceLine } from "./invoicing";
 
 // Enums
@@ -42,6 +42,8 @@ export const revenueSchedule = pgTable("revenue_schedule", {
   endDate: date("end_date").notNull(),
   method: revenueMethodEnum("method").notNull().default("straight_line"),
   status: revenueStatusEnum("status").notNull().default("active"),
+  deferredRevenueAccountId: uuid("deferred_revenue_account_id").references(() => chartAccount.id),
+  revenueAccountId: uuid("revenue_account_id").references(() => chartAccount.id),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -71,6 +73,16 @@ export const revenueScheduleRelations = relations(
     invoice: one(invoice, {
       fields: [revenueSchedule.invoiceId],
       references: [invoice.id],
+    }),
+    deferredRevenueAccount: one(chartAccount, {
+      fields: [revenueSchedule.deferredRevenueAccountId],
+      references: [chartAccount.id],
+      relationName: "revScheduleDeferredAccount",
+    }),
+    revenueAccount: one(chartAccount, {
+      fields: [revenueSchedule.revenueAccountId],
+      references: [chartAccount.id],
+      relationName: "revScheduleRevenueAccount",
     }),
     entries: many(revenueEntry),
   })

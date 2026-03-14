@@ -4,11 +4,13 @@ import { eq, and, gte, lt } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { processStripeEvent } from "./sync";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { sendNotification } from "@/lib/notifications/send";
 
 export async function retryFailedStripeEvents(): Promise<{
   retried: number;
   succeeded: number;
   failed: number;
+  exhaustedAlerts: number;
 }> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -74,5 +76,51 @@ export async function retryFailedStripeEvents(): Promise<{
     }
   }
 
-  return { retried, succeeded, failed };
+  // Alert on exhausted events (failed with retryCount >= 3, not yet alerted)
+  let exhaustedAlerts = 0;
+  const exhaustedLogs = await db.query.stripeSyncLog.findMany({
+    where: and(
+      eq(stripeSyncLog.status, "failed"),
+      gte(stripeSyncLog.retryCount, 3),
+      gte(stripeSyncLog.createdAt, sevenDaysAgo)
+    ),
+    limit: 50,
+  });
+
+  // Group by integration to avoid duplicate lookups
+  const byIntegration = new Map<string, typeof exhaustedLogs>();
+  for (const log of exhaustedLogs) {
+    const existing = byIntegration.get(log.integrationId) ?? [];
+    existing.push(log);
+    byIntegration.set(log.integrationId, existing);
+  }
+
+  for (const [integrationId, logs] of byIntegration) {
+    const integration = await db.query.stripeIntegration.findFirst({
+      where: and(
+        eq(stripeIntegration.id, integrationId),
+        notDeleted(stripeIntegration.deletedAt)
+      ),
+    });
+
+    if (!integration?.connectedBy) continue;
+
+    // Only send one notification per integration per run
+    try {
+      await sendNotification({
+        orgId: integration.organizationId,
+        userId: integration.connectedBy,
+        type: "webhook_exhausted",
+        title: `${logs.length} Stripe webhook event(s) failed after all retries`,
+        body: `Integration "${integration.label}" has ${logs.length} exhausted event(s). Check the sync log for details.`,
+        entityType: "stripe_integration",
+        entityId: integration.id,
+      });
+      exhaustedAlerts++;
+    } catch {
+      // Non-critical, continue
+    }
+  }
+
+  return { retried, succeeded, failed, exhaustedAlerts };
 }

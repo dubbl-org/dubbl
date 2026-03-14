@@ -9,6 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 const updateSchema = z.object({
+  integrationId: z.string().uuid(),
   clearingAccountId: z.string().uuid().optional(),
   revenueAccountId: z.string().uuid().optional(),
   feesAccountId: z.string().uuid().optional(),
@@ -25,6 +26,7 @@ export async function PATCH(request: Request) {
 
     const integration = await db.query.stripeIntegration.findFirst({
       where: and(
+        eq(stripeIntegration.id, body.integrationId),
         eq(stripeIntegration.organizationId, ctx.organizationId),
         notDeleted(stripeIntegration.deletedAt)
       ),

@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { stripeIntegration, stripeEntityMap, stripeSyncLog } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -13,37 +13,105 @@ import { reconcileStripeBalance } from "@/lib/integrations/stripe/reconcile";
 import type { AuthContext } from "@/lib/api/auth-context";
 import type Stripe from "stripe";
 
+async function findIntegration(ctx: AuthContext, integrationId: string) {
+  const integration = await db.query.stripeIntegration.findFirst({
+    where: and(
+      eq(stripeIntegration.id, integrationId),
+      eq(stripeIntegration.organizationId, ctx.organizationId),
+      notDeleted(stripeIntegration.deletedAt)
+    ),
+  });
+  if (!integration) throw new Error("Stripe integration not found");
+  return integration;
+}
+
 export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
   server.tool(
-    "get_stripe_integration_status",
-    "Get the current Stripe Connect integration status. Returns connection status, account mappings (clearing, revenue, fees, payout bank account), last sync time, and whether initial sync is completed.",
+    "list_stripe_integrations",
+    "List all active Stripe integrations for the organization. Returns id, label, stripeAccountId, and status for each.",
     {},
     () =>
       wrapTool(ctx, async () => {
-        const integration = await db.query.stripeIntegration.findFirst({
+        const integrations = await db.query.stripeIntegration.findMany({
           where: and(
             eq(stripeIntegration.organizationId, ctx.organizationId),
             notDeleted(stripeIntegration.deletedAt)
           ),
         });
 
-        if (!integration) {
+        return {
+          integrations: integrations.map((i) => ({
+            id: i.id,
+            label: i.label,
+            stripeAccountId: i.stripeAccountId,
+            status: i.status,
+            livemode: i.livemode,
+            lastSyncAt: i.lastSyncAt,
+            initialSyncCompleted: i.initialSyncCompleted,
+          })),
+        };
+      })
+  );
+
+  server.tool(
+    "get_stripe_integration_status",
+    "Get the status of a specific Stripe Connect integration, or all integrations if no integrationId is provided. Returns connection status, account mappings, last sync time, and whether initial sync is completed.",
+    {
+      integrationId: z
+        .string()
+        .optional()
+        .describe("UUID of the Stripe integration. If omitted, returns all integrations."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        if (params.integrationId) {
+          const integration = await findIntegration(ctx, params.integrationId);
+          return {
+            connected: true,
+            id: integration.id,
+            label: integration.label,
+            status: integration.status,
+            stripeAccountId: integration.stripeAccountId,
+            livemode: integration.livemode,
+            lastSyncAt: integration.lastSyncAt,
+            initialSyncCompleted: integration.initialSyncCompleted,
+            initialSyncDays: integration.initialSyncDays,
+            errorMessage: integration.errorMessage,
+            clearingAccountId: integration.clearingAccountId,
+            revenueAccountId: integration.revenueAccountId,
+            feesAccountId: integration.feesAccountId,
+            payoutBankAccountId: integration.payoutBankAccountId,
+          };
+        }
+
+        const integrations = await db.query.stripeIntegration.findMany({
+          where: and(
+            eq(stripeIntegration.organizationId, ctx.organizationId),
+            notDeleted(stripeIntegration.deletedAt)
+          ),
+        });
+
+        if (integrations.length === 0) {
           return { connected: false };
         }
 
         return {
           connected: true,
-          status: integration.status,
-          stripeAccountId: integration.stripeAccountId,
-          livemode: integration.livemode,
-          lastSyncAt: integration.lastSyncAt,
-          initialSyncCompleted: integration.initialSyncCompleted,
-          initialSyncDays: integration.initialSyncDays,
-          errorMessage: integration.errorMessage,
-          clearingAccountId: integration.clearingAccountId,
-          revenueAccountId: integration.revenueAccountId,
-          feesAccountId: integration.feesAccountId,
-          payoutBankAccountId: integration.payoutBankAccountId,
+          integrations: integrations.map((i) => ({
+            id: i.id,
+            label: i.label,
+            status: i.status,
+            stripeAccountId: i.stripeAccountId,
+            livemode: i.livemode,
+            lastSyncAt: i.lastSyncAt,
+            initialSyncCompleted: i.initialSyncCompleted,
+            initialSyncDays: i.initialSyncDays,
+            errorMessage: i.errorMessage,
+            clearingAccountId: i.clearingAccountId,
+            revenueAccountId: i.revenueAccountId,
+            feesAccountId: i.feesAccountId,
+            payoutBankAccountId: i.payoutBankAccountId,
+          })),
         };
       })
   );
@@ -51,8 +119,12 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "connect_stripe",
     "Generate a Stripe Connect OAuth URL to connect a Stripe account. Returns a URL that the user should open in their browser to authorize the connection.",
-    {},
-    () =>
+    {
+      label: z
+        .string()
+        .describe("A label for this Stripe integration (e.g. 'Main Store', 'EU Account')"),
+    },
+    (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:integrations");
 
@@ -61,28 +133,23 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
           throw new Error("Stripe Connect not configured (missing STRIPE_CONNECT_CLIENT_ID)");
         }
 
-        const existing = await db.query.stripeIntegration.findFirst({
-          where: and(
-            eq(stripeIntegration.organizationId, ctx.organizationId),
-            notDeleted(stripeIntegration.deletedAt)
-          ),
-        });
-        if (existing) {
-          throw new Error("A Stripe account is already connected. Disconnect first.");
-        }
-
-        const params = new URLSearchParams({
+        const stateParams = new URLSearchParams({
           response_type: "code",
           client_id: clientId,
           scope: "read_write",
           state: Buffer.from(
-            JSON.stringify({ orgId: ctx.organizationId, userId: ctx.userId, nonce: Date.now() })
+            JSON.stringify({
+              orgId: ctx.organizationId,
+              userId: ctx.userId,
+              nonce: Date.now(),
+              label: params.label,
+            })
           ).toString("base64url"),
           redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/v1/integrations/stripe/callback`,
         });
 
         return {
-          url: `https://connect.stripe.com/oauth/authorize?${params.toString()}`,
+          url: `https://connect.stripe.com/oauth/authorize?${stateParams.toString()}`,
           message: "Open this URL in a browser to connect your Stripe account.",
         };
       })
@@ -90,8 +157,11 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "disconnect_stripe",
-    "Disconnect the connected Stripe account. Requires confirm: true to proceed. This stops syncing and deauthorizes access.",
+    "Disconnect a specific Stripe account. Requires integrationId and confirm: true to proceed. This stops syncing and deauthorizes access.",
     {
+      integrationId: z
+        .string()
+        .describe("UUID of the Stripe integration to disconnect"),
       confirm: z
         .boolean()
         .describe("Must be true to confirm disconnection"),
@@ -104,14 +174,7 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
           throw new Error("Set confirm to true to disconnect the Stripe account");
         }
 
-        const integration = await db.query.stripeIntegration.findFirst({
-          where: and(
-            eq(stripeIntegration.organizationId, ctx.organizationId),
-            notDeleted(stripeIntegration.deletedAt)
-          ),
-        });
-
-        if (!integration) throw new Error("No Stripe integration found");
+        const integration = await findIntegration(ctx, params.integrationId);
 
         const { stripe } = await import("@/lib/stripe");
 
@@ -139,8 +202,11 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "trigger_stripe_sync",
-    "Trigger a manual sync of Stripe data. Syncs customers, charges, and payouts from the last N days. Returns immediately; sync runs in the background.",
+    "Trigger a manual sync of Stripe data for a specific integration. Syncs customers, charges, and payouts from the last N days. Returns immediately; sync runs in the background.",
     {
+      integrationId: z
+        .string()
+        .describe("UUID of the Stripe integration to sync"),
       days: z
         .number()
         .int()
@@ -154,16 +220,8 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:integrations");
 
-        const integration = await db.query.stripeIntegration.findFirst({
-          where: and(
-            eq(stripeIntegration.organizationId, ctx.organizationId),
-            notDeleted(stripeIntegration.deletedAt)
-          ),
-        });
+        const integration = await findIntegration(ctx, params.integrationId);
 
-        if (!integration) throw new Error("No Stripe integration found");
-
-        // Update sync days if provided
         if (params.days !== integration.initialSyncDays) {
           await db
             .update(stripeIntegration)
@@ -171,7 +229,6 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
             .where(eq(stripeIntegration.id, integration.id));
         }
 
-        // Fire-and-forget
         runInitialSync(integration.id).catch((err) => {
           console.error("MCP triggered sync failed:", err);
         });
@@ -182,8 +239,11 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "list_stripe_sync_log",
-    "List recent Stripe sync log entries. Returns event type, status (success/failed/skipped), error messages, and timestamps. Paginated with limit and offset.",
+    "List recent Stripe sync log entries for a specific integration. Returns event type, status (success/failed/skipped), error messages, and timestamps. Paginated with limit and offset.",
     {
+      integrationId: z
+        .string()
+        .describe("UUID of the Stripe integration"),
       limit: z
         .number()
         .int()
@@ -202,17 +262,10 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const integration = await db.query.stripeIntegration.findFirst({
-          where: and(
-            eq(stripeIntegration.organizationId, ctx.organizationId),
-            notDeleted(stripeIntegration.deletedAt)
-          ),
-        });
-
-        if (!integration) throw new Error("No Stripe integration found");
+        await findIntegration(ctx, params.integrationId);
 
         const logs = await db.query.stripeSyncLog.findMany({
-          where: eq(stripeSyncLog.integrationId, integration.id),
+          where: eq(stripeSyncLog.integrationId, params.integrationId),
           orderBy: desc(stripeSyncLog.createdAt),
           limit: params.limit,
           offset: params.offset,
@@ -224,8 +277,11 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "import_stripe_csv",
-    "Import a Stripe CSV export file. Accepts raw CSV text content and type ('payments' or 'payouts'). Skips already-imported transactions. Returns count of imported, skipped, and errored rows.",
+    "Import a Stripe CSV export file for a specific integration. Accepts raw CSV text content and type ('payments' or 'payouts'). Skips already-imported transactions. Returns count of imported, skipped, and errored rows.",
     {
+      integrationId: z
+        .string()
+        .describe("UUID of the Stripe integration"),
       csvContent: z
         .string()
         .describe("The raw CSV text content from a Stripe export file"),
@@ -237,14 +293,7 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:integrations");
 
-        const integration = await db.query.stripeIntegration.findFirst({
-          where: and(
-            eq(stripeIntegration.organizationId, ctx.organizationId),
-            notDeleted(stripeIntegration.deletedAt)
-          ),
-        });
-
-        if (!integration) throw new Error("No Stripe integration found");
+        const integration = await findIntegration(ctx, params.integrationId);
 
         let imported = 0;
         let skipped = 0;
@@ -328,8 +377,11 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "reconcile_stripe_balance",
-    "Compare Stripe balance transactions against local records to find missed events. Returns matched count and list of missing transactions with their Stripe IDs, types, and amounts in cents.",
+    "Compare Stripe balance transactions against local records to find missed events for a specific integration. Returns matched count and list of missing transactions with their Stripe IDs, types, and amounts in cents.",
     {
+      integrationId: z
+        .string()
+        .describe("UUID of the Stripe integration to reconcile"),
       days: z
         .number()
         .int()
@@ -343,22 +395,78 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:integrations");
 
-        const integration = await db.query.stripeIntegration.findFirst({
-          where: and(
-            eq(stripeIntegration.organizationId, ctx.organizationId),
-            notDeleted(stripeIntegration.deletedAt)
-          ),
-        });
-
-        if (!integration) throw new Error("No Stripe integration found");
+        await findIntegration(ctx, params.integrationId);
 
         const result = await reconcileStripeBalance(
-          integration.id,
+          params.integrationId,
           ctx.organizationId,
           params.days
         );
 
         return result;
+      })
+  );
+
+  server.tool(
+    "get_stripe_webhook_health",
+    "Get webhook health metrics for a Stripe integration. Returns event counts for the last 24 hours, broken down by status.",
+    {
+      integrationId: z
+        .string()
+        .optional()
+        .describe("UUID of a specific Stripe integration. If omitted, returns health for all integrations."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        const conditions = [
+          gte(stripeSyncLog.createdAt, twentyFourHoursAgo),
+        ];
+
+        if (params.integrationId) {
+          await findIntegration(ctx, params.integrationId);
+          conditions.push(eq(stripeSyncLog.integrationId, params.integrationId));
+        } else {
+          // Get all integration IDs for this org
+          const integrations = await db.query.stripeIntegration.findMany({
+            where: and(
+              eq(stripeIntegration.organizationId, ctx.organizationId),
+              notDeleted(stripeIntegration.deletedAt)
+            ),
+            columns: { id: true },
+          });
+          if (integrations.length === 0) {
+            return { totalEvents: 0, success: 0, failed: 0, skipped: 0, exhausted: 0, lastEventAt: null };
+          }
+          conditions.push(
+            sql`${stripeSyncLog.integrationId} IN (${sql.join(
+              integrations.map((i) => sql`${i.id}`),
+              sql`, `
+            )})`
+          );
+        }
+
+        const [stats] = await db
+          .select({
+            total: sql<number>`count(*)`.mapWith(Number),
+            success: sql<number>`count(*) filter (where ${stripeSyncLog.status} = 'success')`.mapWith(Number),
+            failed: sql<number>`count(*) filter (where ${stripeSyncLog.status} = 'failed')`.mapWith(Number),
+            skipped: sql<number>`count(*) filter (where ${stripeSyncLog.status} = 'skipped')`.mapWith(Number),
+            exhausted: sql<number>`count(*) filter (where ${stripeSyncLog.status} = 'failed' and ${stripeSyncLog.retryCount} >= 3)`.mapWith(Number),
+            lastEventAt: sql<Date | null>`max(${stripeSyncLog.createdAt})`,
+          })
+          .from(stripeSyncLog)
+          .where(and(...conditions));
+
+        return {
+          totalEvents: stats?.total ?? 0,
+          success: stats?.success ?? 0,
+          failed: stats?.failed ?? 0,
+          skipped: stats?.skipped ?? 0,
+          exhausted: stats?.exhausted ?? 0,
+          lastEventAt: stats?.lastEventAt ?? null,
+        };
       })
   );
 }
