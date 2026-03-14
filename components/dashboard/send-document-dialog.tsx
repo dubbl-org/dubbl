@@ -58,7 +58,7 @@ export function SendDocumentDialog({
   open,
   onOpenChange,
   documentType,
-  documentId,
+  documentId: _documentId,
   documentNumber,
   contactEmail,
   contactName,
@@ -377,7 +377,7 @@ export function SendDocumentDialog({
                   </Select>
                   {includePaymentLink && (
                     <p className="text-[11px] text-muted-foreground">
-                      A "Pay invoice" button will be included in the email, linking to a Stripe checkout page.
+                      A &quot;Pay invoice&quot; button will be included in the email, linking to a Stripe checkout page.
                     </p>
                   )}
                 </div>

@@ -387,7 +387,7 @@ export default function DocumentTemplatesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-xs">Show Payment Terms</Label>
-                  <p className="text-[11px] text-muted-foreground">Show "due by" date below totals</p>
+                  <p className="text-[11px] text-muted-foreground">Show &quot;due by&quot; date below totals</p>
                 </div>
                 <Switch checked={showPaymentTerms} onCheckedChange={setShowPaymentTerms} />
               </div>

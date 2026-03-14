@@ -19,7 +19,7 @@ export async function checkLowBankBalances(): Promise<{ checked: number; alerted
       )
     );
 
-  let checked = lowBalanceAccounts.length;
+  const checked = lowBalanceAccounts.length;
   let alerted = 0;
 
   for (const account of lowBalanceAccounts) {
