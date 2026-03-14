@@ -6,6 +6,8 @@ import {
   handleChargeSucceeded,
   handleCustomerCreated,
   handlePayoutPaid,
+  handleTransferCreated,
+  handleStripeCreditNoteCreated,
 } from "./sync";
 
 export async function runInitialSync(integrationId: string) {
@@ -79,6 +81,44 @@ export async function runInitialSync(integrationId: string) {
           status: "failed",
           errorMessage: err instanceof Error ? err.message : "Unknown error",
           payload: { payoutId: payout.id },
+        });
+      }
+    }
+
+    // 4. Sync transfers from last N days
+    for await (const transfer of stripe.transfers.list(
+      { limit: 100, created: { gte: since } },
+      { stripeAccount: integration.stripeAccountId }
+    )) {
+      try {
+        await handleTransferCreated(integration, transfer);
+      } catch (err) {
+        await db.insert(stripeSyncLog).values({
+          integrationId,
+          eventType: "transfer.created",
+          stripeEventId: null,
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
+          payload: { transferId: transfer.id },
+        });
+      }
+    }
+
+    // 5. Sync credit notes
+    for await (const cn of stripe.creditNotes.list(
+      { limit: 100 },
+      { stripeAccount: integration.stripeAccountId }
+    )) {
+      try {
+        await handleStripeCreditNoteCreated(integration, cn);
+      } catch (err) {
+        await db.insert(stripeSyncLog).values({
+          integrationId,
+          eventType: "credit_note.created",
+          stripeEventId: null,
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
+          payload: { creditNoteId: cn.id },
         });
       }
     }

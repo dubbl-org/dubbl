@@ -21,6 +21,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "webhook_exhausted",
   "budget_exceeded",
   "low_bank_balance",
+  "stripe_payment_failed",
 ]);
 
 export const notificationChannelEnum = pgEnum("notification_channel", [

@@ -408,6 +408,54 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
   );
 
   server.tool(
+    "list_stripe_entity_mappings",
+    "List Stripe entity mappings for the organization. Shows how Stripe objects (charges, customers, invoices, etc.) map to local records. Useful for debugging sync state. Returns stripeEntityType, stripeEntityId, dubblEntityType, dubblEntityId, and metadata.",
+    {
+      stripeEntityType: z
+        .string()
+        .optional()
+        .describe("Filter by Stripe entity type (e.g. 'charge', 'customer', 'payout', 'transfer', 'stripe_credit_note')"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .default(50)
+        .describe("Number of mappings to return (1-200, default 50)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const conditions = [
+          eq(stripeEntityMap.organizationId, ctx.organizationId),
+        ];
+
+        if (params.stripeEntityType) {
+          conditions.push(eq(stripeEntityMap.stripeEntityType, params.stripeEntityType));
+        }
+
+        const mappings = await db.query.stripeEntityMap.findMany({
+          where: and(...conditions),
+          orderBy: desc(stripeEntityMap.createdAt),
+          limit: params.limit,
+        });
+
+        return {
+          mappings: mappings.map((m) => ({
+            id: m.id,
+            stripeEntityType: m.stripeEntityType,
+            stripeEntityId: m.stripeEntityId,
+            dubblEntityType: m.dubblEntityType,
+            dubblEntityId: m.dubblEntityId,
+            metadata: m.metadata,
+            createdAt: m.createdAt,
+          })),
+          total: mappings.length,
+        };
+      })
+  );
+
+  server.tool(
     "get_stripe_webhook_health",
     "Get webhook health metrics for a Stripe integration. Returns event counts for the last 24 hours, broken down by status.",
     {
