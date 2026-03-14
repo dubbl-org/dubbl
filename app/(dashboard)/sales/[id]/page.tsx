@@ -821,6 +821,7 @@ export default function InvoiceDetailPage() {
           organizationName={orgName}
           amountDue={inv.amountDue}
           dueDate={inv.dueDate}
+          issueDate={inv.issueDate}
           sendApiUrl={`/api/v1/invoices/${id}/send`}
           onSent={handleSendComplete}
         />

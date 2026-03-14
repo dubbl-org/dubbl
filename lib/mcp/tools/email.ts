@@ -5,12 +5,14 @@ import { documentEmailLog, organization } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { wrapTool } from "@/lib/mcp/errors";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
+import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
+import { formatMoney } from "@/lib/money";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerEmailTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "send_document_email",
-    "Send an email for a document (invoice, quote, credit_note, purchase_order, debit_note). Does not change document status - use the send action for that. Checks email limits.",
+    "Send a branded email for a document (invoice, quote, credit_note, purchase_order, debit_note). The email uses the dubbl template with document details (number, amount, dates). You provide the document info and an optional personal message. Does not change document status - use the send action for that. Checks email limits. Amounts in cents.",
     {
       documentType: z
         .enum(["invoice", "quote", "credit_note", "purchase_order", "debit_note"])
@@ -19,18 +21,33 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
         .string()
         .uuid()
         .describe("UUID of the document"),
+      documentNumber: z
+        .string()
+        .describe("Document number (e.g. INV-00042)"),
       recipientEmail: z
         .string()
         .email()
         .describe("Email address of the recipient"),
-      subject: z
+      recipientName: z
         .string()
-        .min(1)
-        .describe("Email subject line"),
-      body: z
+        .describe("Name of the recipient"),
+      personalMessage: z
         .string()
-        .min(1)
-        .describe("Email body content (HTML supported)"),
+        .optional()
+        .describe("Optional personal message to include above the document details"),
+      amountCents: z
+        .number()
+        .int()
+        .optional()
+        .describe("Amount due in integer cents (e.g. 125000 for $1,250.00)"),
+      dueDate: z
+        .string()
+        .optional()
+        .describe("Due date in YYYY-MM-DD format"),
+      issueDate: z
+        .string()
+        .optional()
+        .describe("Issue date in YYYY-MM-DD format"),
       attachPdf: z
         .boolean()
         .default(false)
@@ -40,6 +57,24 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         const org = await db.query.organization.findFirst({
           where: eq(organization.id, ctx.organizationId),
+        });
+
+        const fmtDate = (d?: string) => {
+          if (!d) return undefined;
+          return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        };
+
+        const subject = `${params.documentType.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())} ${params.documentNumber} from ${org?.name || ""}`;
+
+        const html = await renderDocumentEmailHtml({
+          organizationName: org?.name || "",
+          contactName: params.recipientName,
+          documentType: params.documentType,
+          documentNumber: params.documentNumber,
+          personalMessage: params.personalMessage,
+          amountFormatted: params.amountCents != null ? formatMoney(params.amountCents) : undefined,
+          dueDateFormatted: fmtDate(params.dueDate),
+          issueDateFormatted: fmtDate(params.issueDate),
         });
 
         let pdfBuffer: Buffer | undefined;
@@ -93,8 +128,8 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
           documentType: params.documentType,
           documentId: params.documentId,
           recipientEmail: params.recipientEmail,
-          subject: params.subject,
-          body: params.body,
+          subject,
+          body: html,
           attachPdf: params.attachPdf,
           pdfBuffer,
           pdfFilename,

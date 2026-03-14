@@ -333,6 +333,7 @@ export default function CreditNoteDetailPage() {
         contactName={cn.contact?.name}
         organizationName={orgName}
         amountDue={cn.total}
+        issueDate={cn.issueDate}
         sendApiUrl={`/api/v1/credit-notes/${id}/send`}
         onSent={handleSendComplete}
       />

@@ -9,13 +9,26 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { createInvoiceJournalEntry } from "@/lib/api/journal-automation";
 import { buildSenderSnapshot, buildRecipientSnapshot } from "@/lib/documents/snapshots";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
+import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
 import { z } from "zod";
+
+const templatePropsSchema = z.object({
+  organizationName: z.string(),
+  contactName: z.string(),
+  documentType: z.string(),
+  documentNumber: z.string(),
+  personalMessage: z.string().optional(),
+  amountFormatted: z.string().optional(),
+  dueDateFormatted: z.string().optional(),
+  issueDateFormatted: z.string().optional(),
+  viewUrl: z.string().optional(),
+});
 
 const sendBodySchema = z.object({
   sendEmail: z.literal(true),
   recipientEmail: z.string().email(),
   subject: z.string().min(1),
-  body: z.string().min(1),
+  templateProps: templatePropsSchema,
   attachPdf: z.boolean().default(true),
 });
 
@@ -51,7 +64,10 @@ export async function POST(
 
     // Send email if requested
     if (emailParsed.success) {
-      const { recipientEmail, subject, body, attachPdf } = emailParsed.data;
+      const { recipientEmail, subject, templateProps, attachPdf } = emailParsed.data;
+
+      // Render the structured email template to HTML
+      const html = await renderDocumentEmailHtml(templateProps);
 
       let pdfBuffer: Buffer | undefined;
       let pdfFilename: string | undefined;
@@ -103,7 +119,7 @@ export async function POST(
         documentId: id,
         recipientEmail,
         subject,
-        body,
+        body: html,
         attachPdf,
         pdfBuffer,
         pdfFilename,

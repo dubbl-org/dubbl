@@ -113,6 +113,8 @@ export default function QuoteDetailPage() {
         contactName={q.contact?.name}
         organizationName={orgName}
         amountDue={q.total}
+        dueDate={q.expiryDate}
+        issueDate={q.issueDate}
         sendApiUrl={`/api/v1/quotes/${id}/send`}
         onSent={handleSendComplete}
       />

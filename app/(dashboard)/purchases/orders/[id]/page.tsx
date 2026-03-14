@@ -518,6 +518,7 @@ export default function PODetailPage() {
         contactName={po.contact?.name}
         organizationName={orgName}
         amountDue={po.total}
+        issueDate={po.issueDate}
         sendApiUrl={`/api/v1/purchase-orders/${id}/send`}
         onSent={handleSendComplete}
       />
