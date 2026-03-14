@@ -1,13 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { stripeIntegration, stripeSyncLog } from "@/lib/db/schema";
+import { stripeIntegration, stripeEntityMap, stripeSyncLog } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { runInitialSync } from "@/lib/integrations/stripe/initial-sync";
+import { parseStripePaymentsCsv, parseStripePayoutsCsv } from "@/lib/integrations/stripe/csv-parser";
+import { handleChargeSucceeded, handlePayoutPaid } from "@/lib/integrations/stripe/sync";
+import { reconcileStripeBalance } from "@/lib/integrations/stripe/reconcile";
 import type { AuthContext } from "@/lib/api/auth-context";
+import type Stripe from "stripe";
 
 export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -215,6 +219,146 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { logs, total: logs.length };
+      })
+  );
+
+  server.tool(
+    "import_stripe_csv",
+    "Import a Stripe CSV export file. Accepts raw CSV text content and type ('payments' or 'payouts'). Skips already-imported transactions. Returns count of imported, skipped, and errored rows.",
+    {
+      csvContent: z
+        .string()
+        .describe("The raw CSV text content from a Stripe export file"),
+      type: z
+        .enum(["payments", "payouts"])
+        .describe("Type of CSV: 'payments' for charge/payment data, 'payouts' for payout data"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:integrations");
+
+        const integration = await db.query.stripeIntegration.findFirst({
+          where: and(
+            eq(stripeIntegration.organizationId, ctx.organizationId),
+            notDeleted(stripeIntegration.deletedAt)
+          ),
+        });
+
+        if (!integration) throw new Error("No Stripe integration found");
+
+        let imported = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+
+        if (params.type === "payments") {
+          const rows = parseStripePaymentsCsv(params.csvContent);
+
+          for (const row of rows) {
+            const existing = await db.query.stripeEntityMap.findFirst({
+              where: and(
+                eq(stripeEntityMap.organizationId, ctx.organizationId),
+                eq(stripeEntityMap.stripeEntityType, "charge"),
+                eq(stripeEntityMap.stripeEntityId, row.id)
+              ),
+            });
+
+            if (existing) { skipped++; continue; }
+
+            try {
+              const charge = {
+                id: row.id,
+                amount: row.amount,
+                currency: row.currency.toLowerCase(),
+                created: row.createdUtc
+                  ? Math.floor(new Date(row.createdUtc).getTime() / 1000)
+                  : Math.floor(Date.now() / 1000),
+                balance_transaction: null,
+                payment_intent: null,
+                customer: null,
+                billing_details: {
+                  email: row.customerEmail,
+                  name: row.customerName,
+                  address: null,
+                  phone: null,
+                },
+                refunds: { data: [] },
+              } as unknown as Stripe.Charge;
+
+              await handleChargeSucceeded(integration, charge);
+              imported++;
+            } catch (err) {
+              errors.push(`${row.id}: ${err instanceof Error ? err.message : "Unknown error"}`);
+            }
+          }
+        } else {
+          const rows = parseStripePayoutsCsv(params.csvContent);
+
+          for (const row of rows) {
+            const existing = await db.query.stripeEntityMap.findFirst({
+              where: and(
+                eq(stripeEntityMap.organizationId, ctx.organizationId),
+                eq(stripeEntityMap.stripeEntityType, "payout"),
+                eq(stripeEntityMap.stripeEntityId, row.id)
+              ),
+            });
+
+            if (existing) { skipped++; continue; }
+
+            try {
+              const payout = {
+                id: row.id,
+                amount: row.amount,
+                currency: row.currency.toLowerCase(),
+                arrival_date: row.arrivalDate
+                  ? Math.floor(new Date(row.arrivalDate).getTime() / 1000)
+                  : Math.floor(Date.now() / 1000),
+              } as unknown as Stripe.Payout;
+
+              await handlePayoutPaid(integration, payout);
+              imported++;
+            } catch (err) {
+              errors.push(`${row.id}: ${err instanceof Error ? err.message : "Unknown error"}`);
+            }
+          }
+        }
+
+        return { imported, skipped, errors };
+      })
+  );
+
+  server.tool(
+    "reconcile_stripe_balance",
+    "Compare Stripe balance transactions against local records to find missed events. Returns matched count and list of missing transactions with their Stripe IDs, types, and amounts in cents.",
+    {
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .optional()
+        .default(30)
+        .describe("Number of days to reconcile (1-90, default 30)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:integrations");
+
+        const integration = await db.query.stripeIntegration.findFirst({
+          where: and(
+            eq(stripeIntegration.organizationId, ctx.organizationId),
+            notDeleted(stripeIntegration.deletedAt)
+          ),
+        });
+
+        if (!integration) throw new Error("No Stripe integration found");
+
+        const result = await reconcileStripeBalance(
+          integration.id,
+          ctx.organizationId,
+          params.days
+        );
+
+        return result;
       })
   );
 }

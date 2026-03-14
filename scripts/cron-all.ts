@@ -27,6 +27,7 @@ const ENDPOINTS = [
   "/api/cron/webhook-retries",
   "/api/cron/report-schedules",
   "/api/cron/invoicing",
+  "/api/cron/stripe-retry",
 ];
 
 const headers = { Authorization: `Bearer ${CRON_SECRET}` };

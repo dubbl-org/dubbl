@@ -30,6 +30,7 @@ export const stripeIntegration = pgTable(
     webhookSecret: text("webhook_secret"),
     status: text("status").notNull().default("active"), // "active" | "disconnected" | "error"
     errorMessage: text("error_message"),
+    lastError: text("last_error"),
     // Account mapping FKs
     clearingAccountId: uuid("clearing_account_id").references(() => chartAccount.id),
     revenueAccountId: uuid("revenue_account_id").references(() => chartAccount.id),
@@ -86,6 +87,7 @@ export const stripeSyncLog = pgTable(
     stripeEventId: text("stripe_event_id"), // unique with integrationId where NOT NULL
     status: text("status").notNull(), // "success" | "failed" | "skipped"
     errorMessage: text("error_message"),
+    retryCount: integer("retry_count").notNull().default(0),
     payload: jsonb("payload").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },

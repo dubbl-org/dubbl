@@ -6,13 +6,7 @@ import { stripe } from "@/lib/stripe";
 import { stripeIntegration, stripeSyncLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
-import {
-  handleChargeSucceeded,
-  handleChargeRefunded,
-  handlePayoutPaid,
-  handleCustomerCreated,
-  handleCustomerUpdated,
-} from "@/lib/integrations/stripe/sync";
+import { processStripeEvent } from "@/lib/integrations/stripe/sync";
 
 /**
  * Platform-level Connect webhook handler.
@@ -119,38 +113,9 @@ export async function POST(request: Request) {
   let errorMessage: string | null = null;
 
   try {
-    switch (event.type) {
-      case "charge.succeeded": {
-        const charge = event.data.object as Stripe.Charge;
-        await handleChargeSucceeded(integration, charge);
-        break;
-      }
-      case "charge.refunded": {
-        const charge = event.data.object as Stripe.Charge;
-        await handleChargeRefunded(integration, charge);
-        break;
-      }
-      case "payout.paid": {
-        const payout = event.data.object as Stripe.Payout;
-        await handlePayoutPaid(integration, payout);
-        break;
-      }
-      case "payout.failed": {
-        status = "skipped";
-        break;
-      }
-      case "customer.created": {
-        const customer = event.data.object as Stripe.Customer;
-        await handleCustomerCreated(integration, customer);
-        break;
-      }
-      case "customer.updated": {
-        const customer = event.data.object as Stripe.Customer;
-        await handleCustomerUpdated(integration, customer);
-        break;
-      }
-      default:
-        status = "skipped";
+    const result = await processStripeEvent(event, integration);
+    if (result.action === "skipped") {
+      status = "skipped";
     }
   } catch (err) {
     status = "failed";
