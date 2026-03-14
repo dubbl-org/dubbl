@@ -25,6 +25,8 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal } from "@/lib/money";
+import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
+import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
 
 interface PODetail {
@@ -38,7 +40,7 @@ interface PODetail {
   notes: string | null;
   subtotal: number;
   total: number;
-  contact: { name: string } | null;
+  contact: { name: string; email: string | null } | null;
   lines: {
     id: string;
     description: string;
@@ -312,6 +314,9 @@ export default function PODetailPage() {
   const [po, setPo] = useState<PODetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [emailHistoryKey, setEmailHistoryKey] = useState(0);
+  const [orgName, setOrgName] = useState("");
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(po?.poNumber);
@@ -326,16 +331,15 @@ export default function PODetailPage() {
 
   useEffect(() => {
     loadPO();
-  }, [loadPO]);
-
-  async function handleSend() {
-    if (!orgId) return;
-    const res = await fetch(`/api/v1/purchase-orders/${id}/send`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) {
-      const data = await res.json();
-      setPo((prev) => prev ? { ...prev, ...data.purchaseOrder } : prev);
-      toast.success("PO sent");
+    if (orgId) {
+      fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
+        .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
     }
+  }, [loadPO, orgId]);
+
+  function handleSendComplete() {
+    loadPO();
+    setEmailHistoryKey((k) => k + 1);
   }
 
   async function handleConvert() {
@@ -413,7 +417,7 @@ export default function PODetailPage() {
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="mr-2 size-3.5" />Edit
                 </Button>
-                <Button size="sm" onClick={handleSend} className="bg-emerald-600 hover:bg-emerald-700">
+                <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
                   <Send className="mr-2 size-3.5" />Send
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600 hover:text-red-700">
@@ -494,12 +498,28 @@ export default function PODetailPage() {
         </div>
       </div>
 
+      <EmailHistory key={emailHistoryKey} documentType="purchase_order" documentId={id} />
+
       {/* Edit PO Drawer */}
       <EditPODrawer
         open={editOpen}
         onClose={() => setEditOpen(false)}
         po={po}
         onSaved={loadPO}
+      />
+
+      <SendDocumentDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        documentType="purchase_order"
+        documentId={id}
+        documentNumber={po.poNumber}
+        contactEmail={po.contact?.email}
+        contactName={po.contact?.name}
+        organizationName={orgName}
+        amountDue={po.total}
+        sendApiUrl={`/api/v1/purchase-orders/${id}/send`}
+        onSent={handleSendComplete}
       />
 
       {confirmDialog}

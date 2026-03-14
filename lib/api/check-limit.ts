@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { subscription, document, attachment, organization } from "@/lib/db/schema";
+import { subscription, document, attachment, organization, documentEmailLog } from "@/lib/db/schema";
 import { eq, and, gte, sql, isNull } from "drizzle-orm";
-import { getEffectiveLimits, STORAGE_PLANS, type PlanName, type StoragePlanName } from "@/lib/plans";
+import { getEffectiveLimits, PLAN_LIMITS, STORAGE_PLANS, type PlanName, type StoragePlanName } from "@/lib/plans";
 import type { PgTable, PgColumn } from "drizzle-orm/pg-core";
 
 export class LimitExceededError extends Error {
@@ -131,6 +131,37 @@ export async function checkMultiCurrency(orgId: string, currencyCode: string) {
   if (currencyCode && currencyCode !== defaultCurrency) {
     throw new LimitExceededError(
       "Multi-currency requires a Pro or Business plan. Upgrade to use currencies other than your default."
+    );
+  }
+}
+
+export async function checkEmailLimit(orgId: string) {
+  const { sub } = await getOrgPlanLimits(orgId);
+  const plan = (sub?.plan ?? "free") as PlanName;
+  const storagePlan = (sub?.storagePlan ?? "free") as StoragePlanName;
+
+  const max = storagePlan !== "free"
+    ? STORAGE_PLANS[storagePlan].emailsPerMonth
+    : PLAN_LIMITS[plan].emailsPerMonth;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
+    .from(documentEmailLog)
+    .where(
+      and(
+        eq(documentEmailLog.organizationId, orgId),
+        eq(documentEmailLog.status, "sent"),
+        gte(documentEmailLog.sentAt, monthStart)
+      )
+    );
+
+  const current = countResult?.count ?? 0;
+  if (current >= max) {
+    throw new LimitExceededError(
+      `You've reached the limit of ${max} emails per month. Upgrade your plan for more.`
     );
   }
 }

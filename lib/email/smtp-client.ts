@@ -55,7 +55,12 @@ function createTransporter(config: SmtpConfig) {
 
 export async function sendEmail(
   config: SmtpConfig,
-  options: { to: string; subject: string; html: string }
+  options: {
+    to: string;
+    subject: string;
+    html: string;
+    attachments?: { filename: string; content: Buffer }[];
+  }
 ) {
   const transporter = createTransporter(config);
   const from = config.fromName
@@ -68,6 +73,10 @@ export async function sendEmail(
     to: options.to,
     subject: options.subject,
     html: options.html,
+    attachments: options.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+    })),
   });
 }
 

@@ -6,6 +6,7 @@ export const PLAN_LIMITS = {
     multiCurrency: false,
     contacts: 200,
     invoicesPerMonth: 10,
+    emailsPerMonth: 25,
     bankAccounts: 1,
     projects: 2,
     reports: ["trial-balance", "general-ledger"] as string[],
@@ -20,6 +21,7 @@ export const PLAN_LIMITS = {
     multiCurrency: true,
     contacts: Infinity,
     invoicesPerMonth: Infinity,
+    emailsPerMonth: 100,
     bankAccounts: Infinity,
     projects: 20,
     reports: [

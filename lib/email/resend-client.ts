@@ -6,6 +6,7 @@ interface EmailOptions {
   html: string;
   from?: string;
   replyTo?: string;
+  attachments?: { filename: string; content: Buffer }[];
 }
 
 /**
@@ -26,5 +27,9 @@ export async function sendPlatformEmail(options: EmailOptions) {
     subject: options.subject,
     html: options.html,
     replyTo: options.replyTo || undefined,
+    attachments: options.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+    })),
   });
 }

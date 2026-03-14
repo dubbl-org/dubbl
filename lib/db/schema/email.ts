@@ -10,7 +10,7 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { organization } from "./auth";
+import { organization, users } from "./auth";
 
 // Enums
 export const reminderTriggerTypeEnum = pgEnum("reminder_trigger_type", [
@@ -93,7 +93,36 @@ export const reminderLog = pgTable("reminder_log", {
   sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// Document Email Log - tracks emails sent for documents
+export const documentEmailLog = pgTable("document_email_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(), // invoice, quote, credit_note, purchase_order, debit_note
+  documentId: uuid("document_id").notNull(),
+  recipientEmail: text("recipient_email").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  attachPdf: boolean("attach_pdf").notNull().default(true),
+  status: text("status").notNull(), // sent, failed
+  errorMessage: text("error_message"),
+  sentBy: uuid("sent_by").references(() => users.id),
+  sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Relations
+export const documentEmailLogRelations = relations(documentEmailLog, ({ one }) => ({
+  organization: one(organization, {
+    fields: [documentEmailLog.organizationId],
+    references: [organization.id],
+  }),
+  sentByUser: one(users, {
+    fields: [documentEmailLog.sentBy],
+    references: [users.id],
+  }),
+}));
+
 export const emailConfigRelations = relations(emailConfig, ({ one }) => ({
   organization: one(organization, {
     fields: [emailConfig.organizationId],

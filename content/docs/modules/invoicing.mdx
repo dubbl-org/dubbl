@@ -42,6 +42,34 @@ Each line item includes:
 | Tax Rate | Optional tax rate |
 | Amount | Auto-calculated: qty x price |
 
+## Sending Invoices
+
+When you click **Send** on a draft invoice, a dialog appears with:
+
+- **To** - Pre-filled with the contact's email address, editable
+- **Subject** - Pre-filled with the invoice number and your organization name
+- **Message** - Pre-filled template with contact name, amount due, and due date
+- **Attach PDF** - Checkbox to include the invoice as a PDF attachment (enabled by default)
+
+You have two options:
+
+- **Send Email** - Sends the email to the recipient and marks the invoice as sent
+- **Mark as Sent** - Only changes the status without sending an email
+
+### Email History
+
+After sending, an **Email History** section appears on the invoice detail page showing all emails sent for that invoice. Each entry shows the recipient, subject, status (sent/failed), and timestamp. You can **Resend** any previous email.
+
+### Email Limits
+
+Email sending is subject to monthly limits based on your plan:
+
+| Plan | Emails/month |
+|------|-------------|
+| Free | 25 |
+| Pro | 100 |
+| Storage add-on | Up to 10,000 |
+
 ## Recording Payments
 
 From the invoice detail page, click **Record Payment** and enter:

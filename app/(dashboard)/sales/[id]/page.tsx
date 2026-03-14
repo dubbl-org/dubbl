@@ -37,6 +37,8 @@ import { formatMoney, centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
+import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
 
 interface InvoiceDetail {
@@ -130,6 +132,8 @@ export default function InvoiceDetailPage() {
   const [payMethod, setPayMethod] = useState("bank_transfer");
   const [payOpen, setPayOpen] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
+  const [payBankAccountId, setPayBankAccountId] = useState<string>("");
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; name: string }[]>([]);
   const [duplicating, setDuplicating] = useState(false);
   const [complianceWarnings, setComplianceWarnings] = useState<{ field: string; message: string; severity: "error" | "warning" }[]>([]);
   const [complianceDismissed, setComplianceDismissed] = useState(false);
@@ -147,6 +151,9 @@ export default function InvoiceDetailPage() {
   const [recipientTaxNumber, setRecipientTaxNumber] = useState("");
   const [senderSnapshot, setSenderSnapshot] = useState<Record<string, string | null> | null>(null);
   const [recipientSnapshot, setRecipientSnapshot] = useState<Record<string, string | null> | null>(null);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [emailHistoryKey, setEmailHistoryKey] = useState(0);
+  const [orgName, setOrgName] = useState("");
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -181,7 +188,24 @@ export default function InvoiceDetailPage() {
         if (data.recipient) setRecipientSnapshot(data.recipient);
       })
       .catch(() => {});
+
+    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.organization?.name) setOrgName(data.organization.name);
+      })
+      .catch(() => {});
   }, [id, orgId]);
+
+  useEffect(() => {
+    if (!orgId || !payOpen) return;
+    fetch("/api/v1/bank-accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setBankAccounts(data.data.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })));
+      })
+      .catch(() => {});
+  }, [orgId, payOpen]);
 
   function openSnapshotEdit() {
     setSenderName(senderSnapshot?.name || "");
@@ -257,19 +281,18 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  async function handleSend() {
+  function handleSendComplete() {
+    // Re-fetch invoice to get updated status
     if (!orgId) return;
-    const res = await fetch(`/api/v1/invoices/${id}/send`, {
-      method: "POST",
+    fetch(`/api/v1/invoices/${id}`, {
       headers: { "x-organization-id": orgId },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setInv((prev) => prev ? { ...prev, ...data.invoice } : prev);
-      toast.success("Invoice sent");
-    } else {
-      toast.error("Failed to send invoice");
-    }
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.invoice) setInv(data.invoice);
+        if (data.payments) setPayments(data.payments);
+      });
+    setEmailHistoryKey((k) => k + 1);
   }
 
   async function handlePay() {
@@ -288,7 +311,7 @@ export default function InvoiceDetailPage() {
           "Content-Type": "application/json",
           "x-organization-id": orgId,
         },
-        body: JSON.stringify({ amount, date: payDate, method: payMethod }),
+        body: JSON.stringify({ amount, date: payDate, method: payMethod, bankAccountId: payBankAccountId || null }),
       });
 
       if (res.ok) {
@@ -396,7 +419,7 @@ export default function InvoiceDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {inv.status === "draft" && (
-              <Button size="sm" onClick={handleSend} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
                 <Send className="mr-2 size-4" />Send
               </Button>
             )}
@@ -440,6 +463,21 @@ export default function InvoiceDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {bankAccounts.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Bank Account</Label>
+                        <Select value={payBankAccountId} onValueChange={setPayBankAccountId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select bank account (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {bankAccounts.map((ba) => (
+                              <SelectItem key={ba.id} value={ba.id}>{ba.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <Button onClick={handlePay} loading={payLoading} className="w-full bg-emerald-600 hover:bg-emerald-700">
                       Record Payment
                     </Button>
@@ -767,6 +805,25 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Email History */}
+        <EmailHistory key={emailHistoryKey} documentType="invoice" documentId={id} />
+
+        {/* Send Dialog */}
+        <SendDocumentDialog
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          documentType="invoice"
+          documentId={id}
+          documentNumber={inv.invoiceNumber}
+          contactEmail={inv.contact?.email}
+          contactName={inv.contact?.name}
+          organizationName={orgName}
+          amountDue={inv.amountDue}
+          dueDate={inv.dueDate}
+          sendApiUrl={`/api/v1/invoices/${id}/send`}
+          onSent={handleSendComplete}
+        />
 
         {confirmDialog}
       </div>

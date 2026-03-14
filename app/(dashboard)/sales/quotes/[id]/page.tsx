@@ -9,12 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
+import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
 
 interface QuoteDetail {
   id: string; quoteNumber: string; issueDate: string; expiryDate: string; status: string;
   subtotal: number; taxTotal: number; total: number; notes: string | null;
-  contact: { name: string } | null;
+  contact: { name: string; email: string | null } | null;
   lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; account: { code: string; name: string } | null }[];
 }
 
@@ -28,6 +30,9 @@ export default function QuoteDetailPage() {
   const router = useRouter();
   const [q, setQ] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [emailHistoryKey, setEmailHistoryKey] = useState(0);
+  const [orgName, setOrgName] = useState("");
   useEntityTitle(q?.quoteNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -35,6 +40,8 @@ export default function QuoteDetailPage() {
     if (!orgId) return;
     fetch(`/api/v1/quotes/${id}`, { headers: { "x-organization-id": orgId } })
       .then((r) => r.json()).then((data) => { if (data.quote) setQ(data.quote); }).finally(() => setLoading(false));
+    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
   }, [id, orgId]);
 
   async function action(path: string) {
@@ -42,6 +49,13 @@ export default function QuoteDetailPage() {
     const res = await fetch(`/api/v1/quotes/${id}/${path}`, { method: "POST", headers: { "x-organization-id": orgId } });
     if (res.ok) { const data = await res.json(); setQ((prev) => prev ? { ...prev, ...(data.quote || {}) } : prev); toast.success("Done"); }
     else toast.error("Failed");
+  }
+
+  function handleSendComplete() {
+    if (!orgId) return;
+    fetch(`/api/v1/quotes/${id}`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json()).then((data) => { if (data.quote) setQ(data.quote); });
+    setEmailHistoryKey((k) => k + 1);
   }
 
   async function handleConvert() {
@@ -58,7 +72,7 @@ export default function QuoteDetailPage() {
     <div className="space-y-6">
       <PageHeader title={q.quoteNumber} description={`To: ${q.contact?.name || "Unknown"}`}>
         <Button variant="outline" size="sm" asChild><Link href="/sales/quotes"><ArrowLeft className="mr-2 size-4" />Back</Link></Button>
-        {q.status === "draft" && <Button size="sm" onClick={() => action("send")} className="bg-emerald-600 hover:bg-emerald-700"><Send className="mr-2 size-4" />Send</Button>}
+        {q.status === "draft" && <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700"><Send className="mr-2 size-4" />Send</Button>}
         {q.status === "sent" && <>
           <Button size="sm" onClick={() => action("accept")} className="bg-emerald-600 hover:bg-emerald-700"><Check className="mr-2 size-4" />Accept</Button>
           <Button size="sm" variant="outline" onClick={() => action("decline")} className="text-red-600"><X className="mr-2 size-4" />Decline</Button>
@@ -86,6 +100,22 @@ export default function QuoteDetailPage() {
           </div>
         ))}
       </div>
+
+      <EmailHistory key={emailHistoryKey} documentType="quote" documentId={id} />
+
+      <SendDocumentDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        documentType="quote"
+        documentId={id}
+        documentNumber={q.quoteNumber}
+        contactEmail={q.contact?.email}
+        contactName={q.contact?.name}
+        organizationName={orgName}
+        amountDue={q.total}
+        sendApiUrl={`/api/v1/quotes/${id}/send`}
+        onSent={handleSendComplete}
+      />
     </div>
   );
 }

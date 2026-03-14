@@ -27,6 +27,8 @@ import {
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
+import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
 
 interface CreditNoteDetail {
@@ -81,6 +83,10 @@ export default function CreditNoteDetailPage() {
   const [applyAmount, setApplyAmount] = useState("");
   const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
 
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [emailHistoryKey, setEmailHistoryKey] = useState(0);
+  const [orgName, setOrgName] = useState("");
+
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(cn?.creditNoteNumber);
@@ -95,6 +101,8 @@ export default function CreditNoteDetailPage() {
         if (data.creditNote) setCn(data.creditNote);
       })
       .finally(() => setLoading(false));
+    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
   }, [id, orgId]);
 
   // Fetch outstanding invoices for apply dialog
@@ -115,19 +123,11 @@ export default function CreditNoteDetailPage() {
       });
   }, [orgId, applyOpen]);
 
-  async function handleSend() {
+  function handleSendComplete() {
     if (!orgId) return;
-    const res = await fetch(`/api/v1/credit-notes/${id}/send`, {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setCn((prev) => prev ? { ...prev, ...data.creditNote } : prev);
-      toast.success("Credit note sent");
-    } else {
-      toast.error("Failed to send credit note");
-    }
+    fetch(`/api/v1/credit-notes/${id}`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json()).then((data) => { if (data.creditNote) setCn(data.creditNote); });
+    setEmailHistoryKey((k) => k + 1);
   }
 
   async function handleApply() {
@@ -194,7 +194,7 @@ export default function CreditNoteDetailPage() {
           <Link href="/sales/credit-notes"><ArrowLeft className="mr-2 size-4" />Back</Link>
         </Button>
         {cn.status === "draft" && (
-          <Button size="sm" onClick={handleSend} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
             <Send className="mr-2 size-4" />Send
           </Button>
         )}
@@ -320,6 +320,22 @@ export default function CreditNoteDetailPage() {
           <p className="text-sm">{cn.notes}</p>
         </div>
       )}
+
+      <EmailHistory key={emailHistoryKey} documentType="credit_note" documentId={id} />
+
+      <SendDocumentDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        documentType="credit_note"
+        documentId={id}
+        documentNumber={cn.creditNoteNumber}
+        contactEmail={cn.contact?.email}
+        contactName={cn.contact?.name}
+        organizationName={orgName}
+        amountDue={cn.total}
+        sendApiUrl={`/api/v1/credit-notes/${id}/send`}
+        onSent={handleSendComplete}
+      />
 
       {confirmDialog}
     </div>

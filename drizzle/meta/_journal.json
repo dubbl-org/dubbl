@@ -113,6 +113,13 @@
       "when": 1773648000000,
       "tag": "0015_invoice_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1773734400000,
+      "tag": "0016_document_email_log",
+      "breakpoints": true
     }
   ]
 }
