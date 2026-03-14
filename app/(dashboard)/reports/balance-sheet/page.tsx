@@ -74,7 +74,7 @@ export default function BalanceSheetPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           <div className="space-y-6">
             {sections.map((section) => (
               <div key={section.label} className="space-y-2">
@@ -112,7 +112,7 @@ export default function BalanceSheetPage() {
               </div>
             ))}
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

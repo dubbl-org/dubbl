@@ -83,7 +83,7 @@ export default function VendorSpendPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard title="Total Vendor Spend" value={formatMoney(totalSpend)} icon={TrendingDown} changeType="negative" />
             <StatCard title="Vendors" value={String(vendors.length)} icon={TrendingDown} changeType="neutral" change={`${vendors.length} active`} />
@@ -135,7 +135,7 @@ export default function VendorSpendPage() {
               </div>
             </>
           )}
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

@@ -93,7 +93,7 @@ export default function ProfitAndLossPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-3">
               <StatCard title="Revenue" value={formatMoney(totalRevenue)} icon={TrendingUp} changeType="positive" />
@@ -129,7 +129,7 @@ export default function ProfitAndLossPage() {
               <span className="font-mono tabular-nums">{formatMoney(netIncome)}</span>
             </div>
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

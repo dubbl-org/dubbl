@@ -110,13 +110,13 @@ export default function PnlComparisonPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : periods.length === 0 ? (
-        <div>
+        <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No data available for the selected periods.</p>
           </div>
-        </div>
+        </ContentReveal>
       ) : (
-        <div>
+        <ContentReveal>
           {/* Trend Chart */}
           <div className="space-y-6">
             <div className="rounded-lg border p-4">
@@ -230,7 +230,7 @@ export default function PnlComparisonPage() {
               </table>
             </div>
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

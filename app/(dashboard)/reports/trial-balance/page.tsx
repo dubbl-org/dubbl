@@ -79,7 +79,7 @@ export default function TrialBalancePage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           <div className="rounded-lg border overflow-x-auto">
             <Table>
               <TableHeader>
@@ -117,7 +117,7 @@ export default function TrialBalancePage() {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

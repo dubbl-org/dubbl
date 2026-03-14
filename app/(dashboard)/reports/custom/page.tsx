@@ -207,7 +207,7 @@ export default function CustomReportsPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           {savedReports.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
@@ -261,7 +261,7 @@ export default function CustomReportsPage() {
               ))}
             </div>
           )}
-        </div>
+        </ContentReveal>
       )}
 
       {/* Builder Dialog */}

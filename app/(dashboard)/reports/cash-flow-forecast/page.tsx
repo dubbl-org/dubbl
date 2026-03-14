@@ -123,13 +123,13 @@ export default function CashFlowForecastPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : weeks.length === 0 ? (
-        <div>
+        <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No forecast data available. Create invoices, bills, or recurring templates to see projections.</p>
           </div>
-        </div>
+        </ContentReveal>
       ) : (
-        <div>
+        <ContentReveal>
           {/* Cumulative Net Chart */}
           <div className="space-y-6">
             <div>
@@ -203,7 +203,7 @@ export default function CashFlowForecastPage() {
               </div>
             </div>
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

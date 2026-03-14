@@ -112,7 +112,7 @@ export default function ExpenseAnalyticsPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
               title="Total Expenses"
@@ -197,7 +197,7 @@ export default function ExpenseAnalyticsPage() {
               <p className="text-sm text-muted-foreground">No expense data for this period.</p>
             </div>
           )}
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

@@ -91,7 +91,7 @@ export default function AgedPayablesPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
             {buckets.map((b) => (
               <StatCard
@@ -117,7 +117,7 @@ export default function AgedPayablesPage() {
               emptyMessage="No outstanding payables."
             />
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );

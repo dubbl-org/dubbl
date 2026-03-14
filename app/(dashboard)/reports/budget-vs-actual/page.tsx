@@ -162,7 +162,7 @@ export default function BudgetVsActualPage() {
       {reportLoading ? (
         <BrandLoader className="h-48" />
       ) : (
-        <div>
+        <ContentReveal>
           {comparisons.length > 0 && (
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6">
               {comparisons.slice(0, 6).map((c) => (
@@ -190,7 +190,7 @@ export default function BudgetVsActualPage() {
               {formatMoney(totalVariance)}
             </span>
           </div>
-        </div>
+        </ContentReveal>
       )}
     </ContentReveal>
   );
