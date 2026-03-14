@@ -3,34 +3,117 @@ title: Document Templates
 description: Customize the appearance of invoices, quotes, and other documents.
 ---
 
-Document templates control how your invoices, quotes, credit notes, and other PDF documents look. Navigate to **Settings > Document Templates**.
+Document templates control how your invoices, quotes, and other PDF documents look. Navigate to **Settings > Document Templates**.
 
-## Template Features
+## Creating a Template
 
-- Customize branding (logo, colors, fonts)
-- Edit the layout of line items, totals, and tax
-- Add custom header and footer text
-- Set default payment terms and notes
+1. Click **New Template**
+2. Enter a name and select the document type
+3. Configure the settings below
+4. Click **Create**
 
-## Customizing a Template
+You can set one template as the **default** per document type. The default template is automatically applied when generating PDFs.
 
-1. Navigate to **Settings > Document Templates**
-2. Select the template type (Invoice, Quote, Credit Note, etc.)
-3. Edit the template settings
-4. Preview the result
-5. Save
-
-## Template Fields
+## Template Settings
 
 | Field | Description |
-|---|---|
-| Logo | Your organization's logo |
-| Primary Color | Accent color for headings and borders |
-| Header Text | Text shown at the top of the document |
-| Footer Text | Text shown at the bottom (e.g., bank details, terms) |
-| Payment Terms | Default payment terms text |
-| Notes | Default notes appended to documents |
+|-------|-------------|
+| Name | A label for this template (e.g. "Standard Invoice") |
+| Type | Invoice, Quote, Receipt, Payslip, or Purchase Order |
+| Accent Color | Color used for the top accent bar on PDFs |
+| Show Tax Breakdown | Whether to show tax amounts in the totals section |
+| Show Payment Terms | Whether to show "due by" date below the totals |
+| Set as Default | Use this template automatically for the selected document type |
 
-## Usage
+## Content Fields
 
-Templates are applied automatically when generating PDFs for invoices, quotes, and credit notes. You can override template defaults on individual documents.
+These fields let you add custom content to your documents. All support **template variables**.
+
+### Bank Details
+
+Add your banking information so customers know where to send payment. This appears as a dedicated section on the invoice.
+
+```
+IBAN: DE89 3704 0044 0532 0130 00
+SWIFT/BIC: COBADEFFXXX
+Bank: Commerzbank
+```
+
+### Payment Instructions
+
+Freeform instructions for how to pay. Shown as a separate section below bank details.
+
+```
+Please reference invoice {{invoiceNumber}} when making payment.
+Wire transfers only, no checks.
+```
+
+### Notes
+
+Default notes appended to every document using this template. Individual invoices can also have their own notes - template notes take priority when both exist.
+
+```
+Thank you for your business. Late payments are subject to a 1.5% monthly fee.
+```
+
+### Header HTML
+
+Custom HTML rendered at the very top of the document, before the invoice title. Useful for additional branding or legal text.
+
+### Footer HTML
+
+Custom HTML rendered at the bottom of the document, after all content sections. Useful for terms and conditions or legal disclaimers.
+
+## Template Variables
+
+Use these placeholders in any content field. They are replaced with actual values when the document is generated.
+
+| Variable | Description |
+|----------|-------------|
+| `{{orgName}}` | Your organization name |
+| `{{orgAddress}}` | Organization address |
+| `{{orgTaxId}}` | Organization tax ID / VAT number |
+| `{{orgPhone}}` | Organization phone number |
+| `{{orgEmail}}` | Organization email |
+| `{{orgRegistrationNumber}}` | Business registration number |
+| `{{invoiceNumber}}` | Invoice number (e.g. INV-00001) |
+| `{{issueDate}}` | Date of issue |
+| `{{dueDate}}` | Due date |
+| `{{contactName}}` | Customer name |
+| `{{contactEmail}}` | Customer email |
+| `{{contactAddress}}` | Customer billing address |
+| `{{contactTaxNumber}}` | Customer tax / VAT number |
+| `{{reference}}` | Invoice reference / PO number |
+| `{{subtotal}}` | Formatted subtotal |
+| `{{taxTotal}}` | Formatted tax amount |
+| `{{total}}` | Formatted total |
+| `{{currency}}` | Currency code (e.g. USD, EUR) |
+
+## Previewing
+
+Click the **Preview** option from the template's menu to see how a sample invoice looks with your settings. You can also **Download Sample PDF** from the preview dialog to check the actual PDF output.
+
+## PDF Layout
+
+The generated PDF follows a clean, Stripe-inspired design:
+
+1. **Accent bar** - 4px colored bar at the top
+2. **Invoice title** - "Invoice" (or "Tax Invoice" for AU/NZ)
+3. **Metadata** - Invoice number, date of issue, date due
+4. **Seller / Bill to** - Two-column layout with organization and customer details
+5. **Due summary** - "$X due YYYY-MM-DD" in large text
+6. **Line items** - Table with description, qty, unit price, amount
+7. **Totals** - Right-aligned: subtotal, tax, total, amount paid, amount due
+8. **Additional content** - Bank details, payment instructions, notes
+9. **Footer** - Invoice number and amount due, with dubbl branding
+
+## API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/document-templates` | GET | List templates |
+| `/api/v1/document-templates` | POST | Create template |
+| `/api/v1/document-templates/{id}` | PATCH | Update template |
+| `/api/v1/document-templates/{id}` | DELETE | Delete template |
+| `/api/v1/document-templates/{id}/preview` | POST | Preview as HTML |
+| `/api/v1/document-templates/{id}/preview?format=pdf` | POST | Download sample PDF |

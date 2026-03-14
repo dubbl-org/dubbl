@@ -3,7 +3,7 @@ title: Invoicing
 description: Create, send, and manage invoices for accounts receivable.
 ---
 
-The invoicing module handles your accounts receivable workflow.
+The invoicing module handles your accounts receivable workflow, from drafting invoices to collecting payments and downloading PDFs.
 
 ## Invoice Lifecycle
 
@@ -13,20 +13,21 @@ Draft → Sent → Partial/Paid
               → Void
 ```
 
-1. **Draft** — Create and edit freely
-2. **Sent** — Invoice finalized, journal entry created (DR Accounts Receivable, CR Revenue)
-3. **Partial** — Some payment received
-4. **Paid** — Fully paid
-5. **Overdue** — Past due date and unpaid
-6. **Void** — Cancelled
+1. **Draft** - Create and edit freely
+2. **Sent** - Invoice finalized, journal entry created (DR Accounts Receivable, CR Revenue)
+3. **Partial** - Some payment received
+4. **Paid** - Fully paid
+5. **Overdue** - Past due date and unpaid
+6. **Void** - Cancelled
 
 ## Creating an Invoice
 
-1. Navigate to **Sales → Invoices → New Invoice**
+1. Navigate to **Sales > Invoices > New Invoice**
 2. Select a **contact** (customer)
 3. Set **issue date** and **due date**
 4. Add **line items** with description, quantity, unit price, and account
-5. Save as draft or send immediately
+5. Optionally add a **reference** (e.g. PO number) and **notes**
+6. Save as draft or send immediately
 
 ## Line Items
 
@@ -35,20 +36,84 @@ Each line item includes:
 | Field | Description |
 |-------|-------------|
 | Description | What you're billing for |
-| Quantity | Number of units (stored as qty × 100) |
+| Quantity | Number of units (stored as qty x 100) |
 | Unit Price | Price per unit in cents |
 | Account | Revenue account to credit |
 | Tax Rate | Optional tax rate |
-| Amount | Auto-calculated: qty × price |
+| Amount | Auto-calculated: qty x price |
 
 ## Recording Payments
 
 From the invoice detail page, click **Record Payment** and enter:
 
-- **Amount** — Payment amount in cents
-- **Date** — Payment date
+- **Amount** - Payment amount in cents
+- **Date** - Payment date
 
 This creates a payment journal entry (DR Bank, CR Accounts Receivable) and updates the invoice balance.
+
+## PDF Generation
+
+Invoices can be downloaded as PDF files. The PDF is generated server-side and follows a clean, minimal layout:
+
+- **Accent bar** - A thin colored bar at the top using your template's accent color
+- **Invoice metadata** - Invoice number, date of issue, date due, and optional reference
+- **Seller info** - Your organization's name, address, email, phone, tax ID, and registration number
+- **Bill to** - Contact name, address, email, and tax number
+- **Due summary** - Amount due and due date shown prominently
+- **Line items** - Description, quantity, unit price, and amount for each item
+- **Totals** - Subtotal, tax (if enabled), total, amount paid, and amount due
+- **Additional sections** - Bank details, payment instructions, and notes from your template
+
+### Downloading a PDF
+
+- From the invoice detail page, click **Download PDF**
+- From the customer payment page, click **Download Invoice**
+- Via API: `GET /api/v1/invoices/{id}/pdf?format=pdf`
+- Via MCP: use the `get_invoice_pdf` tool
+
+### Customizing the Layout
+
+Invoice appearance is controlled by **Document Templates**. Go to **Settings > Document Templates** to customize:
+
+- Accent color (used for the top bar)
+- Bank details and payment instructions
+- Notes that appear on every invoice
+- Custom header and footer content
+
+All text fields support template variables like `{{orgName}}`, `{{invoiceNumber}}`, `{{total}}`, etc. See the [Document Templates](/docs/settings/document-templates) page for the full list.
+
+## Compliance Warnings
+
+When viewing an invoice, you may see compliance warnings based on your organization's country. These warnings flag missing information that may be legally required on invoices in your jurisdiction.
+
+| Country | Required Fields | Severity |
+|---------|----------------|----------|
+| EU countries | Organization address, VAT number | Error |
+| UK | Organization address, VAT number | Error |
+| Australia | ABN | Warning |
+| New Zealand | GST number | Warning |
+| Canada | GST/HST number | Warning |
+| Other | Organization address, Tax ID | Warning |
+
+For EU B2B invoices (when the contact has a tax number), the contact's address is also recommended.
+
+Compliance warnings are informational only and do not block invoice creation. You can check compliance via:
+
+- The invoice detail page (warning banner at top)
+- API: `GET /api/v1/invoices/{id}/compliance`
+- MCP: `check_invoice_compliance` tool
+
+## Country-Specific Labels
+
+The invoice automatically adapts labels based on your organization's country:
+
+| Country | Tax ID Label | Invoice Title |
+|---------|-------------|---------------|
+| EU / UK | VAT | Invoice |
+| Australia | ABN | Tax Invoice (if ABN is set) |
+| New Zealand | GST | Tax Invoice (if GST is set) |
+| Canada | GST/HST | Invoice |
+| Other | Tax ID | Invoice |
 
 ## Invoice Numbering
 
@@ -57,3 +122,19 @@ Invoices are auto-numbered sequentially: `INV-00001`, `INV-00002`, etc. The pref
 ## Quotes to Invoices
 
 Accepted quotes can be converted directly to invoices, copying all line items.
+
+## Customer Portal
+
+Customers can view and pay invoices through a portal link. The portal shows invoice details, payment status, and provides a PDF download button. Portal links are secured with tokens and can be set to expire.
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/invoices` | GET | List invoices |
+| `/api/v1/invoices` | POST | Create invoice |
+| `/api/v1/invoices/{id}` | GET | Get invoice details |
+| `/api/v1/invoices/{id}` | PATCH | Update invoice |
+| `/api/v1/invoices/{id}/pdf` | GET | Get invoice HTML |
+| `/api/v1/invoices/{id}/pdf?format=pdf` | GET | Download invoice PDF |
+| `/api/v1/invoices/{id}/compliance` | GET | Check compliance warnings |
