@@ -3,7 +3,7 @@ title: Invoicing
 description: Create, send, and manage invoices for accounts receivable.
 ---
 
-The invoicing module handles your accounts receivable workflow, from drafting invoices to collecting payments and downloading PDFs.
+The invoicing module handles your accounts receivable workflow.
 
 ## Invoice Lifecycle
 
@@ -51,69 +51,16 @@ From the invoice detail page, click **Record Payment** and enter:
 
 This creates a payment journal entry (DR Bank, CR Accounts Receivable) and updates the invoice balance.
 
-## PDF Generation
+## Downloading PDFs
 
-Invoices can be downloaded as PDF files. The PDF is generated server-side and follows a clean, minimal layout:
-
-- **Accent bar** - A thin colored bar at the top using your template's accent color
-- **Invoice metadata** - Invoice number, date of issue, date due, and optional reference
-- **Seller info** - Your organization's name, address, email, phone, tax ID, and registration number
-- **Bill to** - Contact name, address, email, and tax number
-- **Due summary** - Amount due and due date shown prominently
-- **Line items** - Description, quantity, unit price, and amount for each item
-- **Totals** - Subtotal, tax (if enabled), total, amount paid, and amount due
-- **Additional sections** - Bank details, payment instructions, and notes from your template
-
-### Downloading a PDF
+Invoices can be downloaded as PDF files from multiple places:
 
 - From the invoice detail page, click **Download PDF**
 - From the customer payment page, click **Download Invoice**
 - Via API: `GET /api/v1/invoices/{id}/pdf?format=pdf`
 - Via MCP: use the `get_invoice_pdf` tool
 
-### Customizing the Layout
-
-Invoice appearance is controlled by **Document Templates**. Go to **Settings > Document Templates** to customize:
-
-- Accent color (used for the top bar)
-- Bank details and payment instructions
-- Notes that appear on every invoice
-- Custom header and footer content
-
-All text fields support template variables like `{{orgName}}`, `{{invoiceNumber}}`, `{{total}}`, etc. See the [Document Templates](/docs/settings/document-templates) page for the full list.
-
-## Compliance Warnings
-
-When viewing an invoice, you may see compliance warnings based on your organization's country. These warnings flag missing information that may be legally required on invoices in your jurisdiction.
-
-| Country | Required Fields | Severity |
-|---------|----------------|----------|
-| EU countries | Organization address, VAT number | Error |
-| UK | Organization address, VAT number | Error |
-| Australia | ABN | Warning |
-| New Zealand | GST number | Warning |
-| Canada | GST/HST number | Warning |
-| Other | Organization address, Tax ID | Warning |
-
-For EU B2B invoices (when the contact has a tax number), the contact's address is also recommended.
-
-Compliance warnings are informational only and do not block invoice creation. You can check compliance via:
-
-- The invoice detail page (warning banner at top)
-- API: `GET /api/v1/invoices/{id}/compliance`
-- MCP: `check_invoice_compliance` tool
-
-## Country-Specific Labels
-
-The invoice automatically adapts labels based on your organization's country:
-
-| Country | Tax ID Label | Invoice Title |
-|---------|-------------|---------------|
-| EU / UK | VAT | Invoice |
-| Australia | ABN | Tax Invoice (if ABN is set) |
-| New Zealand | GST | Tax Invoice (if GST is set) |
-| Canada | GST/HST | Invoice |
-| Other | Tax ID | Invoice |
+To customize how your PDFs look, see [Templates](/docs/settings/document-templates).
 
 ## Invoice Numbering
 

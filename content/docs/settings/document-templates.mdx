@@ -3,7 +3,7 @@ title: Document Templates
 description: Customize the appearance of invoices, quotes, and other documents.
 ---
 
-Document templates control how your invoices, quotes, and other PDF documents look. Navigate to **Settings > Document Templates**.
+Document templates control how your invoices, quotes, and other PDF documents look. Navigate to **Settings > Templates**.
 
 ## Creating a Template
 
@@ -21,6 +21,7 @@ You can set one template as the **default** per document type. The default templ
 | Name | A label for this template (e.g. "Standard Invoice") |
 | Type | Invoice, Quote, Receipt, Payslip, or Purchase Order |
 | Accent Color | Color used for the top accent bar on PDFs |
+| Logo URL | URL to your logo image (shown in HTML preview) |
 | Show Tax Breakdown | Whether to show tax amounts in the totals section |
 | Show Payment Terms | Whether to show "due by" date below the totals |
 | Set as Default | Use this template automatically for the selected document type |
@@ -95,7 +96,7 @@ Click the **Preview** option from the template's menu to see how a sample invoic
 
 ## PDF Layout
 
-The generated PDF follows a clean, Stripe-inspired design:
+The generated PDF follows a clean, minimal design:
 
 1. **Accent bar** - 4px colored bar at the top
 2. **Invoice title** - "Invoice" (or "Tax Invoice" for AU/NZ)
@@ -106,6 +107,45 @@ The generated PDF follows a clean, Stripe-inspired design:
 7. **Totals** - Right-aligned: subtotal, tax, total, amount paid, amount due
 8. **Additional content** - Bank details, payment instructions, notes
 9. **Footer** - Invoice number and amount due, with dubbl branding
+
+## Country-Specific Behavior
+
+The invoice automatically adapts based on your organization's country setting.
+
+### Tax ID Labels
+
+| Country | Label Used |
+|---------|-----------|
+| EU / UK | VAT |
+| Australia | ABN |
+| New Zealand | GST |
+| Canada | GST/HST |
+| Other | Tax ID |
+
+### Invoice Title
+
+For Australian and New Zealand organizations with a tax ID set, the title changes from "Invoice" to "Tax Invoice".
+
+## Compliance Warnings
+
+When viewing an invoice, you may see compliance warnings based on your organization's country. These flag missing information that may be legally required.
+
+| Country | Required Fields | Severity |
+|---------|----------------|----------|
+| EU countries | Organization address, VAT number | Error |
+| UK | Organization address, VAT number | Error |
+| Australia | ABN | Warning |
+| New Zealand | GST number | Warning |
+| Canada | GST/HST number | Warning |
+| Other | Organization address, Tax ID | Warning |
+
+For EU B2B invoices (when the contact has a tax number), the contact's address is also recommended.
+
+Compliance warnings are informational only and do not block invoice creation. You can check compliance via:
+
+- The invoice detail page (warning banner at top)
+- API: `GET /api/v1/invoices/{id}/compliance`
+- MCP: `check_invoice_compliance` tool
 
 ## API
 
