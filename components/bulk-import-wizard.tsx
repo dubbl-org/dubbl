@@ -47,6 +47,7 @@ interface BulkImportWizardProps {
   previewEndpoint: string;
   importEndpoint: string;
   onComplete?: () => void;
+  columnAliases?: Record<string, string[]>; // targetField -> CSV column name aliases
 }
 
 export function BulkImportWizard({
@@ -57,6 +58,7 @@ export function BulkImportWizard({
   previewEndpoint,
   importEndpoint,
   onComplete,
+  columnAliases,
 }: BulkImportWizardProps) {
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "importing" | "results">("upload");
   const [csvData, setCsvData] = useState<Record<string, string>[]>([]);
@@ -103,18 +105,30 @@ export function BulkImportWizard({
       });
       setCsvData(rows);
 
-      // Auto-map matching columns
+      // Auto-map matching columns (check key/label first, then aliases)
       const autoMappings: ColumnMapping[] = headers.map(h => {
-        const match = targetFields.find(
-          f => f.key.toLowerCase() === h.toLowerCase() || f.label.toLowerCase() === h.toLowerCase()
+        const hLower = h.toLowerCase();
+        // Exact key or label match
+        let match = targetFields.find(
+          f => f.key.toLowerCase() === hLower || f.label.toLowerCase() === hLower
         );
+        // Alias match
+        if (!match && columnAliases) {
+          for (const f of targetFields) {
+            const aliases = columnAliases[f.key];
+            if (aliases?.some(a => a.toLowerCase() === hLower)) {
+              match = f;
+              break;
+            }
+          }
+        }
         return { csvColumn: h, targetField: match?.key || "" };
       });
       setMappings(autoMappings);
       setStep("mapping");
     };
     reader.readAsText(file);
-  }, [targetFields]);
+  }, [targetFields, columnAliases]);
 
   const handlePreview = useCallback(async () => {
     setLoading(true);

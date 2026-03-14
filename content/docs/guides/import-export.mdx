@@ -1,0 +1,132 @@
+---
+title: Import & Export
+description: Migrate data from other bookkeeping tools into Dubbl, or export your data as CSV.
+---
+
+## Overview
+
+Dubbl supports importing data from **QuickBooks**, **Xero**, **FreshBooks**, **Wave**, and any custom CSV format. You can also export all your Dubbl data as CSV files.
+
+### Supported entity types
+
+| Entity | Import | Export |
+|--------|--------|--------|
+| Chart of Accounts | Yes | Yes |
+| Contacts | Yes | Yes |
+| Products / Inventory | Yes | Yes |
+| Invoices | Yes | Yes |
+| Bills | Yes | Yes |
+| Journal Entries | Yes | Yes |
+| Bank Transactions | Yes | Yes |
+
+## Exporting from your current tool
+
+### QuickBooks
+
+1. Go to **Reports > Account List** and click **Export to Excel/CSV**
+2. For contacts: **Sales > Customers** or **Expenses > Vendors**, then **Export**
+3. For transactions: **Reports > Transaction List by Date**, filter as needed, then **Export**
+
+### Xero
+
+1. Go to **Accounting > Chart of Accounts** and click **Export**
+2. For contacts: **Contacts > All Contacts > Export**
+3. For transactions: **Accounting > Bank Accounts > [Account] > Export**
+
+### FreshBooks
+
+1. Navigate to **Accounting > Chart of Accounts > Export**
+2. For clients: **Clients > Export Clients**
+3. For invoices: **Invoices > Export**
+
+### Wave
+
+1. Go to **Accounting > Chart of Accounts** and use the export option
+2. For customers/vendors: **Sales > Customers** or **Purchases > Vendors**
+3. For transactions: **Accounting > Transactions > Export**
+
+## Import guide
+
+### Recommended import order
+
+Import entities in this order to resolve dependencies correctly:
+
+1. **Chart of Accounts** - no dependencies
+2. **Contacts** - no dependencies
+3. **Products / Inventory** - depends on accounts
+4. **Invoices** - depends on contacts, accounts, products
+5. **Bills** - depends on contacts, accounts, products
+6. **Journal Entries** - depends on accounts
+7. **Bank Transactions** - depends on bank accounts
+
+### Step-by-step
+
+1. Navigate to **Settings > Import & Export**
+2. Select your source system (QuickBooks, Xero, FreshBooks, Wave, or Custom)
+3. Click on the entity type you want to import
+4. Upload your CSV file
+5. The wizard will auto-map columns based on your selected source
+6. Review and adjust any column mappings
+7. Preview the data and check for validation errors
+8. Click **Import** to process the data
+
+## Column mapping reference
+
+When you select a source system, Dubbl automatically maps column headers from that system to the correct fields. For example:
+
+### Accounts
+
+| Dubbl Field | QuickBooks | Xero | FreshBooks | Wave |
+|------------|------------|------|------------|------|
+| code | Account #, Account Number | Code, *Code | Account Number | Account Number |
+| name | Account Name, Account | Name, *Name | Account Name | Account Name |
+| type | Account Type, Type | Type, *Type | Account Type | Account Type |
+
+### Contacts
+
+| Dubbl Field | QuickBooks | Xero | FreshBooks | Wave |
+|------------|------------|------|------------|------|
+| name | Customer, Vendor, Display Name | Contact Name, *Contact Name | Organization, Client Name | Customer Name, Vendor Name |
+| email | Email, Main Email | Email, Email Address | Email | Email |
+| phone | Phone, Main Phone | Phone, Phone Number | Phone | Phone |
+
+## Export guide
+
+1. Navigate to **Settings > Import & Export**
+2. Scroll to the **Export** section
+3. Select the entities you want to export using the checkboxes
+4. Optionally set a date range for transactional data (invoices, bills, entries, bank transactions)
+5. Click **Export Selected** for individual CSVs or **Export All** for a ZIP containing all entities
+
+### Export format
+
+- Monetary amounts are exported as decimal strings (e.g. `125.50` not `12550`)
+- Foreign keys are resolved to human-readable names (contact IDs become contact names, account IDs become account codes)
+- Dates are in `YYYY-MM-DD` format
+- Boolean fields use `true`/`false`
+
+## MCP tools
+
+The following MCP tools are available for programmatic import/export:
+
+- `get_import_template` - Get expected columns and aliases for a source/entity combo
+- `import_csv_data` - Import CSV data directly (accounts, contacts, products)
+- `export_csv_data` - Export data as CSV text
+- `list_import_jobs` - List past import jobs
+
+## Troubleshooting
+
+### Date formats
+Dubbl accepts dates in `YYYY-MM-DD`, `MM/DD/YYYY`, and `DD-MMM-YYYY` formats. If your dates aren't being recognized, ensure they match one of these patterns.
+
+### Money precision
+All amounts are stored as integer cents internally. When importing, provide decimal values (e.g. `125.50`). When exporting, you'll receive decimal strings.
+
+### Missing references
+If an import fails with "Contact not found" or "Account not found", ensure the referenced contacts or accounts have been imported first. Follow the recommended import order above.
+
+### Duplicate records
+The import process does not check for duplicates. If you run an import twice, you may get duplicate records. Use the import history table to track what has been imported.
+
+### Account type mapping
+Account types from other systems are automatically mapped to Dubbl types (asset, liability, equity, revenue, expense). For example, QuickBooks "Bank" and "Other Current Asset" both map to "asset".
