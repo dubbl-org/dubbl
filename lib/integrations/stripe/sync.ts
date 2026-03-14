@@ -198,6 +198,8 @@ export async function handleChargeSucceeded(
 
     if (existingPayment) {
       // Already recorded via invoice payment link - only record the fee
+      if (!charge.balance_transaction) return;
+
       const balanceTx = await stripe.balanceTransactions.retrieve(
         charge.balance_transaction as string,
         { stripeAccount: integration.stripeAccountId }
@@ -312,6 +314,8 @@ export async function handleChargeSucceeded(
   );
 
   // Fee journal entry: DR Fees, CR Stripe Clearing
+  if (!charge.balance_transaction) return;
+
   const balanceTx = await stripe.balanceTransactions.retrieve(
     charge.balance_transaction as string,
     { stripeAccount: integration.stripeAccountId }
@@ -889,9 +893,6 @@ export async function handleDisputeClosed(
     throw new Error("Stripe integration accounts not configured");
   }
 
-  // Only reverse if merchant won the dispute
-  if (dispute.status !== "won") return;
-
   // Check if we have the original dispute entry
   const disputeMap = await db.query.stripeEntityMap.findFirst({
     where: and(
@@ -903,8 +904,117 @@ export async function handleDisputeClosed(
 
   if (!disputeMap) return;
 
-  // Check for duplicate reversal
-  if (await isDuplicate(integration.organizationId, "dispute_reversal", dispute.id)) return;
+  // Check for duplicate reversal/settlement
+  if (await isDuplicate(integration.organizationId, "dispute_closed", dispute.id)) return;
+
+  // Lost dispute: settle liability by moving it to clearing (money left the account)
+  if (dispute.status === "lost") {
+    const disputeAccountId = await resolveOrCreateAccount(
+      integration.organizationId,
+      "Stripe Disputes",
+      "liability",
+      "current_liability",
+      "STRIPE-DISPUTES"
+    );
+
+    const closeDate = new Date().toISOString().slice(0, 10);
+    const currencyCode = dispute.currency.toUpperCase();
+    const entryNumber = await getNextEntryNumber(integration.organizationId);
+
+    // Settle: DR Dispute Liability, CR Stripe Clearing
+    const [settlementEntry] = await db
+      .insert(journalEntry)
+      .values({
+        organizationId: integration.organizationId,
+        entryNumber,
+        date: closeDate,
+        description: `Stripe dispute lost ${dispute.id}`,
+        reference: dispute.id,
+        status: "posted",
+        sourceType: "stripe_dispute_settlement",
+        postedAt: new Date(),
+        createdBy: integration.connectedBy,
+      })
+      .returning();
+
+    await db.insert(journalLine).values([
+      {
+        journalEntryId: settlementEntry.id,
+        accountId: disputeAccountId,
+        description: `Stripe dispute settlement ${dispute.id}`,
+        debitAmount: dispute.amount,
+        creditAmount: 0,
+        currencyCode,
+      },
+      {
+        journalEntryId: settlementEntry.id,
+        accountId: integration.clearingAccountId!,
+        description: `Stripe dispute settlement ${dispute.id}`,
+        debitAmount: 0,
+        creditAmount: dispute.amount,
+        currencyCode,
+      },
+    ]);
+
+    await insertEntityMap(
+      integration.organizationId,
+      "dispute_closed",
+      dispute.id,
+      "journal_entry",
+      settlementEntry.id,
+      { status: "lost", amount: dispute.amount, currency: currencyCode }
+    );
+
+    // Book the dispute fee if present
+    if (integration.feesAccountId && integration.clearingAccountId) {
+      const balanceTxs = dispute.balance_transactions ?? [];
+      const disputeTx = balanceTxs.find((bt) => bt.reporting_category === "dispute");
+      if (disputeTx) {
+        const disputeFee = Math.abs(disputeTx.fee);
+        if (disputeFee > 0) {
+          const feeEntryNumber = await getNextEntryNumber(integration.organizationId);
+          const [feeEntry] = await db
+            .insert(journalEntry)
+            .values({
+              organizationId: integration.organizationId,
+              entryNumber: feeEntryNumber,
+              date: closeDate,
+              description: `Stripe dispute fee ${dispute.id}`,
+              reference: dispute.id,
+              status: "posted",
+              sourceType: "stripe_fee",
+              postedAt: new Date(),
+              createdBy: integration.connectedBy,
+            })
+            .returning();
+
+          await db.insert(journalLine).values([
+            {
+              journalEntryId: feeEntry.id,
+              accountId: integration.feesAccountId,
+              description: `Stripe dispute fee`,
+              debitAmount: disputeFee,
+              creditAmount: 0,
+              currencyCode,
+            },
+            {
+              journalEntryId: feeEntry.id,
+              accountId: integration.clearingAccountId,
+              description: `Stripe dispute fee`,
+              debitAmount: 0,
+              creditAmount: disputeFee,
+              currencyCode,
+            },
+          ]);
+        }
+      }
+    }
+
+    return;
+  }
+
+  // Only reverse revenue if merchant won the dispute
+  if (dispute.status !== "won") return;
 
   const disputeAccountId = await resolveOrCreateAccount(
     integration.organizationId,
@@ -955,11 +1065,11 @@ export async function handleDisputeClosed(
 
   await insertEntityMap(
     integration.organizationId,
-    "dispute_reversal",
+    "dispute_closed",
     dispute.id,
     "journal_entry",
     reversalEntry.id,
-    { amount: dispute.amount, currency: currencyCode }
+    { status: "won", amount: dispute.amount, currency: currencyCode }
   );
 
   // Reverse dispute fee if applicable
@@ -1067,7 +1177,7 @@ export async function handleInvoicePaid(
 
   // Extract tax info (compute from total - subtotal, or sum total_taxes)
   const subtotal = stripeInvoice.subtotal ?? amountPaid;
-  const taxTotal = amountPaid - subtotal;
+  const taxTotal = Math.max(0, amountPaid - subtotal);
 
   // Create journal entry: DR Clearing, CR Revenue (and CR Tax Liability if applicable)
   const entryNumber = await getNextEntryNumber(integration.organizationId);
@@ -1177,6 +1287,7 @@ export async function handleInvoicePaid(
         reference: invoiceId,
         currencyCode,
         journalEntryId: entry.id,
+        stripePaymentIntentId: invoicePIId,
         createdBy: integration.connectedBy,
       });
     }
