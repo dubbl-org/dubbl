@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createInvoiceJournalEntry } from "@/lib/api/journal-automation";
+import { buildSenderSnapshot, buildRecipientSnapshot } from "@/lib/documents/snapshots";
 
 export async function POST(
   request: Request,
@@ -23,7 +24,7 @@ export async function POST(
         eq(invoice.organizationId, ctx.organizationId),
         notDeleted(invoice.deletedAt)
       ),
-      with: { lines: true },
+      with: { lines: true, contact: true },
     });
 
     if (!found) return notFound("Invoice");
@@ -51,12 +52,20 @@ export async function POST(
       }
     );
 
+    // Snapshot org and contact details at send time
+    const senderSnapshot = await buildSenderSnapshot(ctx.organizationId);
+    const recipientSnapshot = found.contact
+      ? buildRecipientSnapshot(found.contact)
+      : { name: "Unknown", email: null, address: null, taxNumber: null };
+
     const [updated] = await db
       .update(invoice)
       .set({
         status: "sent",
         sentAt: new Date(),
         journalEntryId: entry?.id || null,
+        senderSnapshot,
+        recipientSnapshot,
         updatedAt: new Date(),
       })
       .where(eq(invoice.id, id))

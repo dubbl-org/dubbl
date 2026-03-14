@@ -6,6 +6,7 @@ import {
   integer,
   date,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
@@ -60,6 +61,8 @@ export const invoice = pgTable("invoice", {
   amountPaid: integer("amount_paid").notNull().default(0),
   amountDue: integer("amount_due").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
+  senderSnapshot: jsonb("sender_snapshot"),
+  recipientSnapshot: jsonb("recipient_snapshot"),
   paymentLinkToken: text("payment_link_token").unique(),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   sentAt: timestamp("sent_at", { mode: "date" }),

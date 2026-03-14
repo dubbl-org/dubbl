@@ -576,4 +576,90 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
         };
       })
   );
+
+  server.tool(
+    "get_invoice_snapshot",
+    "Get the frozen sender/recipient details for a finalized invoice. These are the org and contact details captured at send time. Returns null for draft invoices.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+
+        return {
+          sender: inv.senderSnapshot || null,
+          recipient: inv.recipientSnapshot || null,
+        };
+      })
+  );
+
+  server.tool(
+    "update_invoice_snapshot",
+    "Correct the sender or recipient details on a finalized invoice. Use this to fix typos or wrong addresses on sent/paid invoices. Only pass the fields you want to change. Cannot be used on draft invoices.",
+    {
+      invoiceId: z.string().describe("The UUID of the invoice"),
+      sender: z.object({
+        name: z.string().optional().describe("Organization name"),
+        address: z.string().nullable().optional().describe("Organization address"),
+        taxId: z.string().nullable().optional().describe("Tax ID / VAT number"),
+        registrationNumber: z.string().nullable().optional().describe("Business registration number"),
+        phone: z.string().nullable().optional().describe("Phone number"),
+        email: z.string().nullable().optional().describe("Email address"),
+        countryCode: z.string().nullable().optional().describe("Two-letter country code"),
+      }).optional().describe("Sender (organization) fields to update"),
+      recipient: z.object({
+        name: z.string().optional().describe("Contact name"),
+        email: z.string().nullable().optional().describe("Contact email"),
+        address: z.string().nullable().optional().describe("Contact address"),
+        taxNumber: z.string().nullable().optional().describe("Contact tax / VAT number"),
+      }).optional().describe("Recipient (contact) fields to update"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const inv = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, params.invoiceId),
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt)
+          ),
+        });
+
+        if (!inv) throw new Error("Invoice not found");
+        if (inv.status === "draft") throw new Error("Draft invoices don't have snapshots, edit the invoice directly");
+
+        const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+        if (params.sender) {
+          const existing = (inv.senderSnapshot || {}) as Record<string, unknown>;
+          updates.senderSnapshot = { ...existing, ...params.sender };
+        }
+
+        if (params.recipient) {
+          const existing = (inv.recipientSnapshot || {}) as Record<string, unknown>;
+          updates.recipientSnapshot = { ...existing, ...params.recipient };
+        }
+
+        const [updated] = await db
+          .update(invoice)
+          .set(updates)
+          .where(eq(invoice.id, params.invoiceId))
+          .returning();
+
+        return {
+          sender: updated.senderSnapshot,
+          recipient: updated.recipientSnapshot,
+        };
+      })
+  );
 }

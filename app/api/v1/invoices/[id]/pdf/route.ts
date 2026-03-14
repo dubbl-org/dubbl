@@ -6,15 +6,8 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { notFound, handleError } from "@/lib/api/response";
 import { generateInvoiceHtml } from "@/lib/documents/pdf-generator";
-
-function formatContactAddress(addresses: Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null): string | null {
-  if (!addresses) return null;
-  const billing = addresses.billing || Object.values(addresses)[0];
-  if (!billing) return null;
-  return [billing.line1, billing.line2, billing.city, billing.state, billing.postalCode, billing.country]
-    .filter(Boolean)
-    .join(", ");
-}
+import type { SenderSnapshot, RecipientSnapshot } from "@/lib/documents/snapshots";
+import { formatContactAddress } from "@/lib/documents/snapshots";
 
 export async function GET(
   request: Request,
@@ -48,25 +41,42 @@ export async function GET(
       ),
     });
 
-    const org = await db.query.organization.findFirst({
-      where: eq(organization.id, ctx.organizationId),
-    });
+    // Use snapshot if available (finalized invoice), otherwise build from live data
+    const sender = inv.senderSnapshot as SenderSnapshot | null;
+    const recipient = inv.recipientSnapshot as RecipientSnapshot | null;
 
-    const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
-      .filter(Boolean)
-      .join(", ");
+    let orgInfo;
+    if (sender) {
+      orgInfo = sender;
+    } else {
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, ctx.organizationId),
+      });
+      const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
+        .filter(Boolean)
+        .join(", ");
+      orgInfo = {
+        name: org?.name || "Company",
+        address: orgAddress || null,
+        taxId: org?.taxId || null,
+        registrationNumber: org?.businessRegistrationNumber || null,
+        phone: org?.contactPhone || null,
+        email: org?.contactEmail || null,
+        countryCode: org?.countryCode || null,
+      };
+    }
 
-    const contactAddress = formatContactAddress(inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null);
+    const contactAddress = recipient?.address ?? formatContactAddress(inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null);
 
     const invoiceData = {
       invoiceNumber: inv.invoiceNumber,
       issueDate: inv.issueDate,
       dueDate: inv.dueDate,
       status: inv.status,
-      contactName: inv.contact?.name || "Unknown",
-      contactEmail: inv.contact?.email || null,
+      contactName: recipient?.name ?? inv.contact?.name ?? "Unknown",
+      contactEmail: recipient?.email ?? inv.contact?.email ?? null,
       contactAddress,
-      contactTaxNumber: inv.contact?.taxNumber || null,
+      contactTaxNumber: recipient?.taxNumber ?? inv.contact?.taxNumber ?? null,
       lines: inv.lines.map((l) => ({
         description: l.description,
         quantity: l.quantity,
@@ -82,16 +92,6 @@ export async function GET(
       currencyCode: inv.currencyCode,
       reference: inv.reference,
       notes: inv.notes,
-    };
-
-    const orgInfo = {
-      name: org?.name || "Company",
-      address: orgAddress || null,
-      taxId: org?.taxId || null,
-      registrationNumber: org?.businessRegistrationNumber || null,
-      phone: org?.contactPhone || null,
-      email: org?.contactEmail || null,
-      countryCode: org?.countryCode || null,
     };
 
     const templateSettings = template || {};
@@ -115,10 +115,10 @@ export async function GET(
         },
         orgInfo,
         {
-          name: inv.contact?.name || "Unknown",
-          email: inv.contact?.email || null,
+          name: invoiceData.contactName,
+          email: invoiceData.contactEmail,
           address: contactAddress,
-          taxNumber: inv.contact?.taxNumber || null,
+          taxNumber: invoiceData.contactTaxNumber,
         },
         templateSettings
       );

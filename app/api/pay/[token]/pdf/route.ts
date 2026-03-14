@@ -1,18 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, documentTemplate, organization } from "@/lib/db/schema";
+import { invoice, documentTemplate } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { renderInvoicePdf } from "@/lib/documents/pdf-renderer";
-
-function formatContactAddress(addresses: Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null): string | null {
-  if (!addresses) return null;
-  const billing = addresses.billing || Object.values(addresses)[0];
-  if (!billing) return null;
-  return [billing.line1, billing.line2, billing.city, billing.state, billing.postalCode, billing.country]
-    .filter(Boolean)
-    .join(", ");
-}
+import type { SenderSnapshot, RecipientSnapshot } from "@/lib/documents/snapshots";
+import { formatContactAddress } from "@/lib/documents/snapshots";
 
 export async function GET(
   _request: Request,
@@ -46,12 +39,30 @@ export async function GET(
       ),
     });
 
-    const org = inv.organization;
-    const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
-      .filter(Boolean)
-      .join(", ");
+    // Use snapshot if available, otherwise build from live data
+    const sender = inv.senderSnapshot as SenderSnapshot | null;
+    const recipient = inv.recipientSnapshot as RecipientSnapshot | null;
 
-    const contactAddress = formatContactAddress(inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null);
+    const org = inv.organization;
+    let orgInfo;
+    if (sender) {
+      orgInfo = sender;
+    } else {
+      const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
+        .filter(Boolean)
+        .join(", ");
+      orgInfo = {
+        name: org?.name || "Company",
+        address: orgAddress || null,
+        taxId: org?.taxId || null,
+        registrationNumber: org?.businessRegistrationNumber || null,
+        phone: org?.contactPhone || null,
+        email: org?.contactEmail || null,
+        countryCode: org?.countryCode || null,
+      };
+    }
+
+    const contactAddress = recipient?.address ?? formatContactAddress(inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null);
 
     const pdfBuffer = await renderInvoicePdf(
       {
@@ -74,20 +85,12 @@ export async function GET(
         reference: inv.reference,
         notes: inv.notes,
       },
+      orgInfo,
       {
-        name: org?.name || "Company",
-        address: orgAddress || null,
-        taxId: org?.taxId || null,
-        registrationNumber: org?.businessRegistrationNumber || null,
-        phone: org?.contactPhone || null,
-        email: org?.contactEmail || null,
-        countryCode: org?.countryCode || null,
-      },
-      {
-        name: inv.contact?.name || "Unknown",
-        email: inv.contact?.email || null,
+        name: recipient?.name ?? inv.contact?.name ?? "Unknown",
+        email: recipient?.email ?? inv.contact?.email ?? null,
         address: contactAddress,
-        taxNumber: inv.contact?.taxNumber || null,
+        taxNumber: recipient?.taxNumber ?? inv.contact?.taxNumber ?? null,
       },
       template || {}
     );

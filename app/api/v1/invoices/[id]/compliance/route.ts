@@ -5,15 +5,8 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notFound, handleError } from "@/lib/api/response";
 import { checkInvoiceCompliance } from "@/lib/documents/compliance";
-
-function formatContactAddress(addresses: Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null): string | null {
-  if (!addresses) return null;
-  const billing = addresses.billing || Object.values(addresses)[0];
-  if (!billing) return null;
-  return [billing.line1, billing.line2, billing.city, billing.state, billing.postalCode, billing.country]
-    .filter(Boolean)
-    .join(", ");
-}
+import type { SenderSnapshot, RecipientSnapshot } from "@/lib/documents/snapshots";
+import { formatContactAddress } from "@/lib/documents/snapshots";
 
 export async function GET(
   request: Request,
@@ -33,27 +26,41 @@ export async function GET(
 
     if (!inv) return notFound("Invoice");
 
-    const org = await db.query.organization.findFirst({
-      where: eq(organization.id, ctx.organizationId),
-    });
+    // Use snapshot if available, otherwise use live data
+    const sender = inv.senderSnapshot as SenderSnapshot | null;
+    const recipient = inv.recipientSnapshot as RecipientSnapshot | null;
 
-    const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
-      .filter(Boolean)
-      .join(", ");
-
-    const contactAddress = formatContactAddress(inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null);
-
-    const warnings = checkInvoiceCompliance(
-      {
+    let orgData;
+    if (sender) {
+      orgData = {
+        name: sender.name || null,
+        address: sender.address || null,
+        taxId: sender.taxId || null,
+        countryCode: sender.countryCode || null,
+      };
+    } else {
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, ctx.organizationId),
+      });
+      const orgAddress = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode, org?.addressCountry]
+        .filter(Boolean)
+        .join(", ");
+      orgData = {
         name: org?.name || null,
         address: orgAddress || null,
         taxId: org?.taxId || null,
         countryCode: org?.countryCode || null,
-      },
+      };
+    }
+
+    const contactAddress = recipient?.address ?? formatContactAddress(inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null);
+
+    const warnings = checkInvoiceCompliance(
+      orgData,
       {
-        name: inv.contact?.name || null,
+        name: recipient?.name ?? inv.contact?.name ?? null,
         address: contactAddress,
-        taxNumber: inv.contact?.taxNumber || null,
+        taxNumber: recipient?.taxNumber ?? inv.contact?.taxNumber ?? null,
       },
       {
         invoiceNumber: inv.invoiceNumber,
