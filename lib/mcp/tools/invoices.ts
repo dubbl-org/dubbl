@@ -533,7 +533,7 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "check_invoice_compliance",
-    "Check an invoice for compliance warnings based on the organization's country. Returns an array of warnings with field, message, and severity (error/warning). Does not block invoice creation.",
+    "Check an invoice for compliance warnings based on the organization's country. Validates jurisdiction-specific requirements for EU (27 countries), UK, DE, FR, IN, SG, SA, JP, BR, AU, NZ, CA, and US. Returns an array of warnings with field, message, and severity (error/warning). Does not block invoice creation.",
     {
       invoiceId: z.string().describe("The UUID of the invoice to check"),
     },
@@ -560,14 +560,23 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
 
         const contactAddresses = inv.contact?.addresses as Record<string, { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }> | null;
         let contactAddress: string | null = null;
+        let contactCountryCode: string | null = null;
         if (contactAddresses) {
           const billing = contactAddresses.billing || Object.values(contactAddresses)[0];
           if (billing) {
             contactAddress = [billing.line1, billing.line2, billing.city, billing.state, billing.postalCode, billing.country]
               .filter(Boolean)
               .join(", ");
+            contactCountryCode = billing.country || null;
           }
         }
+
+        const typedLines = (inv.lines || []).map((l) => ({
+          description: l.description || null,
+          quantity: l.quantity ?? null,
+          unitPrice: l.unitPrice ?? null,
+          taxAmount: l.taxAmount ?? null,
+        }));
 
         const warnings = checkInvoiceCompliance(
           {
@@ -575,16 +584,25 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
             address: orgAddress || null,
             taxId: org?.taxId || null,
             countryCode: org?.countryCode || null,
+            addressStreet: org?.addressStreet || null,
+            addressCity: org?.addressCity || null,
+            addressPostalCode: org?.addressPostalCode || null,
+            addressCountry: org?.addressCountry || null,
+            businessRegistrationNumber: org?.businessRegistrationNumber || null,
           },
           {
             name: inv.contact?.name || null,
             address: contactAddress,
             taxNumber: inv.contact?.taxNumber || null,
+            countryCode: contactCountryCode,
           },
           {
             invoiceNumber: inv.invoiceNumber,
             issueDate: inv.issueDate,
-            lines: inv.lines,
+            dueDate: inv.dueDate,
+            currencyCode: inv.currencyCode,
+            notes: inv.notes,
+            lines: typedLines,
           }
         );
 

@@ -358,7 +358,7 @@ export default function PayrollSettingsPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <div className="max-w-4xl space-y-8">
+      <div className="space-y-8">
         {/* General Settings */}
         <motion.div {...anim(0)}>
           <Section title="General" description="Default payroll configuration.">
