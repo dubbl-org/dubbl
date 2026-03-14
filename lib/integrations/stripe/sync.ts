@@ -419,50 +419,62 @@ export async function handleChargeRefunded(
       { chargeId: charge.id, amount: refund.amount, currency: currencyCode }
     );
 
-    // Reverse fee if applicable
+    // Reverse fee if applicable (with its own dedup to handle partial failures)
     if (refund.balance_transaction) {
-      const balanceTx = await stripe.balanceTransactions.retrieve(
-        typeof refund.balance_transaction === "string"
-          ? refund.balance_transaction
-          : refund.balance_transaction.id,
-        { stripeAccount: integration.stripeAccountId }
-      );
+      const feeRefundKey = `refund_fee_${refund.id}`;
+      if (!await isDuplicate(integration.organizationId, feeRefundKey, refund.id)) {
+        const balanceTx = await stripe.balanceTransactions.retrieve(
+          typeof refund.balance_transaction === "string"
+            ? refund.balance_transaction
+            : refund.balance_transaction.id,
+          { stripeAccount: integration.stripeAccountId }
+        );
 
-      // Fee refund is negative fee on the balance transaction
-      const feeRefund = Math.abs(balanceTx.fee);
-      if (feeRefund > 0) {
-        const feeEntryNumber = await getNextEntryNumber(integration.organizationId);
-        const [feeRefundEntry] = await db
-          .insert(journalEntry)
-          .values({
-            organizationId: integration.organizationId,
-            entryNumber: feeEntryNumber,
-            date: refundDate,
-            description: `Stripe fee refund for ${refund.id}`,
-            reference: refund.id,
-            status: "posted",
-            sourceType: "stripe_fee_refund",
-            postedAt: new Date(),
-            createdBy: integration.connectedBy,
-          })
-          .returning();
+        // Fee refund is negative fee on the balance transaction
+        const feeRefund = Math.abs(balanceTx.fee);
+        if (feeRefund > 0) {
+          const feeEntryNumber = await getNextEntryNumber(integration.organizationId);
+          const [feeRefundEntry] = await db
+            .insert(journalEntry)
+            .values({
+              organizationId: integration.organizationId,
+              entryNumber: feeEntryNumber,
+              date: refundDate,
+              description: `Stripe fee refund for ${refund.id}`,
+              reference: refund.id,
+              status: "posted",
+              sourceType: "stripe_fee_refund",
+              postedAt: new Date(),
+              createdBy: integration.connectedBy,
+            })
+            .returning();
 
-        await db.insert(journalLine).values([
-          {
-            journalEntryId: feeRefundEntry.id,
-            accountId: integration.clearingAccountId,
-            description: `Stripe fee refund`,
-            debitAmount: feeRefund,
-            creditAmount: 0,
-          },
-          {
-            journalEntryId: feeRefundEntry.id,
-            accountId: integration.feesAccountId,
-            description: `Stripe fee refund`,
-            debitAmount: 0,
-            creditAmount: feeRefund,
-          },
-        ]);
+          await db.insert(journalLine).values([
+            {
+              journalEntryId: feeRefundEntry.id,
+              accountId: integration.clearingAccountId,
+              description: `Stripe fee refund`,
+              debitAmount: feeRefund,
+              creditAmount: 0,
+            },
+            {
+              journalEntryId: feeRefundEntry.id,
+              accountId: integration.feesAccountId,
+              description: `Stripe fee refund`,
+              debitAmount: 0,
+              creditAmount: feeRefund,
+            },
+          ]);
+
+          await insertEntityMap(
+            integration.organizationId,
+            feeRefundKey,
+            refund.id,
+            "journal_entry",
+            feeRefundEntry.id,
+            { feeRefund }
+          );
+        }
       }
     }
 
@@ -654,6 +666,93 @@ export async function handlePayoutCanceled(
     "journal_entry",
     mapped.dubblEntityId,
     { voidedAt: new Date().toISOString() }
+  );
+}
+
+export async function handlePayoutReversed(
+  integration: Integration,
+  payout: Stripe.Payout
+) {
+  if (await isDuplicate(integration.organizationId, "payout_reversed", payout.id)) return;
+
+  // Look up the original payout entity map
+  const mapped = await db.query.stripeEntityMap.findFirst({
+    where: and(
+      eq(stripeEntityMap.organizationId, integration.organizationId),
+      eq(stripeEntityMap.stripeEntityType, "payout"),
+      eq(stripeEntityMap.stripeEntityId, payout.id)
+    ),
+  });
+
+  if (!mapped) return;
+
+  if (!integration.clearingAccountId || !integration.payoutBankAccountId) return;
+
+  // Look up bank account chart account
+  const bankAcct = await db.query.bankAccount.findFirst({
+    where: eq(bankAccount.id, integration.payoutBankAccountId),
+  });
+  const bankChartAccountId = bankAcct?.chartAccountId ?? integration.clearingAccountId;
+
+  const reversalDate = new Date().toISOString().slice(0, 10);
+  const currencyCode = payout.currency.toUpperCase();
+  const entryNumber = await getNextEntryNumber(integration.organizationId);
+
+  // Reverse the payout: DR Stripe Clearing, CR Bank
+  const [reversalEntry] = await db
+    .insert(journalEntry)
+    .values({
+      organizationId: integration.organizationId,
+      entryNumber,
+      date: reversalDate,
+      description: `Stripe payout reversal ${payout.id}`,
+      reference: payout.id,
+      status: "posted",
+      sourceType: "stripe_payout_reversal",
+      postedAt: new Date(),
+      createdBy: integration.connectedBy,
+    })
+    .returning();
+
+  await db.insert(journalLine).values([
+    {
+      journalEntryId: reversalEntry.id,
+      accountId: integration.clearingAccountId,
+      description: `Stripe payout reversal ${payout.id}`,
+      debitAmount: payout.amount,
+      creditAmount: 0,
+      currencyCode,
+    },
+    {
+      journalEntryId: reversalEntry.id,
+      accountId: bankChartAccountId,
+      description: `Stripe payout reversal ${payout.id}`,
+      debitAmount: 0,
+      creditAmount: payout.amount,
+      currencyCode,
+    },
+  ]);
+
+  // Create a negative bank transaction for the reversal
+  await db.insert(bankTransaction).values({
+    bankAccountId: integration.payoutBankAccountId,
+    date: reversalDate,
+    description: `Stripe payout reversal ${payout.id}`,
+    amount: -payout.amount,
+    status: "reconciled",
+    sourceType: "stripe",
+    externalTransactionId: `${payout.id}_reversal`,
+    currencyCode,
+    journalEntryId: reversalEntry.id,
+  });
+
+  await insertEntityMap(
+    integration.organizationId,
+    "payout_reversed",
+    payout.id,
+    "journal_entry",
+    reversalEntry.id,
+    { amount: payout.amount, currency: currencyCode }
   );
 }
 
@@ -862,6 +961,53 @@ export async function handleDisputeClosed(
     reversalEntry.id,
     { amount: dispute.amount, currency: currencyCode }
   );
+
+  // Reverse dispute fee if applicable
+  if (integration.feesAccountId && integration.clearingAccountId) {
+    // Stripe charges a dispute fee when created and refunds it when won
+    // The fee is typically in the balance_transactions on the dispute
+    const balanceTxs = dispute.balance_transactions ?? [];
+    const reversalTx = balanceTxs.find((bt) => bt.reporting_category === "dispute_reversal");
+    if (reversalTx) {
+      const feeRefund = Math.abs(reversalTx.fee);
+      if (feeRefund > 0) {
+        const feeEntryNumber = await getNextEntryNumber(integration.organizationId);
+        const [feeReversalEntry] = await db
+          .insert(journalEntry)
+          .values({
+            organizationId: integration.organizationId,
+            entryNumber: feeEntryNumber,
+            date: closeDate,
+            description: `Stripe dispute fee reversal ${dispute.id}`,
+            reference: dispute.id,
+            status: "posted",
+            sourceType: "stripe_fee_refund",
+            postedAt: new Date(),
+            createdBy: integration.connectedBy,
+          })
+          .returning();
+
+        await db.insert(journalLine).values([
+          {
+            journalEntryId: feeReversalEntry.id,
+            accountId: integration.clearingAccountId,
+            description: `Stripe dispute fee reversal`,
+            debitAmount: feeRefund,
+            creditAmount: 0,
+            currencyCode,
+          },
+          {
+            journalEntryId: feeReversalEntry.id,
+            accountId: integration.feesAccountId,
+            description: `Stripe dispute fee reversal`,
+            debitAmount: 0,
+            creditAmount: feeRefund,
+            currencyCode,
+          },
+        ]);
+      }
+    }
+  }
 }
 
 export async function handleInvoicePaid(
@@ -874,23 +1020,21 @@ export async function handleInvoicePaid(
   // Check if we already processed this invoice
   if (await isDuplicate(integration.organizationId, "stripe_invoice", invoiceId)) return;
 
-  // Prevent double-booking: if this invoice's charge was already processed by handleChargeSucceeded, skip.
-  // The Stripe webhook payload includes charge/payment_intent fields even if the SDK types don't expose them.
+  // Extract payment_intent ID for dedup and payment overlap checks
   const invoiceRaw = stripeInvoice as unknown as Record<string, unknown>;
   const invoiceChargeId = typeof invoiceRaw.charge === "string" ? invoiceRaw.charge : null;
+  const invoicePIId = typeof invoiceRaw.payment_intent === "string" ? invoiceRaw.payment_intent : null;
+
+  // Prevent double-booking: if this invoice's charge was already processed by handleChargeSucceeded, skip
   if (invoiceChargeId && await isDuplicate(integration.organizationId, "charge", invoiceChargeId)) return;
 
   // Fallback: check via payment_intent if charge field isn't present
-  if (!invoiceChargeId) {
-    const invoicePIRaw = invoiceRaw.payment_intent;
-    const invoicePIId = typeof invoicePIRaw === "string" ? invoicePIRaw : null;
-    if (invoicePIId) {
-      const pi = await stripe.paymentIntents.retrieve(invoicePIId, { stripeAccount: integration.stripeAccountId });
-      const latestChargeId = typeof pi.latest_charge === "string"
-        ? pi.latest_charge
-        : (pi.latest_charge as { id?: string } | null)?.id ?? null;
-      if (latestChargeId && await isDuplicate(integration.organizationId, "charge", latestChargeId)) return;
-    }
+  if (!invoiceChargeId && invoicePIId) {
+    const pi = await stripe.paymentIntents.retrieve(invoicePIId, { stripeAccount: integration.stripeAccountId });
+    const latestChargeId = typeof pi.latest_charge === "string"
+      ? pi.latest_charge
+      : (pi.latest_charge as { id?: string } | null)?.id ?? null;
+    if (latestChargeId && await isDuplicate(integration.organizationId, "charge", latestChargeId)) return;
   }
 
   if (
@@ -1000,28 +1144,42 @@ export async function handleInvoicePaid(
     ]);
   }
 
-  // Create payment record if we have a contact
+  // Create payment record if we have a contact, but skip if a payment already exists
+  // for this PI (e.g. created by checkout.session.completed for a Dubbl invoice)
   if (contactId) {
-    const paymentNumber = await getNextNumber(
-      integration.organizationId,
-      "payment",
-      "payment_number",
-      "PAY"
-    );
+    let paymentExists = false;
+    if (invoicePIId) {
+      const existing = await db.query.payment.findFirst({
+        where: and(
+          eq(payment.organizationId, integration.organizationId),
+          eq(payment.stripePaymentIntentId, invoicePIId)
+        ),
+      });
+      paymentExists = !!existing;
+    }
 
-    await db.insert(payment).values({
-      organizationId: integration.organizationId,
-      contactId,
-      paymentNumber,
-      type: "received",
-      date: paidDate,
-      amount: amountPaid,
-      method: "card",
-      reference: invoiceId,
-      currencyCode,
-      journalEntryId: entry.id,
-      createdBy: integration.connectedBy,
-    });
+    if (!paymentExists) {
+      const paymentNumber = await getNextNumber(
+        integration.organizationId,
+        "payment",
+        "payment_number",
+        "PAY"
+      );
+
+      await db.insert(payment).values({
+        organizationId: integration.organizationId,
+        contactId,
+        paymentNumber,
+        type: "received",
+        date: paidDate,
+        amount: amountPaid,
+        method: "card",
+        reference: invoiceId,
+        currencyCode,
+        journalEntryId: entry.id,
+        createdBy: integration.connectedBy,
+      });
+    }
   }
 
   await insertEntityMap(
@@ -1411,7 +1569,7 @@ export async function handleChargeExpired(
 
   if (!mapped) return;
 
-  // Void the linked journal entry
+  // Void the linked journal entry (revenue)
   await db
     .update(journalEntry)
     .set({
@@ -1420,6 +1578,22 @@ export async function handleChargeExpired(
       updatedAt: new Date(),
     })
     .where(eq(journalEntry.id, mapped.dubblEntityId));
+
+  // Also void any fee entry for this charge (stored as separate journal entry with same reference)
+  await db
+    .update(journalEntry)
+    .set({
+      status: "void",
+      voidReason: "Stripe uncaptured charge expired",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(journalEntry.organizationId, integration.organizationId),
+        eq(journalEntry.reference, charge.id),
+        eq(journalEntry.sourceType, "stripe_fee")
+      )
+    );
 
   await db
     .update(stripeEntityMap)
@@ -1798,6 +1972,108 @@ export async function handleStripeCreditNoteUpdated(
       updatedAt: new Date(),
     })
     .where(eq(creditNote.id, mapped.dubblEntityId));
+
+  // Update linked journal entry lines to match new amounts
+  const cn = await db.query.creditNote.findFirst({
+    where: eq(creditNote.id, mapped.dubblEntityId),
+  });
+
+  if (cn?.journalEntryId) {
+    // Void old journal entry and create a corrected one
+    await db
+      .update(journalEntry)
+      .set({
+        status: "void",
+        voidReason: "Stripe credit note amounts updated",
+        updatedAt: new Date(),
+      })
+      .where(eq(journalEntry.id, cn.journalEntryId));
+
+    if (!integration.revenueAccountId) return;
+
+    const currencyCode = stripeCN.currency.toUpperCase();
+    const issueDate = new Date(stripeCN.created * 1000).toISOString().slice(0, 10);
+    const entryNumber = await getNextEntryNumber(integration.organizationId);
+
+    const newJournalLines: {
+      journalEntryId: string;
+      accountId: string;
+      description: string;
+      debitAmount: number;
+      creditAmount: number;
+      currencyCode: string;
+    }[] = [];
+
+    const [newEntry] = await db
+      .insert(journalEntry)
+      .values({
+        organizationId: integration.organizationId,
+        entryNumber,
+        date: issueDate,
+        description: `Stripe credit note ${stripeCN.id} (updated)`,
+        reference: stripeCN.id,
+        status: "posted",
+        sourceType: "stripe_credit_note",
+        postedAt: new Date(),
+        createdBy: integration.connectedBy,
+      })
+      .returning();
+
+    // DR Revenue for subtotal
+    newJournalLines.push({
+      journalEntryId: newEntry.id,
+      accountId: integration.revenueAccountId,
+      description: `Stripe credit note ${stripeCN.id}`,
+      debitAmount: stripeCN.subtotal,
+      creditAmount: 0,
+      currencyCode,
+    });
+
+    // DR Tax Liability if tax > 0
+    const taxAmount = stripeCN.total - stripeCN.subtotal;
+    if (taxAmount > 0) {
+      const taxAccountId = await resolveOrCreateAccount(
+        integration.organizationId,
+        "Tax Liability",
+        "liability",
+        "current_liability",
+        "2200"
+      );
+      newJournalLines.push({
+        journalEntryId: newEntry.id,
+        accountId: taxAccountId,
+        description: `Stripe credit note tax ${stripeCN.id}`,
+        debitAmount: taxAmount,
+        creditAmount: 0,
+        currencyCode,
+      });
+    }
+
+    // CR Accounts Receivable for total
+    const arAccountId = await resolveOrCreateAccount(
+      integration.organizationId,
+      "Accounts Receivable",
+      "asset",
+      "current_asset",
+      "1200"
+    );
+    newJournalLines.push({
+      journalEntryId: newEntry.id,
+      accountId: arAccountId,
+      description: `Stripe credit note ${stripeCN.id}`,
+      debitAmount: 0,
+      creditAmount: stripeCN.total,
+      currencyCode,
+    });
+
+    await db.insert(journalLine).values(newJournalLines);
+
+    // Update credit note to point to new journal entry
+    await db
+      .update(creditNote)
+      .set({ journalEntryId: newEntry.id })
+      .where(eq(creditNote.id, mapped.dubblEntityId));
+  }
 }
 
 export async function handleStripeCreditNoteVoided(
@@ -1896,6 +2172,18 @@ export async function processStripeEvent(
       const payout = event.data.object as Stripe.Payout;
       await handlePayoutCanceled(integration, payout);
       return { action: "payout_canceled" };
+    }
+    case "payout.updated": {
+      const payout = event.data.object as Stripe.Payout;
+      if (payout.status === "canceled") {
+        await handlePayoutCanceled(integration, payout);
+        return { action: "payout_canceled" };
+      }
+      if (payout.status === "reversed") {
+        await handlePayoutReversed(integration, payout);
+        return { action: "payout_reversed" };
+      }
+      return { action: "skipped" };
     }
     case "customer.created": {
       const customer = event.data.object as Stripe.Customer;
