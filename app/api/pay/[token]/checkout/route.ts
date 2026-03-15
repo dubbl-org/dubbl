@@ -8,6 +8,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   const { token } = await params;
 
   const inv = await db.query.invoice.findFirst({
@@ -27,6 +31,7 @@ export async function POST(
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    automatic_tax: { enabled: true },
     payment_method_types: ["card"],
     line_items: [
       {

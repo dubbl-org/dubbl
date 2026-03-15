@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, organization, member, subscription } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { render } from "@react-email/render";
@@ -9,6 +9,7 @@ import { createElement } from "react";
 import { WelcomeEmail } from "@/lib/email/templates/welcome";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { getSiteSetting, isSelfHostedUnlimited } from "@/lib/site-settings";
 
 const registerSchema = z.object({
   name: z.string().min(1),
@@ -32,15 +33,53 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if this is the first user
+    const [{ count: userCount }] = await db
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .from(users);
+    const isFirstUser = userCount === 0;
+
+    if (!isFirstUser) {
+      // Check registration mode
+      const registrationMode = await getSiteSetting("registration_mode");
+      if (registrationMode === "disabled") {
+        return NextResponse.json(
+          { error: "Registration is currently disabled" },
+          { status: 403 }
+        );
+      }
+      if (registrationMode === "invite_only") {
+        // TODO: check invitation table for pending invite
+        return NextResponse.json(
+          { error: "Registration is by invitation only" },
+          { status: 403 }
+        );
+      }
+
+      // Check domain restriction
+      const allowedDomains = await getSiteSetting("allowed_email_domains");
+      if (allowedDomains) {
+        const domains = allowedDomains.split(",").map((d) => d.trim().toLowerCase());
+        const emailDomain = parsed.email.split("@")[1]?.toLowerCase();
+        if (!emailDomain || !domains.includes(emailDomain)) {
+          return NextResponse.json(
+            { error: "Registration is not allowed for this email domain" },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const passwordHash = await bcrypt.hash(parsed.password, 12);
 
-    // Create user
+    // Create user (first user becomes site admin)
     const [user] = await db
       .insert(users)
       .values({
         name: parsed.name,
         email: parsed.email,
         passwordHash,
+        ...(isFirstUser ? { isSiteAdmin: true } : {}),
       })
       .returning();
 
@@ -65,11 +104,13 @@ export async function POST(request: Request) {
       role: "owner",
     });
 
-    // Create free subscription
+    // Create subscription (pro for self-hosted, free otherwise)
+    const selfHosted = isSelfHostedUnlimited();
     await db.insert(subscription).values({
       organizationId: org.id,
-      plan: "free",
+      plan: selfHosted ? "pro" : "free",
       status: "active",
+      ...(selfHosted ? { managedBy: "manual" } : {}),
     });
 
     // Send welcome and org-created emails (fire and forget)

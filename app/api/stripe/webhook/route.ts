@@ -15,6 +15,10 @@ function getItemPeriod(sub: Stripe.Subscription) {
 }
 
 export async function POST(request: Request) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   const body = await request.text();
   const headersList = await headers();
   const sig = headersList.get("stripe-signature");

@@ -17,8 +17,11 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { stripe } from "@/lib/stripe";
+import { stripe as _stripeClient } from "@/lib/stripe";
 import { getNextNumber } from "@/lib/api/numbering";
+
+// Non-null wrapper - callers (webhook handlers) already guard for null stripe
+const stripe = _stripeClient!;
 import { sendNotification } from "@/lib/notifications/send";
 
 type Integration = typeof stripeIntegration.$inferSelect;

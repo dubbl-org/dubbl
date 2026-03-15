@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { stripeIntegration, stripeSyncLog } from "@/lib/db/schema";
-import { stripe } from "@/lib/stripe";
+import { stripe as _stripeClient } from "@/lib/stripe";
+
+// Non-null wrapper - GET handler guards for null
+const stripe = _stripeClient!;
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import { eq, and, desc } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 export async function GET(request: Request) {
+  if (!_stripeClient) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   try {
     const ctx = await getAuthContext(request);
 

@@ -177,6 +177,7 @@ export function registerIntegrationTools(server: McpServer, ctx: AuthContext) {
         const integration = await findIntegration(ctx, params.integrationId);
 
         const { stripe } = await import("@/lib/stripe");
+        if (!stripe) return "Stripe is not configured";
 
         try {
           await stripe.oauth.deauthorize({

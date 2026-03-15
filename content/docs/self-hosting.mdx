@@ -100,14 +100,54 @@ Dubbl supports three authentication methods:
 
 For OAuth providers, set the callback URL to `https://your-domain.com/api/auth/callback/google` (or `/apple`).
 
+## First User Setup
+
+The first user to register on a new instance automatically becomes a **site admin**. This applies to both email/password and OAuth registration. Site admins can access the admin panel at `/admin` and configure site-wide settings at `/admin/settings`.
+
+## Registration Controls
+
+Control who can create accounts on your instance:
+
+| Mode | Description |
+|------|-------------|
+| `open` | Anyone can register (default) |
+| `invite_only` | Only users with an invitation can register |
+| `disabled` | No new registrations (except the first user) |
+
+Set via environment variable (`REGISTRATION_MODE`) or the admin settings page at `/admin/settings`.
+
+## Domain Restrictions
+
+Restrict registration to specific email domains by setting `ALLOWED_EMAIL_DOMAINS` (comma-separated) or configuring it in admin settings. When set, only users with matching email domains can register or sign in via OAuth.
+
+```bash
+ALLOWED_EMAIL_DOMAINS="acme.com,example.com"
+```
+
+## Self-Hosted Unlimited Mode
+
+Without Stripe configured, all organizations automatically receive unlimited Pro features. No billing, subscriptions, or plan limits apply. This is detected automatically based on the absence of `STRIPE_SECRET_KEY`.
+
+You can also control this behavior from the admin settings page:
+- **Auto** (default) - Unlimited when Stripe is not configured
+- **Always on** - Force unlimited regardless of Stripe config
+- **Always off** - Enforce plan limits even without Stripe
+
+## Admin Settings
+
+Site admins can configure all self-hosting settings from `/admin/settings`:
+- Registration mode and allowed email domains
+- Organization creation permissions
+- Self-hosted unlimited mode toggle
+
 ## Billing (Stripe)
 
-Billing is fully optional. Without Stripe configured, all users get the free plan. Site admins can override plan limits per organization from `/admin/organizations`.
+Billing is fully optional. Without Stripe configured, all users get unlimited Pro features automatically. Site admins can also override plan limits per organization from `/admin/organizations`.
 
 To enable paid plans, see the [Billing & Stripe Setup](/docs/settings/billing) guide for full instructions on creating products, prices, and configuring webhooks.
 
 <Callout type="info">
-  Self-hosted instances don't need Stripe. Use admin overrides to grant Pro features to any organization.
+  Self-hosted instances don't need Stripe. All features are automatically unlocked.
 </Callout>
 
 ## Email

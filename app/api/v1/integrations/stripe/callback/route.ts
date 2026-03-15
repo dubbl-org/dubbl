@@ -7,6 +7,10 @@ import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 export async function GET(request: Request) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   try {
     const url = new URL(request.url);
     const code = url.searchParams.get("code");

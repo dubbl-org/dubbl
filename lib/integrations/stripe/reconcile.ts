@@ -3,7 +3,10 @@ import { stripeIntegration, stripeEntityMap } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import Stripe from "stripe";
-import { stripe } from "@/lib/stripe";
+import { stripe as _stripeClient } from "@/lib/stripe";
+
+// Non-null wrapper - callers already guard for null stripe
+const stripe = _stripeClient!;
 
 export interface ReconciliationResult {
   matched: number;

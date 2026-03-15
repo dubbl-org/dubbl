@@ -10,6 +10,7 @@ import {
   Building2,
   Mail,
   ArrowLeft,
+  Settings,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -41,6 +42,12 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/users", label: "Users", icon: Users },
       { href: "/admin/organizations", label: "Organizations", icon: Building2 },
+    ],
+  },
+  {
+    label: "Configuration",
+    items: [
+      { href: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },
   {

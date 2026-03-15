@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -42,6 +43,13 @@ function AppleIcon({ className }: { className?: string }) {
   );
 }
 
+interface ProvidersConfig {
+  google: boolean;
+  apple: boolean;
+  registrationMode: string;
+  allowedDomains: string;
+}
+
 export default function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -49,6 +57,21 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [providers, setProviders] = useState<ProvidersConfig | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/providers-config")
+      .then((r) => r.json())
+      .then((data) => {
+        setProviders(data);
+        if (data.registrationMode === "disabled") {
+          router.replace("/sign-in");
+        }
+      })
+      .catch(() => setProviders({ google: false, apple: false, registrationMode: "open", allowedDomains: "" }));
+  }, [router]);
+
+  const hasOAuth = providers?.google || providers?.apple;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,40 +123,70 @@ export default function SignUpPage() {
         </p>
       </motion.div>
 
-      {/* OAuth providers */}
-      <motion.div
-        className="grid grid-cols-2 gap-2.5"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-      >
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 rounded-lg text-sm font-medium"
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+      {/* Registration mode notices */}
+      {providers?.registrationMode === "invite_only" && (
+        <motion.div
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.03 }}
         >
-          <GoogleIcon className="size-4" />
-          Google
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 rounded-lg text-sm font-medium"
-          onClick={() => signIn("apple", { callbackUrl: "/dashboard" })}
+          Registration is by invitation only. You need an invite to create an account.
+        </motion.div>
+      )}
+      {providers?.allowedDomains && (
+        <motion.div
+          className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.03 }}
         >
-          <AppleIcon className="size-4" />
-          Apple
-        </Button>
-      </motion.div>
+          Registration is limited to: {providers.allowedDomains.split(",").join(", ")}
+        </motion.div>
+      )}
 
-      <div className="my-5 flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-[11px] text-muted-foreground">
-          or continue with email
-        </span>
-        <Separator className="flex-1" />
-      </div>
+      {/* OAuth providers */}
+      {hasOAuth && (
+        <>
+          <motion.div
+            className={cn("grid gap-2.5", providers?.google && providers?.apple ? "grid-cols-2" : "grid-cols-1")}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+          >
+            {providers?.google && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-lg text-sm font-medium"
+                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+              >
+                <GoogleIcon className="size-4" />
+                Google
+              </Button>
+            )}
+            {providers?.apple && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-lg text-sm font-medium"
+                onClick={() => signIn("apple", { callbackUrl: "/dashboard" })}
+              >
+                <AppleIcon className="size-4" />
+                Apple
+              </Button>
+            )}
+          </motion.div>
+
+          <div className="my-5 flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-[11px] text-muted-foreground">
+              or continue with email
+            </span>
+            <Separator className="flex-1" />
+          </div>
+        </>
+      )}
 
       <motion.form
         onSubmit={handleSubmit}

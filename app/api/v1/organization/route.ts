@@ -9,6 +9,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { isValidBusinessType } from "@/lib/data/business-types";
 import { checkOrganizationLimit, LimitExceededError } from "@/lib/api/check-limit";
+import { getSiteSetting } from "@/lib/site-settings";
 import { render } from "@react-email/render";
 import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
@@ -121,6 +122,21 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    // Check if user is allowed to create organizations
+    const allowUserOrgCreation = await getSiteSetting("allow_user_org_creation");
+    if (allowUserOrgCreation !== "true") {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, session.user.id),
+        columns: { isSiteAdmin: true },
+      });
+      if (!user?.isSiteAdmin) {
+        return NextResponse.json(
+          { error: "Only administrators can create organizations" },
+          { status: 403 }
+        );
+      }
+    }
 
     // Check org limit
     await checkOrganizationLimit(session.user.id);
