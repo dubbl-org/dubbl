@@ -21,6 +21,7 @@ export const authConfig: NextAuthConfig = {
         pathname.startsWith("/sign-in") ||
         pathname.startsWith("/sign-up") ||
         pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/health") ||
         pathname.startsWith("/api/stripe/webhook") ||
         pathname.startsWith("/api/currencies") ||
         pathname === "/api/mcp" ||
