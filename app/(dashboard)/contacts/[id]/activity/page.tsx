@@ -22,7 +22,7 @@ import type { ActivityItem } from "../layout";
 export default function ContactActivityPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { contact } = useContactContext();
+  useContactContext();
 
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -40,8 +40,13 @@ export default function ContactActivityPage() {
       if (!orgId) return;
 
       const isLoadMore = !!cursor;
-      if (isLoadMore) setActivityLoadingMore(true);
-      else setActivityLoading(true);
+      if (isLoadMore) {
+        setActivityLoadingMore(true);
+      } else {
+        setActivityCursor(null);
+        setActivityHasMore(true);
+        setActivityLoading(true);
+      }
 
       const params = new URLSearchParams({ limit: "30" });
       if (cursor) params.set("cursor", cursor);
@@ -71,8 +76,7 @@ export default function ContactActivityPage() {
 
   // Fetch activity on mount and when filters change
   useEffect(() => {
-    setActivityCursor(null);
-    setActivityHasMore(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- setState occurs in async .then(), not synchronously
     fetchActivity(null);
   }, [fetchActivity]);
 
