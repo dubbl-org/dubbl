@@ -293,7 +293,7 @@ function SignInContent() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.25 }}
       >
-        Bank-grade encryption &middot; Self-hosted option &middot; Apache 2.0
+        Open source &middot; Self-hosted option &middot; Apache 2.0
       </motion.p>
     </div>
   );

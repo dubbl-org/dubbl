@@ -834,7 +834,7 @@ function SolutionSection() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
             {[
               "Self-hostable",
-              "Bank-grade encryption",
+              "Full audit trail",
               "CSV import from any source",
               "API-first",
             ].map((item) => (
