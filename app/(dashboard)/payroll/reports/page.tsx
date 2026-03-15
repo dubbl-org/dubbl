@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface Summary {
@@ -41,6 +42,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Reports");
 
   useEffect(() => {
     if (!orgId) return;

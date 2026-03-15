@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 const reportCategories = [
   {
@@ -188,6 +189,7 @@ const reportCategories = [
 ];
 
 export default function ReportsPage() {
+  useDocumentTitle("Reports · Overview");
   return (
     <ContentReveal>
       <div className="space-y-6 sm:space-y-10">

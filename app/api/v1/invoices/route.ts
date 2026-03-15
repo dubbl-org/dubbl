@@ -10,6 +10,7 @@ import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { logAudit } from "@/lib/api/audit";
 import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
@@ -186,6 +187,8 @@ export async function POST(request: Request) {
         ...l,
       }))
     );
+
+    logAudit({ ctx, action: "create", entityType: "invoice", entityId: created.id, request });
 
     return NextResponse.json({ invoice: created }, { status: 201 });
   } catch (err) {

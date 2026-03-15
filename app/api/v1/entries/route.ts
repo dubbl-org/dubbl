@@ -4,6 +4,7 @@ import { journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { centsToDecimal } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { checkMonthlyLimit } from "@/lib/api/check-limit";
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
         exchangeRate: l.exchangeRate,
       }))
     );
+
+    logAudit({ ctx, action: "create", entityType: "journal_entry", entityId: entry.id, request });
 
     return NextResponse.json({ entry }, { status: 201 });
   } catch (err) {

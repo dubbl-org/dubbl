@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const upsertSchema = z.object({
@@ -48,6 +49,8 @@ export async function PUT(request: Request) {
         reason: parsed.reason || null,
       })
       .returning();
+
+    logAudit({ ctx, action: "update", entityType: "period_lock", entityId: ctx.organizationId, changes: { lockDate: parsed.lockDate }, request });
 
     return NextResponse.json({ periodLock: created });
   } catch (err) {

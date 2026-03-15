@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/money";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Budget {
   id: string;
@@ -83,6 +84,8 @@ export default function BudgetsPage() {
   const debouncedSearch = useDebounce(search);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [loadingReports, setLoadingReports] = useState(false);
+
+  useDocumentTitle("Accounting \u00B7 Budgets");
 
   const fetchData = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");

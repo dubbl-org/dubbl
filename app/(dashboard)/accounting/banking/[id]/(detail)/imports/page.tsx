@@ -2,11 +2,14 @@
 
 import { FileStack, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "../layout";
 import { ImportRow } from "../../_components";
 
 export default function BankImportsPage() {
   const { imports, openImport } = useBankAccountContext();
+
+  useDocumentTitle("Accounting \u00B7 Bank Imports");
 
   return (
     <div className="space-y-4">

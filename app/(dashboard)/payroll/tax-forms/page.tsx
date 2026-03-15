@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface TaxFormItem {
   id: string;
@@ -76,6 +77,7 @@ export default function TaxFormsPage() {
   const [generating, setGenerating] = useState(false);
   const [taxYear, setTaxYear] = useState("2025");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  useDocumentTitle("Payroll · Tax Forms");
 
   const orgId =
     typeof window !== "undefined"

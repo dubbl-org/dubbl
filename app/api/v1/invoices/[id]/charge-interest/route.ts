@@ -13,6 +13,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, validationError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import {
@@ -209,6 +210,8 @@ export async function POST(
       .update(invoice)
       .set({ journalEntryId: je.id })
       .where(eq(invoice.id, interestInvoice.id));
+
+    logAudit({ ctx, action: "charge_interest", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json(
       {

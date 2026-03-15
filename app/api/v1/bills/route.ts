@@ -11,6 +11,7 @@ import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -136,6 +137,8 @@ export async function POST(request: Request) {
         ...l,
       }))
     );
+
+    logAudit({ ctx, action: "create", entityType: "bill", entityId: created.id, request });
 
     return NextResponse.json({ bill: created }, { status: 201 });
   } catch (err) {

@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import {
   Table,
   TableBody,
@@ -110,6 +111,7 @@ export default function RemindersPage() {
   const [logStatus, setLogStatus] = useState<string>("");
   const [logPage, setLogPage] = useState(1);
   const [logTotal, setLogTotal] = useState(0);
+  useDocumentTitle("Settings · Reminders");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

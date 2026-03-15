@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, error } from "@/lib/api/response";
 import { ALL_PERMISSIONS } from "@/lib/plans";
 import { z } from "zod";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -82,6 +83,8 @@ export async function PUT(
       .where(eq(customRole.id, id))
       .returning();
 
+    logAudit({ ctx, action: "update", entityType: "role", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
+
     return NextResponse.json({ role: updated });
   } catch (err) {
     return handleError(err);
@@ -123,6 +126,8 @@ export async function DELETE(
     }
 
     await db.delete(customRole).where(eq(customRole.id, id));
+
+    logAudit({ ctx, action: "delete", entityType: "role", entityId: id, request });
 
     return NextResponse.json({ success: true });
   } catch (err) {

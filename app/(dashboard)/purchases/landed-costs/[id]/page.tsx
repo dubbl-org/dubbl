@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft } from "lucide-react";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { toast } from "sonner";
 
 interface CostComponent {
@@ -53,6 +54,8 @@ export default function LandedCostDetailPage() {
   const router = useRouter();
   const [item, setItem] = useState<LandedCostDetail | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useDocumentTitle("Purchases · Landed Cost Details");
 
   const orgId =
     typeof window !== "undefined"

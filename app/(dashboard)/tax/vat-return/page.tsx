@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import Link from "next/link";
 
 interface VatBox {
@@ -28,6 +29,7 @@ export default function VatReturnPage() {
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [boxes, setBoxes] = useState<VatBox[]>([]);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Tax · VAT Return");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

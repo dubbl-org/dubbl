@@ -5,6 +5,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import { Plus, Receipt, Search, X, Loader2 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +120,9 @@ export default function ExpensesPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useDocumentTitle("Purchases · Expenses");
+
   const columns = useMemo(() => buildColumns(), []);
 
   const buildParams = useCallback((pg: number) => {

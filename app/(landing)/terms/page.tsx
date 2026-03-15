@@ -7,7 +7,7 @@ import {
 } from "@/components/legal/legal-page-layout";
 
 export const metadata: Metadata = {
-  title: "Terms of Service ·dubbl",
+  title: "Terms of Service",
   description:
     "Terms governing your use of the dubbl hosted service, operated by Mindroot Ltd.",
 };

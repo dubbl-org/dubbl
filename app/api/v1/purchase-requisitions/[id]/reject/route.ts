@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function POST(
@@ -40,6 +41,9 @@ export async function POST(
       .returning();
 
     if (!updated) return notFound("Purchase requisition");
+
+    logAudit({ ctx, action: "reject", entityType: "purchase_requisition", entityId: id, changes: { previousStatus: "submitted" }, request });
+
     return NextResponse.json(updated);
   } catch (err) {
     return handleError(err);

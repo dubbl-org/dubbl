@@ -17,6 +17,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface BatchItemDetail {
   id: string;
@@ -71,6 +72,8 @@ export default function BatchDetailPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
+
+  useDocumentTitle("Accounting \u00B7 Batch Details");
 
   const fetchBatch = useCallback(() => {
     if (!orgId || !id) return;

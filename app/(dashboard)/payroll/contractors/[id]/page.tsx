@@ -23,6 +23,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface ContractorDetail {
@@ -81,6 +82,7 @@ export default function ContractorDetailPage() {
   const [paymentCurrency, setPaymentCurrency] = useState("");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Contractor Details");
 
   function fetchContractor() {
     if (!orgId) return;

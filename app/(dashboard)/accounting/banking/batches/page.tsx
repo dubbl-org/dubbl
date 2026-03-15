@@ -25,6 +25,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney, parseMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface BatchItem {
   id: string;
@@ -81,6 +82,8 @@ export default function PaymentBatchesPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
+
+  useDocumentTitle("Accounting \u00B7 Payment Batches");
 
   const fetchBatches = useCallback(() => {
     if (!orgId) return;

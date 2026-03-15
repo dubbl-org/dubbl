@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { centsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { useInventoryItem } from "./layout";
@@ -36,6 +37,7 @@ export default function InventoryItemDetailsPage() {
   const [invSalePrice, setInvSalePrice] = useState(centsToDecimal(item.salePrice));
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
   const { confirm, dialog: confirmDialog } = useConfirm();
+  useDocumentTitle("Inventory · Product Details");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

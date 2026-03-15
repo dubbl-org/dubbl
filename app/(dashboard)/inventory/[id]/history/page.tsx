@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useInventoryItem } from "../layout";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 const movementTypeColors: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function InventoryItemHistoryPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [movements, setMovements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Inventory · Stock History");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

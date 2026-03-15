@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { createInvoiceJournalEntry } from "@/lib/api/journal-automation";
 import { buildSenderSnapshot, buildRecipientSnapshot } from "@/lib/documents/snapshots";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
@@ -180,6 +181,8 @@ export async function POST(
       })
       .where(eq(invoice.id, id))
       .returning();
+
+    logAudit({ ctx, action: "send", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ invoice: updated });
   } catch (err) {

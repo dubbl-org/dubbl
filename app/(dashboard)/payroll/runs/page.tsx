@@ -44,6 +44,7 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -107,6 +108,7 @@ export default function PayrollRunsPage() {
   const [runTypeFilter, setRunTypeFilter] = useState<RunTypeFilter>("all");
   const [sortBy, setSortBy] = useState<SortKey>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  useDocumentTitle("Payroll · Runs");
 
   // New run dialog
   const [dialogOpen, setDialogOpen] = useState(false);

@@ -2,6 +2,21 @@ import { db } from "@/lib/db";
 import { auditLog } from "@/lib/db/schema";
 import type { AuthContext } from "./auth-context";
 
+export function diffChanges(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  const SKIP = new Set(["updatedAt", "createdAt"]);
+  const diff: Record<string, { from: unknown; to: unknown }> = {};
+  for (const key of Object.keys(after)) {
+    if (SKIP.has(key)) continue;
+    if (before[key] !== after[key]) {
+      diff[key] = { from: before[key], to: after[key] };
+    }
+  }
+  return Object.keys(diff).length > 0 ? { diff } : undefined;
+}
+
 interface LogAuditParams {
   ctx: AuthContext;
   action: string;

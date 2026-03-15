@@ -4,6 +4,7 @@ import { tag } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
         description: parsed.description || null,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "tag", entityId: created.id, request });
 
     return NextResponse.json({ tag: created }, { status: 201 });
   } catch (err) {

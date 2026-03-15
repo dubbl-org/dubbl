@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 type SortKey = "name" | "code" | "expected" | "counted" | "discrepancy";
@@ -216,6 +217,7 @@ export default function StockTakeDetailPage() {
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const { confirm, dialog: confirmDialog } = useConfirm();
+  useDocumentTitle("Inventory · Stock Take Details");
 
   const orgId =
     typeof window !== "undefined"

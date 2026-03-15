@@ -45,9 +45,11 @@ import {
   type ProjectDetail,
 } from "./project-context";
 import Link from "next/link";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function ProjectOverviewPage() {
   const { project: proj } = useProject();
+  useDocumentTitle("Projects · Overview");
   if (!proj) return null;
 
   const daysLeft = daysUntil(proj.endDate);

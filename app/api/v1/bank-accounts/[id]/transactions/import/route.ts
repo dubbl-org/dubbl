@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankAccount, auditLog } from "@/lib/db/schema";
+import { bankAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import {
   commitBankStatementImport,
@@ -93,20 +94,8 @@ export async function POST(
       mapping: body.mapping,
     });
 
-    await db.insert(auditLog).values({
-      organizationId: ctx.organizationId,
-      userId: ctx.userId,
-      action: "imported_statement",
-      entityType: "bank_account",
-      entityId: id,
-      changes: {
-        importId: result.importId,
-        format: result.format,
-        fileName: body.fileName,
-        imported: result.imported,
-        duplicates: result.duplicateCount,
-      },
-    });
+    await logAudit({ ctx, action: "import", entityType: "bank_transaction", entityId: ctx.organizationId,
+      changes: { count: result.imported, importId: result.importId, format: result.format, fileName: body.fileName, duplicates: result.duplicateCount }, request });
 
     return NextResponse.json({ import: result }, { status: 201 });
   } catch (err) {

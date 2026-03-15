@@ -22,6 +22,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
 
@@ -132,6 +133,7 @@ export default function EmployeeDetailPage() {
   const [compensationType, setCompensationType] = useState("salary");
   const [hourlyRate, setHourlyRate] = useState("");
   const [currency, setCurrency] = useState("USD");
+  useDocumentTitle("Payroll · Employee Details");
 
   const orgId =
     typeof window !== "undefined"

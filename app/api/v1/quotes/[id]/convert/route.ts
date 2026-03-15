@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { getNextNumber } from "@/lib/api/numbering";
 
 export async function POST(
@@ -103,6 +104,8 @@ export async function POST(
       })
       .where(eq(quote.id, id))
       .returning();
+
+    logAudit({ ctx, action: "convert", entityType: "quote", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ quote: updated, invoice: createdInvoice });
   } catch (err) {

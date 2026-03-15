@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Check, ChevronsUpDown, Lock } from "lucide-react";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,6 +95,8 @@ export default function SettingsPage() {
   const [lockSaving, setLockSaving] = useState(false);
   const [peppolId, setPeppolId] = useState("");
   const [peppolScheme, setPeppolScheme] = useState("");
+
+  useDocumentTitle("Settings · General");
 
   const businessTypes = useMemo(
     () => (form.country ? getBusinessTypesForCountry(form.country) : []),

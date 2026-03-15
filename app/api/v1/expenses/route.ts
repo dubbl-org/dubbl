@@ -9,6 +9,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const itemSchema = z.object({
@@ -113,6 +114,8 @@ export async function POST(request: Request) {
         ...item,
       }))
     );
+
+    logAudit({ ctx, action: "create", entityType: "expense", entityId: created.id, request });
 
     return NextResponse.json({ expenseClaim: created }, { status: 201 });
   } catch (err) {

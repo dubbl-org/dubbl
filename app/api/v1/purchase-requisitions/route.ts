@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -130,6 +131,8 @@ export async function POST(request: Request) {
           processedLines.map((l) => ({ requisitionId: created.id, ...l }))
         );
     }
+
+    logAudit({ ctx, action: "create", entityType: "purchase_requisition", entityId: created.id, request });
 
     return NextResponse.json({ requisition: created }, { status: 201 });
   } catch (err) {

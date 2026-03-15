@@ -4,6 +4,7 @@ import { chartAccount, journalLine, journalEntry } from "@/lib/db/schema";
 import { eq, and, ilike, gte, lte, asc, desc } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 
@@ -140,6 +141,17 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
+    const existing = await db.query.chartAccount.findFirst({
+      where: and(
+        eq(chartAccount.id, id),
+        eq(chartAccount.organizationId, ctx.organizationId)
+      ),
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const [updated] = await db
       .update(chartAccount)
       .set(parsed)
@@ -151,9 +163,7 @@ export async function PATCH(
       )
       .returning();
 
-    if (!updated) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
+    logAudit({ ctx, action: "update", entityType: "chart_account", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
     return NextResponse.json({ account: updated });
   } catch (err) {

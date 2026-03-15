@@ -17,6 +17,7 @@ import {
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBudgetContext } from "../layout";
 import type { BudgetLineData, BudgetPeriodData } from "../layout";
 import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
@@ -76,6 +77,8 @@ export default function BudgetSettingsPage() {
   const router = useRouter();
   const { budget, accounts, refetch } = useBudgetContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  useDocumentTitle("Accounting \u00B7 Budget Settings");
 
   const [name, setName] = useState(budget.name);
   const [startDate, setStartDate] = useState(budget.startDate);

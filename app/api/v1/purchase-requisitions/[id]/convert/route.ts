@@ -11,6 +11,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { getNextNumber } from "@/lib/api/numbering";
 
 export async function POST(
@@ -90,6 +91,8 @@ export async function POST(
         updatedAt: new Date(),
       })
       .where(eq(purchaseRequisition.id, id));
+
+    logAudit({ ctx, action: "convert", entityType: "purchase_requisition", entityId: id, changes: { previousStatus: "approved" }, request });
 
     return NextResponse.json({ purchaseOrder: po }, { status: 201 });
   } catch (err) {

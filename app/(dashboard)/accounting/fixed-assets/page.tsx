@@ -16,6 +16,7 @@ import { devDelay } from "@/lib/dev-delay";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface FixedAsset {
   id: string;
@@ -198,6 +199,8 @@ export default function FixedAssetsPage() {
   const debouncedSearch = useDebounce(search);
   const [runningDepreciation, setRunningDepreciation] = useState(false);
   const [fetchKey, setFetchKey] = useState(0);
+
+  useDocumentTitle("Accounting \u00B7 Fixed Assets");
 
   const columns = useMemo(() => buildColumns(), []);
 

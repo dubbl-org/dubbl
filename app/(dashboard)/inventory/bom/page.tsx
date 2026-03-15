@@ -15,6 +15,7 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 
 interface BOM {
@@ -33,6 +34,7 @@ export default function BOMListPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [boms, setBoms] = useState<BOM[]>([]);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Inventory · Bills of Materials");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

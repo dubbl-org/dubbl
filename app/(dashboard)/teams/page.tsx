@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { motion, MotionConfig } from "motion/react";
 import {
   Users,
@@ -186,6 +187,7 @@ export default function TeamsPage() {
   const pendingSearch = search !== debouncedSearch;
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  useDocumentTitle("Teams · Overview");
 
   const fetchTeams = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");

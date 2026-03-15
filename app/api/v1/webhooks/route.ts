@@ -9,6 +9,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { logAudit } from "@/lib/api/audit";
 
 const createSchema = z.object({
   url: z.string().url(),
@@ -71,6 +72,8 @@ export async function POST(request: Request) {
         metadata: parsed.metadata || null,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "webhook", entityId: created.id, request });
 
     return NextResponse.json({ webhook: created }, { status: 201 });
   } catch (err) {

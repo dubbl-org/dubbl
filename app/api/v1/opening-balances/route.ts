@@ -5,6 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, validationError, created } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const balanceSchema = z.object({
@@ -112,6 +113,8 @@ export async function POST(request: Request) {
         },
       },
     });
+
+    logAudit({ ctx, action: "update", entityType: "opening_balance", entityId: ctx.organizationId, request });
 
     return created({ entry: full });
   } catch (err) {

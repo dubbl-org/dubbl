@@ -61,6 +61,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface InventoryItem {
@@ -127,6 +128,7 @@ export default function InventoryPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef(1);
+  useDocumentTitle("Inventory · Products");
 
   // Keyboard shortcuts
   useEffect(() => {

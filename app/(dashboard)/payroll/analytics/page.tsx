@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 /* ---------- types ---------- */
@@ -85,6 +86,7 @@ export default function AnalyticsPage() {
   const [newHires, setNewHires] = useState("0");
   const [avgHireSalary, setAvgHireSalary] = useState("60000");
   const [terminations, setTerminations] = useState("0");
+  useDocumentTitle("Payroll · Analytics");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

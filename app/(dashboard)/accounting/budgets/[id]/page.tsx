@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBudgetContext } from "./layout";
 import type { BudgetLineData, PeriodComparison } from "./layout";
 import {
@@ -20,6 +21,8 @@ import {
 
 export default function BudgetOverviewPage() {
   const { budget, comparisons, totalBudgeted, totalActual } = useBudgetContext();
+
+  useDocumentTitle("Accounting \u00B7 Budget Details");
 
   const grandTotal = budget.lines.reduce((s, l) => s + l.total, 0);
   const totalVariance = totalBudgeted - totalActual;

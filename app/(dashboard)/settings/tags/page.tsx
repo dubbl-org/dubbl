@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,6 +55,7 @@ export default function TagsPage() {
   const [color, setColor] = useState("#6b7280");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  useDocumentTitle("Settings · Tags");
 
   const fetchTags = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");

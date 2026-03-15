@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Payslip {
   id: string;
@@ -26,6 +27,7 @@ export default function RunPayslipsPage() {
   const [loading, setLoading] = useState(true);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Payslips");
 
   useEffect(() => {
     // Fetch payslips for all employees in this run

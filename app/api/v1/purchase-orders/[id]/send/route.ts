@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
 import { z } from "zod";
@@ -88,6 +89,8 @@ export async function POST(
       })
       .where(eq(purchaseOrder.id, id))
       .returning();
+
+    logAudit({ ctx, action: "send", entityType: "purchase_order", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ purchaseOrder: updated });
   } catch (err) {

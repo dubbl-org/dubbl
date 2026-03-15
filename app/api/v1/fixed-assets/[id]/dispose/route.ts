@@ -10,6 +10,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const disposeSchema = z.object({
@@ -147,6 +148,8 @@ export async function POST(
       })
       .where(eq(fixedAsset.id, id))
       .returning();
+
+    logAudit({ ctx, action: "dispose", entityType: "fixed_asset", entityId: id, changes: { previousStatus: asset.status }, request });
 
     return NextResponse.json({ asset: updated });
   } catch (err) {

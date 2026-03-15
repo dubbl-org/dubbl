@@ -6,6 +6,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Analytics {
   totalDeals: number;
@@ -22,6 +23,7 @@ interface Analytics {
 export default function CRMAnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("CRM · Analytics");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId") || "";

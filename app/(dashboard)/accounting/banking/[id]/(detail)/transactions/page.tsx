@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "../layout";
 import { TransactionRow } from "../../_components";
 
@@ -31,6 +32,8 @@ export default function BankTransactionsPage() {
   } = useBankAccountContext();
 
   const cur = account.currencyCode;
+
+  useDocumentTitle("Accounting \u00B7 Bank Transactions");
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [txSearch, setTxSearch] = useState("");

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useRouter } from "next/navigation";
 import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X, Target } from "lucide-react";
 import { toast } from "sonner";
@@ -211,6 +212,7 @@ export default function ContactsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  useDocumentTitle("Contacts · All Contacts");
 
   // Reset and fetch page 1 when filters change
   useEffect(() => {

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface Profile {
@@ -64,6 +65,7 @@ export default function SelfServicePage() {
 
   const [email, setEmail] = useState("");
   const [bankAccount, setBankAccount] = useState("");
+  useDocumentTitle("Payroll · Self Service");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

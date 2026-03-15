@@ -10,6 +10,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -413,6 +414,7 @@ export default function TaxPeriodsPage() {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [filing, setFiling] = useState<TaxPeriod | null>(null);
+  useDocumentTitle("Tax · Periods");
 
   const orgId =
     typeof window !== "undefined"

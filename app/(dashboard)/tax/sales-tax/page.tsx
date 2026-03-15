@@ -10,6 +10,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import Link from "next/link";
 
 interface TaxBreakdown {
@@ -27,6 +28,7 @@ export default function SalesTaxPage() {
   const [breakdown, setBreakdown] = useState<TaxBreakdown[]>([]);
   const [exemptAmount, setExemptAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Tax · Sales Tax");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

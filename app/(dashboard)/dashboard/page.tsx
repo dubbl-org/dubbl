@@ -30,6 +30,7 @@ import { ErrorState } from "@/components/dashboard/error-state";
 import { cn } from "@/lib/utils";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { CashFlowWidget } from "@/components/dashboard/cash-flow-widget";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 const GREETINGS_MORNING = [
   "Good morning",
@@ -288,6 +289,8 @@ export default function DashboardPage() {
     uncategorizedTransactions: number;
     accountsNeedingReconciliation: { bankAccountName: string; lastReconDate: string | null }[];
   } | null>(null);
+
+  useDocumentTitle("Dashboard \u00B7 Overview");
 
   useEffect(() => {
     const id = localStorage.getItem("activeOrgId");

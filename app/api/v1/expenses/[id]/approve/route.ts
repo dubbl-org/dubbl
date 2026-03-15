@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 
 export async function POST(
   request: Request,
@@ -42,6 +43,8 @@ export async function POST(
       })
       .where(eq(expenseClaim.id, id))
       .returning();
+
+    logAudit({ ctx, action: "approve", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ expenseClaim: updated });
   } catch (err) {

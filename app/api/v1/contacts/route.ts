@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -103,6 +104,8 @@ export async function POST(request: Request) {
         ...parsed,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "contact", entityId: created.id, request });
 
     return NextResponse.json({ contact: created }, { status: 201 });
   } catch (err) {

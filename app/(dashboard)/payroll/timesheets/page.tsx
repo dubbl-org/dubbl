@@ -21,6 +21,7 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface Timesheet {
@@ -52,6 +53,7 @@ export default function TimesheetsPage() {
   const [creating, setCreating] = useState(false);
   const [newTs, setNewTs] = useState({ employeeId: "", periodStart: "", periodEnd: "" });
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  useDocumentTitle("Payroll · Timesheets");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

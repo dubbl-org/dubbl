@@ -39,6 +39,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -127,6 +128,7 @@ type LeaveFilter = "all" | "pending" | "approved" | "rejected";
 export default function TimeLeavePage() {
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  useDocumentTitle("Payroll · Time & Leave");
 
   const orgId =
     typeof window !== "undefined"

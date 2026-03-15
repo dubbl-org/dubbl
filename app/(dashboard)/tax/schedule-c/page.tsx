@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface ScheduleCLine {
   line: string;
@@ -30,6 +31,7 @@ export default function ScheduleCPage() {
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [netProfit, setNetProfit] = useState(0);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Tax · Schedule C");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

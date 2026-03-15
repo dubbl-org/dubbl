@@ -7,6 +7,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const paySchema = z.object({
@@ -104,6 +105,8 @@ export async function POST(
       })
       .where(eq(bill.id, id))
       .returning();
+
+    logAudit({ ctx, action: "pay", entityType: "bill", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({
       bill: updated,

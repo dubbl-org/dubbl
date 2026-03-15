@@ -10,6 +10,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -87,6 +88,8 @@ export default function QuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useDocumentTitle("Sales · Quotes");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

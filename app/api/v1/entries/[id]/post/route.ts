@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { centsToDecimal } from "@/lib/money";
 
 export async function POST(
@@ -51,6 +52,8 @@ export async function POST(
         },
       },
     });
+
+    logAudit({ ctx, action: "post", entityType: "journal_entry", entityId: id, changes: { previousStatus: entry.status }, request });
 
     return NextResponse.json({
       entry: {

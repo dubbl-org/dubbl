@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { preProcessAccounts } from "@/lib/import-export/pre-process";
 import type { SourceSystem } from "@/lib/import-export/types";
 import { z } from "zod";
@@ -75,6 +76,10 @@ export async function POST(request: Request) {
     }).where(eq(bulkImportJob.id, job.id));
 
     const updated = await db.query.bulkImportJob.findFirst({ where: eq(bulkImportJob.id, job.id) });
+
+    await logAudit({ ctx, action: "import", entityType: "chart_account", entityId: ctx.organizationId,
+      changes: { count: processedRows, jobId: job.id }, request });
+
     return NextResponse.json({ job: updated }, { status: 201 });
   } catch (err) {
     return handleError(err);

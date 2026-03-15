@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import Link from "next/link";
 
 interface DepEntry {
@@ -82,6 +83,8 @@ export default function FixedAssetDetailPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
+
+  useDocumentTitle("Accounting \u00B7 Asset Details");
 
   useEffect(() => {
     if (!orgId) return;

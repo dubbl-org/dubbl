@@ -35,6 +35,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
@@ -160,6 +161,9 @@ export default function RequisitionsPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
+
+  useDocumentTitle("Purchases · Requisitions");
+
   const columns = useMemo(() => buildColumns(), []);
 
   const buildParams = useCallback(

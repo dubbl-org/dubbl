@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { nanoid } from "nanoid";
 import { createHash } from "crypto";
 import { z } from "zod";
+import { logAudit } from "@/lib/api/audit";
 
 const MAX_API_KEYS = 20;
 
@@ -102,6 +103,8 @@ export async function POST(request: Request) {
         createdBy: ctx.userId,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "api_key", entityId: key.id, request });
 
     return NextResponse.json(
       {

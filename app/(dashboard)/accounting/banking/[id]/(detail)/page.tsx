@@ -4,6 +4,7 @@ import { Clock3, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "./layout";
 import { TransactionRow, ImportRow } from "../_components";
 
@@ -19,6 +20,8 @@ export default function BankAccountOverviewPage() {
     handleOpenExpense,
     openImport,
   } = useBankAccountContext();
+
+  useDocumentTitle("Accounting \u00B7 Bank Overview");
 
   const cur = account.currencyCode;
 

@@ -20,6 +20,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface Contractor {
@@ -80,6 +81,7 @@ export default function ContractorsPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Contractors");
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [key, order] = sortValue.split(":");

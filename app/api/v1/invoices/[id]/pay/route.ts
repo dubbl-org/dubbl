@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
@@ -106,6 +107,8 @@ export async function POST(
       })
       .where(eq(invoice.id, id))
       .returning();
+
+    logAudit({ ctx, action: "pay", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({
       invoice: updated,

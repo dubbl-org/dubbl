@@ -5,6 +5,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
@@ -121,6 +122,8 @@ export async function POST(request: Request) {
         );
       }
     }
+
+    logAudit({ ctx, action: "create", entityType: "budget", entityId: created.id, request });
 
     return NextResponse.json({ budget: created }, { status: 201 });
   } catch (err) {

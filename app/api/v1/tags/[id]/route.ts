@@ -4,6 +4,7 @@ import { tag } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -37,6 +38,8 @@ export async function PUT(
       .where(eq(tag.id, id))
       .returning();
 
+    logAudit({ ctx, action: "update", entityType: "tag", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
+
     return NextResponse.json({ tag: updated });
   } catch (err) {
     return handleError(err);
@@ -63,6 +66,8 @@ export async function DELETE(
       .update(tag)
       .set({ deletedAt: new Date() })
       .where(eq(tag.id, id));
+
+    logAudit({ ctx, action: "delete", entityType: "tag", entityId: id, request });
 
     return NextResponse.json({ success: true });
   } catch (err) {

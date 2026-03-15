@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useAccountContext } from "../layout";
 
 export default function AccountSettingsPage() {
@@ -25,6 +26,8 @@ export default function AccountSettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useDocumentTitle("Accounting \u00B7 Account Settings");
 
   if (!account) return null;
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { motion } from "motion/react";
 import {
   Users,
@@ -136,6 +137,7 @@ export default function CRMPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortKey>("value");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  useDocumentTitle("CRM · Deals");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

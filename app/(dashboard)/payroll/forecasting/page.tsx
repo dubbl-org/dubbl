@@ -11,6 +11,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 
 interface Projection {
@@ -46,6 +47,7 @@ export default function ForecastingPage() {
   const [terminations, setTerminations] = useState("0");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Forecasting");
 
   useEffect(() => {
     if (!orgId) return;

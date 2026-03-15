@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download } from "lucide-react";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface TaxFormDetail {
   id: string;
@@ -60,6 +61,7 @@ export default function TaxFormDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [form, setForm] = useState<TaxFormDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Payroll · Tax Form Details");
 
   const orgId =
     typeof window !== "undefined"

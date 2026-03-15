@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const rejectSchema = z.object({
@@ -50,6 +51,8 @@ export async function POST(
       })
       .where(eq(expenseClaim.id, id))
       .returning();
+
+    logAudit({ ctx, action: "reject", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ expenseClaim: updated });
   } catch (err) {

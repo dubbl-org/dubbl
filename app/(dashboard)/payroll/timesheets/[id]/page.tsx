@@ -19,6 +19,7 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface TimesheetDetail {
@@ -67,6 +68,7 @@ export default function TimesheetDetailPage() {
   const [newDesc, setNewDesc] = useState("");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Timesheet Details");
 
   function fetchTimesheet() {
     if (!orgId) return;

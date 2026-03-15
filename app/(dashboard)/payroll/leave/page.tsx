@@ -20,6 +20,7 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface LeaveRequest {
@@ -55,6 +56,7 @@ export default function LeavePage() {
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [policies, setPolicies] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({ employeeId: "", policyId: "", startDate: "", endDate: "", hours: "", reason: "" });
+  useDocumentTitle("Payroll · Leave");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
