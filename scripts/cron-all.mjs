@@ -2,12 +2,12 @@
  * Unified cron job script that hits all cron endpoints in parallel.
  * Runs as a single Railway cron service every 5 minutes.
  *
+ * Plain ESM - no TypeScript, no tsx dependency needed.
+ *
  * Required env vars:
  *   APP_URL     - Base URL of the main app (e.g. https://dubbl.up.railway.app)
  *   CRON_SECRET - Shared secret to authenticate with the cron endpoints
  */
-
-export {};
 
 const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
 const CRON_SECRET = process.env.CRON_SECRET;
