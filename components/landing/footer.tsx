@@ -13,15 +13,37 @@ type FooterLink = {
 const footerLinks: Record<string, FooterLink[]> = {
   Product: [
     { label: "Pricing", href: "/pricing" },
+    { label: "Features", href: "/#features" },
+    { label: "Integrations", href: "/#integrations" },
+    { label: "Self-Hosting", href: "/docs/self-hosting" },
+    { label: "Changelog", href: "https://github.com/dubbl-org/dubbl/releases", external: true },
+  ],
+  Resources: [
     { label: "Documentation", href: "/docs" },
+    { label: "Getting Started", href: "/docs/getting-started" },
+    { label: "Migration Guide", href: "/docs/guides/import-export" },
+    { label: "Jurisdiction Guide", href: "/docs/guides/jurisdictions" },
+    { label: "API Reference", href: "/docs/api-reference" },
+  ],
+  Guides: [
+    { label: "Multi-Currency", href: "/docs/guides/multi-currency" },
+    { label: "Stripe Integration", href: "/docs/guides/stripe-integration" },
+    { label: "Tax Filing Prep", href: "/docs/guides/tax-filing-prep" },
+    { label: "Backups & Recovery", href: "/docs/settings/backups" },
+    { label: "MCP for AI Agents", href: "/docs/guides/mcp" },
   ],
   Developers: [
-    { label: "Status", href: "https://status.dubbl.dev", external: true },
     { label: "GitHub", href: "https://github.com/dubbl-org/dubbl", external: true },
+    { label: "Contributing", href: "/docs/contributing" },
+    { label: "Developer Guide", href: "/docs/guides/developer-guide" },
+    { label: "API Keys", href: "/docs/settings/api-keys" },
+    { label: "Status", href: "https://status.dubbl.dev", external: true },
   ],
-  Legal: [
+  Company: [
     { label: "Privacy Policy", href: "/privacy" },
     { label: "Terms of Service", href: "/terms" },
+    { label: "Audit Log", href: "/docs/settings/audit-log" },
+    { label: "Security", href: "/docs/self-hosting" },
   ],
 };
 
@@ -35,7 +57,7 @@ export function Footer() {
     <footer className="bg-[#0a0a0a] pt-16 pb-8 text-white">
       <Container>
         {/* Top section */}
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-4 md:gap-8">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-6 md:gap-8">
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2">

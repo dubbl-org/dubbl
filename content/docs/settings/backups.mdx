@@ -1,0 +1,124 @@
+---
+title: Backups & Recovery
+description: Protect your organization data with automated daily snapshots, manual backups, and point-in-time restore.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Overview
+
+Dubbl automatically creates daily snapshots of your entire organization data. You can also create manual backups, download snapshots to keep offline, and restore from any backup if something goes wrong.
+
+<Callout type="info">
+  Backups capture all entity data (accounts, contacts, invoices, bills, journal entries, products, and more) as a single JSON file stored in S3. Document file contents are stored separately and are not affected by restore operations.
+</Callout>
+
+## Backup types
+
+| Type | Description | Created by |
+|------|-------------|------------|
+| Scheduled | Automated daily snapshots for all active organizations | System cron |
+| Manual | On-demand snapshots created from the Backups settings page | User |
+| Uploaded | Previously exported backup files re-imported into the system | User |
+
+## Plan limits
+
+| | Free | Pro |
+|---|---|---|
+| Retention | 7 days | 30 days |
+| Manual backups | 3 | 10 |
+| Rate limit | 5 per hour | 5 per hour |
+
+## Creating a backup
+
+1. Go to **Settings > Backups**
+2. Click **Create Backup** and confirm
+3. The backup will appear in the list once complete
+
+## Downloading a snapshot
+
+You can download a full snapshot of your current data directly to your computer without saving it to the server.
+
+1. Go to **Settings > Backups**
+2. Click **Download Snapshot**
+3. A JSON file will be saved to your downloads folder
+
+This is useful for keeping offline copies or transferring data between Dubbl instances.
+
+You can also download any existing backup by clicking the download icon next to it in the backup list.
+
+## Uploading a backup
+
+If you have a previously downloaded Dubbl snapshot file, you can upload it:
+
+1. Go to **Settings > Backups**
+2. Click **Upload Backup**
+3. Select the `.json` backup file
+4. The file will be stored and appear in your backup list
+
+## Restoring from a backup
+
+<Callout type="warn">
+  Restoring replaces all current organization data. A snapshot of your current data is automatically saved before the restore begins, so you can undo the restore if needed.
+</Callout>
+
+1. Go to **Settings > Backups**
+2. Click the restore icon next to the backup you want to restore
+3. Confirm the restore operation
+4. All current records will be soft-deleted and replaced with the backup data
+
+After restoring, your previous data is available in the **Trash** for 30 days if you need to recover individual items.
+
+## Rate limiting
+
+To prevent abuse, backup creation is rate-limited to **5 snapshots per hour** per organization. This limit applies to both stored backups and download-only snapshots. If you hit the limit, wait for the cooldown period shown in the error message.
+
+## Backup contents
+
+Each backup includes:
+
+- Chart of Accounts
+- Contacts
+- Invoices and invoice lines
+- Bills and bill lines
+- Journal entries and journal lines
+- Quotes, credit notes, debit notes, and purchase orders (with lines)
+- Products / inventory items
+- Bank accounts
+- Expenses
+- Payments
+- Recurring templates
+- Projects, budgets, fixed assets, and loans
+- Tax rates and cost centers
+- Document metadata (not file contents)
+
+## Differences from Import & Export
+
+| | Import & Export | Backups |
+|---|---|---|
+| Format | CSV (individual entities) | JSON (full org snapshot) |
+| Purpose | Migration from external tools | Disaster recovery |
+| Scope | One entity type at a time | All entities at once |
+| Restore | Manual re-import | One-click restore |
+| Source mapping | QuickBooks, Xero, etc. | Dubbl native format |
+
+## API
+
+Backups can also be managed via the REST API:
+
+- `GET /api/v1/backups` - List backups
+- `POST /api/v1/backups` - Create a manual backup
+- `GET /api/v1/backups/:id/download` - Download a backup file
+- `POST /api/v1/backups/:id/restore` - Restore from a backup (requires `{ confirm: true }`)
+- `DELETE /api/v1/backups/:id` - Soft-delete a backup
+- `POST /api/v1/backups/upload` - Upload a backup file
+- `GET /api/v1/backups/download-snapshot` - Download a snapshot without saving
+
+## MCP tools
+
+AI agents can manage backups through the MCP server:
+
+- `list_backups` - List organization backups
+- `create_backup` - Create a manual backup
+- `restore_backup` - Restore from a backup
+- `delete_backup` - Delete a backup
