@@ -76,7 +76,7 @@ export async function trackLogin(opts: {
             dateStyle: "long",
             timeStyle: "short",
           }),
-          securityUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev"}/settings/security`,
+          securityUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev"}/settings`,
         })
       );
 

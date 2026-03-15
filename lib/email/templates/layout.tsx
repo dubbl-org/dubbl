@@ -33,7 +33,7 @@ export function EmailLayout({ preview, children, unsubscribeUrl }: LayoutProps) 
               <tr>
                 <td style={{ verticalAlign: "middle", paddingRight: "10px" }}>
                   <Img
-                    src={`${APP_URL}/logo.svg`}
+                    src={`${APP_URL}/logo.png`}
                     width="32"
                     height="26"
                     alt="dubbl"
