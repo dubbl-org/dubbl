@@ -309,10 +309,10 @@ export function BulkImportWizard({
                     </span>
                     <ArrowRight className="size-3 text-muted-foreground shrink-0" />
                     <Select
-                      value={mappings[i]?.targetField || ""}
+                      value={mappings[i]?.targetField || "__skip__"}
                       onValueChange={(v) => {
                         const next = [...mappings];
-                        next[i] = { csvColumn: header, targetField: v };
+                        next[i] = { csvColumn: header, targetField: v === "__skip__" ? "" : v };
                         setMappings(next);
                       }}
                     >
@@ -320,7 +320,7 @@ export function BulkImportWizard({
                         <SelectValue placeholder="Skip" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Skip</SelectItem>
+                        <SelectItem value="__skip__">Skip</SelectItem>
                         {targetFields.map(f => (
                           <SelectItem key={f.key} value={f.key}>
                             {f.label}{f.required ? " *" : ""}
