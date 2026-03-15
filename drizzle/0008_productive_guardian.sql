@@ -1,1 +1,0 @@
-ALTER TABLE "inventory_item" ADD COLUMN "category" text;
