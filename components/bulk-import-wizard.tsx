@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -20,12 +19,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Upload, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Upload, CheckCircle2, XCircle, Loader2, FileUp, ArrowRight } from "lucide-react";
 
 interface ColumnMapping {
   csvColumn: string;
@@ -47,7 +47,13 @@ interface BulkImportWizardProps {
   previewEndpoint: string;
   importEndpoint: string;
   onComplete?: () => void;
-  columnAliases?: Record<string, string[]>; // targetField -> CSV column name aliases
+  columnAliases?: Record<string, string[]>;
+}
+
+const STEPS = ["upload", "mapping", "preview", "importing", "results"] as const;
+
+function getStepIndex(step: typeof STEPS[number]) {
+  return STEPS.indexOf(step);
 }
 
 export function BulkImportWizard({
@@ -60,7 +66,7 @@ export function BulkImportWizard({
   onComplete,
   columnAliases,
 }: BulkImportWizardProps) {
-  const [step, setStep] = useState<"upload" | "mapping" | "preview" | "importing" | "results">("upload");
+  const [step, setStep] = useState<typeof STEPS[number]>("upload");
   const [csvData, setCsvData] = useState<Record<string, string>[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
@@ -69,6 +75,8 @@ export function BulkImportWizard({
   const [fileName, setFileName] = useState("");
   const [result, setResult] = useState<{ processedRows: number; errorRows: number; errorDetails?: Array<{ row: number; error: string }> } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") || "" : "";
 
@@ -81,11 +89,10 @@ export function BulkImportWizard({
     setValidCount(0);
     setFileName("");
     setResult(null);
+    setDragActive(false);
   }, []);
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processFile = useCallback((file: File) => {
     setFileName(file.name);
 
     const reader = new FileReader();
@@ -105,14 +112,11 @@ export function BulkImportWizard({
       });
       setCsvData(rows);
 
-      // Auto-map matching columns (check key/label first, then aliases)
       const autoMappings: ColumnMapping[] = headers.map(h => {
         const hLower = h.toLowerCase();
-        // Exact key or label match
         let match = targetFields.find(
           f => f.key.toLowerCase() === hLower || f.label.toLowerCase() === hLower
         );
-        // Alias match
         if (!match && columnAliases) {
           for (const f of targetFields) {
             const aliases = columnAliases[f.key];
@@ -129,6 +133,18 @@ export function BulkImportWizard({
     };
     reader.readAsText(file);
   }, [targetFields, columnAliases]);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  }, [processFile]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".csv")) processFile(file);
+  }, [processFile]);
 
   const handlePreview = useCallback(async () => {
     setLoading(true);
@@ -190,31 +206,100 @@ export function BulkImportWizard({
     }
   }, [csvData, mappings, importEndpoint, orgId, fileName, onComplete]);
 
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
+  const stepIndex = getStepIndex(step);
+  const mappedCount = mappings.filter(m => m.targetField).length;
+  const requiredFields = targetFields.filter(f => f.required);
+  const mappedRequired = requiredFields.filter(f =>
+    mappings.some(m => m.targetField === f.key)
+  );
+  const allRequiredMapped = mappedRequired.length === requiredFields.length;
 
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
+      <SheetContent className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>
+            {step === "upload" && "Upload a CSV file to get started"}
+            {step === "mapping" && `Map columns from ${fileName}`}
+            {step === "preview" && "Review data before importing"}
+            {step === "importing" && "Import in progress..."}
+            {step === "results" && "Import complete"}
+          </SheetDescription>
+        </SheetHeader>
+
+        {/* Step indicator */}
+        {step !== "importing" && (
+          <div className="flex items-center gap-1.5 px-1 pt-2 pb-4">
+            {(["Upload", "Map", "Preview", "Import"] as const).map((label, i) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div className={`flex size-6 items-center justify-center rounded-full text-[10px] font-medium transition-colors ${
+                  i <= stepIndex
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {i + 1}
+                </div>
+                <span className={`text-xs ${i <= stepIndex ? "text-foreground" : "text-muted-foreground"}`}>
+                  {label}
+                </span>
+                {i < 3 && <ArrowRight className="size-3 text-muted-foreground mx-0.5" />}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Upload step */}
         {step === "upload" && (
           <div className="space-y-4">
-            <div className="flex flex-col items-center gap-4 rounded-lg border-2 border-dashed p-8">
-              <Upload className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Upload a CSV file to import</p>
-              <Input type="file" accept=".csv" onChange={handleFileUpload} className="max-w-xs" />
+            <div
+              className={`flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors cursor-pointer ${
+                dragActive ? "border-foreground bg-muted" : "border-border hover:border-foreground/30 hover:bg-muted/50"
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+                <FileUp className="size-6 text-muted-foreground" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium">Drop your CSV file here</p>
+                <p className="text-xs text-muted-foreground mt-1">or click to browse</p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </div>
           </div>
         )}
 
+        {/* Mapping step */}
         {step === "mapping" && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Map CSV columns to fields</p>
-            <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {mappedCount} of {csvHeaders.length} columns mapped
+              </p>
+              {!allRequiredMapped && (
+                <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200">
+                  Required fields missing
+                </Badge>
+              )}
+            </div>
+
+            <div className="space-y-1.5 rounded-lg border p-3">
               {csvHeaders.map((header, i) => (
-                <div key={header} className="flex items-center gap-3">
-                  <span className="w-40 text-sm truncate">{header}</span>
-                  <span className="text-muted-foreground">→</span>
+                <div key={header} className="flex items-center gap-2">
+                  <span className="w-32 text-xs truncate text-muted-foreground" title={header}>
+                    {header}
+                  </span>
+                  <ArrowRight className="size-3 text-muted-foreground shrink-0" />
                   <Select
                     value={mappings[i]?.targetField || ""}
                     onValueChange={(v) => {
@@ -223,7 +308,7 @@ export function BulkImportWizard({
                       setMappings(next);
                     }}
                   >
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="h-8 text-xs flex-1">
                       <SelectValue placeholder="Skip" />
                     </SelectTrigger>
                     <SelectContent>
@@ -238,90 +323,119 @@ export function BulkImportWizard({
                 </div>
               ))}
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setStep("upload")}>Back</Button>
-              <Button onClick={handlePreview} disabled={loading}>
-                {loading ? <Loader2 className="size-4 animate-spin" /> : "Preview"}
+
+            <div className="flex items-center justify-between pt-2">
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { reset(); }}>
+                Change file
+              </Button>
+              <Button size="sm" className="h-8 text-xs" onClick={handlePreview} disabled={loading || !allRequiredMapped}>
+                {loading ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
+                Preview
               </Button>
             </div>
           </div>
         )}
 
+        {/* Preview step */}
         {step === "preview" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Badge variant="secondary">{validCount} valid</Badge>
-              <Badge variant="destructive">{preview.length - validCount} invalid</Badge>
+              <Badge variant="secondary" className="text-xs gap-1">
+                <CheckCircle2 className="size-3" />
+                {validCount} valid
+              </Badge>
+              {preview.length - validCount > 0 && (
+                <Badge variant="destructive" className="text-xs gap-1">
+                  <XCircle className="size-3" />
+                  {preview.length - validCount} invalid
+                </Badge>
+              )}
             </div>
-            <div className="max-h-60 overflow-y-auto rounded border">
+
+            <div className="max-h-[40vh] overflow-y-auto rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">Row</TableHead>
-                    <TableHead className="w-16">Status</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Errors</TableHead>
+                    <TableHead className="w-12 text-xs">Row</TableHead>
+                    <TableHead className="w-12 text-xs" />
+                    <TableHead className="text-xs">Data</TableHead>
+                    <TableHead className="text-xs">Errors</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {preview.slice(0, 50).map(p => (
                     <TableRow key={p.row}>
-                      <TableCell>{p.row}</TableCell>
+                      <TableCell className="text-xs tabular-nums">{p.row}</TableCell>
                       <TableCell>
-                        {p.valid ? <CheckCircle2 className="size-4 text-green-500" /> : <XCircle className="size-4 text-red-500" />}
+                        {p.valid
+                          ? <CheckCircle2 className="size-3.5 text-emerald-500" />
+                          : <XCircle className="size-3.5 text-destructive" />
+                        }
                       </TableCell>
-                      <TableCell className="text-xs max-w-xs truncate">
+                      <TableCell className="text-[11px] max-w-[200px] truncate text-muted-foreground">
                         {JSON.stringify(p.data).slice(0, 80)}
                       </TableCell>
-                      <TableCell className="text-xs text-red-500">{p.errors.join(", ")}</TableCell>
+                      <TableCell className="text-[11px] text-destructive">{p.errors.join(", ")}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setStep("mapping")}>Back</Button>
-              <Button onClick={handleImport} disabled={validCount === 0}>
+
+            <div className="flex items-center justify-between pt-2">
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setStep("mapping")}>
+                Back
+              </Button>
+              <Button size="sm" className="h-8 text-xs" onClick={handleImport} disabled={validCount === 0}>
+                <Upload className="mr-1.5 size-3.5" />
                 Import {validCount} rows
               </Button>
             </div>
           </div>
         )}
 
+        {/* Importing step */}
         {step === "importing" && (
-          <div className="flex flex-col items-center gap-4 py-8">
+          <div className="flex flex-col items-center gap-4 py-12">
             <Loader2 className="size-8 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Importing...</p>
+            <p className="text-sm text-muted-foreground">Importing {csvData.length} rows...</p>
           </div>
         )}
 
+        {/* Results step */}
         {step === "results" && result && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6 rounded-lg border p-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{result.processedRows}</p>
-                <p className="text-xs text-muted-foreground">Imported</p>
+                <p className="text-2xl font-bold text-emerald-600 tabular-nums">{result.processedRows}</p>
+                <p className="text-[11px] text-muted-foreground">Imported</p>
               </div>
               {result.errorRows > 0 && (
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">{result.errorRows}</p>
-                  <p className="text-xs text-muted-foreground">Errors</p>
+                  <p className="text-2xl font-bold text-destructive tabular-nums">{result.errorRows}</p>
+                  <p className="text-[11px] text-muted-foreground">Errors</p>
                 </div>
               )}
             </div>
+
             {result.errorDetails && result.errorDetails.length > 0 && (
-              <div className="max-h-40 overflow-y-auto rounded border p-3 text-xs">
+              <div className="max-h-40 overflow-y-auto rounded-lg border p-3 space-y-1">
                 {result.errorDetails.map((e, i) => (
-                  <p key={i} className="text-red-500">Row {e.row}: {e.error}</p>
+                  <p key={i} className="text-[11px] text-destructive">
+                    Row {e.row}: {e.error}
+                  </p>
                 ))}
               </div>
             )}
-            <div className="flex justify-end">
-              <Button onClick={() => { reset(); onOpenChange(false); }}>Done</Button>
+
+            <div className="flex justify-end pt-2">
+              <Button size="sm" className="h-8 text-xs" onClick={() => { reset(); onOpenChange(false); }}>
+                Done
+              </Button>
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
