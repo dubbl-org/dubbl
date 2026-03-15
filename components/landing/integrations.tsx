@@ -5,7 +5,6 @@ import {
   FileText,
   ArrowLeftRight,
   Building2,
-  Wallet,
   ShoppingBag,
   Send,
   Store,
@@ -33,20 +32,20 @@ interface Integration {
 
 const row1: Integration[] = [
   { name: "Stripe", category: "Payments", icon: CreditCard, color: "text-blue-500" },
-  { name: "Plaid", category: "Banking", icon: Building2, color: "text-emerald-500" },
-  { name: "Shopify", category: "E-commerce", icon: ShoppingBag, color: "text-purple-500" },
-  { name: "QuickBooks", category: "Accounting", icon: FileText, color: "text-amber-500" },
-  { name: "Wise", category: "Transfers", icon: Send, color: "text-blue-500" },
-  { name: "Square", category: "POS", icon: Store, color: "text-emerald-500" },
+  { name: "QuickBooks", category: "CSV Import", icon: FileText, color: "text-amber-500" },
+  { name: "Xero", category: "CSV Import", icon: ArrowLeftRight, color: "text-amber-500" },
+  { name: "FreshBooks", category: "CSV Import", icon: Receipt, color: "text-emerald-500" },
+  { name: "Wave", category: "CSV Import", icon: Waves, color: "text-amber-500" },
+  { name: "REST API", category: "Custom", icon: Code2, color: "text-purple-500" },
 ];
 
 const row2: Integration[] = [
-  { name: "PayPal", category: "Payments", icon: Wallet, color: "text-blue-500" },
-  { name: "Xero", category: "Accounting", icon: ArrowLeftRight, color: "text-amber-500" },
-  { name: "FreshBooks", category: "Invoicing", icon: Receipt, color: "text-emerald-500" },
-  { name: "Wave", category: "Accounting", icon: Waves, color: "text-amber-500" },
-  { name: "Banks", category: "12,000+ via Plaid", icon: Landmark, color: "text-emerald-500" },
-  { name: "REST API", category: "Custom", icon: Code2, color: "text-purple-500" },
+  { name: "CSV Import", category: "Any Format", icon: FileText, color: "text-blue-500" },
+  { name: "Bank Feeds", category: "Coming Soon", icon: Landmark, color: "text-emerald-500" },
+  { name: "Invoicing", category: "Built-in", icon: Send, color: "text-blue-500" },
+  { name: "Inventory", category: "Built-in", icon: ShoppingBag, color: "text-purple-500" },
+  { name: "Projects", category: "Built-in", icon: Store, color: "text-emerald-500" },
+  { name: "Self-Host", category: "Full Control", icon: Building2, color: "text-emerald-500" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -105,9 +104,9 @@ export function Integrations() {
     <section className="py-16 md:py-20">
       <Container>
         <SectionHeader
-          badge="Integrations"
-          title="Connect to your stack"
-          subtitle="Seamlessly sync with the platforms and services you already use."
+          badge="Import & Integrate"
+          title="Bring your data with you"
+          subtitle="Import from QuickBooks, Xero, FreshBooks, Wave, or any CSV. Live bank feeds coming soon."
         />
 
         <ScrollReveal>

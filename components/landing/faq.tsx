@@ -31,12 +31,12 @@ const faqs = [
   {
     question: "Can I migrate from QuickBooks or Xero?",
     answer:
-      "Yes. dubbl supports importing from 12 standard banking formats including CSV, OFX, QFX, QBO, MT940, and CAMT.053. Most banks export in at least one of these formats, so migration is straightforward.",
+      "Yes. dubbl supports CSV import with built-in column mapping for QuickBooks, Xero, FreshBooks, and Wave. You can import accounts, contacts, invoices, bills, journal entries, products, and bank transactions from any CSV file.",
   },
   {
     question: "Is there an API?",
     answer:
-      "dubbl is API-first. Every feature available in the UI is also accessible via our REST API. We provide SDKs for Python, Node.js, and Go, plus comprehensive OpenAPI documentation. dubbl also supports the Model Context Protocol (MCP), allowing AI assistants to interact with your business data directly.",
+      "dubbl is API-first. Every feature available in the UI is also accessible via our REST API with comprehensive OpenAPI documentation. dubbl also supports the Model Context Protocol (MCP), allowing AI assistants to interact with your business data directly.",
   },
   {
     question: "How do I contribute to dubbl?",

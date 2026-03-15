@@ -11,13 +11,24 @@ import { z } from "zod";
 import { authConfig } from "./auth.config";
 import { headers } from "next/headers";
 import { trackLogin } from "./auth/track-login";
+import { getAppleClientSecret } from "./auth/apple-secret";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
+  // Generate Apple client secret from .p8 key if configured,
+  // otherwise use the default Apple provider (reads AUTH_APPLE_SECRET)
+  const appleProvider = process.env.AUTH_APPLE_KEY_BASE64
+    ? Apple({
+        clientId: process.env.AUTH_APPLE_ID,
+        clientSecret: await getAppleClientSecret(),
+      })
+    : Apple;
+
+  return {
   ...authConfig,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -27,7 +38,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   }),
   providers: [
     Google,
-    Apple,
+    appleProvider,
     Credentials({
       name: "credentials",
       credentials: {
@@ -72,4 +83,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
     },
   },
+  };
 });
