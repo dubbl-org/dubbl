@@ -5,7 +5,7 @@ import { dataBackup } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
-import { createOrgSnapshot, restoreFromSnapshot } from "@/lib/api/backup-snapshot";
+import { createOrgSnapshot, restoreFromSnapshot, checkSnapshotRateLimit } from "@/lib/api/backup-snapshot";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { softDelete } from "@/lib/db/soft-delete";
 import type { AuthContext } from "@/lib/api/auth-context";
@@ -66,6 +66,11 @@ export function registerBackupTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "view:audit-log");
 
+        const { allowed, retryAfter } = await checkSnapshotRateLimit(ctx.organizationId);
+        if (!allowed) {
+          throw new Error(`Snapshot rate limit reached. Try again in ${retryAfter} seconds.`);
+        }
+
         const backup = await createOrgSnapshot(
           ctx.organizationId,
           ctx.userId,
@@ -78,7 +83,7 @@ export function registerBackupTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "restore_backup",
-    "Restore organization data from a backup. WARNING: This replaces all current data. Current data will be moved to trash.",
+    "Restore organization data from a backup. WARNING: This replaces all current data. A snapshot of current data is saved automatically before restoring.",
     {
       backupId: z.string().describe("UUID of the backup to restore"),
       confirm: z
@@ -92,6 +97,9 @@ export function registerBackupTools(server: McpServer, ctx: AuthContext) {
         if (params.confirm !== true) {
           throw new Error("You must set confirm to true to proceed with restore");
         }
+
+        // Auto-snapshot current data before restoring
+        await createOrgSnapshot(ctx.organizationId, ctx.userId, "manual");
 
         const result = await restoreFromSnapshot(
           ctx.organizationId,

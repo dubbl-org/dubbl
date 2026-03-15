@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { restoreFromSnapshot } from "@/lib/api/backup-snapshot";
+import { createOrgSnapshot, restoreFromSnapshot } from "@/lib/api/backup-snapshot";
 
 export async function POST(
   request: Request,
@@ -22,6 +22,9 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    // Auto-snapshot current data before restoring
+    await createOrgSnapshot(ctx.organizationId, ctx.userId, "manual");
 
     const restoredCounts = await restoreFromSnapshot(ctx.organizationId, id, ctx);
 

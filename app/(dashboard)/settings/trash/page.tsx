@@ -20,6 +20,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -78,6 +86,9 @@ export default function TrashPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [deleteItem, setDeleteItem] = useState<TrashItem | null>(null);
+  const [emptyOpen, setEmptyOpen] = useState(false);
+  const [acting, setActing] = useState(false);
 
   const fetchItems = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -91,7 +102,7 @@ export default function TrashPage() {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
-      .then((data) => setItems(data.items || []))
+      .then((data) => setItems(data.data || []))
       .finally(() => setLoading(false));
   }, [typeFilter, search]);
 
@@ -130,23 +141,20 @@ export default function TrashPage() {
     }
   };
 
-  const handleDeletePermanently = async (item: TrashItem) => {
-    const confirmed = window.confirm(
-      `Permanently delete "${item.label}"? This cannot be undone.`
-    );
-    if (!confirmed) return;
-
+  const confirmDeletePermanently = async () => {
+    if (!deleteItem) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
+    setActing(true);
     try {
-      const res = await fetch(`/api/v1/trash/${item.id}`, {
+      const res = await fetch(`/api/v1/trash/${deleteItem.id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
           "x-organization-id": orgId,
         },
-        body: JSON.stringify({ entityType: item.entityType }),
+        body: JSON.stringify({ entityType: deleteItem.entityType }),
       });
 
       if (!res.ok) {
@@ -155,22 +163,21 @@ export default function TrashPage() {
         return;
       }
 
-      toast.success(`${item.label} permanently deleted`);
+      toast.success(`${deleteItem.label} permanently deleted`);
+      setDeleteItem(null);
       fetchItems();
     } catch {
       toast.error("Failed to delete item");
+    } finally {
+      setActing(false);
     }
   };
 
-  const handleEmptyTrash = async () => {
-    const confirmed = window.confirm(
-      "Permanently delete all items in trash? This cannot be undone."
-    );
-    if (!confirmed) return;
-
+  const confirmEmptyTrash = async () => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
+    setActing(true);
     try {
       const res = await fetch("/api/v1/trash/empty", {
         method: "POST",
@@ -184,9 +191,12 @@ export default function TrashPage() {
       }
 
       toast.success("Trash emptied");
+      setEmptyOpen(false);
       fetchItems();
     } catch {
       toast.error("Failed to empty trash");
+    } finally {
+      setActing(false);
     }
   };
 
@@ -205,7 +215,7 @@ export default function TrashPage() {
               variant="destructive"
               size="sm"
               className="h-8 text-xs gap-1.5"
-              onClick={handleEmptyTrash}
+              onClick={() => setEmptyOpen(true)}
             >
               <Trash2 className="size-3.5" />
               Empty Trash
@@ -269,7 +279,7 @@ export default function TrashPage() {
                 {filteredItems.map((item) => (
                   <TableRow key={`${item.entityType}-${item.id}`}>
                     <TableCell className="font-medium text-sm">
-                      {item.label || item.name || "-"}
+                      {item.name || "-"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">
@@ -295,7 +305,7 @@ export default function TrashPage() {
                           size="icon"
                           className="size-7 text-red-600"
                           title="Delete permanently"
-                          onClick={() => handleDeletePermanently(item)}
+                          onClick={() => setDeleteItem(item)}
                         >
                           <X className="size-3.5" />
                         </Button>
@@ -308,6 +318,48 @@ export default function TrashPage() {
           </div>
         )}
       </div>
+
+      {/* Permanent delete confirmation */}
+      <Dialog open={!!deleteItem} onOpenChange={(o) => !o && setDeleteItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete permanently?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete &quot;{deleteItem?.name || deleteItem?.label}&quot;.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteItem(null)} disabled={acting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeletePermanently} disabled={acting}>
+              {acting ? "Deleting..." : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Empty trash confirmation */}
+      <Dialog open={emptyOpen} onOpenChange={setEmptyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Empty trash?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all {filteredItems.length} items in trash.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmptyOpen(false)} disabled={acting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmEmptyTrash} disabled={acting}>
+              {acting ? "Emptying..." : "Empty trash"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ContentReveal>
   );
 }

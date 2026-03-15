@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Database, Download, RotateCcw, Trash2, Upload, Plus } from "lucide-react";
+import { Database, Download, RotateCcw, Trash2, Upload, Plus, HardDriveDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { toast } from "sonner";
@@ -44,9 +52,15 @@ export default function BackupsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dialog state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [restoreBackup, setRestoreBackup] = useState<Backup | null>(null);
+  const [deleteBackup, setDeleteBackup] = useState<Backup | null>(null);
 
   const limit = 20;
   const totalPages = Math.ceil(total / limit);
@@ -74,7 +88,7 @@ export default function BackupsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  async function handleCreate() {
+  async function confirmCreate() {
     const orgId = getOrgId();
     if (!orgId) return;
     setCreating(true);
@@ -83,13 +97,46 @@ export default function BackupsPage() {
         method: "POST",
         headers: { "x-organization-id": orgId },
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
       toast.success("Backup created");
+      setCreateOpen(false);
       fetchBackups();
-    } catch {
-      toast.error("Failed to create backup");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create backup");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleDownloadSnapshot() {
+    const orgId = getOrgId();
+    if (!orgId) return;
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/v1/backups/download-snapshot", {
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dubbl-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Snapshot downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to download snapshot");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -134,18 +181,13 @@ export default function BackupsPage() {
     }
   }
 
-  async function handleRestore(backup: Backup) {
-    const dateLabel = new Date(backup.createdAt).toLocaleString();
-    const confirmed = window.confirm(
-      `This will replace all current data with the snapshot from ${dateLabel}. Current data will be moved to trash.`
-    );
-    if (!confirmed) return;
-
+  async function confirmRestore() {
+    if (!restoreBackup) return;
     const orgId = getOrgId();
     if (!orgId) return;
-    setRestoringId(backup.id);
+    setRestoringId(restoreBackup.id);
     try {
-      const res = await fetch(`/api/v1/backups/${backup.id}/restore`, {
+      const res = await fetch(`/api/v1/backups/${restoreBackup.id}/restore`, {
         method: "POST",
         headers: {
           "x-organization-id": orgId,
@@ -154,7 +196,8 @@ export default function BackupsPage() {
         body: JSON.stringify({ confirm: true }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Backup restored successfully");
+      toast.success("Backup restored. A snapshot of your previous data was saved automatically.");
+      setRestoreBackup(null);
       fetchBackups();
     } catch {
       toast.error("Failed to restore backup");
@@ -163,17 +206,19 @@ export default function BackupsPage() {
     }
   }
 
-  async function handleDelete(backup: Backup) {
+  async function confirmDelete() {
+    if (!deleteBackup) return;
     const orgId = getOrgId();
     if (!orgId) return;
-    setDeletingId(backup.id);
+    setDeletingId(deleteBackup.id);
     try {
-      const res = await fetch(`/api/v1/backups/${backup.id}`, {
+      const res = await fetch(`/api/v1/backups/${deleteBackup.id}`, {
         method: "DELETE",
         headers: { "x-organization-id": orgId },
       });
       if (!res.ok) throw new Error();
       toast.success("Backup deleted");
+      setDeleteBackup(null);
       fetchBackups();
     } catch {
       toast.error("Failed to delete backup");
@@ -210,6 +255,16 @@ export default function BackupsPage() {
             variant="outline"
             size="sm"
             className="h-8 text-xs"
+            disabled={downloading}
+            onClick={handleDownloadSnapshot}
+          >
+            <HardDriveDownload className="mr-1.5 size-3.5" />
+            {downloading ? "Downloading..." : "Download Snapshot"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="mr-1.5 size-3.5" />
@@ -219,13 +274,9 @@ export default function BackupsPage() {
             size="sm"
             className="h-8 text-xs"
             disabled={creating}
-            onClick={handleCreate}
+            onClick={() => setCreateOpen(true)}
           >
-            {creating ? (
-              <span className="mr-1.5 size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Plus className="mr-1.5 size-3.5" />
-            )}
+            <Plus className="mr-1.5 size-3.5" />
             Create Backup
           </Button>
         </div>
@@ -261,7 +312,6 @@ export default function BackupsPage() {
                 key={backup.id}
                 className="grid grid-cols-[1fr_1fr_80px_1.5fr_1fr_auto] gap-3 px-4 py-2.5 border-b last:border-b-0 items-center hover:bg-muted/30 transition-colors"
               >
-                {/* Type */}
                 <div>
                   <Badge
                     variant="outline"
@@ -277,7 +327,6 @@ export default function BackupsPage() {
                   </Badge>
                 </div>
 
-                {/* Date */}
                 <span className="text-sm tabular-nums">
                   {new Date(backup.createdAt).toLocaleDateString(undefined, {
                     month: "short",
@@ -286,17 +335,14 @@ export default function BackupsPage() {
                   })}
                 </span>
 
-                {/* Size */}
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {formatSize(backup.sizeBytes)}
                 </span>
 
-                {/* Entities */}
                 <span className="text-xs text-muted-foreground truncate">
                   {formatEntitySummary(backup.entityCounts)}
                 </span>
 
-                {/* Expires */}
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {backup.expiresAt
                     ? new Date(backup.expiresAt).toLocaleDateString(undefined, {
@@ -307,7 +353,6 @@ export default function BackupsPage() {
                     : "-"}
                 </span>
 
-                {/* Actions */}
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
@@ -323,7 +368,7 @@ export default function BackupsPage() {
                     size="sm"
                     className="h-7 w-7 p-0"
                     disabled={restoringId === backup.id}
-                    onClick={() => handleRestore(backup)}
+                    onClick={() => setRestoreBackup(backup)}
                     title="Restore"
                   >
                     <RotateCcw className={`size-3.5 ${restoringId === backup.id ? "animate-spin" : ""}`} />
@@ -333,7 +378,7 @@ export default function BackupsPage() {
                     size="sm"
                     className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                     disabled={deletingId === backup.id}
-                    onClick={() => handleDelete(backup)}
+                    onClick={() => setDeleteBackup(backup)}
                     title="Delete"
                   >
                     <Trash2 className="size-3.5" />
@@ -343,7 +388,6 @@ export default function BackupsPage() {
             ))}
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2">
               <p className="text-[11px] text-muted-foreground tabular-nums">
@@ -373,6 +417,71 @@ export default function BackupsPage() {
           )}
         </>
       )}
+
+      {/* Create backup confirmation */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create backup?</DialogTitle>
+            <DialogDescription>
+              This will create a full snapshot of all your organization data.
+              The backup can be used to restore your data later.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
+              Cancel
+            </Button>
+            <Button onClick={confirmCreate} disabled={creating}>
+              {creating ? "Creating..." : "Create backup"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore backup confirmation */}
+      <Dialog open={!!restoreBackup} onOpenChange={(o) => !o && setRestoreBackup(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restore from backup?</DialogTitle>
+            <DialogDescription>
+              This will replace all current data with the snapshot from{" "}
+              {restoreBackup && new Date(restoreBackup.createdAt).toLocaleString()}.
+              A snapshot of your current data will be saved automatically before restoring.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRestoreBackup(null)} disabled={!!restoringId}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRestore} disabled={!!restoringId}>
+              {restoringId ? "Restoring..." : "Restore backup"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete backup confirmation */}
+      <Dialog open={!!deleteBackup} onOpenChange={(o) => !o && setDeleteBackup(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete backup?</DialogTitle>
+            <DialogDescription>
+              This backup from{" "}
+              {deleteBackup && new Date(deleteBackup.createdAt).toLocaleString()}{" "}
+              will be moved to trash. You can restore it within 30 days.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteBackup(null)} disabled={!!deletingId}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={!!deletingId}>
+              {deletingId ? "Deleting..." : "Delete backup"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ContentReveal>
   );
 }

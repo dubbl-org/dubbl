@@ -6,7 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { createOrgSnapshot } from "@/lib/api/backup-snapshot";
+import { createOrgSnapshot, checkSnapshotRateLimit } from "@/lib/api/backup-snapshot";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 export async function GET(request: Request) {
@@ -48,7 +48,14 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "view:audit-log");
 
-    // For now, hardcode limits since PLAN_LIMITS doesn't have this yet
+    const { allowed, retryAfter } = await checkSnapshotRateLimit(ctx.organizationId);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Snapshot rate limit reached. Try again in ${retryAfter} seconds.` },
+        { status: 429 },
+      );
+    }
+
     const maxManual = 10;
 
     const [{ total: manualCount }] = await db

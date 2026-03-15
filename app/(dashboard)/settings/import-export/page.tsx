@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DatePicker } from "@/components/ui/date-picker";
 import { BulkImportWizard } from "@/components/bulk-import-wizard";
 import { getMapping, aliasesToRecord } from "@/lib/import-export/mappings";
 import type { SourceSystem, ImportEntity } from "@/lib/import-export/types";
@@ -27,7 +29,10 @@ import {
   BookOpen,
   Package,
   Landmark,
-  Calendar,
+  ArrowRight,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -235,7 +240,6 @@ export default function ImportExportPage() {
       }
 
       if (!entityKey && entities.length > 1) {
-        // Export all as ZIP
         const params = new URLSearchParams();
         if (exportDateFrom) params.set("startDate", exportDateFrom);
         if (exportDateTo) params.set("endDate", exportDateTo);
@@ -247,7 +251,6 @@ export default function ImportExportPage() {
         const blob = await res.blob();
         downloadBlob(blob, "dubbl-export.zip");
       } else {
-        // Single entity export
         const key = entities[0];
         const params = new URLSearchParams();
         if (exportDateFrom) params.set("startDate", exportDateFrom);
@@ -277,165 +280,232 @@ export default function ImportExportPage() {
     });
   };
 
+  const selectAllExports = () => {
+    setSelectedExports(new Set(EXPORT_ENTITIES.map(e => e.key)));
+  };
+
+  const hasTransactionalSelected = Array.from(selectedExports).some(
+    k => EXPORT_ENTITIES.find(e => e.key === k)?.transactional
+  );
+
   return (
     <ContentReveal>
       <div className="space-y-8">
-        <div>
-          <h2 className="text-lg font-semibold">Import & Export</h2>
-          <p className="text-sm text-muted-foreground">
-            Migrate data from other bookkeeping tools or export your Dubbl data
-          </p>
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Import & Export</h2>
+            <p className="text-sm text-muted-foreground">
+              Migrate data from other bookkeeping tools or export your Dubbl data
+            </p>
+          </div>
         </div>
 
         {/* Import Section */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Import</h3>
+        <div className="space-y-5">
+          <div className="flex items-center gap-2">
+            <Upload className="size-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Import Data</h3>
+          </div>
 
           {/* Source selector */}
-          <div>
-            <p className="mb-2 text-sm text-muted-foreground">Select your source system</p>
+          <div className="rounded-lg border p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">Select your source system</p>
             <div className="flex flex-wrap gap-2">
               {SOURCES.map(s => (
-                <button
+                <Button
                   key={s.key}
+                  variant={source === s.key ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs"
                   onClick={() => setSource(s.key)}
-                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                    source === s.key
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border hover:bg-muted"
-                  }`}
                 >
                   {s.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
           {/* Entity grid */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {ENTITIES.map(entity => {
               const Icon = entity.icon;
               return (
                 <button
                   key={entity.key}
                   onClick={() => handleEntityClick(entity)}
-                  className="flex items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted"
+                  className="group flex items-center gap-3 rounded-lg border p-3.5 text-left transition-all hover:bg-muted hover:border-foreground/20"
                 >
-                  <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{entity.label}</p>
-                    <p className="text-xs text-muted-foreground">{entity.note}</p>
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted group-hover:bg-background transition-colors">
+                    <Icon className="size-4 text-muted-foreground" />
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{entity.label}</p>
+                    <p className="text-[11px] text-muted-foreground">{entity.note}</p>
+                  </div>
+                  <ArrowRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                 </button>
               );
             })}
           </div>
 
           {/* Import history */}
-          <div>
-            <h4 className="mb-2 text-sm font-medium">Import History</h4>
-            {jobsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
-            ) : importJobs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No imports yet</p>
-            ) : (
-              <div className="rounded border">
+          {jobsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : importJobs.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-muted-foreground">Recent Imports</h4>
+              <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Type</TableHead>
                       <TableHead>File</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Rows</TableHead>
-                      <TableHead>Errors</TableHead>
+                      <TableHead className="text-right">Rows</TableHead>
+                      <TableHead className="text-right">Errors</TableHead>
                       <TableHead>Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {importJobs.map(job => (
                       <TableRow key={job.id}>
-                        <TableCell className="capitalize">{job.type}</TableCell>
-                        <TableCell className="max-w-[200px] truncate text-xs">{job.fileName}</TableCell>
                         <TableCell>
-                          <Badge variant={job.status === "completed" ? "secondary" : job.status === "failed" ? "destructive" : "outline"}>
-                            {job.status}
+                          <Badge variant="secondary" className="text-xs capitalize">
+                            {job.type}
                           </Badge>
                         </TableCell>
-                        <TableCell>{job.processedRows}/{job.totalRows}</TableCell>
-                        <TableCell>{job.errorRows || "-"}</TableCell>
-                        <TableCell className="text-xs">
-                          {new Date(job.createdAt).toLocaleDateString()}
+                        <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                          {job.fileName}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {job.status === "completed" ? (
+                              <CheckCircle2 className="size-3.5 text-emerald-500" />
+                            ) : job.status === "failed" ? (
+                              <XCircle className="size-3.5 text-destructive" />
+                            ) : (
+                              <Clock className="size-3.5 text-muted-foreground" />
+                            )}
+                            <span className="text-xs capitalize">{job.status}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {job.processedRows}/{job.totalRows}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                          {job.errorRows || "-"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(job.createdAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Export Section */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Export</h3>
-
-          <div className="space-y-3">
-            {EXPORT_ENTITIES.map(entity => (
-              <label key={entity.key} className="flex items-center gap-3 cursor-pointer">
-                <Checkbox
-                  checked={selectedExports.has(entity.key)}
-                  onCheckedChange={() => toggleExport(entity.key)}
-                />
-                <span className="text-sm">{entity.label}</span>
-                {entity.transactional && (
-                  <Calendar className="size-3 text-muted-foreground" />
-                )}
-              </label>
-            ))}
-          </div>
-
-          {/* Date range for transactional data */}
-          {Array.from(selectedExports).some(k => EXPORT_ENTITIES.find(e => e.key === k)?.transactional) && (
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-muted-foreground">Date range:</label>
-              <input
-                type="date"
-                value={exportDateFrom}
-                onChange={e => setExportDateFrom(e.target.value)}
-                className="rounded border bg-background px-2 py-1 text-sm"
-              />
-              <span className="text-muted-foreground">to</span>
-              <input
-                type="date"
-                value={exportDateTo}
-                onChange={e => setExportDateTo(e.target.value)}
-                className="rounded border bg-background px-2 py-1 text-sm"
-              />
             </div>
           )}
+        </div>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={() => handleExport()}
-              disabled={exporting || selectedExports.size === 0}
-            >
-              <Download className="mr-2 size-4" />
-              Export Selected
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelectedExports(new Set(EXPORT_ENTITIES.map(e => e.key)));
-                handleExport("all");
-              }}
-              disabled={exporting}
-            >
-              Export All
-            </Button>
+        {/* Divider */}
+        <div className="border-t" />
+
+        {/* Export Section */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2">
+            <Download className="size-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Export Data</h3>
+          </div>
+
+          <div className="rounded-lg border p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Select entities to export as CSV</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={selectAllExports}
+              >
+                Select all
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-4">
+              {EXPORT_ENTITIES.map(entity => (
+                <Label
+                  key={entity.key}
+                  className="flex items-center gap-2.5 cursor-pointer text-sm font-normal"
+                >
+                  <Checkbox
+                    checked={selectedExports.has(entity.key)}
+                    onCheckedChange={() => toggleExport(entity.key)}
+                  />
+                  <span>{entity.label}</span>
+                  {entity.transactional && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal text-muted-foreground">
+                      date range
+                    </Badge>
+                  )}
+                </Label>
+              ))}
+            </div>
+
+            {/* Date range */}
+            {hasTransactionalSelected && (
+              <div className="flex items-end gap-3 pt-1">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">From</Label>
+                  <DatePicker
+                    value={exportDateFrom}
+                    onChange={setExportDateFrom}
+                    placeholder="Start date"
+                    className="w-[180px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">To</Label>
+                  <DatePicker
+                    value={exportDateTo}
+                    onChange={setExportDateTo}
+                    placeholder="End date"
+                    className="w-[180px]"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => handleExport()}
+                disabled={exporting || selectedExports.size === 0}
+              >
+                <Download className="mr-1.5 size-3.5" />
+                {exporting ? "Exporting..." : "Export Selected"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  selectAllExports();
+                  handleExport("all");
+                }}
+                disabled={exporting}
+              >
+                Export All as ZIP
+              </Button>
+            </div>
           </div>
         </div>
 
