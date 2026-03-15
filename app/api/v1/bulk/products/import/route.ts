@@ -5,19 +5,23 @@ import { eq, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { preProcessProducts } from "@/lib/import-export/pre-process";
 import { z } from "zod";
+
+const rowSchema = z.object({
+  name: z.string().min(1),
+  sku: z.string().optional(),
+  description: z.string().optional(),
+  unitPrice: z.coerce.number().optional().default(0),
+  costPrice: z.coerce.number().optional().default(0),
+  type: z.string().optional(),
+  quantityOnHand: z.coerce.number().int().optional().default(0),
+});
 
 const importSchema = z.object({
   fileName: z.string().min(1),
-  rows: z.array(z.object({
-    name: z.string().min(1),
-    sku: z.string().optional(),
-    description: z.string().optional(),
-    unitPrice: z.coerce.number().optional().default(0),
-    costPrice: z.coerce.number().optional().default(0),
-    type: z.string().optional(),
-    quantityOnHand: z.coerce.number().int().optional().default(0),
-  })),
+  source: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())),
 });
 
 export async function POST(request: Request) {
@@ -25,7 +29,12 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:inventory");
     const body = await request.json();
-    const parsed = importSchema.parse(body);
+    const rawParsed = importSchema.parse(body);
+    const transformedRows = preProcessProducts(rawParsed.rows);
+    const parsed = {
+      fileName: rawParsed.fileName,
+      rows: transformedRows.map(r => rowSchema.parse(r)),
+    };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,

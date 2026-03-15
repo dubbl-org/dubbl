@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import { preProcessBills } from "@/lib/import-export/pre-process";
+import type { SourceSystem } from "@/lib/import-export/types";
 import { z } from "zod";
 
 const rowSchema = z.object({
@@ -19,7 +21,9 @@ export async function POST(request: Request) {
   try {
     await getAuthContext(request);
     const body = await request.json();
-    const rows = z.array(z.record(z.string(), z.unknown())).parse(body.rows || []);
+    const source = (body.source || "custom") as SourceSystem;
+    const rawRows = z.array(z.record(z.string(), z.unknown())).parse(body.rows || []);
+    const rows = preProcessBills(rawRows, source);
 
     const preview = rows.map((row, i) => {
       const result = rowSchema.safeParse(row);

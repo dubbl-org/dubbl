@@ -7,19 +7,24 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { resolveAccountByCode } from "@/lib/import-export/reference-resolver";
 import { parseMoney } from "@/lib/import-export/transformers";
+import { preProcessEntries } from "@/lib/import-export/pre-process";
+import type { SourceSystem } from "@/lib/import-export/types";
 import { z } from "zod";
+
+const rowSchema = z.object({
+  entryNumber: z.coerce.string().optional(),
+  date: z.string().min(1),
+  description: z.string().min(1),
+  reference: z.string().optional(),
+  lineAccountCode: z.string().min(1),
+  debit: z.coerce.string().optional().default("0"),
+  credit: z.coerce.string().optional().default("0"),
+});
 
 const importSchema = z.object({
   fileName: z.string().min(1),
-  rows: z.array(z.object({
-    entryNumber: z.coerce.string().optional(),
-    date: z.string().min(1),
-    description: z.string().min(1),
-    reference: z.string().optional(),
-    lineAccountCode: z.string().min(1),
-    debit: z.coerce.string().optional().default("0"),
-    credit: z.coerce.string().optional().default("0"),
-  })),
+  source: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())),
 });
 
 export async function POST(request: Request) {
@@ -27,7 +32,13 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:entries");
     const body = await request.json();
-    const parsed = importSchema.parse(body);
+    const rawParsed = importSchema.parse(body);
+    const source = (rawParsed.source || "custom") as SourceSystem;
+    const transformedRows = preProcessEntries(rawParsed.rows, source);
+    const parsed = {
+      fileName: rawParsed.fileName,
+      rows: transformedRows.map(r => rowSchema.parse(r)),
+    };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,

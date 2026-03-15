@@ -5,17 +5,22 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { preProcessAccounts } from "@/lib/import-export/pre-process";
+import type { SourceSystem } from "@/lib/import-export/types";
 import { z } from "zod";
 
 const importSchema = z.object({
   fileName: z.string().min(1),
-  rows: z.array(z.object({
-    code: z.string().min(1),
-    name: z.string().min(1),
-    type: z.enum(["asset", "liability", "equity", "revenue", "expense"]),
-    subType: z.string().nullable().optional(),
-    description: z.string().nullable().optional(),
-  })),
+  source: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())),
+});
+
+const rowSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  type: z.enum(["asset", "liability", "equity", "revenue", "expense"]),
+  subType: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -23,7 +28,13 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:accounts");
     const body = await request.json();
-    const parsed = importSchema.parse(body);
+    const rawParsed = importSchema.parse(body);
+    const source = (rawParsed.source || "custom") as SourceSystem;
+    const transformedRows = preProcessAccounts(rawParsed.rows, source);
+    const parsed = {
+      fileName: rawParsed.fileName,
+      rows: transformedRows.map(r => rowSchema.parse(r)),
+    };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,

@@ -48,6 +48,7 @@ interface BulkImportWizardProps {
   importEndpoint: string;
   onComplete?: () => void;
   columnAliases?: Record<string, string[]>;
+  source?: string;
 }
 
 const STEPS = ["upload", "mapping", "preview", "importing", "results"] as const;
@@ -65,6 +66,7 @@ export function BulkImportWizard({
   importEndpoint,
   onComplete,
   columnAliases,
+  source,
 }: BulkImportWizardProps) {
   const [step, setStep] = useState<typeof STEPS[number]>("upload");
   const [csvData, setCsvData] = useState<Record<string, string>[]>([]);
@@ -162,7 +164,7 @@ export function BulkImportWizard({
       const res = await fetch(previewEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ rows: mappedRows }),
+        body: JSON.stringify({ rows: mappedRows, source }),
       });
       const data = await res.json();
       setPreview(data.preview || []);
@@ -173,7 +175,7 @@ export function BulkImportWizard({
     } finally {
       setLoading(false);
     }
-  }, [csvData, mappings, previewEndpoint, orgId]);
+  }, [csvData, mappings, previewEndpoint, orgId, source]);
 
   const handleImport = useCallback(async () => {
     setStep("importing");
@@ -191,7 +193,7 @@ export function BulkImportWizard({
       const res = await fetch(importEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ fileName, rows: mappedRows }),
+        body: JSON.stringify({ fileName, rows: mappedRows, source }),
       });
       const data = await res.json();
       setResult({
@@ -204,7 +206,7 @@ export function BulkImportWizard({
     } catch {
       setStep("preview");
     }
-  }, [csvData, mappings, importEndpoint, orgId, fileName, onComplete]);
+  }, [csvData, mappings, importEndpoint, orgId, fileName, onComplete, source]);
 
   const stepIndex = getStepIndex(step);
   const mappedCount = mappings.filter(m => m.targetField).length;

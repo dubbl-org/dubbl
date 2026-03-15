@@ -9,15 +9,15 @@ export const waveAccounts: ColumnAlias[] = [
 ];
 
 export const waveContacts: ColumnAlias[] = [
-  { targetField: "name", aliases: ["Customer Name", "Vendor Name", "Name"] },
+  { targetField: "name", aliases: ["Customer Name", "Vendor Name", "Name", "Company Name", "First Name", "Last Name", "Display Name"] },
   { targetField: "email", aliases: ["Email"] },
   { targetField: "phone", aliases: ["Phone"] },
   { targetField: "type", aliases: ["Type", "Contact Type"] },
   { targetField: "taxNumber", aliases: ["Tax Number"] },
   { targetField: "billingLine1", aliases: ["Address Line 1", "Street"] },
   { targetField: "billingCity", aliases: ["City"] },
-  { targetField: "billingState", aliases: ["Province/State", "State"] },
-  { targetField: "billingPostalCode", aliases: ["Postal Code/Zip Code", "Postal Code"] },
+  { targetField: "billingState", aliases: ["Province/State", "State", "Province"] },
+  { targetField: "billingPostalCode", aliases: ["Postal Code/Zip Code", "Postal Code", "Zip Code", "Zip"] },
   { targetField: "billingCountry", aliases: ["Country"] },
 ];
 
@@ -26,7 +26,7 @@ export const waveInvoices: ColumnAlias[] = [
   { targetField: "contactName", aliases: ["Customer", "Customer Name"] },
   { targetField: "issueDate", aliases: ["Invoice Date", "Date"] },
   { targetField: "dueDate", aliases: ["Due Date"] },
-  { targetField: "lineDescription", aliases: ["Description", "Product / Service"] },
+  { targetField: "lineDescription", aliases: ["Description", "Product / Service", "Item", "Line Description"] },
   { targetField: "lineQuantity", aliases: ["Quantity"] },
   { targetField: "lineUnitPrice", aliases: ["Price", "Unit Price"] },
   { targetField: "lineAmount", aliases: ["Amount", "Line Total"] },
@@ -38,7 +38,7 @@ export const waveBills: ColumnAlias[] = [
   { targetField: "contactName", aliases: ["Vendor", "Vendor Name"] },
   { targetField: "issueDate", aliases: ["Bill Date", "Date"] },
   { targetField: "dueDate", aliases: ["Due Date"] },
-  { targetField: "lineDescription", aliases: ["Description"] },
+  { targetField: "lineDescription", aliases: ["Description", "Item", "Line Description"] },
   { targetField: "lineQuantity", aliases: ["Quantity"] },
   { targetField: "lineUnitPrice", aliases: ["Price", "Unit Price"] },
   { targetField: "lineAmount", aliases: ["Amount", "Line Total"] },
@@ -48,7 +48,7 @@ export const waveBills: ColumnAlias[] = [
 export const waveEntries: ColumnAlias[] = [
   { targetField: "entryNumber", aliases: ["Entry Number", "Number"] },
   { targetField: "date", aliases: ["Date", "Transaction Date"] },
-  { targetField: "description", aliases: ["Description"] },
+  { targetField: "description", aliases: ["Description", "Memo"] },
   { targetField: "reference", aliases: ["Reference"] },
   { targetField: "lineAccountCode", aliases: ["Account", "Account Name"] },
   { targetField: "debit", aliases: ["Debit"] },

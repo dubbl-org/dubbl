@@ -9,22 +9,22 @@ export const freshbooksAccounts: ColumnAlias[] = [
 ];
 
 export const freshbooksContacts: ColumnAlias[] = [
-  { targetField: "name", aliases: ["Organization", "Client Name", "Vendor Name", "Display Name"] },
-  { targetField: "email", aliases: ["Email"] },
-  { targetField: "phone", aliases: ["Phone", "Work Phone"] },
+  { targetField: "name", aliases: ["Organization", "Client Name", "Vendor Name", "Display Name", "Company Name", "First Name", "Last Name"] },
+  { targetField: "email", aliases: ["Email", "Email Address"] },
+  { targetField: "phone", aliases: ["Phone", "Work Phone", "Phone Number"] },
   { targetField: "type", aliases: ["Type"] },
   { targetField: "taxNumber", aliases: ["Tax Number", "VAT Number"] },
   { targetField: "billingLine1", aliases: ["Street", "Street Address", "Address Line 1"] },
   { targetField: "billingCity", aliases: ["City"] },
   { targetField: "billingState", aliases: ["Province", "State"] },
-  { targetField: "billingPostalCode", aliases: ["Postal Code", "Zip"] },
+  { targetField: "billingPostalCode", aliases: ["Postal Code", "Zip", "Zip Code"] },
   { targetField: "billingCountry", aliases: ["Country"] },
 ];
 
 export const freshbooksInvoices: ColumnAlias[] = [
   { targetField: "invoiceNumber", aliases: ["Invoice Number", "Number"] },
-  { targetField: "contactName", aliases: ["Client", "Customer Name"] },
-  { targetField: "issueDate", aliases: ["Date Created", "Invoice Date", "Date"] },
+  { targetField: "contactName", aliases: ["Client", "Customer Name", "Client Name"] },
+  { targetField: "issueDate", aliases: ["Date Created", "Invoice Date", "Date", "Create Date"] },
   { targetField: "dueDate", aliases: ["Date Due", "Due Date"] },
   { targetField: "lineDescription", aliases: ["Item Name", "Description", "Line Description"] },
   { targetField: "lineQuantity", aliases: ["Quantity", "Qty"] },
@@ -71,4 +71,6 @@ export const freshbooksBankTransactions: ColumnAlias[] = [
   { targetField: "amount", aliases: ["Amount", "Total"] },
   { targetField: "reference", aliases: ["Reference", "Check Number"] },
   { targetField: "bankAccountCode", aliases: ["Account", "Bank Account"] },
+  { targetField: "debit", aliases: ["Amount Spent"] },
+  { targetField: "credit", aliases: ["Amount Earned"] },
 ];

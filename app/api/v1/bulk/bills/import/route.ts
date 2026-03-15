@@ -8,9 +8,15 @@ import { handleError } from "@/lib/api/response";
 import { getNextNumber } from "@/lib/api/numbering";
 import { resolveContactByName, resolveAccountByCode } from "@/lib/import-export/reference-resolver";
 import { parseMoney } from "@/lib/import-export/transformers";
+import { preProcessBills } from "@/lib/import-export/pre-process";
+import type { SourceSystem } from "@/lib/import-export/types";
 import { z } from "zod";
 
-const lineSchema = z.object({
+const rowSchema = z.object({
+  billNumber: z.string().optional(),
+  contactName: z.string().min(1),
+  issueDate: z.string().min(1),
+  dueDate: z.string().min(1),
   lineDescription: z.string().min(1),
   lineQuantity: z.coerce.number().optional().default(1),
   lineUnitPrice: z.coerce.number().optional().default(0),
@@ -20,17 +26,8 @@ const lineSchema = z.object({
 
 const importSchema = z.object({
   fileName: z.string().min(1),
-  rows: z.array(z.object({
-    billNumber: z.string().optional(),
-    contactName: z.string().min(1),
-    issueDate: z.string().min(1),
-    dueDate: z.string().min(1),
-    lineDescription: z.string().min(1),
-    lineQuantity: z.coerce.number().optional().default(1),
-    lineUnitPrice: z.coerce.number().optional().default(0),
-    lineAmount: z.coerce.string().optional(),
-    lineAccountCode: z.string().optional(),
-  })),
+  source: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())),
 });
 
 export async function POST(request: Request) {
@@ -38,7 +35,13 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:bills");
     const body = await request.json();
-    const parsed = importSchema.parse(body);
+    const rawParsed = importSchema.parse(body);
+    const source = (rawParsed.source || "custom") as SourceSystem;
+    const transformedRows = preProcessBills(rawParsed.rows, source);
+    const parsed = {
+      fileName: rawParsed.fileName,
+      rows: transformedRows.map(r => rowSchema.parse(r)),
+    };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,

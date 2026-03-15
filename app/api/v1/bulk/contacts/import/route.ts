@@ -5,16 +5,26 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { preProcessContacts } from "@/lib/import-export/pre-process";
 import { z } from "zod";
+
+const rowSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  type: z.enum(["customer", "supplier", "both"]).default("customer"),
+  taxNumber: z.string().nullable().optional(),
+  billingLine1: z.string().nullable().optional(),
+  billingCity: z.string().nullable().optional(),
+  billingState: z.string().nullable().optional(),
+  billingPostalCode: z.string().nullable().optional(),
+  billingCountry: z.string().nullable().optional(),
+});
 
 const importSchema = z.object({
   fileName: z.string().min(1),
-  rows: z.array(z.object({
-    name: z.string().min(1),
-    email: z.string().nullable().optional(),
-    phone: z.string().nullable().optional(),
-    type: z.enum(["customer", "supplier", "both"]).default("customer"),
-  })),
+  source: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())),
 });
 
 export async function POST(request: Request) {
@@ -22,7 +32,12 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:contacts");
     const body = await request.json();
-    const parsed = importSchema.parse(body);
+    const rawParsed = importSchema.parse(body);
+    const transformedRows = preProcessContacts(rawParsed.rows);
+    const parsed = {
+      fileName: rawParsed.fileName,
+      rows: transformedRows.map(r => rowSchema.parse(r)),
+    };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,
@@ -39,12 +54,24 @@ export async function POST(request: Request) {
 
     for (let i = 0; i < parsed.rows.length; i++) {
       try {
+        const row = parsed.rows[i];
+        const hasAddress = row.billingLine1 || row.billingCity || row.billingState || row.billingPostalCode || row.billingCountry;
         await db.insert(contact).values({
           organizationId: ctx.organizationId,
-          name: parsed.rows[i].name,
-          email: parsed.rows[i].email || null,
-          phone: parsed.rows[i].phone || null,
-          type: parsed.rows[i].type || "customer",
+          name: row.name,
+          email: row.email || null,
+          phone: row.phone || null,
+          type: row.type || "customer",
+          taxNumber: row.taxNumber || null,
+          addresses: hasAddress ? {
+            billing: {
+              line1: row.billingLine1 || undefined,
+              city: row.billingCity || undefined,
+              state: row.billingState || undefined,
+              postalCode: row.billingPostalCode || undefined,
+              country: row.billingCountry || undefined,
+            },
+          } : undefined,
         });
         processedRows++;
       } catch (err) {

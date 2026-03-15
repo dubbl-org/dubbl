@@ -81,6 +81,11 @@ const ENTITIES: {
       { key: "phone", label: "Phone" },
       { key: "type", label: "Type" },
       { key: "taxNumber", label: "Tax Number" },
+      { key: "billingLine1", label: "Billing Address" },
+      { key: "billingCity", label: "Billing City" },
+      { key: "billingState", label: "Billing State" },
+      { key: "billingPostalCode", label: "Billing Postal Code" },
+      { key: "billingCountry", label: "Billing Country" },
     ],
   },
   {
@@ -163,6 +168,8 @@ const ENTITIES: {
       { key: "amount", label: "Amount", required: true },
       { key: "reference", label: "Reference" },
       { key: "bankAccountCode", label: "Bank Account", required: true },
+      { key: "debit", label: "Debit" },
+      { key: "credit", label: "Credit" },
     ],
   },
 ];
@@ -519,6 +526,7 @@ export default function ImportExportPage() {
             previewEndpoint={activeEntity.previewEndpoint}
             importEndpoint={activeEntity.importEndpoint}
             columnAliases={columnAliases}
+            source={source}
             onComplete={fetchJobs}
           />
         )}
