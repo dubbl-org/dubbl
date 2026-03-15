@@ -1,0 +1,90 @@
+---
+title: Trash & Recovery
+description: View, restore, and permanently delete soft-deleted records across your organization.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Overview
+
+When you delete a record in Dubbl, it is **soft-deleted** and moved to the Trash. Soft-deleted records are hidden from all lists, reports, and calculations but can be restored within 30 days. After 30 days, records are automatically purged.
+
+## Supported entity types
+
+The following record types can be recovered from Trash:
+
+| Entity | Permission required |
+|--------|-------------------|
+| Contact | manage:contacts |
+| Invoice | manage:invoices |
+| Bill | manage:bills |
+| Account | manage:accounts |
+| Journal Entry | manage:accounts |
+| Product | manage:inventory |
+| Expense | manage:expenses |
+| Quote | manage:invoices |
+| Credit Note | manage:credit-notes |
+| Debit Note | manage:debit-notes |
+| Purchase Order | manage:bills |
+| Bank Account | manage:banking |
+| Payment | manage:payments |
+| Recurring Template | manage:recurring |
+| Project | manage:projects |
+| Fixed Asset | manage:assets |
+| Budget | manage:budgets |
+| Loan | manage:banking |
+| Document | view:data |
+| Template | manage:invoices |
+| Backup | delete:organization |
+
+## Viewing deleted items
+
+1. Go to **Settings > Trash**
+2. Use the search bar to find specific items
+3. Filter by entity type using the dropdown
+
+Each item shows its name, type, and when it was deleted (relative time).
+
+## Restoring an item
+
+Click the restore icon next to any item to restore it. The record will reappear in its original location with all data intact.
+
+<Callout type="info">
+  Restoring a record does not automatically restore related records. For example, restoring a contact does not restore invoices that were separately deleted.
+</Callout>
+
+## Permanently deleting an item
+
+Click the delete icon next to an item and confirm to permanently remove it. This action cannot be undone.
+
+## Emptying the trash
+
+Organization owners can permanently delete all items in the trash at once:
+
+1. Click **Empty Trash** in the top-right corner
+2. Confirm the action
+
+<Callout type="warn">
+  Emptying the trash permanently deletes all soft-deleted records across every entity type. This cannot be undone.
+</Callout>
+
+## Auto-purge
+
+A daily cron job automatically purges records that have been in the trash for more than 30 days. No action is required.
+
+## Cascade behavior
+
+Soft-deletes are **not cascading**. Deleting a contact does not delete its invoices, bills, or documents. Each record must be deleted individually. The only exception is `contactPerson` records, which are cascade-deleted at the database level when their parent contact is removed.
+
+## API
+
+- `GET /api/v1/trash` - List trashed items (supports `entityType`, `search`, `page`, `limit` params)
+- `POST /api/v1/trash/:id/restore` - Restore an item (body: `{ entityType }`)
+- `DELETE /api/v1/trash/:id` - Permanently delete (body: `{ entityType }`)
+- `POST /api/v1/trash/empty` - Empty all trash (owner only)
+
+## MCP tools
+
+- `list_trash` - List soft-deleted records
+- `restore_trash_item` - Restore a record
+- `purge_trash_item` - Permanently delete a record

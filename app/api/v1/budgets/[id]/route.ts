@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
 import type { PeriodType } from "@/lib/budget-periods";
@@ -168,6 +169,15 @@ export async function DELETE(
     if (!existing) return notFound("Budget");
 
     await db.update(budget).set(softDelete()).where(eq(budget.id, id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "budget",
+      entityId: id,
+      changes: existing as Record<string, unknown>,
+      request,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

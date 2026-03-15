@@ -38,3 +38,4 @@ export * from "./approvals";
 export * from "./invitations";
 export * from "./login-history";
 export * from "./integrations";
+export * from "./backups";

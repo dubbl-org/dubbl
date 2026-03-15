@@ -403,13 +403,13 @@ function ProblemSection() {
 const marqueeConfig: { size: "lg" | "md" | "sm"; pills: string[] }[] = [
   { size: "lg", pills: ["Invoice #2847 — $12,580 sent", "P&L report generated ✓", "Statement imported", "Expense claim approved", "Tax return ready ✓"] },
   { size: "sm", pills: ["Categorized", "Sent", "Paid", "Filed", "Logged", "Synced", "Approved", "Imported", "Auto-tagged", "Booked", "Invoiced", "Tracked"] },
-  { size: "md", pills: ["Stripe payout imported", "Chase CSV parsed", "Bill from AWS — $3,240", "Receipt: $340 office", "PayPal export loaded", "Shopify → Revenue", "Mercury statement", "QFX import"] },
+  { size: "md", pills: ["QuickBooks CSV parsed", "Chase CSV parsed", "Bill from AWS - $3,240", "Receipt: $340 office", "Xero export loaded", "Wave CSV imported", "Bank statement parsed", "CSV import complete"] },
   { size: "lg", pills: ["$45,000 payment received ✓", "Balance sheet updated", "Multi-currency enabled", "Payroll processed ✓", "Cash flow forecast ready"] },
   { size: "sm", pills: ["Reconciled", "Updated", "Matched", "Sorted", "Verified", "Closed", "Exported", "Synced", "Tagged", "Archived", "Settled", "Reviewed"] },
   { size: "md", pills: ["Invoice to Acme Corp", "Bill: $1,200 rent", "Expense: $89 SaaS", "Credit note issued", "Recurring invoice set", "Vendor payment sent", "Client deposit logged", "Journal entry posted"] },
   { size: "lg", pills: ["Year-end close complete ✓", "Auto-categorized $174,900", "GST auto-calculated", "Client portal live ✓", "Global statement imports"] },
   { size: "sm", pills: ["Booked", "Paid", "Sent", "Filed", "Logged", "Tagged", "Approved", "Synced", "Tracked", "Closed", "Imported", "Done"] },
-  { size: "md", pills: ["BofA → Auto-reconciled", "Amex QFX loaded", "Gusto payroll synced", "Wise multi-currency", "Brex → Categorized", "Capital One OFX", "US Bank CSV", "Regions import"] },
+  { size: "md", pills: ["Bank CSV reconciled", "Statement imported", "Payroll entry posted", "Multi-currency entry", "Expense categorized", "CSV mapped", "Bank CSV imported", "Transactions matched"] },
 ];
 
 const marqueeSizeClasses = {
@@ -471,8 +471,8 @@ function MarqueeView() {
 /* --- View 1: Connected Node Network --- */
 const networkNodes = [
   { label: "Invoices", x: 8, y: 12 },
-  { label: "Stripe", x: 28, y: 8 },
-  { label: "Bank feeds", x: 5, y: 42 },
+  { label: "CSV Import", x: 28, y: 8 },
+  { label: "Reconciliation", x: 5, y: 42 },
   { label: "Expenses", x: 25, y: 48 },
   { label: "P&L Report", x: 48, y: 15 },
   { label: "Tax filing", x: 72, y: 10 },
@@ -547,8 +547,8 @@ const receiptCards = [
   { desc: "Payroll — March", amount: "-$28,450", status: "Processed", x: 30, y: 18, rotate: -2, z: 3 },
   { desc: "Client payment", amount: "+$45,000", status: "Received", x: 72, y: 28, rotate: 5, z: 2 },
   { desc: "Expense — Office rent", amount: "-$8,900", status: "Booked", x: 6, y: 55, rotate: 2, z: 1 },
-  { desc: "Bank feed — Chase", amount: "+$67,800", status: "Synced", x: 55, y: 62, rotate: -5, z: 2 },
-  { desc: "Revenue — Shopify", amount: "+$92,100", status: "Imported", x: 78, y: 70, rotate: 3, z: 1 },
+  { desc: "Bank CSV — Chase", amount: "+$67,800", status: "Imported", x: 55, y: 62, rotate: -5, z: 2 },
+  { desc: "Revenue — Sales", amount: "+$92,100", status: "Booked", x: 78, y: 70, rotate: 3, z: 1 },
   { desc: "Credit note — #CN-041", amount: "-$2,400", status: "Issued", x: 22, y: 72, rotate: -3, z: 3 },
 ];
 
@@ -721,8 +721,8 @@ const capabilities = [
     icon: FileText,
   },
   {
-    headline: "12,000+ Bank Feeds",
-    description: "Connect via Plaid to thousands of financial institutions worldwide.",
+    headline: "CSV Import & Export",
+    description: "Import from QuickBooks, Xero, FreshBooks, Wave, or any CSV format. Live bank feeds coming soon.",
     icon: Building2,
   },
   {
@@ -833,9 +833,9 @@ function SolutionSection() {
         <ScrollReveal delay={0.3}>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
             {[
-              "Real-time sync",
+              "Self-hostable",
               "Bank-grade encryption",
-              "Unlimited data sources",
+              "CSV import from any source",
               "API-first",
             ].map((item) => (
               <div

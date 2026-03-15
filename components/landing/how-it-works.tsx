@@ -26,22 +26,22 @@ import { cn } from "@/lib/utils";
 
 const integrations = [
   {
-    name: "Stripe",
-    icon: CreditCard,
+    name: "QuickBooks CSV",
+    icon: FileText,
     status: "connected" as const,
-    description: "Payment processing",
+    description: "Accounts imported",
   },
   {
-    name: "Plaid",
+    name: "Bank Statement",
     icon: Building2,
     status: "connected" as const,
-    description: "Bank accounts",
+    description: "CSV imported",
   },
   {
-    name: "QuickBooks",
-    icon: FileText,
+    name: "Xero Export",
+    icon: CreditCard,
     status: "pending" as const,
-    description: "Accounting sync",
+    description: "Ready to import",
   },
 ];
 
@@ -59,7 +59,7 @@ function ConnectVisual() {
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Integrations
         </span>
-        <span className="text-[10px] text-muted-foreground">2 of 3 active</span>
+        <span className="text-[10px] text-muted-foreground">2 of 3 imported</span>
       </motion.div>
 
       {/* Integration rows */}
@@ -132,7 +132,7 @@ function ConnectVisual() {
         transition={{ delay: 0.7, duration: 0.35 }}
         className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-[10px] font-medium text-muted-foreground"
       >
-        <span>+ Add integration</span>
+        <span>+ Import another CSV</span>
       </motion.div>
     </div>
   );
@@ -407,7 +407,7 @@ const steps = [
   {
     step: 1,
     title: "Connect",
-    subtitle: "Link your banks, payment processors, and accounting tools in one click.",
+    subtitle: "Import your data from QuickBooks, Xero, FreshBooks, Wave, or any CSV file.",
     visual: <ConnectVisual />,
   },
   {

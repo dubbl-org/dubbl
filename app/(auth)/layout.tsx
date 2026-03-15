@@ -8,7 +8,6 @@ import { Container } from "@/components/shared/container";
 import { OrbitalDecoration } from "@/components/shared/orbital-decoration";
 import { GrainGradient } from "@paper-design/shaders-react";
 import { BookOpen, Server, Code2, ArrowUpRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const features = [
   { text: "Double-entry", icon: BookOpen },
@@ -16,23 +15,28 @@ const features = [
   { text: "API-first", icon: Code2 },
 ];
 
-const marqueeRows: { size: "lg" | "md" | "sm"; pills: string[] }[] = [
-  { size: "md", pills: ["Invoice #2847 sent", "Revenue recognized", "Bank feed synced", "Journal posted", "AP aging 30d", "Reconciled"] },
-  { size: "sm", pills: ["Categorized", "Matched", "Approved", "Exported", "Voided", "Accrued", "Settled", "Tagged"] },
-  { size: "lg", pills: ["Stripe deposit $4,200", "Payroll batch complete", "Q4 close ready", "AR collected $12,580"] },
-  { size: "sm", pills: ["USD", "EUR", "Multi-entity", "1099-ready", "Audit trail", "CSV import", "GAAP", "Double-entry"] },
-  { size: "md", pills: ["Chase auto-synced", "Plaid connected", "Mercury linked", "Wise integrated", "Brex reconciled"] },
-  { size: "sm", pills: ["Posted", "Pending", "Cleared", "Balanced", "Verified", "Locked", "Synced", "Closed"] },
-  { size: "lg", pills: ["P&L report generated", "Balance sheet ready", "Trial balance clean", "Cash flow projected"] },
-  { size: "md", pills: ["Tax provision set", "Depreciation run", "Interco eliminated", "Prepaid amortized", "Accruals reversed"] },
-  { size: "sm", pills: ["API", "Webhook", "REST", "Batch", "Real-time", "Async", "Scheduled", "Streaming"] },
+const networkNodes = [
+  { label: "Invoices", x: 10, y: 10 },
+  { label: "Accounts", x: 30, y: 6 },
+  { label: "Contacts", x: 8, y: 38 },
+  { label: "Expenses", x: 28, y: 44 },
+  { label: "P&L Report", x: 52, y: 12 },
+  { label: "Tax filing", x: 75, y: 8 },
+  { label: "Clients", x: 88, y: 16 },
+  { label: "Bills", x: 70, y: 40 },
+  { label: "Payroll", x: 10, y: 72 },
+  { label: "Receipts", x: 45, y: 75 },
+  { label: "Inventory", x: 78, y: 72 },
+  { label: "Multi-currency", x: 88, y: 52 },
+  { label: "Balance sheet", x: 55, y: 50 },
+  { label: "Journal entries", x: 18, y: 24 },
 ];
 
-const marqueeSizeClasses = {
-  lg: "px-4 py-2 text-[11px]",
-  md: "px-3 py-1.5 text-[10px]",
-  sm: "px-2 py-1 text-[8px]",
-};
+const networkEdges = [
+  [0, 1], [0, 13], [1, 4], [2, 3], [2, 8], [3, 12],
+  [4, 5], [5, 6], [6, 7], [7, 11], [8, 9], [9, 10],
+  [10, 11], [12, 7], [12, 9], [13, 3],
+];
 
 export default function AuthLayout({
   children,
@@ -139,9 +143,9 @@ export default function AuthLayout({
                 {/* Subtle depth vignette */}
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_50%,transparent_30%,rgba(0,0,0,0.1)_100%)]" />
 
-                {/* Marquee rows filling the panel */}
+                {/* Connected node network */}
                 <div
-                  className="absolute inset-0 z-[1] flex flex-col justify-evenly overflow-hidden py-6"
+                  className="absolute inset-0 z-[1] overflow-hidden"
                   style={{
                     maskImage:
                       "radial-gradient(ellipse 70% 45% at 50% 50%, transparent 25%, black 70%)",
@@ -149,43 +153,49 @@ export default function AuthLayout({
                       "radial-gradient(ellipse 70% 45% at 50% 50%, transparent 25%, black 70%)",
                   }}
                 >
-                  {marqueeRows.map((row, rowIdx) => {
-                    const duration = 22 + (rowIdx % 4) * 7;
-                    const reverse = rowIdx % 2 === 1;
-                    const sizeClass = marqueeSizeClasses[row.size];
-                    return (
-                      <div key={rowIdx} className="relative flex overflow-hidden">
-                        <div
-                          className="flex shrink-0 items-center gap-2"
-                          style={{
-                            animation: `auth-marquee-${reverse ? "rev" : "fwd"} ${duration}s linear infinite`,
+                  <div className="relative h-full w-full">
+                    <svg className="absolute inset-0 h-full w-full">
+                      {networkEdges.map(([from, to], i) => (
+                        <motion.line
+                          key={i}
+                          x1={`${networkNodes[from].x}%`}
+                          y1={`${networkNodes[from].y}%`}
+                          x2={`${networkNodes[to].x}%`}
+                          y2={`${networkNodes[to].y}%`}
+                          stroke="white"
+                          strokeOpacity="0.15"
+                          strokeWidth="1"
+                          strokeDasharray="6 4"
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: 1, strokeDashoffset: [0, -20] }}
+                          transition={{
+                            pathLength: { duration: 1.5, delay: i * 0.08 },
+                            strokeDashoffset: { duration: 3, repeat: Infinity, ease: "linear" },
                           }}
-                        >
-                          {[...row.pills, ...row.pills, ...row.pills, ...row.pills].map((pill, j) => {
-                            const isFeatured =
-                              pill.includes("$") ||
-                              pill.includes("ready") ||
-                              pill.includes("complete") ||
-                              pill.includes("clean");
-                            return (
-                              <span
-                                key={j}
-                                className={cn(
-                                  "shrink-0 whitespace-nowrap rounded-full font-medium text-white/70 backdrop-blur-sm",
-                                  sizeClass,
-                                  isFeatured
-                                    ? "border border-white/20 bg-white/15 text-white/90"
-                                    : "bg-white/[0.08]"
-                                )}
-                              >
-                                {pill}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
+                        />
+                      ))}
+                    </svg>
+                    {networkNodes.map((node, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute rounded-xl bg-white/15 px-3 py-1.5 text-[10px] font-medium text-white backdrop-blur-sm"
+                        style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{
+                          opacity: 1,
+                          scale: 1,
+                          y: [0, -5, 0],
+                        }}
+                        transition={{
+                          opacity: { duration: 0.4, delay: i * 0.06 },
+                          scale: { duration: 0.4, delay: i * 0.06 },
+                          y: { duration: 3 + (i % 3), delay: i * 0.2, repeat: Infinity, ease: "easeInOut" },
+                        }}
+                      >
+                        {node.label}
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Center brand card */}
@@ -246,17 +256,6 @@ export default function AuthLayout({
                   </motion.div>
                 </div>
 
-                {/* Marquee keyframes */}
-                <style>{`
-                  @keyframes auth-marquee-fwd {
-                    from { transform: translateX(0); }
-                    to { transform: translateX(-25%); }
-                  }
-                  @keyframes auth-marquee-rev {
-                    from { transform: translateX(-25%); }
-                    to { transform: translateX(0); }
-                  }
-                `}</style>
               </div>
 
               {/* ---- Right: form panel ---- */}

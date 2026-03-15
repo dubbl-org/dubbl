@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { softDelete } from "@/lib/db/soft-delete";
 import { ok, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const schema = z.object({
@@ -29,6 +30,17 @@ export async function POST(request: Request) {
         )
       )
       .returning({ id: contact.id });
+
+    for (const row of updated) {
+      logAudit({
+        ctx,
+        action: "delete",
+        entityType: "contact",
+        entityId: row.id,
+        changes: row as Record<string, unknown>,
+        request,
+      });
+    }
 
     return ok({ deleted: updated.length });
   } catch (err) {

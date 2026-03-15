@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
@@ -104,6 +105,15 @@ export async function DELETE(
       .update(bankAccount)
       .set(softDelete())
       .where(eq(bankAccount.id, id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "bank_account",
+      entityId: id,
+      changes: existing as Record<string, unknown>,
+      request,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

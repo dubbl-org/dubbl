@@ -6,6 +6,8 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { getNextNumber } from "@/lib/api/numbering";
+import { preProcessInvoices } from "@/lib/import-export/pre-process";
+import type { SourceSystem } from "@/lib/import-export/types";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -15,15 +17,18 @@ const lineSchema = z.object({
   accountId: z.string().nullable().optional(),
 });
 
+const rowSchema = z.object({
+  contactId: z.string().min(1),
+  issueDate: z.string().min(1),
+  dueDate: z.string().min(1),
+  reference: z.string().nullable().optional(),
+  lines: z.array(lineSchema).min(1),
+});
+
 const importSchema = z.object({
   fileName: z.string().min(1),
-  rows: z.array(z.object({
-    contactId: z.string().min(1),
-    issueDate: z.string().min(1),
-    dueDate: z.string().min(1),
-    reference: z.string().nullable().optional(),
-    lines: z.array(lineSchema).min(1),
-  })),
+  source: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())),
 });
 
 export async function POST(request: Request) {
@@ -31,7 +36,13 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:invoices");
     const body = await request.json();
-    const parsed = importSchema.parse(body);
+    const rawParsed = importSchema.parse(body);
+    const source = (rawParsed.source || "custom") as SourceSystem;
+    const transformedRows = preProcessInvoices(rawParsed.rows, source);
+    const parsed = {
+      fileName: rawParsed.fileName,
+      rows: transformedRows.map(r => rowSchema.parse(r)),
+    };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,

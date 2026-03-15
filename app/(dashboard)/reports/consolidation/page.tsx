@@ -1,23 +1,57 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
+  ArrowLeft,
   Building2,
   Plus,
   Trash2,
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Loader2,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
+import { ExportButton } from "@/components/dashboard/export-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+
+interface UserOrg {
+  id: string;
+  name: string;
+  slug: string;
+  country: string | null;
+}
 
 interface ConsolidationGroupMember {
   id: string;
@@ -97,19 +131,33 @@ function apiFetch(url: string, options: RequestInit = {}) {
 
 export default function ConsolidationPage() {
   const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<ConsolidationGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [report, setReport] = useState<ConsolidatedReport | null>(null);
-  const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [tab, setTab] = useState<"pnl" | "balance-sheet">("pnl");
 
   const [newGroupName, setNewGroupName] = useState("");
-  const [addOrgId, setAddOrgId] = useState("");
-  const [addLabel, setAddLabel] = useState("");
+  const [userOrgs, setUserOrgs] = useState<UserOrg[]>([]);
+  const [orgPickerOpen, setOrgPickerOpen] = useState(false);
 
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
+
+  const activeOrgId = getOrgId();
+
+  useEffect(() => {
+    fetch("/api/v1/organization")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.organizations) {
+          setUserOrgs(data.organizations);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchGroups = useCallback(async () => {
     setLoading(true);
@@ -123,6 +171,7 @@ export default function ConsolidationPage() {
       });
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, []);
 
@@ -170,15 +219,13 @@ export default function ConsolidationPage() {
     }
   };
 
-  const addMember = async () => {
-    if (!selectedGroupId || !addOrgId.trim()) return;
+  const addMember = async (orgId: string, label: string) => {
+    if (!selectedGroupId || !orgId) return;
     const res = await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}/members`, {
       method: "POST",
-      body: JSON.stringify({ orgId: addOrgId.trim(), label: addLabel.trim() || undefined }),
+      body: JSON.stringify({ orgId, label: label || undefined }),
     });
     if (res.ok) {
-      setAddOrgId("");
-      setAddLabel("");
       await fetchGroups();
       await fetchReport();
     }
@@ -198,20 +245,74 @@ export default function ConsolidationPage() {
   const pnl = report?.consolidatedPnL;
   const bs = report?.consolidatedBalanceSheet;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
+  // Filter out orgs that are already members or the active (parent) org
+  const availableOrgs = useMemo(() => {
+    const memberOrgIds = new Set(selectedGroup?.members.map((m) => m.orgId) || []);
+    return userOrgs.filter(
+      (o) => o.id !== activeOrgId && !memberOrgIds.has(o.id)
     );
-  }
+  }, [userOrgs, activeOrgId, selectedGroup?.members]);
+
+  // Build export data
+  const exportData = useMemo(() => {
+    if (!report) return [];
+    if (tab === "pnl" && pnl) {
+      return pnl.accounts.map((a) => {
+        const row: Record<string, string | number> = {
+          type: a.type,
+          code: a.code,
+          name: a.name,
+          total: a.total,
+        };
+        for (const m of report.members) {
+          row[m.label] = a.byEntity[m.orgId] || 0;
+        }
+        return row;
+      });
+    }
+    if (tab === "balance-sheet" && bs) {
+      return bs.accounts.map((a) => {
+        const row: Record<string, string | number> = {
+          type: a.type,
+          code: a.code,
+          name: a.name,
+          total: a.total,
+        };
+        for (const m of report.members) {
+          row[m.label] = a.byEntity[m.orgId] || 0;
+        }
+        return row;
+      });
+    }
+    return [];
+  }, [report, tab, pnl, bs]);
+
+  const exportColumns = useMemo(() => {
+    if (!report) return [];
+    const memberCols = report.members.map((m) => m.label);
+    return ["type", "code", "name", ...memberCols, "total"];
+  }, [report]);
+
+  if (initialLoad) return <BrandLoader />;
 
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Consolidation"
         description="Combined financial statements across multiple entities."
-      />
+      >
+        {report && exportData.length > 0 && (
+          <ExportButton
+            data={exportData}
+            columns={exportColumns}
+            filename={`consolidation-${tab}`}
+          />
+        )}
+      </PageHeader>
 
       {/* Group Management */}
       <div className="rounded-xl border border-border/50 bg-card/80 p-4 sm:p-6 space-y-4">
@@ -279,25 +380,52 @@ export default function ConsolidationPage() {
             Members of &quot;{selectedGroup.name}&quot;
           </h2>
 
-          {/* Add member */}
-          <div className="flex flex-wrap gap-2">
-            <Input
-              placeholder="Organization ID"
-              value={addOrgId}
-              onChange={(e) => setAddOrgId(e.target.value)}
-              className="max-w-xs"
-            />
-            <Input
-              placeholder="Label (optional)"
-              value={addLabel}
-              onChange={(e) => setAddLabel(e.target.value)}
-              className="max-w-[200px]"
-            />
-            <Button onClick={addMember} size="sm" disabled={!addOrgId.trim()}>
-              <Plus className="size-4 mr-1" />
-              Add Entity
-            </Button>
-          </div>
+          {/* Add member - org picker */}
+          {availableOrgs.length > 0 ? (
+            <Popover open={orgPickerOpen} onOpenChange={setOrgPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Plus className="size-4" />
+                  Add Entity
+                  <ChevronsUpDown className="size-3 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search organizations..." />
+                  <CommandList>
+                    <CommandEmpty>No organizations found.</CommandEmpty>
+                    <CommandGroup>
+                      {availableOrgs.map((org) => (
+                        <CommandItem
+                          key={org.id}
+                          value={`${org.name} ${org.slug}`}
+                          onSelect={() => {
+                            addMember(org.id, org.name);
+                            setOrgPickerOpen(false);
+                          }}
+                        >
+                          <Building2 className="size-4 mr-2 shrink-0 text-muted-foreground" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate text-sm">{org.name}</span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              {org.slug}{org.country ? ` · ${org.country}` : ""}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {userOrgs.length <= 1
+                ? "You only belong to one organization. Create another org to add it here."
+                : "All your organizations have been added to this group."}
+            </p>
+          )}
 
           {/* Member list */}
           {selectedGroup.members.length > 0 ? (
@@ -326,7 +454,7 @@ export default function ConsolidationPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No member entities yet. Add organizations by their ID.
+              No member entities yet. Select an organization to add.
             </p>
           )}
         </div>
@@ -371,11 +499,9 @@ export default function ConsolidationPage() {
           </div>
 
           {reportLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
+            <BrandLoader className="h-48" />
           ) : (
-            <>
+            <ContentReveal>
               {/* P&L Tab */}
               {tab === "pnl" && pnl && (
                 <div className="space-y-6">
@@ -396,38 +522,36 @@ export default function ConsolidationPage() {
                     <div className="bg-muted/30 px-4 py-3">
                       <h3 className="text-sm font-semibold">Per Entity Summary</h3>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border/50">
-                            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Entity</th>
-                            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Revenue</th>
-                            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Expenses</th>
-                            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Net Income</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pnl.byEntity.map((e) => (
-                            <tr key={e.orgId} className="border-b border-border/30">
-                              <td className="px-4 py-3 font-medium">{e.label}</td>
-                              <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.revenue)}</td>
-                              <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.expenses)}</td>
-                              <td className={cn("px-4 py-3 text-right font-mono tabular-nums", e.netIncome >= 0 ? "text-emerald-600" : "text-red-600")}>
-                                {formatMoney(e.netIncome)}
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="bg-muted/30 font-semibold">
-                            <td className="px-4 py-3">Total</td>
-                            <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalRevenue)}</td>
-                            <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalExpenses)}</td>
-                            <td className={cn("px-4 py-3 text-right font-mono tabular-nums", pnl.netIncome >= 0 ? "text-emerald-600" : "text-red-600")}>
-                              {formatMoney(pnl.netIncome)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border/50">
+                          <TableHead className="px-4">Entity</TableHead>
+                          <TableHead className="px-4 text-right">Revenue</TableHead>
+                          <TableHead className="px-4 text-right">Expenses</TableHead>
+                          <TableHead className="px-4 text-right">Net Income</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pnl.byEntity.map((e) => (
+                          <TableRow key={e.orgId} className="border-border/30">
+                            <TableCell className="px-4 py-3 font-medium">{e.label}</TableCell>
+                            <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.revenue)}</TableCell>
+                            <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.expenses)}</TableCell>
+                            <TableCell className={cn("px-4 py-3 text-right font-mono tabular-nums", e.netIncome >= 0 ? "text-emerald-600" : "text-red-600")}>
+                              {formatMoney(e.netIncome)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/30 font-semibold">
+                          <TableCell className="px-4 py-3">Total</TableCell>
+                          <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalRevenue)}</TableCell>
+                          <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalExpenses)}</TableCell>
+                          <TableCell className={cn("px-4 py-3 text-right font-mono tabular-nums", pnl.netIncome >= 0 ? "text-emerald-600" : "text-red-600")}>
+                            {formatMoney(pnl.netIncome)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
 
                   {/* Account Detail */}
@@ -454,34 +578,32 @@ export default function ConsolidationPage() {
                     <div className="bg-muted/30 px-4 py-3">
                       <h3 className="text-sm font-semibold">Per Entity Summary</h3>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border/50">
-                            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Entity</th>
-                            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Assets</th>
-                            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Liabilities</th>
-                            <th className="text-right px-4 py-3 font-medium text-muted-foreground">Equity</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {bs.byEntity.map((e) => (
-                            <tr key={e.orgId} className="border-b border-border/30">
-                              <td className="px-4 py-3 font-medium">{e.label}</td>
-                              <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.assets)}</td>
-                              <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.liabilities)}</td>
-                              <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.equity)}</td>
-                            </tr>
-                          ))}
-                          <tr className="bg-muted/30 font-semibold">
-                            <td className="px-4 py-3">Total</td>
-                            <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalAssets)}</td>
-                            <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalLiabilities)}</td>
-                            <td className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalEquity)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border/50">
+                          <TableHead className="px-4">Entity</TableHead>
+                          <TableHead className="px-4 text-right">Assets</TableHead>
+                          <TableHead className="px-4 text-right">Liabilities</TableHead>
+                          <TableHead className="px-4 text-right">Equity</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bs.byEntity.map((e) => (
+                          <TableRow key={e.orgId} className="border-border/30">
+                            <TableCell className="px-4 py-3 font-medium">{e.label}</TableCell>
+                            <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.assets)}</TableCell>
+                            <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.liabilities)}</TableCell>
+                            <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.equity)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/30 font-semibold">
+                          <TableCell className="px-4 py-3">Total</TableCell>
+                          <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalAssets)}</TableCell>
+                          <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalLiabilities)}</TableCell>
+                          <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(bs.totalEquity)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
 
                   {/* Account Detail */}
@@ -492,11 +614,11 @@ export default function ConsolidationPage() {
                   />
                 </div>
               )}
-            </>
+            </ContentReveal>
           )}
         </>
       )}
-    </div>
+    </ContentReveal>
   );
 }
 
@@ -532,26 +654,24 @@ function AccountDetailTable({
       <div className="bg-muted/30 px-4 py-3">
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border/50">
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th>
-              {members.map((m) => (
-                <th key={m.orgId} className="text-right px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">
-                  {m.label}
-                </th>
-              ))}
-              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from(grouped.entries()).map(([type, typeAccounts]) => (
-              <GroupSection key={type} type={type} label={typeLabels[type] || type} accounts={typeAccounts} members={members} />
+      <Table>
+        <TableHeader>
+          <TableRow className="border-border/50">
+            <TableHead className="px-4">Account</TableHead>
+            {members.map((m) => (
+              <TableHead key={m.orgId} className="px-4 text-right">
+                {m.label}
+              </TableHead>
             ))}
-          </tbody>
-        </table>
-      </div>
+            <TableHead className="px-4 text-right">Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from(grouped.entries()).map(([type, typeAccounts]) => (
+            <GroupSection key={type} type={type} label={typeLabels[type] || type} accounts={typeAccounts} members={members} />
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -574,38 +694,38 @@ function GroupSection({
 
   return (
     <>
-      <tr className="bg-muted/20">
-        <td colSpan={members.length + 2} className="px-4 py-2 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+      <TableRow className="bg-muted/20 hover:bg-muted/20">
+        <TableCell colSpan={members.length + 2} className="px-4 py-2 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
           {label}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {accounts.map((a) => (
-        <tr key={`${a.type}:${a.code}`} className="border-b border-border/20">
-          <td className="px-4 py-2.5">
+        <TableRow key={`${a.type}:${a.code}`} className="border-border/20">
+          <TableCell className="px-4 py-2.5">
             <span className="font-mono text-xs text-muted-foreground mr-2">{a.code}</span>
             {a.name}
-          </td>
+          </TableCell>
           {members.map((m) => (
-            <td key={m.orgId} className="px-4 py-2.5 text-right font-mono tabular-nums">
+            <TableCell key={m.orgId} className="px-4 py-2.5 text-right font-mono tabular-nums">
               {formatMoney(a.byEntity[m.orgId] || 0)}
-            </td>
+            </TableCell>
           ))}
-          <td className="px-4 py-2.5 text-right font-mono tabular-nums font-medium">
+          <TableCell className="px-4 py-2.5 text-right font-mono tabular-nums font-medium">
             {formatMoney(a.total)}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       ))}
-      <tr className="border-b border-border/50 bg-muted/10">
-        <td className="px-4 py-2 font-semibold text-sm">Total {label}</td>
+      <TableRow className="border-border/50 bg-muted/10 hover:bg-muted/10">
+        <TableCell className="px-4 py-2 font-semibold text-sm">Total {label}</TableCell>
         {members.map((m) => (
-          <td key={m.orgId} className="px-4 py-2 text-right font-mono tabular-nums font-semibold">
+          <TableCell key={m.orgId} className="px-4 py-2 text-right font-mono tabular-nums font-semibold">
             {formatMoney(entityTotals[m.orgId] || 0)}
-          </td>
+          </TableCell>
         ))}
-        <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold">
+        <TableCell className="px-4 py-2 text-right font-mono tabular-nums font-semibold">
           {formatMoney(groupTotal)}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
     </>
   );
 }

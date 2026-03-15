@@ -18,6 +18,9 @@ import { registerDocumentTools } from "./documents";
 import { registerIntegrationTools } from "./integrations";
 import { registerEmailTools } from "./email";
 import { registerPeriodCloseTools } from "./period-close";
+import { registerImportExportTools } from "./import-export";
+import { registerTrashTools } from "./trash";
+import { registerBackupTools } from "./backups";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -38,4 +41,7 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerIntegrationTools(server, ctx);
   registerEmailTools(server, ctx);
   registerPeriodCloseTools(server, ctx);
+  registerImportExportTools(server, ctx);
+  registerTrashTools(server, ctx);
+  registerBackupTools(server, ctx);
 }

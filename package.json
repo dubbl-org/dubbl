@@ -36,6 +36,7 @@
     "fumadocs-core": "^16.6.8",
     "fumadocs-mdx": "^14.2.9",
     "fumadocs-ui": "^16.6.8",
+    "jose": "^6.2.1",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^0.575.0",
     "motion": "^12.34.3",

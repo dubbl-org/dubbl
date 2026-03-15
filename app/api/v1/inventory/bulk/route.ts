@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const bulkSchema = z.object({
@@ -48,6 +49,16 @@ export async function POST(request: Request) {
               inArray(inventoryItem.id, ids)
             )
           );
+        for (const item of items) {
+          logAudit({
+            ctx,
+            action: "delete",
+            entityType: "inventory_item",
+            entityId: item.id,
+            changes: item as Record<string, unknown>,
+            request,
+          });
+        }
         break;
 
       case "set_active":

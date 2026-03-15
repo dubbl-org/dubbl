@@ -23,6 +23,9 @@ import {
   ScrollText,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
+  Database,
+  Eraser,
   type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -101,6 +104,21 @@ const ACTION_CONFIG: Record<string, { icon: LucideIcon; label: string; color: st
     icon: Send, label: "Sent",
     color: "text-blue-600 dark:text-blue-400",
     badgeClass: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  },
+  restore: {
+    icon: RotateCcw, label: "Restored",
+    color: "text-teal-600 dark:text-teal-400",
+    badgeClass: "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300",
+  },
+  purge: {
+    icon: Eraser, label: "Purged",
+    color: "text-rose-600 dark:text-rose-400",
+    badgeClass: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300",
+  },
+  restore_backup: {
+    icon: Database, label: "Backup Restored",
+    color: "text-amber-600 dark:text-amber-400",
+    badgeClass: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   },
 };
 

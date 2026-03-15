@@ -73,7 +73,9 @@ volumes:
 | `AUTH_GOOGLE_ID` | No | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | No | Google OAuth client secret |
 | `AUTH_APPLE_ID` | No | Apple Sign In service ID |
-| `AUTH_APPLE_SECRET` | No | Apple Sign In private key |
+| `AUTH_APPLE_TEAM_ID` | No | Apple Developer team ID |
+| `AUTH_APPLE_KEY_ID` | No | Apple Sign In key ID |
+| `AUTH_APPLE_KEY_BASE64` | No | Base64-encoded .p8 private key |
 | `STRIPE_SECRET_KEY` | No | Stripe API key for billing |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
 | `RESEND_API_KEY` | No | Resend API key for platform emails |
@@ -94,7 +96,7 @@ Dubbl supports three authentication methods:
 
 - **Email & Password** - Works out of the box, no additional setup needed
 - **Google OAuth** - Requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-- **Apple Sign In** - Requires `AUTH_APPLE_ID` and `AUTH_APPLE_SECRET` from [Apple Developer](https://developer.apple.com)
+- **Apple Sign In** - Requires `AUTH_APPLE_ID`, `AUTH_APPLE_TEAM_ID`, `AUTH_APPLE_KEY_ID`, and `AUTH_APPLE_KEY_BASE64` from [Apple Developer](https://developer.apple.com). Encode your `.p8` key file with `base64 -w0 AuthKey_XXXXXXXXXX.p8`
 
 For OAuth providers, set the callback URL to `https://your-domain.com/api/auth/callback/google` (or `/apple`).
 

@@ -1,15 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { DollarSign, Target } from "lucide-react";
+import { ArrowLeft, DollarSign, Target } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { BudgetProgressBar } from "@/components/dashboard/budget-progress-bar";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { formatMoney } from "@/lib/money";
-import { BlurReveal } from "@/components/ui/blur-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatMoney } from "@/lib/money";
 
 interface Budget {
   id: string;
@@ -46,13 +48,14 @@ const columns: Column<Comparison>[] = [
 ];
 
 export default function BudgetVsActualPage() {
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>("");
   const [comparisons, setComparisons] = useState<Comparison[]>([]);
   const [totalBudgeted, setTotalBudgeted] = useState(0);
   const [totalActual, setTotalActual] = useState(0);
   const [totalVariance, setTotalVariance] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
 
   // Fetch budget list
@@ -72,7 +75,12 @@ export default function BudgetVsActualPage() {
           setSelectedBudgetId(list[0].id);
         }
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -82,6 +90,8 @@ export default function BudgetVsActualPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReportLoading(true);
     fetch(`/api/v1/reports/budget-vs-actual?budgetId=${selectedBudgetId}`, {
       headers: { "x-organization-id": orgId },
     })
@@ -97,23 +107,30 @@ export default function BudgetVsActualPage() {
     return () => { cancelled = true; };
   }, [selectedBudgetId]);
 
-  if (loading) return <BrandLoader />;
+  if (initialLoad) return <BrandLoader />;
 
   if (budgets.length === 0) {
     return (
-      <BlurReveal className="space-y-6">
+      <ContentReveal className="space-y-6">
+        <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="size-3.5" /> Back to reports
+        </Link>
         <PageHeader title="Budget vs Actual" description="Compare budgeted amounts to actual GL balances." />
         <EmptyState
           icon={Target}
           title="No budgets yet"
           description="Create a budget first to see budget vs actual comparisons."
         />
-      </BlurReveal>
+      </ContentReveal>
     );
   }
 
   return (
-    <BlurReveal className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Budget vs Actual"
         description="Compare budgeted amounts to actual GL balances."
@@ -121,15 +138,16 @@ export default function BudgetVsActualPage() {
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="text-sm font-medium">Budget:</label>
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border bg-background px-3 text-sm"
-          value={selectedBudgetId}
-          onChange={(e) => setSelectedBudgetId(e.target.value)}
-        >
-          {budgets.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
+        <Select value={selectedBudgetId} onValueChange={setSelectedBudgetId}>
+          <SelectTrigger className="h-9 w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {budgets.map((b) => (
+              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -143,33 +161,39 @@ export default function BudgetVsActualPage() {
         />
       </div>
 
-      {comparisons.length > 0 && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {comparisons.slice(0, 6).map((c) => (
-            <div key={c.accountId} className="rounded-lg border bg-card p-4">
-              <BudgetProgressBar
-                budgeted={c.budgeted}
-                actual={c.actual}
-                label={c.accountName}
-              />
+      {reportLoading ? (
+        <BrandLoader className="h-48" />
+      ) : (
+        <ContentReveal>
+          {comparisons.length > 0 && (
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+              {comparisons.slice(0, 6).map((c) => (
+                <div key={c.accountId} className="rounded-lg border bg-card p-4">
+                  <BudgetProgressBar
+                    budgeted={c.budgeted}
+                    actual={c.actual}
+                    label={c.accountName}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          <DataTable
+            columns={columns}
+            data={comparisons}
+            loading={loading || reportLoading}
+            emptyMessage="No budget lines to compare."
+          />
+
+          <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-muted/50 rounded-lg text-sm font-semibold mt-6">
+            <span>Total Variance</span>
+            <span className={`font-mono tabular-nums ${totalVariance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {formatMoney(totalVariance)}
+            </span>
+          </div>
+        </ContentReveal>
       )}
-
-      <DataTable
-        columns={columns}
-        data={comparisons}
-        loading={loading || reportLoading}
-        emptyMessage="No budget lines to compare."
-      />
-
-      <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-muted/50 rounded-lg text-sm font-semibold">
-        <span>Total Variance</span>
-        <span className={`font-mono tabular-nums ${totalVariance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-          {formatMoney(totalVariance)}
-        </span>
-      </div>
-    </BlurReveal>
+    </ContentReveal>
   );
 }

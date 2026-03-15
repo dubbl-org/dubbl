@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, ok, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -93,6 +94,15 @@ export async function DELETE(
       .update(consolidationGroup)
       .set(softDelete())
       .where(eq(consolidationGroup.id, id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "consolidation_group",
+      entityId: id,
+      changes: existing as Record<string, unknown>,
+      request,
+    });
 
     return ok({ success: true });
   } catch (err) {

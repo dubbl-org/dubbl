@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ArrowDownUp, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -22,6 +25,8 @@ const columns: Column<CashFlowRow>[] = [
 
 export default function CashFlowPage() {
   const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [operating, setOperating] = useState<CashFlowRow[]>([]);
@@ -31,12 +36,13 @@ export default function CashFlowPage() {
   const [totalInvesting, setTotalInvesting] = useState(0);
   const [totalFinancing, setTotalFinancing] = useState(0);
   const [netCashFlow, setNetCashFlow] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
     const params = new URLSearchParams({ startDate, endDate });
     fetch(`/api/v1/reports/cash-flow?${params}`, {
       headers: { "x-organization-id": orgId },
@@ -52,7 +58,12 @@ export default function CashFlowPage() {
         setTotalFinancing(data.totalFinancing || 0);
         setNetCashFlow(data.netCashFlow || 0);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [startDate, endDate]);
 
@@ -62,8 +73,14 @@ export default function CashFlowPage() {
     { title: "Financing Activities", data: financing, total: totalFinancing, icon: TrendingUp },
   ];
 
+  if (initialLoad) return <BrandLoader />;
+
   return (
-    <div className="space-y-6">
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
       <PageHeader
         title="Cash Flow Statement"
         description="Cash inflows and outflows by activity type."
@@ -75,39 +92,47 @@ export default function CashFlowPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-        {sections.map((s) => (
-          <StatCard
-            key={s.title}
-            title={s.title.replace(" Activities", "")}
-            value={formatMoney(s.total)}
-            icon={s.icon}
-            changeType={s.total >= 0 ? "positive" : "negative"}
-          />
-        ))}
-        <StatCard
-          title="Net Cash Flow"
-          value={formatMoney(netCashFlow)}
-          icon={DollarSign}
-          changeType={netCashFlow >= 0 ? "positive" : "negative"}
-        />
-      </div>
+      {loading ? (
+        <BrandLoader className="h-48" />
+      ) : (
+        <ContentReveal>
+          <div className="space-y-6">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+              {sections.map((s) => (
+                <StatCard
+                  key={s.title}
+                  title={s.title.replace(" Activities", "")}
+                  value={formatMoney(s.total)}
+                  icon={s.icon}
+                  changeType={s.total >= 0 ? "positive" : "negative"}
+                />
+              ))}
+              <StatCard
+                title="Net Cash Flow"
+                value={formatMoney(netCashFlow)}
+                icon={DollarSign}
+                changeType={netCashFlow >= 0 ? "positive" : "negative"}
+              />
+            </div>
 
-      {sections.map((s) => (
-        <div key={s.title} className="space-y-2">
-          <h2 className="text-lg font-semibold">{s.title}</h2>
-          <DataTable columns={columns} data={s.data} loading={loading} emptyMessage={`No ${s.title.toLowerCase()}.`} />
-          <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
-            <span>Total {s.title}</span>
-            <span className="font-mono tabular-nums">{formatMoney(s.total)}</span>
+            {sections.map((s) => (
+              <div key={s.title} className="space-y-2">
+                <h2 className="text-lg font-semibold">{s.title}</h2>
+                <DataTable columns={columns} data={s.data} loading={false} emptyMessage={`No ${s.title.toLowerCase()}.`} />
+                <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
+                  <span>Total {s.title}</span>
+                  <span className="font-mono tabular-nums">{formatMoney(s.total)}</span>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg font-semibold text-sm sm:text-base">
+              <span>Net Cash Flow</span>
+              <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
+            </div>
           </div>
-        </div>
-      ))}
-
-      <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-emerald-50 border border-emerald-200 rounded-lg font-semibold text-sm sm:text-base">
-        <span>Net Cash Flow</span>
-        <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
-      </div>
-    </div>
+        </ContentReveal>
+      )}
+    </ContentReveal>
   );
 }
