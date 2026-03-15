@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -78,6 +79,16 @@ export async function DELETE(
       .returning();
 
     if (!deleted) return notFound("Pipeline");
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "pipeline",
+      entityId: id,
+      changes: deleted as Record<string, unknown>,
+      request,
+    });
+
     return ok({ success: true });
   } catch (err) {
     return handleError(err);

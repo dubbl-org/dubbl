@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 
 export async function GET(
   request: Request,
@@ -62,6 +63,15 @@ export async function DELETE(
         .set({ status: "void" })
         .where(eq(payrollRun.id, id));
 
+      logAudit({
+        ctx,
+        action: "delete",
+        entityType: "payroll_run",
+        entityId: id,
+        changes: run as Record<string, unknown>,
+        request,
+      });
+
       return NextResponse.json({ success: true, voided: true });
     }
 
@@ -71,6 +81,15 @@ export async function DELETE(
       .update(payrollRun)
       .set(softDelete())
       .where(eq(payrollRun.id, id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "payroll_run",
+      entityId: id,
+      changes: run as Record<string, unknown>,
+      request,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

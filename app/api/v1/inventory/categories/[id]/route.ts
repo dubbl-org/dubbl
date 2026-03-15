@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -68,6 +69,15 @@ export async function DELETE(
       .returning();
 
     if (!deleted) return notFound("Category");
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "inventory_category",
+      entityId: id,
+      changes: deleted as Record<string, unknown>,
+      request,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

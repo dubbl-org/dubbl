@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const unsubscribeSchema = z.object({
@@ -32,6 +33,15 @@ export async function POST(request: Request) {
       .update(webhook)
       .set(softDelete())
       .where(eq(webhook.id, parsed.id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "webhook",
+      entityId: parsed.id,
+      changes: existing as Record<string, unknown>,
+      request,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

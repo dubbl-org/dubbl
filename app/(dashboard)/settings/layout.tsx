@@ -7,6 +7,7 @@ import {
   Settings, Users, CreditCard, Key, ScrollText, Target,
   Bell, BellRing, GitBranch, Tags, Shield, ShieldCheck,
   ListFilter, Webhook, CheckCircle2, Zap, PaintbrushVertical, ArrowLeftRight,
+  Trash2, Database,
 } from "lucide-react";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,8 @@ const GROUPS: NavGroup[] = [
       { href: "/settings/advisors", label: "Advisors", icon: Shield },
       { href: "/settings/document-templates", label: "Templates", icon: PaintbrushVertical },
       { href: "/settings/import-export", label: "Import & Export", icon: ArrowLeftRight },
+      { href: "/settings/trash", label: "Trash", icon: Trash2 },
+      { href: "/settings/backups", label: "Backups", icon: Database },
     ],
   },
   {

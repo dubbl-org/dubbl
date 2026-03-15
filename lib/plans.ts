@@ -13,6 +13,8 @@ export const PLAN_LIMITS = {
     storageMb: 100,
     apiAccess: false,
     auditLogDays: 30,
+    backupRetentionDays: 7,
+    maxManualBackups: 3,
   },
   pro: {
     organizations: 1,
@@ -38,6 +40,8 @@ export const PLAN_LIMITS = {
     storageMb: 5120,
     apiAccess: true,
     auditLogDays: 365,
+    backupRetentionDays: 30,
+    maxManualBackups: 10,
   },
 } as const;
 

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { eq, and } from "drizzle-orm";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 
 export async function POST(request: Request) {
   try {
@@ -48,6 +49,15 @@ export async function POST(request: Request) {
         updatedAt: new Date(),
       })
       .where(eq(stripeIntegration.id, integration.id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "stripe_integration",
+      entityId: integration.id,
+      changes: integration as Record<string, unknown>,
+      request,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

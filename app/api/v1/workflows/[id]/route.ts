@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -115,6 +116,15 @@ export async function DELETE(
     if (!existing) return notFound("Workflow");
 
     await db.update(workflow).set(softDelete()).where(eq(workflow.id, id));
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "workflow",
+      entityId: id,
+      changes: existing as Record<string, unknown>,
+      request,
+    });
 
     return ok({ success: true });
   } catch (err) {

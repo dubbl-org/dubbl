@@ -29,6 +29,8 @@ const ENDPOINTS = [
   "/api/cron/invoicing",
   "/api/cron/stripe-retry",
   "/api/cron/bookkeeping",
+  "/api/cron/trash-purge",
+  "/api/cron/backups",
 ];
 
 const headers = { Authorization: `Bearer ${CRON_SECRET}` };

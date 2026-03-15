@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -91,6 +92,16 @@ export async function DELETE(
       .returning();
 
     if (!deleted) return notFound("Report");
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "saved_report",
+      entityId: id,
+      changes: deleted as Record<string, unknown>,
+      request,
+    });
+
     return ok({ success: true });
   } catch (err) {
     return handleError(err);

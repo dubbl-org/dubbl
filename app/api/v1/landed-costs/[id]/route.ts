@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -81,6 +82,16 @@ export async function DELETE(
       .returning();
 
     if (!deleted) return notFound("Landed cost allocation");
+
+    logAudit({
+      ctx,
+      action: "delete",
+      entityType: "landed_cost",
+      entityId: id,
+      changes: deleted as Record<string, unknown>,
+      request,
+    });
+
     return NextResponse.json({ success: true });
   } catch (err) {
     return handleError(err);
