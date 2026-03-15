@@ -32,6 +32,7 @@ import {
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 type BankAccountType =
   | "checking"
@@ -91,6 +92,8 @@ export default function BankingPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBalances, setShowBalances] = useState(true);
+
+  useDocumentTitle("Accounting \u00B7 Bank Accounts");
 
   function fetchAccounts() {
     const orgId = localStorage.getItem("activeOrgId");

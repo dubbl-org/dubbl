@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Employee {
   id: string;
@@ -51,6 +52,7 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Payroll · Overview");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

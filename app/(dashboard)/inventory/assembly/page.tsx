@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface AssemblyOrder {
   id: string;
@@ -33,6 +34,7 @@ export default function AssemblyOrdersPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [orders, setOrders] = useState<AssemblyOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Inventory · Assembly");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

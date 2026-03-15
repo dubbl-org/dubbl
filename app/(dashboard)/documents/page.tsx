@@ -67,6 +67,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { SearchInput } from "@/components/ui/search-input";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface DocFolder {
@@ -130,6 +131,7 @@ export default function DocumentsPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "documents" | "images" | "spreadsheets">("all");
   const [sortBy, setSortBy] = useState<"name" | "date" | "size">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  useDocumentTitle("Documents · All Documents");
   const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);

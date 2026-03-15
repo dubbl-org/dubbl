@@ -33,6 +33,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney, parseMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface ScheduledPaymentItem {
   id: string;
@@ -111,6 +112,8 @@ export default function ScheduledPaymentsPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
+
+  useDocumentTitle("Accounting \u00B7 Scheduled Payments");
 
   const fetchItems = useCallback(() => {
     if (!orgId) return;

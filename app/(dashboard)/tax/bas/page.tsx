@@ -10,6 +10,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -34,6 +35,7 @@ export default function BasPage() {
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [fields, setFields] = useState<BasField[]>([]);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Tax · BAS");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

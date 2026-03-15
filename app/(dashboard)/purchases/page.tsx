@@ -31,6 +31,7 @@ import {
 import { formatMoney } from "@/lib/money";
 import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { motion, MotionConfig } from "motion/react";
@@ -180,6 +181,8 @@ export default function BillsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useDocumentTitle("Purchases · Bills");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   const columns = useMemo(() => buildColumns(), []);

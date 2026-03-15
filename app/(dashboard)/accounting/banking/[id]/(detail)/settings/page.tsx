@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "../layout";
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS } from "../../_components";
 
@@ -28,6 +29,8 @@ export default function BankSettingsPage() {
   const [bankCurrency, setBankCurrency] = useState(account?.currencyCode || "USD");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useDocumentTitle("Accounting \u00B7 Bank Settings");
 
   async function handleSaveSettings(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

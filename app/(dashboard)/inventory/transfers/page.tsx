@@ -40,6 +40,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface WarehouseInfo {
@@ -124,6 +125,7 @@ export default function TransfersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortKey>("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  useDocumentTitle("Inventory · Transfers");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

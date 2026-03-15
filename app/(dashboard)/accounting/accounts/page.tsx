@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Account {
   id: string;
@@ -46,6 +47,8 @@ export default function AccountsPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sort, setSort] = useState("code:asc");
+
+  useDocumentTitle("Accounting \u00B7 Chart of Accounts");
 
   function fetchAccounts() {
     const orgId = localStorage.getItem("activeOrgId");

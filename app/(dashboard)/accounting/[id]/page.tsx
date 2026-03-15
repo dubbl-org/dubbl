@@ -33,6 +33,7 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import Link from "next/link";
 
 interface Line {
@@ -116,6 +117,7 @@ export default function EntryDetailPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
+  useDocumentTitle("Accounting \u00B7 Entry Details");
   useEntityTitle(entry ? `JE-${entry.entryNumber}` : undefined);
 
   useEffect(() => {

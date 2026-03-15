@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface MemberTeam {
   id: string;
@@ -41,6 +42,7 @@ export default function TeamMembersPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const pendingSearch = search !== debouncedSearch;
+  useDocumentTitle("Teams · Members");
 
   const fetchMembers = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");

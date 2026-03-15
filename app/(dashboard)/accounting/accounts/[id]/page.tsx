@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface LedgerEntry {
   entryId: string;
@@ -106,6 +107,8 @@ export default function AccountLedgerPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useDocumentTitle("Accounting \u00B7 Account Details");
 
   const pendingSearch = search !== debouncedSearch;
 

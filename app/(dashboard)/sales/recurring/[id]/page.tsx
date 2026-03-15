@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import Link from "next/link";
 
@@ -73,6 +74,7 @@ export default function RecurringDetailPage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
+  useDocumentTitle("Sales · Recurring Template");
   useEntityTitle(template?.name);
 
   useEffect(() => {

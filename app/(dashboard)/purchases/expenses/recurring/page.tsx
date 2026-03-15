@@ -26,6 +26,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Plus, Trash2 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 
@@ -71,6 +72,8 @@ const emptyLine = (): LineItem => ({
 export default function RecurringExpensesPage() {
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useDocumentTitle("Purchases · Recurring Expenses");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 

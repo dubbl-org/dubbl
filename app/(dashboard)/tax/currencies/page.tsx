@@ -10,6 +10,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -291,6 +292,7 @@ export default function CurrenciesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [refOpen, setRefOpen] = useState(false);
+  useDocumentTitle("Tax · Currencies");
 
   const orgId =
     typeof window !== "undefined"

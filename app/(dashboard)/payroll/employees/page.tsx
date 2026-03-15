@@ -29,6 +29,7 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +79,7 @@ export default function EmployeesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  useDocumentTitle("Payroll · Employees");
 
   const fetchEmployees = useCallback(() => {
     const orgId = localStorage.getItem("activeOrgId");

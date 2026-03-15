@@ -43,6 +43,7 @@ import { AccountPicker } from "@/components/dashboard/account-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal, decimalToCents } from "@/lib/money";
 import Link from "next/link";
@@ -452,6 +453,7 @@ export default function ExpenseDetailPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
+  useDocumentTitle("Purchases · Expense Details");
   useEntityTitle(claim?.title);
 
   const loadClaim = useCallback(() => {

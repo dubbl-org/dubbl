@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useProject, type NoteData } from "../project-context";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function NotesPage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
@@ -45,6 +46,7 @@ export default function NotesPage() {
   const [filterAuthor, setFilterAuthor] = useState("all");
   const [filterPinned, setFilterPinned] = useState("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
+  useDocumentTitle("Projects · Notes");
 
   if (!proj) return null;
 

@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Plus, Trash2 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { toast } from "sonner";
 
 interface CostComponent {
@@ -53,6 +54,8 @@ export default function LandedCostsPage() {
   const router = useRouter();
   const [items, setItems] = useState<LandedCost[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useDocumentTitle("Purchases · Landed Costs");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 

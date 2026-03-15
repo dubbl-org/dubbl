@@ -51,6 +51,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useProject, formatHours, formatDateShort, type TimeEntryData, type RunningTimerData } from "../project-context";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function TimePage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
@@ -84,6 +85,7 @@ export default function TimePage() {
   const lastSavedTaskRef = useRef("none");
   const lastSavedBillableRef = useRef(true);
   const stoppingRef = useRef(false);
+  useDocumentTitle("Projects · Time Entries");
 
   // Initialize timer from server data
   useEffect(() => {

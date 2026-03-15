@@ -7,7 +7,7 @@ import {
 } from "@/components/legal/legal-page-layout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy ·dubbl",
+  title: "Privacy Policy",
   description:
     "How dubbl (Mindroot Ltd) collects, uses, and protects your personal data under the UK GDPR.",
 };

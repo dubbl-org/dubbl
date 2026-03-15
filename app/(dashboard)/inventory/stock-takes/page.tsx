@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 
@@ -72,6 +73,7 @@ export default function StockTakesPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<FilterTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  useDocumentTitle("Inventory · Stock Takes");
 
   function fetchStockTakes() {
     const orgId = localStorage.getItem("activeOrgId");

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import {
   Plus,
   Trash2,
@@ -91,6 +92,7 @@ export default function TasksPage() {
   const [checkItemSaving, setCheckItemSaving] = useState(false);
   const [deletingCheckId, setDeletingCheckId] = useState<string | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  useDocumentTitle("Projects · Tasks");
 
   if (!proj) return null;
 

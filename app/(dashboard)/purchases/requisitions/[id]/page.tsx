@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import {
   Sheet,
@@ -71,6 +72,7 @@ export default function RequisitionDetailPage() {
   const [rejectSheetOpen, setRejectSheetOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [acting, setActing] = useState(false);
+  useDocumentTitle("Purchases · Requisition Details");
   useEntityTitle(req?.requisitionNumber);
   const orgId =
     typeof window !== "undefined"

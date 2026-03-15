@@ -8,6 +8,7 @@ import {
   Clock, XCircle, Check, Trash2, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +104,7 @@ export default function MembersPage() {
   const [linkMaxUses, setLinkMaxUses] = useState("");
   const [linkExpiryDays, setLinkExpiryDays] = useState("");
   const [creatingLink, setCreatingLink] = useState(false);
+  useDocumentTitle("Settings · Members");
 
   function getOrgId() {
     return localStorage.getItem("activeOrgId") || "";

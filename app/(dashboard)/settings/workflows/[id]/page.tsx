@@ -19,6 +19,7 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Condition {
   field: string;
@@ -97,6 +98,7 @@ export default function WorkflowDetailPage() {
   const [actions, setActions] = useState<Action[]>([]);
   const [testResult, setTestResult] = useState<{ matches: boolean } | null>(null);
   const [testData, setTestData] = useState("{}");
+  useDocumentTitle("Settings · Workflow Details");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

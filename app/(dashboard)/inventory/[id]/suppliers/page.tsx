@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function InventoryItemSuppliersPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +37,7 @@ export default function InventoryItemSuppliersPage() {
   const [leadDays, setLeadDays] = useState("");
   const [price, setPrice] = useState("");
   const [preferred, setPreferred] = useState(false);
+  useDocumentTitle("Inventory · Suppliers");
 
   function fetchSuppliers() {
     const orgId = localStorage.getItem("activeOrgId");

@@ -32,6 +32,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface PayrollRunDetail {
@@ -106,6 +107,7 @@ export default function PayrollRunDetailPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
+  useDocumentTitle("Payroll · Run Details");
 
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);

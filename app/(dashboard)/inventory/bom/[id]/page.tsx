@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 
 interface BOMDetail {
@@ -38,6 +39,7 @@ export default function BOMDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<BOMDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Inventory · BOM Details");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2, Loader2 } from "lucide-react";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -35,6 +36,7 @@ export default function SettingsPage() {
   const [projBudget, setProjBudget] = useState(centsToDecimal(proj?.budget ?? 0));
   const [projHourlyRate, setProjHourlyRate] = useState(centsToDecimal(proj?.hourlyRate ?? 0));
   const [projFixedPrice, setProjFixedPrice] = useState(centsToDecimal(proj?.fixedPrice ?? 0));
+  useDocumentTitle("Projects · Settings");
 
   if (!proj) return null;
 

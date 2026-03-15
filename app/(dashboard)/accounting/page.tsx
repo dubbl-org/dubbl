@@ -33,6 +33,7 @@ import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Entry {
   id: string;
@@ -114,6 +115,8 @@ export default function TransactionsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("date:desc");
+
+  useDocumentTitle("Accounting \u00B7 Journal Entries");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");

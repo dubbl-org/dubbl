@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ export default function WorkflowsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", trigger: "invoice_created" });
+  useDocumentTitle("Settings · Workflows");
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";

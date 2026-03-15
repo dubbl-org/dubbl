@@ -30,6 +30,7 @@ import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface BankAccountDetail {
   id: string;
@@ -81,6 +82,8 @@ export default function ReconcilePage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
+
+  useDocumentTitle("Accounting \u00B7 Reconciliation");
 
   const fetchData = useCallback(() => {
     if (!orgId) return;

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface ReviewDetail {
@@ -44,6 +45,7 @@ export default function ReviewDetailPage() {
   const router = useRouter();
   const [review, setReview] = useState<ReviewDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle("Payroll · Review Details");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

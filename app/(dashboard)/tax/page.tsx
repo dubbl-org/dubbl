@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import {
   Sheet,
   SheetContent,
@@ -119,6 +120,7 @@ export default function TaxRatesPage() {
   const [editRate, setEditRate] = useState("");
   const [editType, setEditType] = useState("both");
   const [editSaving, setEditSaving] = useState(false);
+  useDocumentTitle("Tax · Tax Rates");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 

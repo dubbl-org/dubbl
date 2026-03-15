@@ -43,6 +43,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { formatMoney } from "@/lib/money";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface Band {
@@ -123,6 +124,7 @@ export default function CompensationPage() {
   const [newReview, setNewReview] = useState({ name: "", effectiveDate: "", totalBudget: "" });
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Payroll · Compensation");
 
   const fetchData = useCallback(() => {
     if (!orgId) return;

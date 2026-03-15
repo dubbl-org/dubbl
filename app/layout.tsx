@@ -22,10 +22,75 @@ const playfairDisplay = Playfair_Display({
   subsets: ["latin"],
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev";
+
 export const metadata: Metadata = {
-  title: "dubbl · Open Source Bookkeeping",
+  title: {
+    default: "dubbl · Open-Source Accounting, ERP & Business Management",
+    template: "%s · dubbl",
+  },
   description:
-    "Open source, double-entry bookkeeping for modern teams. API-first, developer-friendly, and licensed under Apache 2.0.",
+    "Free, open-source double-entry accounting with invoicing, bills, payroll, inventory, projects, and CRM. Self-host or use our cloud. API-first, MCP-ready, Apache 2.0.",
+  metadataBase: new URL(APP_URL),
+  keywords: [
+    "open source accounting",
+    "double-entry bookkeeping",
+    "invoicing software",
+    "accounts payable",
+    "accounts receivable",
+    "general ledger",
+    "ERP",
+    "payroll software",
+    "inventory management",
+    "project management",
+    "CRM",
+    "self-hosted accounting",
+    "API-first accounting",
+    "small business accounting",
+    "free accounting software",
+  ],
+  authors: [{ name: "dubbl", url: APP_URL }],
+  creator: "dubbl",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: APP_URL,
+    siteName: "dubbl",
+    title: "dubbl · Open-Source Accounting & Business Management",
+    description:
+      "Free, open-source double-entry accounting with invoicing, bills, payroll, inventory, projects, and CRM. Self-host or use our cloud.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "dubbl - Open-source accounting for modern teams",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "dubbl · Open-Source Accounting & Business Management",
+    description:
+      "Free, open-source double-entry accounting with invoicing, bills, payroll, inventory, projects, and CRM. Self-host or use our cloud.",
+    images: ["/og.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  icons: {
+    icon: "/logo.svg",
+    apple: "/web-app-manifest-192x192.png",
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { useProject, formatDateShort, pct } from "../project-context";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function MilestonesPage() {
   const { project: proj, orgId, projectId, refresh } = useProject();
@@ -69,6 +70,7 @@ export default function MilestonesPage() {
     invoicedPercent?: number;
   }
   const [uninvoicedData, setUninvoicedData] = useState<UninvoicedData | null>(null);
+  useDocumentTitle("Projects · Milestones");
 
   useEffect(() => {
     if (!assignMilestoneId || !orgId) return;

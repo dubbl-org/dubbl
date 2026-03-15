@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -128,6 +129,9 @@ export default function PurchaseOrdersPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  useDocumentTitle("Purchases · Purchase Orders");
+
   const columns = useMemo(() => buildColumns(), []);
 
   const buildParams = useCallback((pg: number) => {

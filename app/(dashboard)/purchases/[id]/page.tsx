@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import Link from "next/link";
@@ -43,6 +44,7 @@ export default function BillDetailPage() {
   const [payOpen, setPayOpen] = useState(false);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
+  useDocumentTitle("Purchases · Bill Details");
   useEntityTitle(b?.billNumber);
 
   const loadBill = useCallback(() => {

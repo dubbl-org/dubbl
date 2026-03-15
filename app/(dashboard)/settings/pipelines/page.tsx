@@ -42,6 +42,7 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 interface PipelineStage {
@@ -415,6 +416,7 @@ export default function PipelinesSettingsPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  useDocumentTitle("Settings · Pipelines");
 
   const fetchPipelines = useCallback(async () => {
     if (!orgId) return;

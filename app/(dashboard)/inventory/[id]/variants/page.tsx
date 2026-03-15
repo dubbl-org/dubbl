@@ -19,6 +19,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { formatMoney } from "@/lib/money";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
 export default function InventoryItemVariantsPage() {
@@ -33,6 +34,7 @@ export default function InventoryItemVariantsPage() {
   const [purchasePrice, setPurchasePrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [quantity, setQuantity] = useState("");
+  useDocumentTitle("Inventory · Variants");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
