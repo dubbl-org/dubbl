@@ -12,6 +12,7 @@ import {
   generateAmortizationSchedule,
 } from "@/lib/api/amortization";
 import { decimalToCents } from "@/lib/money";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
         sortOrder: entry.periodNumber,
       }))
     );
+
+    logAudit({ ctx, action: "create", entityType: "loan", entityId: created.id, request });
 
     return NextResponse.json({ loan: created, schedule }, { status: 201 });
   } catch (err) {

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { fiscalYear } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
         ...parsed,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "fiscal_year", entityId: year.id, request });
 
     return NextResponse.json({ fiscalYear: year }, { status: 201 });
   } catch (err) {

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -92,6 +93,8 @@ export async function POST(request: Request) {
         accumulatedDepAccountId: parsed.accumulatedDepAccountId || null,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "fixed_asset", entityId: created.id, request });
 
     return NextResponse.json({ asset: created }, { status: 201 });
   } catch (err) {

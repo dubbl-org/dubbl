@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createBillJournalEntry } from "@/lib/api/journal-automation";
+import { logAudit } from "@/lib/api/audit";
 
 export async function POST(
   request: Request,
@@ -60,6 +61,8 @@ export async function POST(
       })
       .where(eq(bill.id, id))
       .returning();
+
+    logAudit({ ctx, action: "receive", entityType: "bill", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ bill: updated });
   } catch (err) {

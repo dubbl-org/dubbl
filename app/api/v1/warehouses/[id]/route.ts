@@ -6,7 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
-import { logAudit } from "@/lib/api/audit";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -67,6 +67,8 @@ export async function PATCH(
       .set({ ...parsed, updatedAt: new Date() })
       .where(eq(warehouse.id, id))
       .returning();
+
+    logAudit({ ctx, action: "update", entityType: "warehouse", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
     return NextResponse.json({ warehouse: updated });
   } catch (err) {

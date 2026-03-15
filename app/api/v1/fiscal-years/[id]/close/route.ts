@@ -11,6 +11,7 @@ import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, error, notFound } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -203,6 +204,8 @@ export async function POST(
     const updated = await db.query.fiscalYear.findFirst({
       where: eq(fiscalYear.id, fy.id),
     });
+
+    logAudit({ ctx, action: "close", entityType: "fiscal_year", entityId: id, changes: { previousStatus: "open" }, request });
 
     return NextResponse.json({ fiscalYear: updated });
   } catch (err) {

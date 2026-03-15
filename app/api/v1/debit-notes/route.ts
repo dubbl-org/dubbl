@@ -5,6 +5,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
@@ -141,6 +142,8 @@ export async function POST(request: Request) {
         ...l,
       }))
     );
+
+    logAudit({ ctx, action: "create", entityType: "debit_note", entityId: created.id, request });
 
     return NextResponse.json({ debitNote: created }, { status: 201 });
   } catch (err) {

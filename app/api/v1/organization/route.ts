@@ -9,6 +9,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { isValidBusinessType } from "@/lib/data/business-types";
 import { checkOrganizationLimit, LimitExceededError } from "@/lib/api/check-limit";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { getSiteSetting } from "@/lib/site-settings";
 import { render } from "@react-email/render";
 import { createElement } from "react";
@@ -179,6 +180,8 @@ export async function POST(request: Request) {
         .catch(() => {});
     }
 
+    logAudit({ ctx: { organizationId: orgId, userId: session.user!.id!, role: "owner", permissions: [] }, action: "create", entityType: "organization", entityId: orgId, request });
+
     return NextResponse.json({ organization: created }, { status: 201 });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -204,11 +207,17 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
+    const existing = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+    });
+
     const [updated] = await db
       .update(organization)
       .set({ ...parsed, updatedAt: new Date() })
       .where(eq(organization.id, ctx.organizationId))
       .returning();
+
+    logAudit({ ctx, action: "update", entityType: "organization", entityId: ctx.organizationId, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
     return NextResponse.json({ organization: updated });
   } catch (err) {

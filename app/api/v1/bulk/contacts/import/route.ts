@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { preProcessContacts } from "@/lib/import-export/pre-process";
 import { z } from "zod";
 
@@ -87,6 +88,9 @@ export async function POST(request: Request) {
       status: errorRows === parsed.rows.length ? "failed" : "completed",
       completedAt: new Date(),
     }).where(eq(bulkImportJob.id, job.id)).returning();
+
+    await logAudit({ ctx, action: "import", entityType: "contact", entityId: ctx.organizationId,
+      changes: { count: processedRows, jobId: job.id }, request });
 
     return NextResponse.json({ job: updated }, { status: 201 });
   } catch (err) {

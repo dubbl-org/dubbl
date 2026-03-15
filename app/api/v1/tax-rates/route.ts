@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
         ...parsed,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "tax_rate", entityId: created.id, request });
 
     return NextResponse.json({ taxRate: created }, { status: 201 });
   } catch (err) {

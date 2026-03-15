@@ -4,6 +4,7 @@ import { eq, and, desc, asc, isNull, isNotNull, ilike } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 
@@ -115,6 +116,8 @@ export async function POST(request: Request) {
         ...parsed,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "deal", entityId: d.id, request });
 
     return created({ deal: d });
   } catch (err) {

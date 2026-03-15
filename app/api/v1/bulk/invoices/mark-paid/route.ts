@@ -4,6 +4,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { ok, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const schema = z.object({
@@ -40,6 +41,10 @@ export async function POST(request: Request) {
         .where(eq(invoice.id, inv.id));
       count++;
     }
+
+    const paidIds = invoices.filter((inv) => inv.status !== "void").map((inv) => inv.id);
+    await logAudit({ ctx, action: "pay", entityType: "invoice", entityId: ctx.organizationId,
+      changes: { count, ids: paidIds }, request });
 
     return ok({ updated: count });
   } catch (err) {

@@ -4,6 +4,7 @@ import { chartAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
         ...parsed,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "chart_account", entityId: account.id, request });
 
     return NextResponse.json({ account }, { status: 201 });
   } catch (err) {

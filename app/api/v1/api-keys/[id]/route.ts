@@ -4,6 +4,7 @@ import { apiKey } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
+import { logAudit } from "@/lib/api/audit";
 
 export async function DELETE(
   request: Request,
@@ -27,6 +28,8 @@ export async function DELETE(
     if (!deleted) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    logAudit({ ctx, action: "delete", entityType: "api_key", entityId: id, request });
 
     return NextResponse.json({ success: true });
   } catch (err) {

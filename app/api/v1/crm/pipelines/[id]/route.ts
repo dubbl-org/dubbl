@@ -5,7 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
-import { logAudit } from "@/lib/api/audit";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -50,6 +50,11 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
+    const existing = await db.query.pipeline.findFirst({
+      where: and(eq(pipeline.id, id), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)),
+    });
+    if (!existing) return notFound("Pipeline");
+
     const [updated] = await db
       .update(pipeline)
       .set(parsed)
@@ -57,6 +62,9 @@ export async function PATCH(
       .returning();
 
     if (!updated) return notFound("Pipeline");
+
+    logAudit({ ctx, action: "update", entityType: "pipeline", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
+
     return ok({ pipeline: updated });
   } catch (err) {
     return handleError(err);

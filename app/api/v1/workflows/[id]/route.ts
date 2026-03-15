@@ -5,7 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
-import { logAudit } from "@/lib/api/audit";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -91,6 +91,8 @@ export async function PATCH(
       .set({ ...parsed, updatedAt: new Date() })
       .where(eq(workflow.id, id))
       .returning();
+
+    logAudit({ ctx, action: "update", entityType: "workflow", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
     return ok({ workflow: updated });
   } catch (err) {

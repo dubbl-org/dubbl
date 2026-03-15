@@ -5,7 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
-import { logAudit } from "@/lib/api/audit";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 
 export async function GET(
@@ -68,6 +68,8 @@ export async function PATCH(
       .set({ ...body, updatedAt: new Date() })
       .where(eq(bill.id, id))
       .returning();
+
+    logAudit({ ctx, action: "update", entityType: "bill", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
     return NextResponse.json({ bill: updated });
   } catch (err) {

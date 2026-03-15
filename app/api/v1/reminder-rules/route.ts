@@ -5,6 +5,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
         customEmails: parsed.customEmails || null,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "reminder_rule", entityId: created.id, request });
 
     return NextResponse.json({ reminderRule: created }, { status: 201 });
   } catch (err) {

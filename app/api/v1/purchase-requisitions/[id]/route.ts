@@ -6,7 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
-import { logAudit } from "@/lib/api/audit";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(
@@ -49,19 +49,24 @@ export async function PUT(
       })
       .parse(body);
 
+    const existing = await db.query.purchaseRequisition.findFirst({
+      where: and(
+        eq(purchaseRequisition.id, id),
+        eq(purchaseRequisition.organizationId, ctx.organizationId),
+        notDeleted(purchaseRequisition.deletedAt)
+      ),
+    });
+
+    if (!existing) return notFound("Purchase requisition");
+
     const [updated] = await db
       .update(purchaseRequisition)
       .set({ ...parsed, updatedAt: new Date() })
-      .where(
-        and(
-          eq(purchaseRequisition.id, id),
-          eq(purchaseRequisition.organizationId, ctx.organizationId),
-          notDeleted(purchaseRequisition.deletedAt)
-        )
-      )
+      .where(eq(purchaseRequisition.id, id))
       .returning();
 
-    if (!updated) return notFound("Purchase requisition");
+    logAudit({ ctx, action: "update", entityType: "purchase_requisition", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
+
     return NextResponse.json(updated);
   } catch (err) {
     return handleError(err);

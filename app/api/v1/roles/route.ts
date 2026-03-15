@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { ALL_PERMISSIONS } from "@/lib/plans";
 import { z } from "zod";
+import { logAudit } from "@/lib/api/audit";
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
         permissions: parsed.permissions,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "role", entityId: created.id, request });
 
     return NextResponse.json({ role: created }, { status: 201 });
   } catch (err) {

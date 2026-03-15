@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
+import { logAudit, diffChanges } from "@/lib/api/audit";
 
 const updateSchema = z.object({
   role: z.enum(["admin", "member"]).optional(),
@@ -50,6 +51,8 @@ export async function PATCH(
       .where(eq(member.id, id))
       .returning();
 
+    logAudit({ ctx, action: "update", entityType: "member", entityId: id, changes: diffChanges(target as Record<string, unknown>, updated as Record<string, unknown>), request });
+
     return NextResponse.json({ member: updated });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -86,6 +89,8 @@ export async function DELETE(
     }
 
     await db.delete(member).where(eq(member.id, id));
+
+    logAudit({ ctx, action: "delete", entityType: "member", entityId: id, request });
 
     return NextResponse.json({ success: true });
   } catch (err) {

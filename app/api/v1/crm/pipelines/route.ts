@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(request: Request) {
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
         ...parsed,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "pipeline", entityId: p.id, request });
 
     return created({ pipeline: p });
   } catch (err) {

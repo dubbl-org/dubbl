@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, expenseClaim, expenseItem, auditLog } from "@/lib/db/schema";
+import { bankTransaction, bankAccount, expenseClaim, expenseItem } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { decimalToCents } from "@/lib/money";
 import { z } from "zod";
@@ -101,14 +102,7 @@ export async function POST(
       .set({ status: "reconciled" })
       .where(eq(bankTransaction.id, id));
 
-    await db.insert(auditLog).values({
-      organizationId: ctx.organizationId,
-      userId: ctx.userId,
-      action: "created_expense",
-      entityType: "bank_transaction",
-      entityId: id,
-      changes: { expenseClaimId: created.id, amount: totalAmount },
-    });
+    logAudit({ ctx, action: "create", entityType: "expense", entityId: created.id, changes: { bankTransactionId: id, amount: totalAmount }, request });
 
     return NextResponse.json({ expenseClaim: created }, { status: 201 });
   } catch (err) {

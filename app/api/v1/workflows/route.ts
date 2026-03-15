@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 export async function GET(request: Request) {
@@ -76,6 +77,8 @@ export async function POST(request: Request) {
         isActive: parsed.isActive,
       })
       .returning();
+
+    logAudit({ ctx, action: "create", entityType: "workflow", entityId: wf.id, request });
 
     return created({ workflow: wf });
   } catch (err) {

@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
 const schema = z.object({
@@ -19,6 +20,11 @@ export async function POST(
     const ctx = await getAuthContext(request);
     const body = await request.json();
     const { reason } = schema.parse(body);
+
+    const found = await db.query.deal.findFirst({
+      where: and(eq(deal.id, id), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)),
+    });
+    if (!found) return notFound("Deal");
 
     const [updated] = await db
       .update(deal)
@@ -39,6 +45,9 @@ export async function POST(
       .returning();
 
     if (!updated) return notFound("Deal");
+
+    logAudit({ ctx, action: "lost", entityType: "deal", entityId: id, changes: { previousStatus: found.stageId }, request });
+
     return ok({ deal: updated });
   } catch (err) {
     return handleError(err);
