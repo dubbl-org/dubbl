@@ -4,7 +4,10 @@ import { subscription, organization } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { stripe } from "@/lib/stripe";
+import { stripe as _stripeClient } from "@/lib/stripe";
+
+// Non-null wrapper - POST handler guards for null before calling helpers
+const stripe = _stripeClient!;
 import { z } from "zod";
 
 const checkoutSchema = z.object({
@@ -14,6 +17,10 @@ const checkoutSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  if (!_stripeClient) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:billing");
@@ -102,6 +109,7 @@ async function handleSeatCheckout(
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
+    automatic_tax: { enabled: true },
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?success=true`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing`,
@@ -168,6 +176,7 @@ async function handleStorageCheckout(
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
+    automatic_tax: { enabled: true },
     line_items: [{ price: storagePriceId, quantity: 1 }],
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?success=true`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing`,

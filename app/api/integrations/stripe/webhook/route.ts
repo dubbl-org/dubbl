@@ -22,6 +22,10 @@ import { processStripeEvent } from "@/lib/integrations/stripe/sync";
  * - Single secret to manage via STRIPE_CONNECT_WEBHOOK_SECRET env var
  */
 export async function POST(request: Request) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   const connectWebhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
   if (!connectWebhookSecret) {
     console.error("STRIPE_CONNECT_WEBHOOK_SECRET not configured");

@@ -7,6 +7,10 @@ import { requireRole } from "@/lib/api/require-role";
 import { stripe } from "@/lib/stripe";
 
 export async function POST(request: Request) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:billing");

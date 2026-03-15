@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -52,6 +53,13 @@ export default function SignInPage() {
   );
 }
 
+interface ProvidersConfig {
+  google: boolean;
+  apple: boolean;
+  registrationMode: string;
+  allowedDomains: string;
+}
+
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,6 +69,17 @@ function SignInContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
+  const [providers, setProviders] = useState<ProvidersConfig | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/providers-config")
+      .then((r) => r.json())
+      .then(setProviders)
+      .catch(() => setProviders({ google: false, apple: false, registrationMode: "open", allowedDomains: "" }));
+  }, []);
+
+  const hasOAuth = providers?.google || providers?.apple;
+  const registrationDisabled = providers?.registrationMode === "disabled";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,39 +168,47 @@ function SignInContent() {
       )}
 
       {/* OAuth providers */}
-      <motion.div
-        className="grid grid-cols-2 gap-2.5"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-      >
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 rounded-lg text-sm font-medium"
-          onClick={() => signIn("google", { callbackUrl })}
-        >
-          <GoogleIcon className="size-4" />
-          Google
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 rounded-lg text-sm font-medium"
-          onClick={() => signIn("apple", { callbackUrl })}
-        >
-          <AppleIcon className="size-4" />
-          Apple
-        </Button>
-      </motion.div>
+      {hasOAuth && (
+        <>
+          <motion.div
+            className={cn("grid gap-2.5", providers?.google && providers?.apple ? "grid-cols-2" : "grid-cols-1")}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+          >
+            {providers?.google && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-lg text-sm font-medium"
+                onClick={() => signIn("google", { callbackUrl })}
+              >
+                <GoogleIcon className="size-4" />
+                Google
+              </Button>
+            )}
+            {providers?.apple && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-lg text-sm font-medium"
+                onClick={() => signIn("apple", { callbackUrl })}
+              >
+                <AppleIcon className="size-4" />
+                Apple
+              </Button>
+            )}
+          </motion.div>
 
-      <div className="my-5 flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-[11px] text-muted-foreground">
-          or continue with email
-        </span>
-        <Separator className="flex-1" />
-      </div>
+          <div className="my-5 flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-[11px] text-muted-foreground">
+              or continue with email
+            </span>
+            <Separator className="flex-1" />
+          </div>
+        </>
+      )}
 
       <motion.form
         onSubmit={handleSubmit}
@@ -243,20 +270,22 @@ function SignInContent() {
         </Button>
       </motion.form>
 
-      <motion.p
-        className="mt-6 text-center text-sm text-muted-foreground"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-      >
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/sign-up"
-          className="font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+      {!registrationDisabled && (
+        <motion.p
+          className="mt-6 text-center text-sm text-muted-foreground"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
         >
-          Sign up
-        </Link>
-      </motion.p>
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/sign-up"
+            className="font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+          >
+            Sign up
+          </Link>
+        </motion.p>
+      )}
 
       <motion.p
         className="mt-4 text-center text-[11px] text-muted-foreground/60"

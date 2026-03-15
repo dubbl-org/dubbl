@@ -11,6 +11,8 @@ import {
 } from "./sync";
 
 export async function runInitialSync(integrationId: string) {
+  if (!stripe) throw new Error("Stripe is not configured");
+
   const integration = await db.query.stripeIntegration.findFirst({
     where: eq(stripeIntegration.id, integrationId),
   });

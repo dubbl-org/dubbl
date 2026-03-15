@@ -1,7 +1,10 @@
 import { db } from "@/lib/db";
 import { stripeSyncLog, stripeIntegration } from "@/lib/db/schema";
 import { eq, and, gte, lt } from "drizzle-orm";
-import { stripe } from "@/lib/stripe";
+import { stripe as _stripeClient } from "@/lib/stripe";
+
+// Non-null wrapper - callers already guard for null stripe
+const stripe = _stripeClient!;
 import { processStripeEvent } from "./sync";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { sendNotification } from "@/lib/notifications/send";

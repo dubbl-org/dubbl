@@ -39,3 +39,4 @@ export * from "./invitations";
 export * from "./login-history";
 export * from "./integrations";
 export * from "./backups";
+export * from "./site-settings";

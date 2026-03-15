@@ -10,6 +10,10 @@ import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 
 export async function POST(request: Request) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Billing not configured" }, { status: 404 });
+  }
+
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:integrations");

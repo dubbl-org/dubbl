@@ -49,6 +49,7 @@ const storagePlans = [
 
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [selfHosted, setSelfHosted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -64,6 +65,7 @@ export default function BillingPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.billing) setBilling(data.billing);
+        if (data.selfHosted) setSelfHosted(true);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -118,6 +120,22 @@ export default function BillingPage() {
   const isPro = currentPlan === "pro";
 
   if (loading) return <BrandLoader />;
+
+  if (selfHosted) {
+    return (
+      <ContentReveal className="space-y-6">
+        <div className="rounded-xl border bg-card p-8 text-center">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
+            <Check className="size-6 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h3 className="text-lg font-semibold">All features unlocked</h3>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+            This is a self-hosted instance with all Pro features enabled. No billing or subscription is required.
+          </p>
+        </div>
+      </ContentReveal>
+    );
+  }
 
   return (
     <ContentReveal className="space-y-10">

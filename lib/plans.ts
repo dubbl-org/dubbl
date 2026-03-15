@@ -165,6 +165,28 @@ export function getEffectiveLimits(sub: {
   overrideMultiCurrency?: boolean | null;
   overrideEntriesPerMonth?: number | null;
 } | null) {
+  // Self-hosted mode: if no Stripe key, everything is unlimited
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return {
+      ...PLAN_LIMITS.pro,
+      organizations: Infinity,
+      members: Infinity,
+      storageMb: Infinity,
+      entriesPerMonth: Infinity,
+      contacts: Infinity,
+      invoicesPerMonth: Infinity,
+      emailsPerMonth: Infinity,
+      bankAccounts: Infinity,
+      projects: Infinity,
+      multiCurrency: true,
+      apiAccess: true,
+      auditLogDays: Infinity,
+      backupRetentionDays: Infinity,
+      maxManualBackups: Infinity,
+      reports: PLAN_LIMITS.pro.reports,
+    };
+  }
+
   const plan = sub?.plan ?? "free";
   const base = PLAN_LIMITS[plan];
   return {

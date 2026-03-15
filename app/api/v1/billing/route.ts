@@ -48,7 +48,10 @@ export async function GET(request: Request) {
       ? STORAGE_PLANS[storagePlan].emailsPerMonth
       : PLAN_LIMITS[plan].emailsPerMonth;
 
+    const selfHosted = !process.env.STRIPE_SECRET_KEY;
+
     return NextResponse.json({
+      selfHosted,
       billing: sub
         ? {
             plan: sub.plan,
