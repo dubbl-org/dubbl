@@ -18,7 +18,7 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:period_lock");
+    requireRole(ctx, "manage:period-lock");
 
     // Get fiscal year and verify ownership
     const fy = await db.query.fiscalYear.findFirst({

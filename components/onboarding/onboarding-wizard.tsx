@@ -41,6 +41,9 @@ interface OrgData {
   id: string;
   name: string;
   country: string | null;
+  countryCode: string | null;
+  businessType: string | null;
+  industrySector: string | null;
 }
 
 export function OnboardingWizard() {
@@ -75,6 +78,9 @@ export function OnboardingWizard() {
         if (org) {
           setOrgId(org.id);
           setOrgName(org.name);
+          if (org.countryCode) setCountryCode(org.countryCode);
+          if (org.businessType) setBusinessType(org.businessType);
+          if (org.industrySector) setIndustry(org.industrySector);
         }
       })
       .catch(() => {})

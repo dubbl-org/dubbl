@@ -15,16 +15,18 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const budgetId = url.searchParams.get("budgetId");
 
-    if (!budgetId) {
-      return NextResponse.json({ error: "budgetId is required" }, { status: 400 });
-    }
-
+    // If no budgetId, try to find the most recent active budget
     const found = await db.query.budget.findFirst({
-      where: and(
-        eq(budget.id, budgetId),
-        eq(budget.organizationId, ctx.organizationId),
-        isNull(budget.deletedAt)
-      ),
+      where: budgetId
+        ? and(
+            eq(budget.id, budgetId),
+            eq(budget.organizationId, ctx.organizationId),
+            isNull(budget.deletedAt)
+          )
+        : and(
+            eq(budget.organizationId, ctx.organizationId),
+            isNull(budget.deletedAt)
+          ),
       with: {
         lines: {
           with: {
@@ -35,7 +37,19 @@ export async function GET(request: Request) {
       },
     });
 
-    if (!found) return notFound("Budget");
+    if (!found) {
+      return NextResponse.json({
+        budget: null,
+        comparisons: [],
+        totalBudgeted: 0,
+        totalActual: 0,
+        totalVariance: 0,
+        totalBurnRate: 0,
+        daysElapsed: 0,
+        daysRemaining: 0,
+        totalDays: 0,
+      });
+    }
 
     // Get actual GL balances for each account in the budget's date range
     const actuals = await db

@@ -99,8 +99,8 @@ export default function SettingsPage() {
   useDocumentTitle("Settings · General");
 
   const businessTypes = useMemo(
-    () => (form.country ? getBusinessTypesForCountry(form.country) : []),
-    [form.country]
+    () => (form.countryCode ? getBusinessTypesForCountry(form.countryCode) : []),
+    [form.countryCode]
   );
 
   useEffect(() => {
@@ -156,7 +156,7 @@ export default function SettingsPage() {
     const country = getCountryByCode(countryCode);
     setForm((prev) => ({
       ...prev,
-      country: countryCode,
+      country: country?.name ?? countryCode,
       businessType: "",
       countryCode: countryCode,
       ...(country ? { defaultCurrency: country.defaultCurrency } : {}),
@@ -208,8 +208,8 @@ export default function SettingsPage() {
     }
   }
 
-  const selectedCountry = form.country
-    ? getCountryByCode(form.country)
+  const selectedCountry = form.countryCode
+    ? getCountryByCode(form.countryCode)
     : null;
 
   return (
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              form.country === country.code
+                              form.countryCode === country.code
                                 ? "opacity-100"
                                 : "opacity-0"
                             )}
@@ -282,7 +282,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Entity type</Label>
-            {form.country ? (
+            {form.countryCode ? (
               <Select
                 value={form.businessType}
                 onValueChange={(v) => setForm({ ...form, businessType: v })}
