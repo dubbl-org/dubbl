@@ -115,6 +115,13 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
   "manage:approvals": "admin",
   "manage:time-tracking": "member",
   "manage:reports": "admin",
+  "manage:integrations": "admin",
+  "manage:entries": "member",
+  "manage:purchases": "member",
+  "manage:accruals": "admin",
+  "manage:revenue": "admin",
+  "manage:members": "admin",
+  "approve:purchases": "admin",
   "manage:billing": "owner",
   "delete:organization": "owner",
 };
@@ -141,8 +148,10 @@ export const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "Cost Centers": ["manage:cost-centers"],
   "Automation": ["manage:webhooks", "manage:approvals"],
   "Reports": ["manage:reports"],
+  "Integrations": ["manage:integrations"],
   "Time Tracking": ["manage:time-tracking"],
-  "Admin": ["manage:teams", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
+  "Purchases": ["manage:purchases", "approve:purchases"],
+  "Admin": ["manage:teams", "manage:members", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
   "Owner": ["manage:billing", "delete:organization"],
 };
 
@@ -213,6 +222,10 @@ export function hasPermission(
 
   // Legacy role-based check
   const role = roleOrPermissions;
+
+  // Owner always has full access
+  if (role === "owner") return true;
+
   const required = PERMISSION_REQUIREMENTS[permission];
   if (!required) return false;
   return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[required];
