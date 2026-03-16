@@ -10,6 +10,18 @@ export const authConfig: NextAuthConfig = {
   },
   providers: [],
   callbacks: {
+    redirect({ url, baseUrl }) {
+      // After OAuth sign-in (especially Apple form_post), the callbackUrl
+      // can be lost. Default to /dashboard instead of landing on /.
+      if (url === baseUrl || url === `${baseUrl}/` || url === "/") {
+        return `${baseUrl}/dashboard`;
+      }
+      // Allow relative URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allow same-origin URLs
+      if (url.startsWith(baseUrl)) return url;
+      return `${baseUrl}/dashboard`;
+    },
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;

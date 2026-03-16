@@ -1,8 +1,7 @@
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
-import { mcpAccessToken, member, subscription } from "@/lib/db/schema";
+import { mcpAccessToken, member } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { PLAN_LIMITS } from "@/lib/plans";
 import type { AuthContext } from "@/lib/api/auth-context";
 import { AuthError } from "@/lib/api/auth-context";
 import type { MemberRole } from "@/lib/plans";
@@ -20,19 +19,6 @@ export async function resolveToken(bearerToken: string): Promise<AuthContext> {
 
   if (token.expiresAt < new Date()) {
     throw new AuthError("Access token expired", 401);
-  }
-
-  // Check org subscription is still on a paid plan
-  const sub = await db.query.subscription.findFirst({
-    where: eq(subscription.organizationId, token.organizationId),
-  });
-
-  const plan = sub?.plan ?? "free";
-  if (!PLAN_LIMITS[plan].apiAccess) {
-    throw new AuthError(
-      "MCP access requires a Pro plan",
-      403
-    );
   }
 
   // Verify membership still exists

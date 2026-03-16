@@ -11,7 +11,7 @@ export const PLAN_LIMITS = {
     projects: 2,
     reports: ["trial-balance", "general-ledger"] as string[],
     storageMb: 100,
-    apiAccess: false,
+    apiAccess: true,
     auditLogDays: 30,
     backupRetentionDays: 7,
     maxManualBackups: 3,
