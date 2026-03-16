@@ -7,21 +7,14 @@ const pool = new pg.Pool({
   max: 5,
   idleTimeoutMillis: 60_000,
   connectionTimeoutMillis: 10_000,
+  statement_timeout: 30_000,
+  query_timeout: 30_000,
 });
 
-// Retry connection on Neon cold-start failures
-const originalConnect = pool.connect.bind(pool);
-pool.connect = async function retryConnect() {
-  const maxRetries = 3;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await originalConnect();
-    } catch (err) {
-      if (attempt === maxRetries) throw err;
-      await new Promise((r) => setTimeout(r, attempt * 1000));
-    }
-  }
-  return originalConnect();
-} as typeof pool.connect;
+// Prevent process crash on idle connection errors (e.g. Neon auto-suspend).
+// node-postgres automatically removes the dead client and reconnects on next query.
+pool.on("error", (err) => {
+  console.error("Unexpected pool client error:", err.message);
+});
 
 export const db = drizzle(pool, { schema });
