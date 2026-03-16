@@ -1,0 +1,68 @@
+import type { AccountTemplate } from "./types";
+
+/** Swedish BAS chart of accounts */
+export const SE_ACCOUNTS: AccountTemplate[] = [
+  // Class 1: Assets
+  { code: "1010", name: "Development Expenditure", type: "asset", subType: "fixed" },
+  { code: "1110", name: "Buildings", type: "asset", subType: "fixed" },
+  { code: "1130", name: "Land", type: "asset", subType: "fixed" },
+  { code: "1210", name: "Machinery", type: "asset", subType: "fixed" },
+  { code: "1220", name: "Equipment & Fixtures", type: "asset", subType: "fixed" },
+  { code: "1229", name: "Acc. Depreciation - Equipment & Fixtures", type: "asset", subType: "fixed" },
+  { code: "1410", name: "Inventory - Raw Materials", type: "asset", subType: "current" },
+  { code: "1460", name: "Inventory - Goods for Resale", type: "asset", subType: "current" },
+  { code: "1510", name: "Accounts Receivable", type: "asset", subType: "current" },
+  { code: "1630", name: "Tax Account", type: "asset", subType: "current" },
+  { code: "1650", name: "VAT Receivable", type: "asset", subType: "current" },
+  { code: "1680", name: "Other Current Receivables", type: "asset", subType: "current" },
+  { code: "1790", name: "Prepaid Expenses & Accrued Income", type: "asset", subType: "current" },
+  { code: "1910", name: "Cash", type: "asset", subType: "current" },
+  { code: "1930", name: "Bank", type: "asset", subType: "current" },
+  // Class 2: Equity & Liabilities
+  { code: "2081", name: "Share Capital", type: "equity", subType: "equity" },
+  { code: "2091", name: "Retained Earnings", type: "equity", subType: "retained" },
+  { code: "2098", name: "Profit/Loss Brought Forward", type: "equity", subType: "retained" },
+  { code: "2099", name: "Net Profit/Loss for the Year", type: "equity", subType: "equity" },
+  { code: "2150", name: "Accumulated Excess Depreciation", type: "equity", subType: "equity" },
+  { code: "2350", name: "Long-term Loans from Credit Institutions", type: "liability", subType: "non_current" },
+  { code: "2440", name: "Accounts Payable", type: "liability", subType: "current" },
+  { code: "2510", name: "Tax Liabilities", type: "liability", subType: "current" },
+  { code: "2610", name: "Output VAT 25%", type: "liability", subType: "current" },
+  { code: "2640", name: "Input VAT", type: "liability", subType: "current" },
+  { code: "2650", name: "VAT Liability", type: "liability", subType: "current" },
+  { code: "2710", name: "Employee Withholding Tax", type: "liability", subType: "current" },
+  { code: "2730", name: "Employer Social Security Contributions Payable", type: "liability", subType: "current" },
+  { code: "2990", name: "Accrued Expenses & Prepaid Income", type: "liability", subType: "current" },
+  // Class 3: Revenue
+  { code: "3001", name: "Sales - Sweden 25% VAT", type: "revenue", subType: "operating" },
+  { code: "3002", name: "Sales - Sweden 12% VAT", type: "revenue", subType: "operating" },
+  { code: "3003", name: "Sales - Sweden 6% VAT", type: "revenue", subType: "operating" },
+  { code: "3004", name: "Sales - Sweden VAT Exempt", type: "revenue", subType: "operating" },
+  { code: "3910", name: "Rental Income", type: "revenue", subType: "operating" },
+  // Class 4: Cost of Goods / Materials
+  { code: "4000", name: "Purchases of Goods - Sweden", type: "expense", subType: "cogs" },
+  { code: "4600", name: "Subcontract Work", type: "expense", subType: "cogs" },
+  // Class 5-6: Other External Operating Expenses
+  { code: "5000", name: "Premises Costs", type: "expense", subType: "operating" },
+  { code: "5400", name: "Consumables & Supplies", type: "expense", subType: "operating" },
+  { code: "5500", name: "Repairs & Maintenance", type: "expense", subType: "operating" },
+  { code: "5600", name: "Vehicle Costs", type: "expense", subType: "operating" },
+  { code: "5800", name: "Travel Expenses", type: "expense", subType: "operating" },
+  { code: "5900", name: "Advertising & PR", type: "expense", subType: "operating" },
+  { code: "6100", name: "Office Supplies & Printing", type: "expense", subType: "operating" },
+  { code: "6200", name: "Telecom & Postage", type: "expense", subType: "operating" },
+  { code: "6310", name: "Business Insurance", type: "expense", subType: "operating" },
+  { code: "6420", name: "Audit Fees", type: "expense", subType: "operating" },
+  { code: "6530", name: "Accounting Services", type: "expense", subType: "operating" },
+  { code: "6550", name: "Consulting Fees", type: "expense", subType: "operating" },
+  { code: "6570", name: "Bank Charges", type: "expense", subType: "operating" },
+  // Class 7: Personnel Costs & Depreciation
+  { code: "7210", name: "Salaries - Salaried Employees", type: "expense", subType: "operating" },
+  { code: "7510", name: "Employer Social Security Contributions", type: "expense", subType: "operating" },
+  { code: "7410", name: "Pension Insurance Premiums", type: "expense", subType: "operating" },
+  { code: "7800", name: "Depreciation - Tangible & Intangible Assets", type: "expense", subType: "operating" },
+  // Class 8: Financial Items
+  { code: "8310", name: "Interest Income", type: "revenue", subType: "non_operating" },
+  { code: "8410", name: "Interest Expense - Long-term Liabilities", type: "expense", subType: "non_operating" },
+  { code: "8910", name: "Income Tax Expense", type: "expense", subType: "tax" },
+];

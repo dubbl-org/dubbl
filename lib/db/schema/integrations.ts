@@ -23,6 +23,7 @@ export const stripeIntegration = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     stripeAccountId: text("stripe_account_id").notNull(), // "acct_xxx"
     label: text("label").notNull().default("Default"),
+    displayName: text("display_name"),
     accessToken: text("access_token").notNull(),
     refreshToken: text("refresh_token"),
     livemode: boolean("livemode").notNull().default(false),

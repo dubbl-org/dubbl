@@ -21,6 +21,7 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,8 +47,11 @@ interface BankAccountItem {
   bankName: string | null;
 }
 
-interface IntegrationStatus {
+interface IntegrationItem {
+  id: string;
   connected: boolean;
+  displayName?: string | null;
+  label: string;
   status?: string;
   stripeAccountId?: string;
   livemode?: boolean;
@@ -59,7 +63,8 @@ interface IntegrationStatus {
   revenueAccountId?: string;
   feesAccountId?: string;
   payoutBankAccountId?: string;
-  syncLogs?: SyncLogEntry[];
+  healthy?: boolean;
+  healthError?: string | null;
 }
 
 function getOrgId() {
@@ -71,11 +76,12 @@ function orgHeaders(extra?: Record<string, string>) {
 }
 
 export default function StripeIntegrationPage() {
-  const [data, setData] = useState<IntegrationStatus | null>(null);
+  const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
+  const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountItem[]>([]);
 
@@ -85,7 +91,8 @@ export default function StripeIntegrationPage() {
         headers: orgHeaders(),
       });
       const json = await res.json();
-      setData(json);
+      setConnected(json.connected ?? false);
+      setIntegrations(json.integrations || []);
     } catch {
       toast.error("Failed to load Stripe integration status");
     } finally {
@@ -123,7 +130,7 @@ export default function StripeIntegrationPage() {
     const error = params.get("error");
     if (error) {
       const messages: Record<string, string> = {
-        already_connected: "A Stripe account is already connected",
+        account_already_connected: "This Stripe account is already connected",
         missing_params: "Missing OAuth parameters",
         invalid_state: "Invalid OAuth state",
         oauth_failed: "OAuth authorization failed",
@@ -153,12 +160,13 @@ export default function StripeIntegrationPage() {
     }
   }
 
-  async function handleSync() {
-    setSyncing(true);
+  async function handleSync(integrationId: string) {
+    setSyncingId(integrationId);
     try {
       const res = await fetch("/api/v1/integrations/stripe/sync", {
         method: "POST",
-        headers: orgHeaders(),
+        headers: orgHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ integrationId }),
       });
       if (res.ok) {
         toast.success("Sync started");
@@ -169,17 +177,18 @@ export default function StripeIntegrationPage() {
     } catch {
       toast.error("Failed to start sync");
     } finally {
-      setSyncing(false);
+      setSyncingId(null);
     }
   }
 
-  async function handleDisconnect() {
-    if (!confirm("Are you sure you want to disconnect your Stripe account? This will stop syncing new transactions.")) return;
-    setDisconnecting(true);
+  async function handleDisconnect(integrationId: string) {
+    if (!confirm("Are you sure you want to disconnect this Stripe account? This will stop syncing new transactions.")) return;
+    setDisconnectingId(integrationId);
     try {
       const res = await fetch("/api/v1/integrations/stripe/disconnect", {
         method: "POST",
-        headers: orgHeaders(),
+        headers: orgHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ integrationId }),
       });
       if (res.ok) {
         toast.success("Stripe account disconnected");
@@ -190,16 +199,16 @@ export default function StripeIntegrationPage() {
     } catch {
       toast.error("Failed to disconnect");
     } finally {
-      setDisconnecting(false);
+      setDisconnectingId(null);
     }
   }
 
-  async function updateMapping(field: string, value: string) {
+  async function updateMapping(integrationId: string, field: string, value: string) {
     try {
       const res = await fetch("/api/v1/integrations/stripe/settings", {
         method: "PATCH",
         headers: orgHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ [field]: value }),
+        body: JSON.stringify({ integrationId, [field]: value }),
       });
       if (res.ok) {
         toast.success("Settings updated");
@@ -224,7 +233,7 @@ export default function StripeIntegrationPage() {
     );
   }
 
-  if (!data?.connected) {
+  if (!connected) {
     return (
       <div className="space-y-6">
         <div>
@@ -276,46 +285,103 @@ export default function StripeIntegrationPage() {
     );
   }
 
-  const statusColor = {
-    active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    error: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-    disconnected: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
-  }[data.status || "active"];
-
-  const StatusIcon = {
-    active: CheckCircle2,
-    error: XCircle,
-    disconnected: AlertCircle,
-  }[data.status || "active"] || AlertCircle;
-
-  const maskedAccountId = data.stripeAccountId
-    ? `${data.stripeAccountId.slice(0, 8)}...${data.stripeAccountId.slice(-4)}`
-    : "";
-
-  const accountsConfigured = !!(data.clearingAccountId && data.revenueAccountId && data.feesAccountId);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Stripe Integration</h1>
           <p className="text-sm text-muted-foreground">
-            Manage your connected Stripe account
+            Manage your connected Stripe {integrations.length === 1 ? "account" : "accounts"}
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={handleConnect} disabled={connecting}>
+          {connecting ? (
+            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-3.5 w-3.5" />
+          )}
+          Connect another account
+        </Button>
+      </div>
+
+      {integrations.map((integration) => (
+        <IntegrationCard
+          key={integration.id}
+          integration={integration}
+          accounts={accounts}
+          bankAccounts={bankAccounts}
+          syncing={syncingId === integration.id}
+          disconnecting={disconnectingId === integration.id}
+          onSync={() => handleSync(integration.id)}
+          onDisconnect={() => handleDisconnect(integration.id)}
+          onUpdateMapping={(field, value) => updateMapping(integration.id, field, value)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function IntegrationCard({
+  integration,
+  accounts,
+  bankAccounts,
+  syncing,
+  disconnecting,
+  onSync,
+  onDisconnect,
+  onUpdateMapping,
+}: {
+  integration: IntegrationItem;
+  accounts: Account[];
+  bankAccounts: BankAccountItem[];
+  syncing: boolean;
+  disconnecting: boolean;
+  onSync: () => void;
+  onDisconnect: () => void;
+  onUpdateMapping: (field: string, value: string) => void;
+}) {
+  const statusColor = {
+    active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    error: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    disconnected: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+  }[integration.status || "active"];
+
+  const StatusIcon = {
+    active: CheckCircle2,
+    error: XCircle,
+    disconnected: AlertCircle,
+  }[integration.status || "active"] || AlertCircle;
+
+  const maskedAccountId = integration.stripeAccountId
+    ? `${integration.stripeAccountId.slice(0, 8)}...${integration.stripeAccountId.slice(-4)}`
+    : "";
+
+  const accountsConfigured = !!(integration.clearingAccountId && integration.revenueAccountId && integration.feesAccountId);
+  const accountDisplayName = integration.displayName || integration.label;
+
+  return (
+    <div className="rounded-lg border space-y-4 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="font-medium">{accountDisplayName}</h2>
+            <span className="text-sm text-muted-foreground font-mono">{maskedAccountId}</span>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing || !accountsConfigured}>
+          <Button variant="outline" size="sm" onClick={onSync} disabled={syncing || !accountsConfigured}>
             {syncing ? (
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (
               <RefreshCw className="mr-2 h-3.5 w-3.5" />
             )}
-            Run Full Sync
+            Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={handleDisconnect}
+            onClick={onDisconnect}
             disabled={disconnecting}
             className="text-destructive hover:text-destructive"
           >
@@ -329,36 +395,32 @@ export default function StripeIntegrationPage() {
         </div>
       </div>
 
-      {/* Status Card */}
-      <div className="rounded-lg border p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Badge className={statusColor}>
-              <StatusIcon className="mr-1 h-3 w-3" />
-              {data.status}
-            </Badge>
-            <span className="text-sm text-muted-foreground font-mono">{maskedAccountId}</span>
-            {data.livemode ? (
-              <Badge variant="outline" className="text-xs">Live</Badge>
-            ) : (
-              <Badge variant="secondary" className="text-xs">Test</Badge>
-            )}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {data.lastSyncAt
-              ? `Last sync: ${new Date(data.lastSyncAt).toLocaleString()}`
-              : "Not synced yet"}
-          </div>
-        </div>
-        {data.errorMessage && (
-          <p className="text-sm text-destructive">{data.errorMessage}</p>
+      {/* Status */}
+      <div className="flex items-center gap-3">
+        <Badge className={statusColor}>
+          <StatusIcon className="mr-1 h-3 w-3" />
+          {integration.status}
+        </Badge>
+        {integration.livemode ? (
+          <Badge variant="outline" className="text-xs">Live</Badge>
+        ) : (
+          <Badge variant="secondary" className="text-xs">Test</Badge>
         )}
-        {!data.initialSyncCompleted && accountsConfigured && (
-          <p className="text-sm text-amber-600 dark:text-amber-400">
-            Initial sync in progress...
-          </p>
-        )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {integration.lastSyncAt
+            ? `Last sync: ${new Date(integration.lastSyncAt).toLocaleString()}`
+            : "Not synced yet"}
+        </span>
       </div>
+
+      {integration.errorMessage && (
+        <p className="text-sm text-destructive">{integration.errorMessage}</p>
+      )}
+      {!integration.initialSyncCompleted && accountsConfigured && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          Initial sync in progress...
+        </p>
+      )}
 
       {/* Account mapping warning */}
       {!accountsConfigured && (
@@ -367,21 +429,21 @@ export default function StripeIntegrationPage() {
           <div>
             <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Account mappings required</p>
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-              Select a clearing, revenue, and fees account below before running a sync. These accounts depend on your chart of accounts setup.
+              Select a clearing, revenue, and fees account below before running a sync.
             </p>
           </div>
         </div>
       )}
 
       {/* Account Mappings */}
-      <div className="rounded-lg border p-4 space-y-4">
-        <h2 className="font-medium">Account Mappings</h2>
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium">Account Mappings</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Clearing Account (Asset)</Label>
             <Select
-              value={data.clearingAccountId || ""}
-              onValueChange={(v) => updateMapping("clearingAccountId", v)}
+              value={integration.clearingAccountId || ""}
+              onValueChange={(v) => onUpdateMapping("clearingAccountId", v)}
             >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
@@ -398,8 +460,8 @@ export default function StripeIntegrationPage() {
           <div className="space-y-1.5">
             <Label className="text-xs">Revenue Account</Label>
             <Select
-              value={data.revenueAccountId || ""}
-              onValueChange={(v) => updateMapping("revenueAccountId", v)}
+              value={integration.revenueAccountId || ""}
+              onValueChange={(v) => onUpdateMapping("revenueAccountId", v)}
             >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
@@ -416,8 +478,8 @@ export default function StripeIntegrationPage() {
           <div className="space-y-1.5">
             <Label className="text-xs">Fees Account (Expense)</Label>
             <Select
-              value={data.feesAccountId || ""}
-              onValueChange={(v) => updateMapping("feesAccountId", v)}
+              value={integration.feesAccountId || ""}
+              onValueChange={(v) => onUpdateMapping("feesAccountId", v)}
             >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
@@ -434,8 +496,8 @@ export default function StripeIntegrationPage() {
           <div className="space-y-1.5">
             <Label className="text-xs">Payout Bank Account</Label>
             <Select
-              value={data.payoutBankAccountId || ""}
-              onValueChange={(v) => updateMapping("payoutBankAccountId", v)}
+              value={integration.payoutBankAccountId || ""}
+              onValueChange={(v) => onUpdateMapping("payoutBankAccountId", v)}
             >
               <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
               <SelectContent>
@@ -449,35 +511,6 @@ export default function StripeIntegrationPage() {
           </div>
         </div>
       </div>
-
-      {/* Sync History */}
-      {data.syncLogs && data.syncLogs.length > 0 && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h2 className="font-medium">Sync History</h2>
-          <div className="divide-y text-sm">
-            {data.syncLogs.map((log) => (
-              <div key={log.id} className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-2">
-                  {log.status === "success" ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                  ) : log.status === "failed" ? (
-                    <XCircle className="h-3.5 w-3.5 text-red-500" />
-                  ) : (
-                    <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                  <span className="font-mono text-xs">{log.eventType}</span>
-                  {log.errorMessage && (
-                    <span className="text-xs text-destructive">{log.errorMessage}</span>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(log.createdAt).toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

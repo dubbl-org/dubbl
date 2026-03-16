@@ -51,6 +51,12 @@ export async function GET(request: Request) {
       );
     }
 
+    // Fetch business display name from Stripe
+    const account = await stripe.accounts.retrieve(response.stripe_user_id);
+    const displayName = account.business_profile?.name
+      || account.settings?.dashboard?.display_name
+      || null;
+
     // Check if this specific Stripe account is already connected
     const existingAccount = await db.query.stripeIntegration.findFirst({
       where: and(
@@ -79,6 +85,7 @@ export async function GET(request: Request) {
         organizationId: stateData.orgId,
         stripeAccountId: response.stripe_user_id,
         label: stateData.label || "Default",
+        displayName,
         accessToken: response.access_token,
         refreshToken: response.refresh_token ?? null,
         livemode: response.livemode ?? false,

@@ -5,10 +5,8 @@ import {
   mcpAccessToken,
   mcpRefreshToken,
   member,
-  subscription,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { PLAN_LIMITS } from "@/lib/plans";
 import type { MemberRole } from "@/lib/plans";
 
 const CORS_HEADERS: Record<string, string> = {
@@ -134,24 +132,6 @@ async function handleAuthorizationCode(params: Record<string, string>) {
     );
   }
 
-  // Check plan gating
-  const sub = await db.query.subscription.findFirst({
-    where: eq(subscription.organizationId, authCode.organizationId),
-  });
-
-  const plan = sub?.plan ?? "free";
-  if (!PLAN_LIMITS[plan].apiAccess) {
-    // Clean up code
-    await db.delete(mcpOAuthCode).where(eq(mcpOAuthCode.id, authCode.id));
-    return corsJson(
-      {
-        error: "access_denied",
-        error_description: "MCP access requires a Pro plan",
-      },
-      { status: 403 }
-    );
-  }
-
   // Get user's role in org
   const mem = await db.query.member.findFirst({
     where: and(
@@ -246,21 +226,6 @@ async function handleRefreshToken(params: Record<string, string>) {
     );
   }
 
-  // Check plan gating
-  const sub = await db.query.subscription.findFirst({
-    where: eq(subscription.organizationId, oldAccessToken.organizationId),
-  });
-
-  const plan = sub?.plan ?? "free";
-  if (!PLAN_LIMITS[plan].apiAccess) {
-    return corsJson(
-      {
-        error: "access_denied",
-        error_description: "MCP access requires a Pro plan",
-      },
-      { status: 403 }
-    );
-  }
 
   // Delete old refresh token
   await db

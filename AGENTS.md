@@ -18,3 +18,8 @@
 - Register new tool files in `lib/mcp/tools/index.ts`
 - Use `.describe()` on every Zod field in tool input schemas
 - One tool per operation (no multi-purpose tools)
+
+## Database
+- All schema changes require Drizzle migration files -- run `npx drizzle-kit generate` after modifying any file in `lib/db/schema/`
+- Never use `npx drizzle-kit push` in production -- it applies changes directly without migrations
+- Migration files live in `drizzle/` and must be committed alongside schema changes

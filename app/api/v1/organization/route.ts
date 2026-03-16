@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { organization, member, users } from "@/lib/db/schema";
+import { organization, member, users, subscription } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
@@ -10,11 +10,12 @@ import { randomUUID } from "crypto";
 import { isValidBusinessType } from "@/lib/data/business-types";
 import { checkOrganizationLimit, LimitExceededError } from "@/lib/api/check-limit";
 import { logAudit, diffChanges } from "@/lib/api/audit";
-import { getSiteSetting } from "@/lib/site-settings";
+import { getSiteSetting, isSelfHostedUnlimited } from "@/lib/site-settings";
 import { render } from "@react-email/render";
 import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { seedDefaultAccounts } from "@/lib/db/default-accounts";
 
 const updateSchema = z
   .object({
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Slug already taken" }, { status: 409 });
     }
 
-    // Create org + owner membership in a transaction
+    // Create org + owner membership + subscription in a transaction
     const orgId = randomUUID();
     await db.transaction(async (tx) => {
       await tx.insert(organization).values({
@@ -162,6 +163,13 @@ export async function POST(request: Request) {
         organizationId: orgId,
         userId: session.user!.id!,
         role: "owner",
+      });
+      const selfHosted = isSelfHostedUnlimited();
+      await tx.insert(subscription).values({
+        organizationId: orgId,
+        plan: selfHosted ? "pro" : "free",
+        status: "active",
+        ...(selfHosted ? { managedBy: "manual" } : {}),
       });
     });
 
@@ -216,6 +224,11 @@ export async function PATCH(request: Request) {
       .set({ ...parsed, updatedAt: new Date() })
       .where(eq(organization.id, ctx.organizationId))
       .returning();
+
+    // Seed default chart of accounts on first-time country set (onboarding completion)
+    if (existing?.country === null && updated.country !== null) {
+      await seedDefaultAccounts(ctx.organizationId, updated.defaultCurrency || "USD", updated.countryCode || undefined);
+    }
 
     logAudit({ ctx, action: "update", entityType: "organization", entityId: ctx.organizationId, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 

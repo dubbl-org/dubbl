@@ -18,6 +18,8 @@ import {
   Factory,
   Megaphone,
   ClipboardCheck,
+  ArrowUpRight,
+  Info,
 } from "lucide-react";
 import {
   COUNTRIES,
@@ -61,30 +63,49 @@ export function OnboardingWizard() {
   const [referralSource, setReferralSource] = useState("");
   const [referralOther, setReferralOther] = useState("");
 
-  // Load existing org data
+  // Escape hatch: user has other completed orgs
+  const [hasOtherOrgs, setHasOtherOrgs] = useState(false);
+  const [otherOrgId, setOtherOrgId] = useState("");
+
+  // Load existing org data + check for other completed orgs
   useEffect(() => {
     const activeOrgId = localStorage.getItem("activeOrgId");
-    if (!activeOrgId) {
-      setLoading(false);
-      return;
-    }
 
-    fetch("/api/v1/organization", {
-      headers: { "x-organization-id": activeOrgId },
-    })
+    // Fetch all orgs (no org header) to check for completed orgs
+    const fetchAllOrgs = fetch("/api/v1/organization")
       .then((r) => r.json())
       .then((data) => {
-        const org = data.organization as OrgData | undefined;
-        if (org) {
-          setOrgId(org.id);
-          setOrgName(org.name);
-          if (org.countryCode) setCountryCode(org.countryCode);
-          if (org.businessType) setBusinessType(org.businessType);
-          if (org.industrySector) setIndustry(org.industrySector);
+        const orgs = data.organizations as Array<OrgData & { role: string }> | undefined;
+        if (orgs) {
+          const completedOrg = orgs.find((o) => o.country !== null);
+          if (completedOrg) {
+            setHasOtherOrgs(true);
+            setOtherOrgId(completedOrg.id);
+          }
         }
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {});
+
+    // Fetch active org data if set
+    const fetchActiveOrg = activeOrgId
+      ? fetch("/api/v1/organization", {
+          headers: { "x-organization-id": activeOrgId },
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            const org = data.organization as OrgData | undefined;
+            if (org) {
+              setOrgId(org.id);
+              setOrgName(org.name);
+              if (org.countryCode) setCountryCode(org.countryCode);
+              if (org.businessType) setBusinessType(org.businessType);
+              if (org.industrySector) setIndustry(org.industrySector);
+            }
+          })
+          .catch(() => {})
+      : Promise.resolve();
+
+    Promise.all([fetchAllOrgs, fetchActiveOrg]).finally(() => setLoading(false));
   }, []);
 
   function generateSlug(name: string) {
@@ -202,6 +223,18 @@ export function OnboardingWizard() {
 
   return (
     <div className="w-full max-w-lg">
+      {hasOtherOrgs && (
+        <button
+          onClick={() => {
+            localStorage.setItem("activeOrgId", otherOrgId);
+            window.location.href = "/dashboard";
+          }}
+          className="mb-4 flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowUpRight className="size-3.5" />
+          Back to Dashboard
+        </button>
+      )}
       {/* Step content */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-black/5 dark:shadow-black/40">
         {/* Grain gradient banner */}
@@ -649,6 +682,12 @@ function StepReview({
             </span>
           </div>
         ))}
+      </div>
+      <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-amber-50 px-3.5 py-3 dark:bg-amber-950/30">
+        <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          A default chart of accounts for your country will be created. We recommend reviewing it with your accountant to ensure it meets local regulatory requirements.
+        </p>
       </div>
     </div>
   );

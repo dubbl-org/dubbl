@@ -89,6 +89,7 @@ import {
 } from "./schema";
 import { eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { DEFAULT_ACCOUNTS } from "./default-accounts";
 
 const CURRENCIES = [
   { code: "USD", name: "US Dollar", symbol: "$", decimalPlaces: 2 },
@@ -123,82 +124,8 @@ const CURRENCIES = [
   { code: "TWD", name: "Taiwan Dollar", symbol: "NT$", decimalPlaces: 0 },
 ];
 
-// Chart of Accounts template
-const ACCOUNTS = [
-  // Assets (1xxx)
-  { code: "1000", name: "Cash", type: "asset" as const, subType: "current" },
-  { code: "1010", name: "Petty Cash", type: "asset" as const, subType: "current" },
-  { code: "1100", name: "Checking Account", type: "asset" as const, subType: "bank" },
-  { code: "1110", name: "Savings Account", type: "asset" as const, subType: "bank" },
-  { code: "1200", name: "Accounts Receivable", type: "asset" as const, subType: "current" },
-  { code: "1300", name: "Inventory", type: "asset" as const, subType: "current" },
-  { code: "1310", name: "Raw Materials", type: "asset" as const, subType: "current" },
-  { code: "1400", name: "Prepaid Expenses", type: "asset" as const, subType: "current" },
-  { code: "1410", name: "Prepaid Insurance", type: "asset" as const, subType: "current" },
-  { code: "1500", name: "Input Tax Credits", type: "asset" as const, subType: "current" },
-  { code: "1600", name: "Equipment", type: "asset" as const, subType: "fixed" },
-  { code: "1610", name: "Furniture & Fixtures", type: "asset" as const, subType: "fixed" },
-  { code: "1620", name: "Computer Equipment", type: "asset" as const, subType: "fixed" },
-  { code: "1630", name: "Vehicles", type: "asset" as const, subType: "fixed" },
-  { code: "1640", name: "Buildings", type: "asset" as const, subType: "fixed" },
-  { code: "1650", name: "Land", type: "asset" as const, subType: "fixed" },
-  { code: "1700", name: "Accumulated Depreciation - Equipment", type: "asset" as const, subType: "fixed" },
-  { code: "1710", name: "Accumulated Depreciation - Furniture", type: "asset" as const, subType: "fixed" },
-  { code: "1720", name: "Accumulated Depreciation - Computers", type: "asset" as const, subType: "fixed" },
-  { code: "1730", name: "Accumulated Depreciation - Vehicles", type: "asset" as const, subType: "fixed" },
-
-  // Liabilities (2xxx)
-  { code: "2000", name: "Accounts Payable", type: "liability" as const, subType: "current" },
-  { code: "2100", name: "Accounts Payable - Trade", type: "liability" as const, subType: "current" },
-  { code: "2200", name: "Tax Payable", type: "liability" as const, subType: "current" },
-  { code: "2210", name: "GST/VAT Payable", type: "liability" as const, subType: "current" },
-  { code: "2220", name: "Income Tax Payable", type: "liability" as const, subType: "current" },
-  { code: "2300", name: "Accrued Expenses", type: "liability" as const, subType: "current" },
-  { code: "2310", name: "Wages Payable", type: "liability" as const, subType: "current" },
-  { code: "2400", name: "Unearned Revenue", type: "liability" as const, subType: "current" },
-  { code: "2500", name: "Short-Term Loans", type: "liability" as const, subType: "current" },
-  { code: "2600", name: "Credit Card Payable", type: "liability" as const, subType: "current" },
-  { code: "2700", name: "Long-Term Debt", type: "liability" as const, subType: "non_current" },
-  { code: "2800", name: "Mortgage Payable", type: "liability" as const, subType: "non_current" },
-
-  // Equity (3xxx)
-  { code: "3000", name: "Owner's Equity", type: "equity" as const, subType: "equity" },
-  { code: "3100", name: "Retained Earnings", type: "equity" as const, subType: "retained" },
-  { code: "3200", name: "Owner's Drawings", type: "equity" as const, subType: "equity" },
-  { code: "3300", name: "Common Stock", type: "equity" as const, subType: "equity" },
-
-  // Revenue (4xxx)
-  { code: "4000", name: "Sales Revenue", type: "revenue" as const, subType: "operating" },
-  { code: "4010", name: "Service Revenue", type: "revenue" as const, subType: "operating" },
-  { code: "4020", name: "Consulting Revenue", type: "revenue" as const, subType: "operating" },
-  { code: "4100", name: "Interest Income", type: "revenue" as const, subType: "non_operating" },
-  { code: "4200", name: "Rental Income", type: "revenue" as const, subType: "non_operating" },
-  { code: "4300", name: "Gain on Asset Disposal", type: "revenue" as const, subType: "non_operating" },
-  { code: "4900", name: "Other Revenue", type: "revenue" as const, subType: "non_operating" },
-
-  // Expenses (5xxx)
-  { code: "5000", name: "Cost of Goods Sold", type: "expense" as const, subType: "cogs" },
-  { code: "5100", name: "Wages & Salaries", type: "expense" as const, subType: "operating" },
-  { code: "5110", name: "Employee Benefits", type: "expense" as const, subType: "operating" },
-  { code: "5120", name: "Payroll Tax", type: "expense" as const, subType: "operating" },
-  { code: "5200", name: "Rent Expense", type: "expense" as const, subType: "operating" },
-  { code: "5210", name: "Utilities", type: "expense" as const, subType: "operating" },
-  { code: "5220", name: "Internet & Phone", type: "expense" as const, subType: "operating" },
-  { code: "5300", name: "Office Supplies", type: "expense" as const, subType: "operating" },
-  { code: "5310", name: "Postage & Shipping", type: "expense" as const, subType: "operating" },
-  { code: "5400", name: "Insurance", type: "expense" as const, subType: "operating" },
-  { code: "5500", name: "Depreciation Expense", type: "expense" as const, subType: "operating" },
-  { code: "5600", name: "Marketing & Advertising", type: "expense" as const, subType: "operating" },
-  { code: "5700", name: "Professional Fees", type: "expense" as const, subType: "operating" },
-  { code: "5710", name: "Legal Fees", type: "expense" as const, subType: "operating" },
-  { code: "5720", name: "Accounting Fees", type: "expense" as const, subType: "operating" },
-  { code: "5800", name: "Travel Expense", type: "expense" as const, subType: "operating" },
-  { code: "5810", name: "Meals & Entertainment", type: "expense" as const, subType: "operating" },
-  { code: "5900", name: "Bank Fees & Charges", type: "expense" as const, subType: "operating" },
-  { code: "5910", name: "Interest Expense", type: "expense" as const, subType: "non_operating" },
-  { code: "5920", name: "Loss on Asset Disposal", type: "expense" as const, subType: "non_operating" },
-  { code: "5990", name: "Miscellaneous Expense", type: "expense" as const, subType: "operating" },
-];
+// Chart of Accounts template (imported from shared module)
+const ACCOUNTS = DEFAULT_ACCOUNTS;
 
 // Contacts seed data
 const CONTACTS = [
