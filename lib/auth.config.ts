@@ -46,7 +46,19 @@ export const authConfig: NextAuthConfig = {
         pathname.startsWith("/.well-known") ||
         pathname.startsWith("/docs") ||
         pathname.startsWith("/_next") ||
-        pathname.startsWith("/favicon")
+        pathname.startsWith("/favicon") ||
+        pathname === "/sitemap.xml" ||
+        pathname === "/robots.txt" ||
+        pathname === "/manifest.json" ||
+        pathname === "/og.jpg" ||
+        pathname === "/og.png" ||
+        pathname === "/logo.svg" ||
+        pathname.endsWith(".ico") ||
+        pathname.endsWith(".svg") ||
+        pathname.endsWith(".png") ||
+        pathname.endsWith(".jpg") ||
+        pathname.endsWith(".webp") ||
+        pathname.endsWith(".xml")
       ) {
         return true;
       }
