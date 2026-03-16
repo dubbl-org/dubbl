@@ -56,6 +56,7 @@ export async function GET(request: Request) {
         healthError,
         id: integration.id,
         label: integration.label,
+        displayName: integration.displayName,
         status: integration.status,
         stripeAccountId: integration.stripeAccountId,
         livemode: integration.livemode,
@@ -97,6 +98,7 @@ export async function GET(request: Request) {
         return {
           id: integration.id,
           label: integration.label,
+          displayName: integration.displayName,
           connected: true,
           healthy,
           healthError,

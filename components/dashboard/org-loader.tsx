@@ -42,6 +42,10 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
             window.location.href = "/onboarding";
             return;
           }
+        } else {
+          // User has no orgs at all, redirect to onboarding
+          window.location.href = "/onboarding";
+          return;
         }
         startFadeOut();
       })

@@ -12,8 +12,7 @@ import { authConfig } from "./auth.config";
 import { headers } from "next/headers";
 import { trackLogin } from "./auth/track-login";
 import { getAppleClientSecret } from "./auth/apple-secret";
-import { getSiteSetting, isSelfHostedUnlimited } from "./site-settings";
-import { organization, member, subscription } from "./db/schema";
+import { getSiteSetting } from "./site-settings";
 import { sql } from "drizzle-orm";
 
 const loginSchema = z.object({
@@ -129,8 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       }
     },
     async createUser({ user }) {
-      // OAuth user creation - set up default org and subscription
-      if (!user.id || !user.name) return;
+      if (!user.id) return;
 
       // Check if first user (count <= 1 because this user was just created)
       const [{ count: userCount }] = await db
@@ -141,34 +139,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       if (isFirstUser) {
         await db.update(users).set({ isSiteAdmin: true }).where(eq(users.id, user.id));
       }
-
-      // Create default organization
-      const slug = (user.name || "user")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-
-      const [org] = await db
-        .insert(organization)
-        .values({
-          name: `${user.name}'s Org`,
-          slug: `${slug}-${Date.now().toString(36)}`,
-        })
-        .returning();
-
-      await db.insert(member).values({
-        organizationId: org.id,
-        userId: user.id,
-        role: "owner",
-      });
-
-      const selfHosted = isSelfHostedUnlimited();
-      await db.insert(subscription).values({
-        organizationId: org.id,
-        plan: selfHosted ? "pro" : "free",
-        status: "active",
-        ...(selfHosted ? { managedBy: "manual" } : {}),
-      });
     },
   },
   };
