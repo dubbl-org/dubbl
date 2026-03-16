@@ -61,7 +61,7 @@ export const metadata: Metadata = {
       "Free, open-source double-entry accounting with invoicing, bills, payroll, inventory, projects, and CRM. Self-host or use our cloud.",
     images: [
       {
-        url: "/og.png",
+        url: "/og.jpg",
         width: 1200,
         height: 630,
         alt: "dubbl - Open-source accounting for modern teams",
@@ -73,7 +73,7 @@ export const metadata: Metadata = {
     title: "dubbl · Open-Source Accounting & Business Management",
     description:
       "Free, open-source double-entry accounting with invoicing, bills, payroll, inventory, projects, and CRM. Self-host or use our cloud.",
-    images: ["/og.png"],
+    images: ["/og.jpg"],
   },
   robots: {
     index: true,
