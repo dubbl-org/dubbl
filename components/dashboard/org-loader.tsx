@@ -22,22 +22,26 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
     };
 
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) {
-      startFadeOut();
-      return () => {
-        isMounted = false;
-        if (readyTimer) window.clearTimeout(readyTimer);
-      };
-    }
+    const headers: Record<string, string> = {};
+    if (orgId) headers["x-organization-id"] = orgId;
 
-    fetch("/api/v1/organization", {
-      headers: { "x-organization-id": orgId },
-    })
+    fetch("/api/v1/organization", { headers })
       .then((r) => r.json())
       .then((data) => {
-        if (data.organization && data.organization.country === null) {
-          window.location.href = "/onboarding";
-          return;
+        // Single org response (header was sent)
+        const org = data.organization
+          // List response (no header) - pick the first org
+          ?? data.organizations?.[0];
+
+        if (org) {
+          // Persist resolved org for OAuth users who don't have it set yet
+          if (!orgId && org.id) {
+            localStorage.setItem("activeOrgId", org.id);
+          }
+          if (org.country === null) {
+            window.location.href = "/onboarding";
+            return;
+          }
         }
         startFadeOut();
       })
