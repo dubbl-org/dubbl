@@ -294,8 +294,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const id = localStorage.getItem("activeOrgId");
-    if (!id) return;
-    const headers = { "x-organization-id": id };
+    const headers: Record<string, string> = {};
+    if (id) headers["x-organization-id"] = id;
 
     Promise.all([
       fetch("/api/v1/entries?limit=10", { headers }).then((r) => r.json()),
