@@ -28,8 +28,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     ? Apple({
         clientId: process.env.AUTH_APPLE_ID,
         clientSecret: await getAppleClientSecret(),
+        allowDangerousEmailAccountLinking: true,
       })
-    : Apple;
+    : Apple({ allowDangerousEmailAccountLinking: true });
 
   return {
   ...authConfig,
@@ -40,8 +41,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     verificationTokensTable: verificationTokens,
   }),
   providers: [
-    ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET ? [Google] : []),
-    ...(process.env.AUTH_APPLE_ID && (process.env.AUTH_APPLE_KEY_BASE64 || process.env.AUTH_APPLE_SECRET) ? [appleProvider] : []),
+    ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+      ? [Google({ allowDangerousEmailAccountLinking: true })]
+      : []),
+    ...(process.env.AUTH_APPLE_ID && (process.env.AUTH_APPLE_KEY_BASE64 || process.env.AUTH_APPLE_SECRET)
+      ? [appleProvider]
+      : []),
     Credentials({
       name: "credentials",
       credentials: {
