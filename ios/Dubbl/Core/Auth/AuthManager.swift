@@ -232,6 +232,83 @@ final class AuthManager: ObservableObject {
         state = .unauthenticated
     }
 
+    // MARK: - OAuth
+
+    func signInWithApple(identityToken: Data?, fullName: PersonNameComponents?, email: String?) async {
+        guard let tokenData = identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8) else {
+            error = "Failed to get Apple identity token"
+            return
+        }
+
+        isLoading = true
+        error = nil
+
+        var name: String?
+        if let fullName = fullName {
+            let parts = [fullName.givenName, fullName.familyName].compactMap { $0 }
+            if !parts.isEmpty { name = parts.joined(separator: " ") }
+        }
+
+        do {
+            let body: [String: String?] = [
+                "idToken": idToken,
+                "name": name,
+                "email": email
+            ]
+            let response: AuthResponse = try await apiClient.request(
+                APIEndpoint(path: "/auth/apple", method: .post),
+                body: body.compactMapValues { $0 }
+            )
+
+            guard let token = response.token else {
+                self.error = response.error ?? "Apple sign in failed"
+                isLoading = false
+                return
+            }
+
+            keychain.save(token, for: .authToken)
+            if let refreshToken = response.refreshToken {
+                keychain.save(refreshToken, for: .refreshToken)
+            }
+            await apiClient.setAuthToken(token)
+            currentUser = response.user
+
+            await loadOrganizations()
+            if organizations.count == 1, let org = organizations.first {
+                selectOrganization(org)
+            } else {
+                state = .needsOrganization
+            }
+        } catch {
+            self.error = (error as? APIError)?.errorDescription ?? error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    func signInWithGoogle() async {
+        // Google Sign-In requires the GoogleSignIn SDK.
+        // For now, open the web-based OAuth flow as a fallback.
+        isLoading = true
+        error = nil
+
+        let callbackScheme = "dubbl"
+        let authURL = "\(baseURL)/api/auth/signin/google?callbackUrl=\(callbackScheme)://auth/callback"
+
+        guard let url = URL(string: authURL) else {
+            error = "Invalid Google sign-in URL"
+            isLoading = false
+            return
+        }
+
+        await MainActor.run {
+            UIApplication.shared.open(url)
+        }
+
+        isLoading = false
+    }
+
     // MARK: - Organization
 
     func loadOrganizations() async {

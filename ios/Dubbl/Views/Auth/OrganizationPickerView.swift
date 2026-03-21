@@ -4,79 +4,96 @@ struct OrganizationPickerView: View {
     @EnvironmentObject var authManager: AuthManager
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                VStack(spacing: 8) {
-                    Image(systemName: "building.2")
-                        .font(.system(size: 40))
-                        .foregroundColor(.dubblPrimary)
-                    Text("Select Organization")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("Choose which organization to work with")
-                        .font(.subheadline)
-                        .foregroundColor(.dubblMuted)
-                }
-                .padding(.top, 40)
+        GeometryReader { geo in
+            ZStack {
+                AuthBackground()
 
-                if authManager.organizations.isEmpty {
-                    EmptyStateView(
-                        icon: "building.2",
-                        title: "No Organizations",
-                        message: "You don't belong to any organizations yet. Ask an admin to invite you."
-                    )
-                } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(authManager.organizations) { org in
-                                Button(action: { authManager.selectOrganization(org) }) {
-                                    HStack(spacing: 14) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color.dubblPrimary.opacity(0.15))
-                                                .frame(width: 44, height: 44)
-                                            Text(String(org.name.prefix(1)).uppercased())
-                                                .font(.headline)
-                                                .foregroundColor(.dubblPrimary)
-                                        }
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(org.name)
-                                                .font(.headline)
-                                                .foregroundColor(.primary)
-                                            if let role = org.role {
-                                                Text(role.capitalized)
-                                                    .font(.caption)
-                                                    .foregroundColor(.dubblMuted)
+                VStack(spacing: 0) {
+                    AuthBanner(compact: true)
+
+                    // White card
+                    VStack(spacing: 0) {
+                        ScrollView(showsIndicators: false) {
+                            VStack(spacing: 0) {
+                                VStack(spacing: 4) {
+                                    Text("Choose workspace")
+                                        .font(.system(size: 24, weight: .bold))
+                                    Text("Select an organization to continue")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Color(.secondaryLabel))
+                                }
+                                .padding(.bottom, 28)
+
+                                if authManager.organizations.isEmpty {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "building.2")
+                                            .font(.system(size: 28))
+                                            .foregroundColor(Color(.tertiaryLabel))
+                                        Text("No organizations yet")
+                                            .font(.system(size: 15, weight: .medium))
+                                        Text("Ask an admin to invite you.")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(Color(.secondaryLabel))
+                                    }
+                                    .padding(.vertical, 32)
+                                } else {
+                                    VStack(spacing: 8) {
+                                        ForEach(authManager.organizations) { org in
+                                            Button(action: { authManager.selectOrganization(org) }) {
+                                                HStack(spacing: 14) {
+                                                    Text(String(org.name.prefix(1)).uppercased())
+                                                        .font(.system(size: 14, weight: .bold))
+                                                        .foregroundColor(Color(hex: "059669"))
+                                                        .frame(width: 38, height: 38)
+                                                        .background(Color(hex: "ecfdf5"))
+                                                        .cornerRadius(8)
+
+                                                    VStack(alignment: .leading, spacing: 2) {
+                                                        Text(org.name)
+                                                            .font(.system(size: 15, weight: .medium))
+                                                            .foregroundColor(Color(.label))
+                                                        if let role = org.role {
+                                                            Text(role.capitalized)
+                                                                .font(.system(size: 12))
+                                                                .foregroundColor(Color(.secondaryLabel))
+                                                        }
+                                                    }
+
+                                                    Spacer()
+
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .foregroundColor(Color(.tertiaryLabel))
+                                                }
+                                                .padding(12)
+                                                .background(Color(.secondarySystemBackground))
+                                                .cornerRadius(10)
                                             }
                                         }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.dubblMuted)
                                     }
-                                    .padding(16)
-                                    .background(Color.dubblCardBackground)
-                                    .cornerRadius(10)
-                                    .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
                                 }
+
+                                Spacer(minLength: 40)
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.top, 28)
                         }
-                        .padding(.horizontal, 24)
+
+                        // Fixed bottom
+                        Button(action: { Task { await authManager.signOut() } }) {
+                            Text("Sign out")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color(.systemRed))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .padding(.bottom, geo.safeAreaInsets.bottom > 0 ? 0 : 12)
                     }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(24, corners: [.topLeft, .topRight])
                 }
-
-                Spacer()
-
-                Button(action: {
-                    Task { await authManager.signOut() }
-                }) {
-                    Text("Sign Out")
-                }
-                .buttonStyle(DubblButtonStyle(isPrimary: false, isDestructive: true))
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
             }
-            .background(Color.dubblBackground.ignoresSafeArea())
-            .navigationBarHidden(true)
         }
+        .ignoresSafeArea(edges: .bottom)
     }
 }

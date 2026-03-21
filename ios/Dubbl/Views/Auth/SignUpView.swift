@@ -1,16 +1,19 @@
 import SwiftUI
 import AuthenticationServices
 
-struct LoginView: View {
+struct SignUpView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
     @State private var email = ""
     @State private var password = ""
-    @State private var showSignUp = false
-    @State private var showServer = false
+    @State private var confirmPassword = ""
     @State private var appeared = false
     @FocusState private var focus: Field?
 
-    enum Field: Hashable { case email, password }
+    enum Field: Hashable { case name, email, password, confirm }
+
+    private var passwordsMatch: Bool { !password.isEmpty && password == confirmPassword }
 
     var body: some View {
         GeometryReader { geo in
@@ -18,18 +21,17 @@ struct LoginView: View {
                 AuthBackground()
 
                 VStack(spacing: 0) {
-                    AuthBanner()
+                    AuthBanner(compact: true)
 
-                    // ── White card area (rounded top corners, fills rest of screen) ──
+                    // ── White card ──
                     VStack(spacing: 0) {
                         ScrollView(showsIndicators: false) {
                             VStack(alignment: .leading, spacing: 0) {
 
-                                // Heading
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Welcome back")
+                                    Text("Create your account")
                                         .font(.system(size: 24, weight: .bold))
-                                    Text("Sign in to your account")
+                                    Text("Get started with dubbl")
                                         .font(.system(size: 14))
                                         .foregroundColor(Color(.secondaryLabel))
                                 }
@@ -39,7 +41,7 @@ struct LoginView: View {
 
                                 // OAuth
                                 HStack(spacing: 10) {
-                                    Button(action: { Task { await authManager.signInWithGoogle() } }) {
+                                    Button(action: { Task { await authManager.signInWithGoogle(); maybeDismiss() } }) {
                                         HStack(spacing: 8) {
                                             GoogleIcon(size: 16)
                                             Text("Google")
@@ -75,7 +77,6 @@ struct LoginView: View {
                                 }
                                 .opacity(appeared ? 1 : 0)
 
-                                // Separator
                                 HStack(spacing: 12) {
                                     sep
                                     Text("or continue with email")
@@ -86,43 +87,40 @@ struct LoginView: View {
                                 }
                                 .padding(.vertical, 20)
 
-                                // Email
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Email")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(Color(.secondaryLabel))
-                                    TextField("you@example.com", text: $email)
-                                        .focused($focus, equals: .email)
-                                        .font(.system(size: 15))
-                                        .padding(.horizontal, 14)
-                                        .frame(height: 46)
-                                        .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(10)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .stroke(focus == .email ? Color.emerald500 : Color.clear, lineWidth: 2)
-                                        )
-                                        .textContentType(.emailAddress)
-                                        .keyboardType(.emailAddress)
-                                        .autocapitalization(.none)
-                                        .autocorrectionDisabled()
-                                        .submitLabel(.next)
-                                        .onSubmit { focus = .password }
-                                }
+                                // Fields
+                                VStack(spacing: 14) {
+                                    inputField(label: "Full name", placeholder: "John Doe", text: $name, field: .name, contentType: .name, next: .email)
 
-                                // Password
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Password")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(Color(.secondaryLabel))
-                                    PasswordField(placeholder: "Your password", text: $password, isFocused: focus == .password)
-                                        .focused($focus, equals: .password)
-                                        .submitLabel(.go)
-                                        .onSubmit { signIn() }
-                                }
-                                .padding(.top, 14)
+                                    inputField(label: "Email", placeholder: "you@example.com", text: $email, field: .email, contentType: .emailAddress, keyboard: .emailAddress, next: .password)
 
-                                // Error
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Password")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(Color(.secondaryLabel))
+                                        PasswordField(placeholder: "Create a password", text: $password, isFocused: focus == .password)
+                                            .focused($focus, equals: .password)
+                                            .submitLabel(.next)
+                                            .onSubmit { focus = .confirm }
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Confirm password")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(Color(.secondaryLabel))
+                                        PasswordField(placeholder: "Repeat password", text: $confirmPassword, isFocused: focus == .confirm)
+                                            .focused($focus, equals: .confirm)
+                                            .submitLabel(.go)
+                                            .onSubmit { create() }
+
+                                        if !confirmPassword.isEmpty && !passwordsMatch {
+                                            Text("Passwords don't match")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(Color(hex: "dc2626"))
+                                        }
+                                    }
+                                }
+                                .opacity(appeared ? 1 : 0)
+
                                 if let error = authManager.error {
                                     HStack(spacing: 8) {
                                         Image(systemName: "exclamationmark.triangle.fill")
@@ -139,48 +137,19 @@ struct LoginView: View {
                                 }
 
                                 Spacer(minLength: 24)
-
-                                // Self-hosted
-                                if showServer {
-                                    VStack(spacing: 4) {
-                                        TextField("https://dubbl.dev", text: $authManager.baseURL)
-                                            .font(.system(size: 14))
-                                            .padding(.horizontal, 12)
-                                            .frame(height: 40)
-                                            .background(Color(.secondarySystemBackground))
-                                            .cornerRadius(8)
-                                            .autocapitalization(.none)
-                                            .autocorrectionDisabled()
-                                            .keyboardType(.URL)
-                                        Text("For self-hosted instances")
-                                            .font(.system(size: 10))
-                                            .foregroundColor(Color(.quaternaryLabel))
-                                    }
-                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                    .padding(.bottom, 8)
-                                }
-
-                                Button(action: { withAnimation(.spring(response: 0.3)) { showServer.toggle() } }) {
-                                    Label(showServer ? "Hide" : "Self-hosted?", systemImage: "server.rack")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color(.tertiaryLabel))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.bottom, 8)
                             }
                             .padding(.horizontal, 24)
                             .padding(.top, 28)
                         }
 
-                        // ── Fixed bottom bar ──
+                        // ── Fixed bottom ──
                         VStack(spacing: 0) {
-                            // Sign in button
-                            Button(action: signIn) {
+                            Button(action: create) {
                                 HStack(spacing: 8) {
                                     if authManager.isLoading {
                                         ProgressView().tint(.white)
                                     } else {
-                                        Text("Sign in")
+                                        Text("Create account")
                                             .font(.system(size: 16, weight: .semibold))
                                         Image(systemName: "arrow.right")
                                             .font(.system(size: 13, weight: .semibold))
@@ -189,20 +158,19 @@ struct LoginView: View {
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
                                 .foregroundColor(.white)
-                                .background(canSignIn ? Color(hex: "059669") : Color(hex: "059669").opacity(0.35))
+                                .background(canCreate ? Color(hex: "059669") : Color(hex: "059669").opacity(0.35))
                                 .cornerRadius(12)
-                                .shadow(color: Color(hex: "059669").opacity(canSignIn ? 0.2 : 0), radius: 8, y: 4)
+                                .shadow(color: Color(hex: "059669").opacity(canCreate ? 0.2 : 0), radius: 8, y: 4)
                             }
-                            .disabled(!canSignIn)
+                            .disabled(!canCreate)
                             .padding(.horizontal, 24)
                             .padding(.top, 8)
 
-                            // Sign up link
-                            Button(action: { showSignUp = true }) {
+                            Button(action: { dismiss() }) {
                                 HStack(spacing: 4) {
-                                    Text("Don't have an account?")
+                                    Text("Already have an account?")
                                         .foregroundColor(Color(.secondaryLabel))
-                                    Text("Sign up")
+                                    Text("Sign in")
                                         .foregroundColor(Color(hex: "059669"))
                                         .font(.system(size: 14, weight: .semibold))
                                 }
@@ -223,23 +191,53 @@ struct LoginView: View {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) { appeared = true }
         }
         .onTapGesture { focus = nil }
-        .fullScreenCover(isPresented: $showSignUp) {
-            SignUpView().environmentObject(authManager)
-        }
     }
 
     private var sep: some View {
         Rectangle().frame(height: 0.5).foregroundColor(Color(.separator))
     }
 
-    private var canSignIn: Bool {
-        !email.isEmpty && !password.isEmpty && !authManager.isLoading
+    private var canCreate: Bool {
+        !name.isEmpty && !email.isEmpty && passwordsMatch && !authManager.isLoading
     }
 
-    private func signIn() {
-        guard canSignIn else { return }
+    private func create() {
+        guard canCreate else { return }
         focus = nil
-        Task { await authManager.signIn(email: email, password: password) }
+        Task {
+            await authManager.signUp(name: name, email: email, password: password)
+            maybeDismiss()
+        }
+    }
+
+    private func maybeDismiss() {
+        if authManager.state != .unauthenticated { dismiss() }
+    }
+
+    @ViewBuilder
+    private func inputField(label: String, placeholder: String, text: Binding<String>, field: Field, contentType: UITextContentType = .name, keyboard: UIKeyboardType = .default, next: Field? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Color(.secondaryLabel))
+            TextField(placeholder, text: text)
+                .focused($focus, equals: field)
+                .font(.system(size: 15))
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(focus == field ? Color.emerald500 : Color.clear, lineWidth: 2)
+                )
+                .textContentType(contentType)
+                .keyboardType(keyboard)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                .submitLabel(next != nil ? .next : .done)
+                .onSubmit { if let next = next { focus = next } }
+        }
     }
 
     private func triggerAppleSignIn() {
@@ -256,6 +254,7 @@ struct LoginView: View {
                             fullName: cred.fullName,
                             email: cred.email
                         )
+                        maybeDismiss()
                     }
                 }
             case .failure(let error):
@@ -274,87 +273,4 @@ struct LoginView: View {
         }
         controller.performRequests()
     }
-}
-
-// MARK: - Rounded specific corners
-
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCornerShape(radius: radius, corners: corners))
-    }
-}
-
-struct RoundedCornerShape: Shape {
-    var radius: CGFloat
-    var corners: UIRectCorner
-
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
-        return Path(path.cgPath)
-    }
-}
-
-// MARK: - Password field
-
-struct PasswordField: View {
-    let placeholder: String
-    @Binding var text: String
-    var isFocused: Bool = false
-    @State private var revealed = false
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Group {
-                if revealed {
-                    TextField(placeholder, text: $text)
-                } else {
-                    SecureField(placeholder, text: $text)
-                }
-            }
-            .font(.system(size: 15))
-            .textContentType(.password)
-
-            Button(action: { revealed.toggle() }) {
-                Image(systemName: revealed ? "eye.slash" : "eye")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color(.tertiaryLabel))
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 46)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isFocused ? Color.emerald500 : Color.clear, lineWidth: 2)
-        )
-    }
-}
-
-// MARK: - Apple auth helpers
-
-class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate {
-    static var retained: AppleSignInCoordinator?
-    let handler: (Result<ASAuthorization, Error>) -> Void
-
-    init(handler: @escaping (Result<ASAuthorization, Error>) -> Void) {
-        self.handler = handler
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        handler(.success(authorization))
-        Self.retained = nil
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        handler(.failure(error))
-        Self.retained = nil
-    }
-}
-
-class WindowProvider: NSObject, ASAuthorizationControllerPresentationContextProviding {
-    static var retained: WindowProvider?
-    let window: UIWindow
-    init(window: UIWindow) { self.window = window }
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor { window }
 }

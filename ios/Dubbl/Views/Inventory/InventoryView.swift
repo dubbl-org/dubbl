@@ -214,8 +214,8 @@ struct InventoryFormView: View {
             _ = try await service.createItem(InventoryItemCreate(
                 code: code, name: name,
                 sku: sku.isEmpty ? nil : sku,
-                salePrice: Int((Double(salePrice) ?? 0) * 100),
-                purchasePrice: Int((Double(purchasePrice) ?? 0) * 100)
+                purchasePrice: Int((Double(purchasePrice) ?? 0) * 100),
+                salePrice: Int((Double(salePrice) ?? 0) * 100)
             ))
             onComplete?(); dismiss()
         } catch {
