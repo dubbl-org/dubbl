@@ -6,12 +6,14 @@ import SwiftUI
 struct LoginRequest: Encodable {
     let email: String
     let password: String
+    let turnstileToken: String?
 }
 
 struct RegisterRequest: Encodable {
     let name: String
     let email: String
     let password: String
+    let turnstileToken: String?
 }
 
 struct AuthResponse: Decodable {
@@ -125,14 +127,14 @@ final class AuthManager: ObservableObject {
         }
     }
 
-    func signIn(email: String, password: String) async {
+    func signIn(email: String, password: String, turnstileToken: String? = nil) async {
         isLoading = true
         error = nil
 
         do {
             let response: AuthResponse = try await apiClient.request(
                 APIEndpoint(path: "/auth/sign-in", method: .post),
-                body: LoginRequest(email: email, password: password)
+                body: LoginRequest(email: email, password: password, turnstileToken: turnstileToken)
             )
 
             guard let token = response.token else {
@@ -163,14 +165,14 @@ final class AuthManager: ObservableObject {
         isLoading = false
     }
 
-    func signUp(name: String, email: String, password: String) async {
+    func signUp(name: String, email: String, password: String, turnstileToken: String? = nil) async {
         isLoading = true
         error = nil
 
         do {
             let response: AuthResponse = try await apiClient.request(
                 APIEndpoint(path: "/auth/register", method: .post),
-                body: RegisterRequest(name: name, email: email, password: password)
+                body: RegisterRequest(name: name, email: email, password: password, turnstileToken: turnstileToken)
             )
 
             guard let token = response.token else {

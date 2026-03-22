@@ -7,6 +7,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var showSignUp = false
     @State private var appeared = false
+    @State private var turnstileToken: String?
     @FocusState private var focus: Field?
 
     enum Field: Hashable { case email, password }
@@ -137,6 +138,18 @@ struct LoginView: View {
                                     .padding(.top, 12)
                                 }
 
+                                // Turnstile captcha
+                                if let siteKey = turnstileSiteKey {
+                                    TurnstileView(
+                                        siteKey: siteKey,
+                                        onToken: { token in turnstileToken = token },
+                                        onError: { _ in turnstileToken = nil }
+                                    )
+                                    .frame(height: 65)
+                                    .cornerRadius(8)
+                                    .padding(.top, 16)
+                                }
+
                                 Spacer(minLength: 24)
                             }
                             .padding(.horizontal, 24)
@@ -205,12 +218,13 @@ struct LoginView: View {
 
     private var canSignIn: Bool {
         !email.isEmpty && !password.isEmpty && !authManager.isLoading
+            && (turnstileSiteKey == nil || turnstileToken != nil)
     }
 
     private func signIn() {
         guard canSignIn else { return }
         focus = nil
-        Task { await authManager.signIn(email: email, password: password) }
+        Task { await authManager.signIn(email: email, password: password, turnstileToken: turnstileToken) }
     }
 
     private func triggerAppleSignIn() {

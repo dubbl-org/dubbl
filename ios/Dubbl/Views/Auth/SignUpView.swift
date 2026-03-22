@@ -9,6 +9,7 @@ struct SignUpView: View {
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var appeared = false
+    @State private var turnstileToken: String?
     @FocusState private var focus: Field?
 
     enum Field: Hashable { case name, email, password, confirm }
@@ -136,6 +137,18 @@ struct SignUpView: View {
                                     .padding(.top, 12)
                                 }
 
+                                // Turnstile captcha
+                                if let siteKey = turnstileSiteKey {
+                                    TurnstileView(
+                                        siteKey: siteKey,
+                                        onToken: { token in turnstileToken = token },
+                                        onError: { _ in turnstileToken = nil }
+                                    )
+                                    .frame(height: 65)
+                                    .cornerRadius(8)
+                                    .padding(.top, 16)
+                                }
+
                                 Spacer(minLength: 24)
                             }
                             .padding(.horizontal, 24)
@@ -199,13 +212,14 @@ struct SignUpView: View {
 
     private var canCreate: Bool {
         !name.isEmpty && !email.isEmpty && passwordsMatch && !authManager.isLoading
+            && (turnstileSiteKey == nil || turnstileToken != nil)
     }
 
     private func create() {
         guard canCreate else { return }
         focus = nil
         Task {
-            await authManager.signUp(name: name, email: email, password: password)
+            await authManager.signUp(name: name, email: email, password: password, turnstileToken: turnstileToken)
             maybeDismiss()
         }
     }
