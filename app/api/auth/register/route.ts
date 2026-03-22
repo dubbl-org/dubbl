@@ -10,17 +10,35 @@ import { WelcomeEmail } from "@/lib/email/templates/welcome";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { getSiteSetting, isSelfHostedUnlimited } from "@/lib/site-settings";
+import { verifyTurnstile } from "@/lib/auth/turnstile";
 
 const registerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
+  turnstileToken: z.string().optional(),
 });
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = registerSchema.parse(body);
+
+    // Verify Turnstile captcha
+    if (parsed.turnstileToken) {
+      const valid = await verifyTurnstile(parsed.turnstileToken);
+      if (!valid) {
+        return NextResponse.json(
+          { error: "Captcha verification failed" },
+          { status: 400 }
+        );
+      }
+    } else if (process.env.TURNSTILE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: "Captcha token required" },
+        { status: 400 }
+      );
+    }
 
     // Check if email exists
     const existing = await db.query.users.findFirst({

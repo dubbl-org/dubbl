@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -57,7 +58,10 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [providers, setProviders] = useState<ProvidersConfig | null>(null);
+
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
     fetch("/api/auth/providers-config")
@@ -82,7 +86,7 @@ export default function SignUpPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, turnstileToken: turnstileToken || undefined }),
       });
 
       if (!res.ok) {
@@ -247,10 +251,18 @@ export default function SignUpPage() {
           />
         </div>
 
+        {turnstileSiteKey && (
+          <Turnstile
+            siteKey={turnstileSiteKey}
+            onSuccess={setTurnstileToken}
+            options={{ theme: "auto", size: "flexible" }}
+          />
+        )}
+
         <Button
           type="submit"
           className="h-11 w-full rounded-lg bg-emerald-600 shadow-md shadow-emerald-600/15 transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
-          disabled={loading}
+          disabled={loading || (!!turnstileSiteKey && !turnstileToken)}
         >
           {loading ? (
             "Creating account..."

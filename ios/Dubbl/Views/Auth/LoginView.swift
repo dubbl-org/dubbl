@@ -6,7 +6,6 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var showSignUp = false
-    @State private var showServer = false
     @State private var appeared = false
     @FocusState private var focus: Field?
 
@@ -139,34 +138,6 @@ struct LoginView: View {
                                 }
 
                                 Spacer(minLength: 24)
-
-                                // Self-hosted
-                                if showServer {
-                                    VStack(spacing: 4) {
-                                        TextField("https://dubbl.dev", text: $authManager.baseURL)
-                                            .font(.system(size: 14))
-                                            .padding(.horizontal, 12)
-                                            .frame(height: 40)
-                                            .background(Color(.secondarySystemBackground))
-                                            .cornerRadius(8)
-                                            .autocapitalization(.none)
-                                            .autocorrectionDisabled()
-                                            .keyboardType(.URL)
-                                        Text("For self-hosted instances")
-                                            .font(.system(size: 10))
-                                            .foregroundColor(Color(.quaternaryLabel))
-                                    }
-                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                    .padding(.bottom, 8)
-                                }
-
-                                Button(action: { withAnimation(.spring(response: 0.3)) { showServer.toggle() } }) {
-                                    Label(showServer ? "Hide" : "Self-hosted?", systemImage: "server.rack")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color(.tertiaryLabel))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.bottom, 8)
                             }
                             .padding(.horizontal, 24)
                             .padding(.top, 28)
