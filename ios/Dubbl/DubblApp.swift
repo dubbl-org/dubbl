@@ -42,7 +42,34 @@ struct LaunchScreen: View {
 
     var body: some View {
         ZStack {
-            Color(hex: "047857").ignoresSafeArea()
+            // Rich emerald gradient (matches web auth palette)
+            LinearGradient(
+                colors: [
+                    Color.emerald100,
+                    Color.emerald200,
+                    Color.emerald300,
+                    Color.emerald400,
+                    Color.emerald500,
+                    Color.emerald400,
+                    Color.emerald300
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            .overlay(
+                LinearGradient(
+                    colors: [
+                        Color.emerald300.opacity(0.6),
+                        Color.emerald400.opacity(0.4),
+                        Color.emerald500.opacity(0.5),
+                        Color.emerald400.opacity(0.3)
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                )
+                .ignoresSafeArea()
+            )
 
             // Decorative rings
             Circle()

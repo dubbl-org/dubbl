@@ -9,7 +9,7 @@ struct OrganizationPickerView: View {
                 AuthBackground()
 
                 VStack(spacing: 0) {
-                    AuthBanner(compact: true)
+                    AuthBanner(compact: true, topInset: geo.safeAreaInsets.top)
 
                     // White card
                     VStack(spacing: 0) {
@@ -94,6 +94,6 @@ struct OrganizationPickerView: View {
                 }
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea()
     }
 }

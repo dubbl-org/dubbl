@@ -3,6 +3,7 @@ import SwiftUI
 /// Rich emerald gradient banner with animated orbital rings.
 struct AuthBanner: View {
     var compact: Bool = false
+    var topInset: CGFloat = 0
     @State private var pulseScale: CGFloat = 0.95
     @State private var pulseOpacity: Double = 0.4
     @State private var ringRotation: Double = 0
@@ -10,15 +11,39 @@ struct AuthBanner: View {
 
     var body: some View {
         ZStack {
-            // Solid emerald background
-            Color(hex: "047857")
+            // Rich emerald gradient background (matches web grain gradient palette)
+            LinearGradient(
+                colors: [
+                    Color.emerald100,
+                    Color.emerald200,
+                    Color.emerald300,
+                    Color.emerald400,
+                    Color.emerald500,
+                    Color.emerald400,
+                    Color.emerald300
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            // Secondary diagonal gradient for depth
+            LinearGradient(
+                colors: [
+                    Color.emerald300.opacity(0.6),
+                    Color.emerald400.opacity(0.4),
+                    Color.emerald500.opacity(0.5),
+                    Color.emerald400.opacity(0.3)
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
 
             // Noise/grain texture
             Canvas { ctx, size in
                 for _ in 0..<Int(size.width * size.height * 0.02) {
                     let x = CGFloat.random(in: 0..<size.width)
                     let y = CGFloat.random(in: 0..<size.height)
-                    let opacity = Double.random(in: 0.02...0.06)
+                    let opacity = Double.random(in: 0.03...0.08)
                     ctx.fill(
                         Path(CGRect(x: x, y: y, width: 1, height: 1)),
                         with: .color(.white.opacity(opacity))
@@ -28,7 +53,7 @@ struct AuthBanner: View {
 
             // Radial vignette
             RadialGradient(
-                colors: [.clear, Color.black.opacity(0.12)],
+                colors: [.clear, Color.emerald800.opacity(0.15)],
                 center: .center,
                 startRadius: 60,
                 endRadius: 300
@@ -85,10 +110,10 @@ struct AuthBanner: View {
                         .opacity(appeared ? 1 : 0)
                 }
             }
-            .padding(.top, compact ? 8 : 16)
+            .padding(.top, topInset + (compact ? 8 : 16))
             .padding(.bottom, compact ? 16 : 24)
         }
-        .frame(height: compact ? 160 : 220)
+        .frame(height: (compact ? 160 : 220) + topInset)
         .clipped()
         .onAppear {
             withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
@@ -111,13 +136,38 @@ struct AuthBackground: View {
 
     var body: some View {
         ZStack {
-            Color(hex: "047857")
+            // Rich emerald gradient background (matches web grain gradient palette)
+            LinearGradient(
+                colors: [
+                    Color.emerald100,
+                    Color.emerald200,
+                    Color.emerald300,
+                    Color.emerald400,
+                    Color.emerald500,
+                    Color.emerald400,
+                    Color.emerald300
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            // Secondary diagonal gradient for depth
+            LinearGradient(
+                colors: [
+                    Color.emerald300.opacity(0.6),
+                    Color.emerald400.opacity(0.4),
+                    Color.emerald500.opacity(0.5),
+                    Color.emerald400.opacity(0.3)
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
 
             Canvas { ctx, size in
                 for _ in 0..<Int(size.width * size.height * 0.02) {
                     let x = CGFloat.random(in: 0..<size.width)
                     let y = CGFloat.random(in: 0..<size.height)
-                    let opacity = Double.random(in: 0.02...0.06)
+                    let opacity = Double.random(in: 0.03...0.08)
                     ctx.fill(
                         Path(CGRect(x: x, y: y, width: 1, height: 1)),
                         with: .color(.white.opacity(opacity))
@@ -126,7 +176,7 @@ struct AuthBackground: View {
             }
 
             RadialGradient(
-                colors: [.clear, Color.black.opacity(0.12)],
+                colors: [.clear, Color.emerald800.opacity(0.15)],
                 center: UnitPoint(x: 0.5, y: 0.25),
                 startRadius: 60,
                 endRadius: 400

@@ -21,7 +21,7 @@ struct SignUpView: View {
                 AuthBackground()
 
                 VStack(spacing: 0) {
-                    AuthBanner(compact: true)
+                    AuthBanner(compact: true, topInset: geo.safeAreaInsets.top)
 
                     // ── White card ──
                     VStack(spacing: 0) {
@@ -186,7 +186,7 @@ struct SignUpView: View {
                 }
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea()
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) { appeared = true }
         }
