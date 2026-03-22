@@ -21,7 +21,7 @@ struct SignUpView: View {
                 AuthBackground()
 
                 VStack(spacing: 0) {
-                    AuthBanner(compact: true, topInset: geo.safeAreaInsets.top)
+                    AuthBanner(compact: true)
 
                     // ── White card ──
                     VStack(spacing: 0) {

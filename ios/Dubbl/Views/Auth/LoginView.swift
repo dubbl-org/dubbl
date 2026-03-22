@@ -18,7 +18,7 @@ struct LoginView: View {
                 AuthBackground()
 
                 VStack(spacing: 0) {
-                    AuthBanner(topInset: geo.safeAreaInsets.top)
+                    AuthBanner()
 
                     // ── White card area (rounded top corners, fills rest of screen) ──
                     VStack(spacing: 0) {

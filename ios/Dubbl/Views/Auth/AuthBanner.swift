@@ -3,7 +3,6 @@ import SwiftUI
 /// Rich emerald gradient banner with animated orbital rings.
 struct AuthBanner: View {
     var compact: Bool = false
-    var topInset: CGFloat = 0
     @State private var pulseScale: CGFloat = 0.95
     @State private var pulseOpacity: Double = 0.4
     @State private var ringRotation: Double = 0
@@ -110,10 +109,10 @@ struct AuthBanner: View {
                         .opacity(appeared ? 1 : 0)
                 }
             }
-            .padding(.top, topInset + (compact ? 8 : 16))
+            .padding(.top, Self.statusBarHeight + (compact ? 8 : 16))
             .padding(.bottom, compact ? 16 : 24)
         }
-        .frame(height: (compact ? 160 : 220) + topInset)
+        .frame(height: (compact ? 160 : 220) + Self.statusBarHeight)
         .clipped()
         .onAppear {
             withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
@@ -127,6 +126,13 @@ struct AuthBanner: View {
                 ringRotation = 360
             }
         }
+    }
+
+    private static var statusBarHeight: CGFloat {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        else { return 59 }
+        return windowScene.statusBarManager?.statusBarFrame.height ?? 59
     }
 }
 
