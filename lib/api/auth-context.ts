@@ -5,6 +5,7 @@ import { subscription } from "@/lib/db/schema/billing";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
 import { getEffectiveLimits, type MemberRole } from "@/lib/plans";
+import { verifyMobileToken } from "@/lib/auth/mobile-token";
 
 export interface AuthContext {
   userId: string;
@@ -81,6 +82,33 @@ export async function getAuthContext(
       role: (mem?.role ?? "member") as MemberRole,
       ...customRoleInfo,
     };
+  }
+
+  // Try mobile token auth (JWT from iOS/mobile app)
+  if (authHeader?.startsWith("Bearer ") && !authHeader.startsWith("Bearer dk_")) {
+    const token = authHeader.slice(7);
+    const payload = await verifyMobileToken(token);
+    if (payload?.sub) {
+      const userId = payload.sub;
+      const orgId = organizationId || request.headers.get("x-organization-id");
+
+      if (!orgId) {
+        const memberships = await db.query.member.findMany({
+          where: eq(member.userId, userId),
+        });
+        if (memberships.length === 0) throw new AuthError("Not a member of any organization", 403);
+        if (memberships.length > 1) throw new AuthError("Organization ID required", 400);
+        const customRoleInfo = await resolveCustomRole(memberships[0]);
+        return { userId, organizationId: memberships[0].organizationId, role: memberships[0].role as MemberRole, ...customRoleInfo };
+      }
+
+      const mem = await db.query.member.findFirst({
+        where: and(eq(member.organizationId, orgId), eq(member.userId, userId)),
+      });
+      if (!mem) throw new AuthError("Not a member of this organization", 403);
+      const customRoleInfo = await resolveCustomRole(mem);
+      return { userId, organizationId: orgId, role: mem.role as MemberRole, ...customRoleInfo };
+    }
   }
 
   // Session auth

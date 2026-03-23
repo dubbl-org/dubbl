@@ -1,0 +1,166 @@
+---
+title: iOS Development
+description: Set up and run the Dubbl iOS app locally against your development server.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Tabs, Tab } from "fumadocs-ui/components/tabs";
+
+## Prerequisites
+
+- **Xcode 16+** (from the Mac App Store)
+- **iOS 17+ Simulator** or a physical device
+- The **web app running locally** (see [Getting Started](/docs/getting-started))
+
+## Quick Start
+
+1. Start the web app backend:
+
+```bash
+pnpm dev
+```
+
+2. Open the iOS project in Xcode:
+
+```bash
+open ios/Dubbl.xcodeproj
+```
+
+3. Select a simulator (iPhone 15 Pro recommended) and press **Cmd+R** to build and run.
+
+<Callout type="info">
+  In debug builds, the iOS app automatically connects to `http://localhost:3000`. No configuration needed.
+</Callout>
+
+## Architecture
+
+The iOS app uses **SwiftUI** with an **MVVM** pattern:
+
+```
+ios/Dubbl/
+  Core/
+    Auth/           AuthManager, KeychainService
+    Networking/     APIClient (REST, v1 endpoints)
+    Theme/          Colors, typography, modifiers
+  Views/
+    Auth/           Login, SignUp, OrganizationPicker
+    Components/     Shared UI components
+    Dashboard/      Main tab views
+```
+
+### API Layer
+
+The app communicates with the Next.js backend through **v1 REST endpoints**:
+
+| iOS Action | Endpoint | Auth |
+|---|---|---|
+| Sign in | `POST /api/v1/auth/sign-in` | None |
+| Register | `POST /api/v1/auth/register` | None |
+| Apple Sign-In | `POST /api/v1/auth/apple` | None |
+| Check session | `GET /api/v1/auth/session` | Bearer token |
+| List orgs | `GET /api/v1/organization` | Bearer token |
+| All other v1 routes | Various | Bearer token + `x-organization-id` header |
+
+The app receives a JWT token on sign-in and stores it in the iOS Keychain. All subsequent requests send it as a `Bearer` token in the `Authorization` header.
+
+## Testing with the Simulator
+
+### Demo Account
+
+If you ran the seed script (`pnpm db:seed`), you can sign in with:
+
+- **Email:** `demo@dubbl.dev`
+- **Password:** `password123`
+
+### Creating a New Account
+
+The register flow works locally out of the box. The iOS app will call `POST /api/v1/auth/register` on your local server.
+
+### Apple Sign-In
+
+Apple Sign-In on the simulator requires:
+
+1. A real Apple Developer account
+2. A configured Sign in with Apple capability in Xcode
+3. The `AUTH_APPLE_ID` environment variable set in your `.env`
+
+<Callout type="warn">
+  Apple Sign-In does not work on the iOS simulator without a physical Apple ID signed into the device. Test on a real device for Apple auth.
+</Callout>
+
+### Google Sign-In
+
+Google Sign-In opens a web browser flow. For local testing:
+
+1. Set `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` in your `.env`
+2. Add `http://localhost:3000/api/auth/callback/google` as an authorized redirect URI in Google Cloud Console
+
+## Cloudflare Turnstile (Captcha)
+
+Turnstile is **optional** and disabled by default. To enable it:
+
+1. Create a Turnstile widget at [Cloudflare Dashboard](https://dash.cloudflare.com) for your domain
+2. Add to your `.env`:
+
+```bash
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-site-key
+TURNSTILE_SECRET_KEY=your-secret-key
+```
+
+3. In `ios/Dubbl/Views/Components/TurnstileView.swift`, set the site key:
+
+```swift
+let turnstileSiteKey: String? = "your-site-key"
+```
+
+<Callout type="info">
+  For local development, you can use Cloudflare's test keys:
+  - Site key: `1x00000000000000000000AA` (always passes)
+  - Secret key: `1x0000000000000000000000000000000AA` (always passes)
+</Callout>
+
+The Turnstile widget is rendered in a `WKWebView`. The `baseURL` in `TurnstileView.swift` must match a hostname registered in your Turnstile widget settings. For local testing with test keys, any domain works.
+
+## Debugging
+
+### Network Requests
+
+All API requests go through `APIClient.swift`. To inspect network traffic:
+
+- Use Xcode's **Instruments > Network** profiler
+- Or set a breakpoint in `APIClient.buildRequest()` to inspect URLs and headers
+
+### Auth State
+
+`AuthManager` publishes its state as `@Published` properties. The app state machine:
+
+```
+loading → unauthenticated → (sign in) → needsOrganization → (select org) → authenticated
+```
+
+### Common Issues
+
+| Issue | Fix |
+|---|---|
+| "Could not connect to the server" | Make sure `pnpm dev` is running on port 3000 |
+| Sign-in returns 404 | Check that the v1 auth routes exist in `app/api/v1/auth/` |
+| Token rejected on API calls | Token may be expired (30-day lifetime). Sign out and back in |
+| Turnstile widget blank | Check the site key matches your Cloudflare config |
+
+## Physical Device Testing
+
+To test on a real iPhone connected to the same Wi-Fi:
+
+1. Find your Mac's local IP (e.g. `192.168.1.100`)
+2. In `AuthManager.swift`, the debug `baseURL` is `http://localhost:3000` which won't reach your Mac from a phone. Override it temporarily:
+
+```swift
+// In AuthManager.init(), change the DEBUG baseURL:
+self.baseURL = KeychainService.shared.get(.baseURL) ?? "http://192.168.1.100:3000"
+```
+
+3. Start the dev server on all interfaces:
+
+```bash
+pnpm dev --hostname 0.0.0.0
+```

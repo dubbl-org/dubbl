@@ -89,34 +89,61 @@ struct SignUpView: View {
                                 .padding(.vertical, 20)
 
                                 // Fields
-                                VStack(spacing: 14) {
-                                    inputField(label: "Full name", placeholder: "John Doe", text: $name, field: .name, contentType: .name, next: .email)
+                                VStack(spacing: 10) {
+                                    AuthTextField(
+                                        label: "Full name",
+                                        placeholder: "John Doe",
+                                        text: $name,
+                                        isFocused: focus == .name,
+                                        contentType: .name
+                                    )
+                                    .focused($focus, equals: .name)
+                                    .submitLabel(.next)
+                                    .onSubmit { focus = .email }
 
-                                    inputField(label: "Email", placeholder: "you@example.com", text: $email, field: .email, contentType: .emailAddress, keyboard: .emailAddress, next: .password)
+                                    AuthTextField(
+                                        label: "Email",
+                                        placeholder: "you@example.com",
+                                        text: $email,
+                                        isFocused: focus == .email,
+                                        contentType: .emailAddress,
+                                        keyboard: .emailAddress
+                                    )
+                                    .focused($focus, equals: .email)
+                                    .submitLabel(.next)
+                                    .onSubmit { focus = .password }
+
+                                    AuthPasswordField(
+                                        label: "Password",
+                                        placeholder: "Create a password",
+                                        text: $password,
+                                        isFocused: focus == .password
+                                    )
+                                    .focused($focus, equals: .password)
+                                    .submitLabel(.next)
+                                    .onSubmit { focus = .confirm }
 
                                     VStack(alignment: .leading, spacing: 6) {
-                                        Text("Password")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(Color(.secondaryLabel))
-                                        PasswordField(placeholder: "Create a password", text: $password, isFocused: focus == .password)
-                                            .focused($focus, equals: .password)
-                                            .submitLabel(.next)
-                                            .onSubmit { focus = .confirm }
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text("Confirm password")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(Color(.secondaryLabel))
-                                        PasswordField(placeholder: "Repeat password", text: $confirmPassword, isFocused: focus == .confirm)
-                                            .focused($focus, equals: .confirm)
-                                            .submitLabel(.go)
-                                            .onSubmit { create() }
+                                        AuthPasswordField(
+                                            label: "Confirm password",
+                                            placeholder: "Repeat password",
+                                            text: $confirmPassword,
+                                            isFocused: focus == .confirm
+                                        )
+                                        .focused($focus, equals: .confirm)
+                                        .submitLabel(.go)
+                                        .onSubmit { create() }
 
                                         if !confirmPassword.isEmpty && !passwordsMatch {
-                                            Text("Passwords don't match")
-                                                .font(.system(size: 12))
-                                                .foregroundColor(Color(hex: "dc2626"))
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .font(.system(size: 11))
+                                                Text("Passwords don't match")
+                                                    .font(.system(size: 12))
+                                            }
+                                            .foregroundColor(Color(hex: "dc2626"))
+                                            .padding(.leading, 4)
+                                            .padding(.top, 2)
                                         }
                                     }
                                 }
@@ -226,32 +253,6 @@ struct SignUpView: View {
 
     private func maybeDismiss() {
         if authManager.state != .unauthenticated { dismiss() }
-    }
-
-    @ViewBuilder
-    private func inputField(label: String, placeholder: String, text: Binding<String>, field: Field, contentType: UITextContentType = .name, keyboard: UIKeyboardType = .default, next: Field? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color(.secondaryLabel))
-            TextField(placeholder, text: text)
-                .focused($focus, equals: field)
-                .font(.system(size: 15))
-                .padding(.horizontal, 14)
-                .frame(height: 46)
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(focus == field ? Color.emerald500 : Color.clear, lineWidth: 2)
-                )
-                .textContentType(contentType)
-                .keyboardType(keyboard)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-                .submitLabel(next != nil ? .next : .done)
-                .onSubmit { if let next = next { focus = next } }
-        }
     }
 
     private func triggerAppleSignIn() {

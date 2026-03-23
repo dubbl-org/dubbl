@@ -60,7 +60,11 @@ actor APIClient {
     private let encoder: JSONEncoder
     private var authToken: String?
 
+    #if DEBUG
+    static let shared = APIClient(configuration: .development)
+    #else
     static let shared = APIClient()
+    #endif
 
     init(configuration: APIConfiguration = .default) {
         self.configuration = configuration

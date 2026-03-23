@@ -92,7 +92,11 @@ final class AuthManager: ObservableObject {
     static let shared = AuthManager()
 
     init() {
+        #if DEBUG
+        self.baseURL = KeychainService.shared.get(.baseURL) ?? "http://localhost:3000"
+        #else
         self.baseURL = KeychainService.shared.get(.baseURL) ?? "https://dubbl.dev"
+        #endif
         Task { await checkAuthStatus() }
     }
 

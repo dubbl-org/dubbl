@@ -87,40 +87,29 @@ struct LoginView: View {
                                 .padding(.vertical, 20)
 
                                 // Email
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Email")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(Color(.secondaryLabel))
-                                    TextField("you@example.com", text: $email)
-                                        .focused($focus, equals: .email)
-                                        .font(.system(size: 15))
-                                        .padding(.horizontal, 14)
-                                        .frame(height: 46)
-                                        .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(10)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .stroke(focus == .email ? Color.emerald500 : Color.clear, lineWidth: 2)
-                                        )
-                                        .textContentType(.emailAddress)
-                                        .keyboardType(.emailAddress)
-                                        .autocapitalization(.none)
-                                        .autocorrectionDisabled()
-                                        .submitLabel(.next)
-                                        .onSubmit { focus = .password }
-                                }
+                                AuthTextField(
+                                    label: "Email",
+                                    placeholder: "you@example.com",
+                                    text: $email,
+                                    isFocused: focus == .email,
+                                    contentType: .emailAddress,
+                                    keyboard: .emailAddress
+                                )
+                                .focused($focus, equals: .email)
+                                .submitLabel(.next)
+                                .onSubmit { focus = .password }
 
                                 // Password
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Password")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(Color(.secondaryLabel))
-                                    PasswordField(placeholder: "Your password", text: $password, isFocused: focus == .password)
-                                        .focused($focus, equals: .password)
-                                        .submitLabel(.go)
-                                        .onSubmit { signIn() }
-                                }
-                                .padding(.top, 14)
+                                AuthPasswordField(
+                                    label: "Password",
+                                    placeholder: "Your password",
+                                    text: $password,
+                                    isFocused: focus == .password
+                                )
+                                .focused($focus, equals: .password)
+                                .submitLabel(.go)
+                                .onSubmit { signIn() }
+                                .padding(.top, 4)
 
                                 // Error
                                 if let error = authManager.error {
@@ -276,43 +265,6 @@ struct RoundedCornerShape: Shape {
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
         return Path(path.cgPath)
-    }
-}
-
-// MARK: - Password field
-
-struct PasswordField: View {
-    let placeholder: String
-    @Binding var text: String
-    var isFocused: Bool = false
-    @State private var revealed = false
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Group {
-                if revealed {
-                    TextField(placeholder, text: $text)
-                } else {
-                    SecureField(placeholder, text: $text)
-                }
-            }
-            .font(.system(size: 15))
-            .textContentType(.password)
-
-            Button(action: { revealed.toggle() }) {
-                Image(systemName: revealed ? "eye.slash" : "eye")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color(.tertiaryLabel))
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 46)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isFocused ? Color.emerald500 : Color.clear, lineWidth: 2)
-        )
     }
 }
 
