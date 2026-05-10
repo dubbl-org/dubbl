@@ -26,10 +26,9 @@ const en: KeywordPack = {
     "total due",
     "total payable",
     "to pay",
-    "total\\s*\\(.*\\)",
     "total",
   ],
-  subtotal: ["sub\\s*total", "net total", "net amount", "net"],
+  subtotal: ["subtotal", "sub-total", "sub total", "net total", "net amount", "net"],
   tax: ["sales tax", "vat", "gst", "hst", "pst", "qst", "tax"],
   date: ["date", "issued", "issue date", "transaction date", "trans date", "purchased"],
   receiptNumber: [

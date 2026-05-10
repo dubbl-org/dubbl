@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ScanLine,
   Loader2,
@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Check,
   Plus,
+  StopCircle,
 } from "lucide-react";
 import {
   scan,
@@ -128,12 +129,24 @@ export function ReceiptScanner({ onApply, className }: ReceiptScannerProps) {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [review, setReview] = useState<ReviewState | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+    },
+    []
+  );
 
   const handleFile = useCallback(async (f: File) => {
     if (!f.type.startsWith("image/")) {
       setError("Please upload an image file (JPG, PNG, WebP).");
       return;
     }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setError(null);
     setResult(null);
     setReview(null);
@@ -147,27 +160,44 @@ export function ReceiptScanner({ onApply, className }: ReceiptScannerProps) {
 
     try {
       const r = await scan(f, {
+        signal: controller.signal,
         onProgress: (status, p) => {
+          if (controller.signal.aborted) return;
           setProgressLabel(status);
           setProgress(Math.round(p * 100));
         },
       });
+      if (controller.signal.aborted) return;
       setResult(r);
       setReview(fieldsToReview(r.fields));
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Failed to scan receipt.");
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setProcessing(false);
     }
   }, []);
 
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setProcessing(false);
+    setProgress(0);
+    setProgressLabel("");
+    setPreview(null);
+  }, []);
+
   const reset = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setPreview(null);
     setResult(null);
     setReview(null);
     setError(null);
     setProgress(0);
     setProgressLabel("");
+    setProcessing(false);
     if (inputRef.current) inputRef.current.value = "";
   }, []);
 
@@ -297,6 +327,14 @@ export function ReceiptScanner({ onApply, className }: ReceiptScannerProps) {
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={cancel}
+                  className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  <StopCircle className="size-3.5" />
+                  Cancel
+                </button>
               </div>
             )}
             {!processing && (
@@ -483,25 +521,35 @@ export function ReceiptScanner({ onApply, className }: ReceiptScannerProps) {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <Button
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={reset}
+                  onClick={() => inputRef.current?.click()}
+                  className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                 >
-                  <RotateCcw className="size-3 mr-1.5" />
-                  Discard
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleApply}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Check className="size-3 mr-1.5" />
-                  Apply
-                </Button>
+                  <ScanLine className="size-3" />
+                  Scan another
+                </button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={reset}
+                  >
+                    <RotateCcw className="size-3 mr-1.5" />
+                    Discard
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleApply}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <Check className="size-3 mr-1.5" />
+                    Apply
+                  </Button>
+                </div>
               </div>
             </div>
           )}

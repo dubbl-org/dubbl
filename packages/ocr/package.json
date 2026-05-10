@@ -34,6 +34,9 @@
     "bookkeeping"
   ],
   "license": "MIT",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts"
+  },
   "peerDependencies": {
     "tesseract.js": ">=5"
   },

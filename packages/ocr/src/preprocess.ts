@@ -6,13 +6,16 @@
 //      receipt). Tesseract loses ~20 confidence points on small images.
 //   3. Convert to grayscale.
 //   4. Apply CLAHE-lite contrast (per-tile histogram stretch).
-//   5. Otsu binarization (global threshold computed from the histogram).
+//   5. Binarize with Sauvola (adaptive, per-window). Beats Otsu on uneven
+//      lighting and thermal-paper receipts; falls back to Otsu when requested.
 //   6. Optional deskew based on horizontal projection variance (cheap
-//      alternative to a Hough transform; works well for ±10° receipt skew).
+//      alternative to a Hough transform; works well for ±15° receipt skew).
 //
 // The output is a canvas you pass to Tesseract.recognize.
 
 import type { OcrInput, PreprocessResult } from "./types";
+
+export type BinarizeMethod = "sauvola" | "otsu";
 
 export interface PreprocessOptions {
   /** Skip preprocessing entirely. */
@@ -25,6 +28,12 @@ export interface PreprocessOptions {
   targetMinDim?: number;
   /** Max output dimension. Default 2400 (Tesseract perf cliff). */
   maxDim?: number;
+  /** Binarization method. Default "sauvola". */
+  binarize?: BinarizeMethod;
+  /** Sauvola window size in pixels. Default = max(15, min(31, height / 40)). */
+  sauvolaWindow?: number;
+  /** Sauvola k coefficient. Default 0.2. */
+  sauvolaK?: number;
 }
 
 const DEFAULT_TARGET = 1200;
@@ -77,8 +86,8 @@ export async function preprocessImage(
       // Re-grab the post-rotation buffer.
       const rctx = rotated.getContext("2d")!;
       const rdata = rctx.getImageData(0, 0, rotated.width, rotated.height);
-      const finalData = options.skipBinarize ? rdata : (otsuBinarize(rdata), rdata);
-      rctx.putImageData(finalData, 0, 0);
+      if (!options.skipBinarize) binarize(rdata, options);
+      rctx.putImageData(rdata, 0, 0);
       return {
         image: rotated,
         width: rotated.width,
@@ -89,11 +98,27 @@ export async function preprocessImage(
     }
   }
 
-  // 5) Otsu binarization.
-  if (!options.skipBinarize) otsuBinarize(data);
+  // 5) Binarize.
+  if (!options.skipBinarize) binarize(data, options);
   ctx.putImageData(data, 0, 0);
 
   return { image: c, width: w, height: h, rotationDeg, binarized: !options.skipBinarize };
+}
+
+function binarize(data: ImageData, options: PreprocessOptions): void {
+  if (options.binarize === "otsu") {
+    otsuBinarize(data);
+    return;
+  }
+  // Sauvola with adaptive window size based on image height.
+  const w = options.sauvolaWindow ?? clampInt(Math.round(data.height / 40), 15, 31);
+  const k = options.sauvolaK ?? 0.2;
+  sauvolaBinarize(data, w, k);
+}
+
+function clampInt(n: number, lo: number, hi: number): number {
+  const i = Math.round(n);
+  return i < lo ? lo : i > hi ? hi : i;
 }
 
 // --- decode -----------------------------------------------------------------
@@ -192,6 +217,63 @@ function contrastStretch(data: ImageData) {
   for (let i = 0; i < d.length; i += 4) {
     const v = (d[i] - lo) * inv;
     d[i] = d[i + 1] = d[i + 2] = v < 0 ? 0 : v > 255 ? 255 : v;
+  }
+}
+
+/** Sauvola adaptive binarization. Per-pixel threshold using local mean and
+ *  stddev within a `window` × `window` neighborhood. Uses two integral images
+ *  (sum and squared sum) so each pixel is O(1). Significantly more robust
+ *  than Otsu on uneven lighting (thermal receipts, photos with shadows). */
+function sauvolaBinarize(data: ImageData, window: number, k: number): void {
+  const d = data.data;
+  const w = data.width;
+  const h = data.height;
+  const half = Math.floor(window / 2);
+  const R = 128; // dynamic range constant for 8-bit
+
+  // Integral images of v and v² over the grayscale (red channel = grayscale post-step 3).
+  const iw = w + 1;
+  const ih = h + 1;
+  const sum = new Float64Array(iw * ih);
+  const sqsum = new Float64Array(iw * ih);
+  for (let y = 1; y <= h; y++) {
+    let rowSum = 0;
+    let rowSqSum = 0;
+    const yOff = y * iw;
+    const yPrevOff = (y - 1) * iw;
+    for (let x = 1; x <= w; x++) {
+      const v = d[((y - 1) * w + (x - 1)) * 4];
+      rowSum += v;
+      rowSqSum += v * v;
+      sum[yOff + x] = sum[yPrevOff + x] + rowSum;
+      sqsum[yOff + x] = sqsum[yPrevOff + x] + rowSqSum;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - half);
+    const y1 = Math.min(h - 1, y + half);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - half);
+      const x1 = Math.min(w - 1, x + half);
+      const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+
+      const A = (y1 + 1) * iw + (x1 + 1);
+      const B = y0 * iw + (x1 + 1);
+      const C = (y1 + 1) * iw + x0;
+      const D = y0 * iw + x0;
+
+      const s = sum[A] - sum[B] - sum[C] + sum[D];
+      const sq = sqsum[A] - sqsum[B] - sqsum[C] + sqsum[D];
+      const mean = s / area;
+      const variance = Math.max(0, sq / area - mean * mean);
+      const std = Math.sqrt(variance);
+      const t = mean * (1 + k * (std / R - 1));
+
+      const idx = (y * w + x) * 4;
+      const out = d[idx] >= t ? 255 : 0;
+      d[idx] = d[idx + 1] = d[idx + 2] = out;
+    }
   }
 }
 

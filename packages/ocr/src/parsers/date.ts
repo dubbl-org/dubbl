@@ -146,7 +146,7 @@ function findDatesInText(text: string, locale?: Locale): FoundDate[] {
     `\\b(\\d{1,2})\\s+(${monthAlt})\\.?\\s*,?\\s+(\\d{2,4})\\b`,
     "gi"
   );
-  for (const m of reDMY.exec(text) ? [...text.matchAll(reDMY)] : []) {
+  for (const m of text.matchAll(reDMY)) {
     const d = Number(m[1]);
     const mo = MONTH_NAMES[m[2].toLowerCase()];
     let y = Number(m[3]);
@@ -160,7 +160,7 @@ function findDatesInText(text: string, locale?: Locale): FoundDate[] {
     `\\b(${monthAlt})\\.?\\s+(\\d{1,2})\\s*,?\\s+(\\d{2,4})\\b`,
     "gi"
   );
-  for (const m of reMDY.exec(text) ? [...text.matchAll(reMDY)] : []) {
+  for (const m of text.matchAll(reMDY)) {
     const mo = MONTH_NAMES[m[1].toLowerCase()];
     const d = Number(m[2]);
     let y = Number(m[3]);
