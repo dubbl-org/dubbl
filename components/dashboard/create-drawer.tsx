@@ -54,8 +54,10 @@ import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatMoney, decimalToCents } from "@/lib/money";
-import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
-import type { ReceiptData } from "@/lib/ocr/extract-receipt";
+import {
+  ReceiptScanner,
+  type ReceiptApplied,
+} from "@/components/dashboard/receipt-scanner";
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
 
@@ -644,19 +646,57 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     }
   }, [open]);
 
-  const handleReceiptExtracted = useCallback((data: ReceiptData) => {
+  const handleReceiptApplied = useCallback((data: ReceiptApplied) => {
     if (data.date) {
       setIssueDate(data.date);
       const d = new Date(data.date);
-      d.setDate(d.getDate() + 30);
-      setDueDate(d.toISOString().split("T")[0]);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() + 30);
+        setDueDate(d.toISOString().split("T")[0]);
+      }
     }
-    if (data.total !== null) {
-      const totalStr = (data.total / 100).toFixed(2);
-      setLines([{ description: data.vendor || "Receipt item", quantity: "1", unitPrice: totalStr, accountId: "", taxRateId: "" }]);
+    if (data.receiptNumber) setReference(data.receiptNumber);
+    else if (data.vendor) setReference(data.vendor);
+
+    if (data.lineItems.length > 0) {
+      setLines(
+        data.lineItems.map((li) => {
+          const unitCents =
+            li.unitPrice ??
+            (li.amount != null && li.quantity > 0
+              ? Math.round(li.amount / li.quantity)
+              : null);
+          return {
+            description: li.description || data.vendor || "Item",
+            quantity: String(li.quantity || 1),
+            unitPrice: unitCents != null ? (unitCents / 100).toFixed(2) : "",
+            accountId: "",
+            taxRateId: "",
+          };
+        })
+      );
+    } else if (data.total !== null) {
+      setLines([
+        {
+          description: data.vendor || "Receipt item",
+          quantity: "1",
+          unitPrice: (data.total / 100).toFixed(2),
+          accountId: "",
+          taxRateId: "",
+        },
+      ]);
     }
-    if (data.vendor) {
-      setReference(data.vendor);
+
+    const noteParts: string[] = [];
+    if (data.paymentMethod) noteParts.push(`Payment: ${data.paymentMethod}`);
+    if (data.currency) noteParts.push(`Currency: ${data.currency}`);
+    if (data.warnings.length > 0) {
+      noteParts.push(`OCR warnings: ${data.warnings.join("; ")}`);
+    }
+    if (noteParts.length > 0) {
+      setNotes((prev) =>
+        prev ? `${prev}\n${noteParts.join("\n")}` : noteParts.join("\n")
+      );
     }
   }, []);
 
@@ -713,7 +753,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
-            <ReceiptOcr onExtracted={handleReceiptExtracted} />
+            <ReceiptScanner onApply={handleReceiptApplied} />
 
             <div className="h-px bg-border" />
 
@@ -1275,6 +1315,59 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
   }
 
+  const handleReceiptApplied = useCallback((data: ReceiptApplied) => {
+    if (!title && data.vendor) setTitle(data.vendor);
+
+    const itemDate =
+      data.date && !isNaN(new Date(data.date).getTime())
+        ? data.date
+        : new Date().toISOString().split("T")[0];
+
+    if (data.lineItems.length > 0) {
+      setItems(
+        data.lineItems.map((li) => ({
+          date: itemDate,
+          description: li.description || data.vendor || "Item",
+          amount:
+            li.amount != null
+              ? (li.amount / 100).toFixed(2)
+              : li.unitPrice != null
+                ? ((li.unitPrice * (li.quantity || 1)) / 100).toFixed(2)
+                : "",
+          category: "",
+          accountId: "",
+          receiptFileKey: "",
+          receiptFileName: "",
+        }))
+      );
+    } else if (data.total !== null) {
+      setItems([
+        {
+          date: itemDate,
+          description: data.vendor || "Receipt",
+          amount: (data.total / 100).toFixed(2),
+          category: "",
+          accountId: "",
+          receiptFileKey: "",
+          receiptFileName: "",
+        },
+      ]);
+    }
+
+    const noteParts: string[] = [];
+    if (data.paymentMethod) noteParts.push(`Payment: ${data.paymentMethod}`);
+    if (data.currency) noteParts.push(`Currency: ${data.currency}`);
+    if (data.receiptNumber) noteParts.push(`Receipt #: ${data.receiptNumber}`);
+    if (data.warnings.length > 0) {
+      noteParts.push(`OCR warnings: ${data.warnings.join("; ")}`);
+    }
+    if (noteParts.length > 0) {
+      setDescription((prev) =>
+        prev ? `${prev}\n${noteParts.join("\n")}` : noteParts.join("\n")
+      );
+    }
+  }, [title]);
+
   const total = items.reduce((sum, item) => sum + decimalToCents(parseFloat(item.amount) || 0), 0);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1334,6 +1427,10 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
         </SheetHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <ReceiptScanner onApply={handleReceiptApplied} />
+
+            <div className="h-px bg-border" />
+
             <div className="space-y-4">
               <SectionLabel>Claim Info</SectionLabel>
               <div className="space-y-2">
