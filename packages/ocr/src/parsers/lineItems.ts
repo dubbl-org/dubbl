@@ -11,7 +11,7 @@
 
 import type { LineItem, Locale, OcrLine } from "../types";
 import { buildKeywordRegex, getMergedKeywords } from "../util/keywords";
-import { rightmostAmount, parseAmount, toCents } from "../util/number";
+import { findAmounts, rightmostAmount, parseAmount, toCents } from "../util/number";
 
 const QTY_RE = /^(\d{1,3})\s*(?:x|×|\*|@)\s*([\d.,]+)?\s*[-–]?\s*/i;
 const QTY_TRAILING_RE = /(\d{1,3})\s*(?:x|×|\*|@)\s*([\d.,]+)/i;
@@ -82,46 +82,103 @@ export function parseLineItems(
     // $100k; anything bigger is almost certainly a misread.
     if (Math.abs(last.value) > 100000) continue;
 
-    // Description = everything before the rightmost amount, minus trailing dots/separators.
-    let desc = text.slice(0, last.index).replace(/[\s.\-:]+$/, "").trim();
+    // Detect a tabular "[desc] [qty] [unit] [amount]" layout — common on
+    // invoices and longer-form receipts. The signal is two price-shaped
+    // amounts on the line, with a small integer between them (or between
+    // description and the first amount), such that qty × unit ≈ amount.
+    // Without this, the description swallows the qty and unit columns and
+    // unitPrice is computed as amount/1, which is exactly the user-reported
+    // "unit price is not correct, just a random number" failure mode.
+    const allAmounts = findAmounts(text);
+    const pricedAmounts = allAmounts.filter((a) => PRICE_SHAPE.test(a.raw));
+    let qty = 1;
+    let unitPrice: number | null = null;
+    let amount = last;
+    let descEnd = last.index;
+    let detected: "tabular" | "leading-qty" | "trailing-qty" | "single" = "single";
+
+    if (pricedAmounts.length >= 2) {
+      const a = pricedAmounts[pricedAmounts.length - 1];
+      const u = pricedAmounts[pricedAmounts.length - 2];
+      // Search for a bare integer (the qty column) anywhere to the left of
+      // the unit. Walk right-to-left and take the first one not contained
+      // in any priced amount's span.
+      const head = text.slice(0, u.index);
+      const intMatches = [...head.matchAll(/\b(\d{1,4})\b/g)];
+      let qtyMatch: { index: number; raw: string; value: number } | undefined;
+      for (let i = intMatches.length - 1; i >= 0; i--) {
+        const m = intMatches[i];
+        const idx = m.index ?? 0;
+        const insideAmount = pricedAmounts.some(
+          (p) => idx >= p.index && idx < p.index + p.length
+        );
+        if (insideAmount) continue;
+        const n = Number(m[1]);
+        if (!Number.isFinite(n) || n < 1 || n > 9999) continue;
+        qtyMatch = { index: idx, raw: m[1], value: n };
+        break;
+      }
+      if (qtyMatch) {
+        const expected = qtyMatch.value * u.value;
+        const tolerance = Math.max(0.02, Math.abs(a.value) * 0.01);
+        if (Math.abs(expected - a.value) <= tolerance) {
+          qty = qtyMatch.value;
+          unitPrice = u.value;
+          amount = a;
+          descEnd = qtyMatch.index;
+          detected = "tabular";
+        }
+      }
+    }
+
+    // Description = everything before whatever we consumed from the right,
+    // minus trailing dots/separators.
+    let desc = text.slice(0, descEnd).replace(/[\s.\-:]+$/, "").trim();
     if (desc.length < 2) continue;
     if (/^\d+$/.test(desc)) continue; // pure-number "description" is noise
     // Must contain at least one letter — pure punctuation/numbers can't be an item name.
     if (!/[A-Za-zÀ-ÿ]/.test(desc)) continue;
 
-    let qty = 1;
-    let unitPrice: number | null = null;
-
-    const leadingQty = QTY_RE.exec(desc);
-    if (leadingQty) {
-      qty = Number(leadingQty[1]);
-      if (leadingQty[2]) unitPrice = parseAmount(leadingQty[2]);
-      desc = desc.slice(leadingQty[0].length).trim();
-    } else {
-      const trailingQty = QTY_TRAILING_RE.exec(desc);
-      if (trailingQty) {
-        qty = Number(trailingQty[1]);
-        unitPrice = parseAmount(trailingQty[2]);
+    if (detected !== "tabular") {
+      const leadingQty = QTY_RE.exec(desc);
+      if (leadingQty) {
+        qty = Number(leadingQty[1]);
+        if (leadingQty[2]) unitPrice = parseAmount(leadingQty[2]);
+        desc = desc.slice(leadingQty[0].length).trim();
+        detected = "leading-qty";
+      } else {
+        const trailingQty = QTY_TRAILING_RE.exec(desc);
+        if (trailingQty) {
+          qty = Number(trailingQty[1]);
+          unitPrice = parseAmount(trailingQty[2]);
+          detected = "trailing-qty";
+        }
       }
     }
 
-    if (unitPrice == null && qty > 0 && last.value > 0) {
-      unitPrice = +(last.value / qty).toFixed(2);
+    if (unitPrice == null && qty > 0 && amount.value > 0) {
+      unitPrice = +(amount.value / qty).toFixed(2);
     }
 
     items.push({
       description: { value: desc, raw: text, confidence: 0.6, bbox: [line.bbox] },
-      quantity: { value: qty, raw: null, confidence: qty === 1 ? 0.4 : 0.8, bbox: null },
+      quantity: {
+        value: qty,
+        raw: null,
+        confidence: detected === "tabular" ? 0.9 : qty === 1 ? 0.4 : 0.8,
+        bbox: null,
+      },
       unitPrice: {
         value: unitPrice != null ? toCents(unitPrice) : null,
         raw: null,
-        confidence: unitPrice != null ? 0.6 : 0,
+        confidence:
+          detected === "tabular" ? 0.9 : unitPrice != null ? 0.6 : 0,
         bbox: null,
       },
       amount: {
-        value: toCents(last.value),
-        raw: last.raw,
-        confidence: 0.7,
+        value: toCents(amount.value),
+        raw: amount.raw,
+        confidence: detected === "tabular" ? 0.9 : 0.7,
         bbox: [line.bbox],
       },
     });

@@ -91,7 +91,28 @@ export interface AmountMatch {
   length: number;
 }
 
-const AMOUNT_RE = /(?:[-+]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{1,3})|[-+]?\d+(?:[.,]\d{1,3})?)/g;
+// Each alternative pairs a thousands separator with a compatible decimal
+// separator. Listing them explicitly (vs. the looser `[.,\s]` group used
+// before) keeps a layout like "3 100.00" from being read as the single
+// number 3,100.00 — the space here is column padding, not French
+// thousands-grouping. Order matters: most-specific alternatives first so
+// the regex engine doesn't truncate a thousands-grouped number into a
+// shorter match.
+const AMOUNT_RE = new RegExp(
+  [
+    // 1,234.56 — comma thousands, dot decimal (US/UK/CA/AU)
+    String.raw`[-+]?\d{1,3}(?:,\d{3})+\.\d{1,3}`,
+    // 1.234,56 — dot thousands, comma decimal (DE/IT/ES/NL/PT/HU/PL/...)
+    String.raw`[-+]?\d{1,3}(?:\.\d{3})+,\d{1,3}`,
+    // 1 234,56 / 1 234,56 — space (or NBSP) thousands, comma decimal (FR/SE/FI/NO/CZ)
+    String.raw`[-+]?\d{1,3}(?:[\s ]\d{3})+,\d{1,3}`,
+    // 12.99 / 12,99 — plain decimal, no thousands grouping
+    String.raw`[-+]?\d+[.,]\d{1,3}`,
+    // 1234 — bare integer (qty, year fragment, sometimes a whole-number price)
+    String.raw`[-+]?\d+`,
+  ].join("|"),
+  "g"
+);
 
 export function findAmounts(text: string): AmountMatch[] {
   const out: AmountMatch[] = [];

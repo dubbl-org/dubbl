@@ -189,6 +189,92 @@ test("integration: thermal grocery receipt — full field extraction", { skip: !
   assert.deepEqual(r.warnings, [], `unexpected warnings: ${JSON.stringify(r.warnings)}`);
 });
 
+function tabularInvoiceSvg(): string {
+  // Mimics the standard "electronic receipt template" layout found all over
+  // the web: four right-aligned columns [Description] [Qty] [Unit] [Amount].
+  // Reproduces the user-reported failure mode where the description used to
+  // swallow the qty + unit-price columns ("Electronic Products or Services
+  // 3 100.00 300.00" → desc="Electronic Products or Services 3 100.00",
+  // unit=300.00, amount=300.00).
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+    <rect width="800" height="600" fill="white"/>
+    <style>
+      .h  { font: bold 28px sans-serif; }
+      .b  { font: 18px sans-serif; }
+      .hh { font: bold 16px sans-serif; }
+    </style>
+    <text x="40"  y="60" class="h">INVOICE</text>
+    <text x="760" y="60" class="b" text-anchor="end">Invoice #: INV-2026-0042</text>
+    <text x="760" y="85" class="b" text-anchor="end">Date: 2026-04-08</text>
+
+    <line x1="40" y1="120" x2="760" y2="120" stroke="black" stroke-width="2"/>
+    <text x="40"  y="145" class="hh">Description</text>
+    <text x="500" y="145" class="hh" text-anchor="end">Qty</text>
+    <text x="630" y="145" class="hh" text-anchor="end">Unit Price</text>
+    <text x="760" y="145" class="hh" text-anchor="end">Amount</text>
+    <line x1="40" y1="160" x2="760" y2="160" stroke="black" stroke-width="1"/>
+
+    <text x="40"  y="195" class="b">Electronic Products or Services</text>
+    <text x="500" y="195" class="b" text-anchor="end">3</text>
+    <text x="630" y="195" class="b" text-anchor="end">100.00</text>
+    <text x="760" y="195" class="b" text-anchor="end">300.00</text>
+
+    <text x="40"  y="225" class="b">Shipping and Handling</text>
+    <text x="500" y="225" class="b" text-anchor="end">1</text>
+    <text x="630" y="225" class="b" text-anchor="end">25.00</text>
+    <text x="760" y="225" class="b" text-anchor="end">25.00</text>
+
+    <text x="40"  y="255" class="b">Extended Warranty</text>
+    <text x="500" y="255" class="b" text-anchor="end">2</text>
+    <text x="630" y="255" class="b" text-anchor="end">49.99</text>
+    <text x="760" y="255" class="b" text-anchor="end">99.98</text>
+
+    <line x1="40" y1="285" x2="760" y2="285" stroke="black" stroke-width="1"/>
+    <text x="500" y="320" class="b" text-anchor="end">Subtotal</text>
+    <text x="760" y="320" class="b" text-anchor="end">424.98</text>
+    <text x="500" y="345" class="b" text-anchor="end">Tax 7.5%</text>
+    <text x="760" y="345" class="b" text-anchor="end">31.87</text>
+    <text x="500" y="380" class="h" text-anchor="end">TOTAL</text>
+    <text x="760" y="380" class="h" text-anchor="end">$456.85</text>
+
+    <text x="40"  y="430" class="b">Paid by VISA ****1234</text>
+  </svg>`;
+}
+
+test("integration: tabular invoice — qty/unit/amount columns", { skip: !RUN }, async () => {
+  const png = await render(tabularInvoiceSvg());
+  const r = await scan(png, { rawInput: true, locale: "en-US" });
+  debug("invoice", r);
+
+  assert.equal(r.fields.date.value, "2026-04-08");
+  assert.equal(r.fields.total.value, 45685);
+  assert.equal(r.fields.subtotal.value, 42498);
+  assert.equal(r.fields.tax.value, 3187);
+  assert.equal(r.fields.taxRate.value, 7.5);
+  assert.match(r.fields.paymentMethod.value ?? "", /visa/i);
+
+  assert.equal(r.fields.lineItems.length, 3, `got ${r.fields.lineItems.length} items`);
+
+  const electronics = r.fields.lineItems.find((li) =>
+    /electronic/i.test(li.description.value ?? "")
+  );
+  assert.ok(electronics, "expected an Electronic Products line item");
+  assert.equal(electronics.quantity.value, 3, `qty was ${electronics.quantity.value}`);
+  assert.equal(electronics.unitPrice.value, 10000, `unit was ${electronics.unitPrice.value}`);
+  assert.equal(electronics.amount.value, 30000, `amount was ${electronics.amount.value}`);
+  // Description should NOT swallow the qty/unit columns.
+  assert.doesNotMatch(electronics.description.value ?? "", /\b3\b|\b100\.00\b/,
+    `description leaked numeric columns: "${electronics.description.value}"`);
+
+  const warranty = r.fields.lineItems.find((li) => li.amount.value === 9998);
+  assert.ok(warranty, "expected an Extended Warranty line item");
+  assert.equal(warranty.quantity.value, 2);
+  assert.equal(warranty.unitPrice.value, 4999);
+
+  const sum = r.fields.lineItems.reduce((a, li) => a + (li.amount.value ?? 0), 0);
+  assert.equal(sum, 42498, `line item sum ${sum} should equal subtotal 42498`);
+});
+
 test.after(async () => {
   await shutdown();
 });
