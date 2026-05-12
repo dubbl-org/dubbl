@@ -93,23 +93,42 @@ async function getWorker(
       // Dynamic import so server bundles that never call scan() don't pull
       // tesseract.js into their tree.
       const mod: typeof import("tesseract.js") = await import("tesseract.js");
-      const w = await mod.createWorker(langs, 1, {
-        ...(options.workerPath ? { workerPath: options.workerPath } : {}),
-        ...(options.corePath ? { corePath: options.corePath } : {}),
-        ...(options.langPath ? { langPath: options.langPath } : {}),
-        logger: options.onProgress
-          ? (m: { status?: string; progress?: number }) => {
-              options.onProgress?.(m.status ?? "", m.progress ?? 0);
-            }
-          : undefined,
-      });
-      // Receipt-friendly defaults. We intentionally drop dictionary bias since
-      // receipts are full of brand names, codes, and prices the dictionary will
-      // miscorrect. preserve_interword_spaces keeps column alignment so our
-      // bbox-based line clustering and "rightmost amount" extraction work.
-      await w.setParameters({
+
+      // tesseract.js v7 spreads our options over its defaults, so an explicit
+      // `logger: undefined` overwrites the default no-op logger and the worker
+      // crashes with "TypeError: logger is not a function". Only include keys
+      // we actually want to set.
+      const workerOpts: Record<string, unknown> = {};
+      if (options.workerPath) workerOpts.workerPath = options.workerPath;
+      if (options.corePath) workerOpts.corePath = options.corePath;
+      if (options.langPath) workerOpts.langPath = options.langPath;
+      if (options.onProgress) {
+        workerOpts.logger = (m: { status?: string; progress?: number }) => {
+          options.onProgress?.(m.status ?? "", m.progress ?? 0);
+        };
+      }
+
+      // Receipt-friendly init config. The dawg/dictionary parameters are
+      // INIT-ONLY in tesseract — setParameters silently rejects them. Pass
+      // them as the 4th arg of createWorker. We intentionally drop the
+      // dictionary bias because receipts are full of brand names, codes and
+      // prices the dictionary would happily miscorrect ("USD" → "usb",
+      // "VENMO" → "vendor", "TOTAL 12.99" → "TOTAL 12.991", etc.).
+      const initConfig = {
         load_system_dawg: "0",
         load_freq_dawg: "0",
+        load_unambig_dawg: "0",
+        load_punc_dawg: "0",
+        load_number_dawg: "0",
+        load_bigram_dawg: "0",
+      };
+
+      const w = await mod.createWorker(langs, 1, workerOpts, initConfig);
+
+      // Runtime parameters: column alignment for bbox clustering, and an
+      // assumed DPI so tesseract doesn't print "Invalid resolution 0 dpi"
+      // warnings (the value just has to be plausible — we control sizing).
+      await w.setParameters({
         preserve_interword_spaces: "1",
         user_defined_dpi: "300",
       });
@@ -128,7 +147,15 @@ export async function recognize(
   const langs = options.languages ?? localeToLangs(options.locale);
   const worker = await getWorker(langs, options);
 
-  const psms = options.multiPass === false ? [PSM.SINGLE_BLOCK] : [PSM.SINGLE_BLOCK, PSM.SINGLE_COLUMN, PSM.SPARSE];
+  // PSM 4 (SINGLE_COLUMN) is the receipt sweet spot — tesseract treats the
+  // page as one column of text of variable line widths, which matches the
+  // [description] ... [amount] structure better than PSM 6 (uniform block).
+  // PSM 6 is a good fallback for densely-packed receipts; PSM 11 (sparse)
+  // helps when columns are widely separated but mis-reads dictionary words.
+  const psms =
+    options.multiPass === false
+      ? [PSM.SINGLE_COLUMN]
+      : [PSM.SINGLE_COLUMN, PSM.SINGLE_BLOCK, PSM.SPARSE];
 
   const runs: RecognizeRunResult[] = [];
   for (const psm of psms) {
