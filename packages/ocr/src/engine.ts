@@ -29,7 +29,11 @@ interface RecognizeRunResult {
 
 interface WorkerLike {
   setParameters: (params: Record<string, string | number>) => Promise<void>;
-  recognize: (input: unknown) => Promise<{ data: TesseractData }>;
+  recognize: (
+    input: unknown,
+    options?: unknown,
+    output?: { text?: boolean; blocks?: boolean }
+  ) => Promise<{ data: TesseractData }>;
   terminate: () => Promise<void>;
 }
 
@@ -99,7 +103,10 @@ async function getWorker(
             }
           : undefined,
       });
-      // Receipt-friendly defaults: drop dictionary bias, restrict charset.
+      // Receipt-friendly defaults. We intentionally drop dictionary bias since
+      // receipts are full of brand names, codes, and prices the dictionary will
+      // miscorrect. preserve_interword_spaces keeps column alignment so our
+      // bbox-based line clustering and "rightmost amount" extraction work.
       await w.setParameters({
         load_system_dawg: "0",
         load_freq_dawg: "0",
@@ -127,7 +134,14 @@ export async function recognize(
   for (const psm of psms) {
     if (options.signal?.aborted) throw new Error("OCR aborted");
     await worker.setParameters({ tessedit_pageseg_mode: String(psm) });
-    const { data } = await worker.recognize(input as unknown);
+    // tesseract.js v6+ requires explicit output selection — without
+    // `blocks: true` the response has data.text only and data.blocks is null,
+    // which would collapse our word/bbox pipeline to zero output.
+    const { data } = await worker.recognize(
+      input as unknown,
+      {},
+      { text: true, blocks: true }
+    );
     const words = flattenWords(data);
     runs.push({
       text: data.text ?? "",
