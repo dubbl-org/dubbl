@@ -256,8 +256,17 @@ function dedupe<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
 
-/** Build a case-insensitive regex matching any of the keywords as a phrase. */
+/** Build a case-insensitive regex matching any of the keywords as a phrase.
+ *  Anchors with word boundaries so that "Cash" doesn't match inside "Cashier"
+ *  and "Tax" doesn't match inside "Taxi". For keywords whose first or last
+ *  char is a non-word character (e.g. "receipt #"), the \b is moved inward to
+ *  avoid the always-false case where \b sits between two non-word chars. */
 export function buildKeywordRegex(words: string[]): RegExp {
-  const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return new RegExp(`(?:${escaped.join("|")})`, "i");
+  const parts = words.map((w) => {
+    const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const left = /^\w/.test(w) ? "\\b" : "";
+    const right = /\w$/.test(w) ? "\\b" : "";
+    return `${left}${esc}${right}`;
+  });
+  return new RegExp(`(?:${parts.join("|")})`, "i");
 }
