@@ -88,15 +88,24 @@ test("parseLineItems: tabular layout doesn't misfire on grocery '1.32 LB' weight
   assert.equal(items[0].quantity.value, 1);
 });
 
-test("parseLineItems: tabular validation requires qty * unit ≈ amount", () => {
-  // Three priced amounts on the same line but the arithmetic doesn't work
-  // out — should NOT be treated as tabular qty/unit/amount.
+test("parseLineItems: tabular structure trumps arithmetic mismatch (OCR misread tolerance)", () => {
+  // Real-world case: OCR misreads "300.00" as "30.00" in a 4-column invoice.
+  // The column STRUCTURE is still intact (qty + 2 prices), so we should
+  // trust it and emit qty=3, unit=100.00, amount=30.00. Confidence on
+  // those three fields is lowered because qty*unit != amount, signalling
+  // the user should double-check — but we don't drop the row to single-
+  // amount, which would have lost the qty entirely.
   resetLineY();
-  const lines = [L("Bundle Deal 4 25.00 87.50")];
+  const lines = [L("Electronic Products or Services 3 100.00 30.00")];
   const items = parseLineItems(lines);
   assert.equal(items.length, 1);
-  // Falls back to single-amount mode: amount = rightmost.
-  assert.equal(items[0].amount.value, 8750);
-  // No tabular qty was accepted, so qty stays 1.
-  assert.equal(items[0].quantity.value, 1);
+  assert.equal(items[0].description.value, "Electronic Products or Services");
+  assert.equal(items[0].quantity.value, 3);
+  assert.equal(items[0].unitPrice.value, 10000);
+  assert.equal(items[0].amount.value, 3000);
+  // Arithmetic mismatch must dampen confidence so the UI flags this row.
+  assert.ok(
+    items[0].amount.confidence < 0.9,
+    `confidence ${items[0].amount.confidence} should be below 0.9 on a mismatch`
+  );
 });

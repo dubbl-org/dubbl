@@ -60,7 +60,14 @@ export async function scan(
   const taxParse = parseTax(lines, locale);
 
   // Find the y-position of the total line so we can stop line-item parsing there.
-  const totalY = totalParse.total.bbox?.[0]?.y0;
+  // Only use it as a cutoff when parseTotal had real keyword evidence — if
+  // the total was a low-confidence fallback (e.g. "largest amount in the
+  // bottom third"), it may actually be a line item, and using it as a
+  // cutoff would skip that row entirely.
+  const totalY =
+    totalParse.total.confidence >= 0.5
+      ? totalParse.total.bbox?.[0]?.y0
+      : undefined;
 
   const fields: ScanFields = {
     vendor: parseVendor(lines),

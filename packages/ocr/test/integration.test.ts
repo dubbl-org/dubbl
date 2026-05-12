@@ -275,6 +275,55 @@ test("integration: tabular invoice — qty/unit/amount columns", { skip: !RUN },
   assert.equal(sum, 42498, `line item sum ${sum} should equal subtotal 42498`);
 });
 
+function misreadInvoiceSvg(): string {
+  // Same tabular invoice layout, but the rightmost "Amount" column has a
+  // value that doesn't reconcile with qty × unit. Simulates the failure
+  // mode the user reported on their real-world image (OCR read "300.00"
+  // as "30.00"). A correct parser must trust the COLUMN structure: keep
+  // qty=3, unit=100.00, desc clean — only the amount is wrong, and that's
+  // surfaced via a warning so the user can edit it.
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+    <rect width="800" height="500" fill="white"/>
+    <style>
+      .h { font: bold 28px sans-serif; }
+      .b { font: 18px sans-serif; }
+      .hh { font: bold 16px sans-serif; }
+    </style>
+    <text x="40"  y="60" class="h">INVOICE</text>
+    <text x="760" y="60" class="b" text-anchor="end">Date: 2026-04-08</text>
+    <line x1="40" y1="120" x2="760" y2="120" stroke="black" stroke-width="2"/>
+    <text x="40"  y="145" class="hh">Description</text>
+    <text x="500" y="145" class="hh" text-anchor="end">Qty</text>
+    <text x="630" y="145" class="hh" text-anchor="end">Unit Price</text>
+    <text x="760" y="145" class="hh" text-anchor="end">Amount</text>
+    <line x1="40" y1="160" x2="760" y2="160" stroke="black" stroke-width="1"/>
+    <text x="40"  y="195" class="b">Electronic Products or Services</text>
+    <text x="500" y="195" class="b" text-anchor="end">3</text>
+    <text x="630" y="195" class="b" text-anchor="end">100.00</text>
+    <text x="760" y="195" class="b" text-anchor="end">30.00</text>
+  </svg>`;
+}
+
+test("integration: tabular invoice survives OCR amount-column misreads", { skip: !RUN }, async () => {
+  const png = await render(misreadInvoiceSvg());
+  const r = await scan(png, { rawInput: true, locale: "en-US" });
+  debug("misread", r);
+
+  assert.equal(r.fields.lineItems.length, 1);
+  const li = r.fields.lineItems[0];
+  // Description must NOT swallow numeric columns even when arithmetic doesn't
+  // reconcile — column structure is the load-bearing signal.
+  assert.equal(li.description.value, "Electronic Products or Services");
+  assert.equal(li.quantity.value, 3);
+  assert.equal(li.unitPrice.value, 10000);
+  assert.equal(li.amount.value, 3000);
+  // Lower confidence flags the mismatch for the UI.
+  assert.ok(
+    li.amount.confidence < 0.9,
+    `expected damped confidence on mismatch, got ${li.amount.confidence}`
+  );
+});
+
 test.after(async () => {
   await shutdown();
 });
