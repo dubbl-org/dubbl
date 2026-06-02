@@ -5,6 +5,7 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import { EmailLayout } from "./layout";
+import { toAppUrl } from "@/lib/public-url";
 
 interface DigestNotification {
   type: string;
@@ -35,7 +36,7 @@ export function NotificationDigestEmail({
   userName = "there",
   orgName = "Acme Corp",
   notifications = [],
-  dashboardUrl = "https://dubbl.dev/notifications",
+  dashboardUrl = toAppUrl("/notifications"),
   unsubscribeUrl,
 }: NotificationDigestProps) {
   const MAX_SHOWN = 9;

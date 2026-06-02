@@ -8,6 +8,7 @@ import { WelcomeEmail } from "@/lib/email/templates/welcome";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { MemberInviteEmail } from "@/lib/email/templates/member-invite";
 import { LoginAlertEmail } from "@/lib/email/templates/login-alert";
+import { toAppUrl } from "@/lib/public-url";
 
 const TEMPLATES: Record<string, { name: string; component: () => React.ReactElement }> = {
   "notification-digest": {
@@ -29,7 +30,7 @@ const TEMPLATES: Record<string, { name: string; component: () => React.ReactElem
           { type: "payment_received", title: "Payment received from GlobalRetail", body: "$2,100.00 applied to INV-0037", createdAt: "13h ago" },
           { type: "approval_needed", title: "Bill approval: Office supplies", body: "$340.00 from Staples UK", createdAt: "14h ago" },
         ],
-        dashboardUrl: "https://dubbl.dev/notifications",
+        dashboardUrl: toAppUrl("/notifications"),
       }),
   },
   welcome: {
@@ -37,7 +38,7 @@ const TEMPLATES: Record<string, { name: string; component: () => React.ReactElem
     component: () =>
       createElement(WelcomeEmail, {
         userName: "John",
-        loginUrl: "https://dubbl.dev/sign-in",
+        loginUrl: toAppUrl("/sign-in"),
       }),
   },
   "org-created": {
@@ -46,7 +47,7 @@ const TEMPLATES: Record<string, { name: string; component: () => React.ReactElem
       createElement(OrgCreatedEmail, {
         userName: "John",
         orgName: "Acme Corp",
-        dashboardUrl: "https://dubbl.dev/dashboard",
+        dashboardUrl: toAppUrl("/dashboard"),
       }),
   },
   "member-invite": {
@@ -56,7 +57,7 @@ const TEMPLATES: Record<string, { name: string; component: () => React.ReactElem
         inviterName: "Jane Smith",
         orgName: "Acme Corp",
         role: "admin",
-        loginUrl: "https://dubbl.dev/sign-in",
+        loginUrl: toAppUrl("/sign-in"),
       }),
   },
   "login-alert": {
@@ -68,7 +69,7 @@ const TEMPLATES: Record<string, { name: string; component: () => React.ReactElem
         userAgent: "Chrome 120 on macOS",
         provider: "Google",
         timestamp: "March 13, 2026 at 2:30 PM",
-        securityUrl: "https://dubbl.dev/settings",
+        securityUrl: toAppUrl("/settings"),
       }),
   },
 };

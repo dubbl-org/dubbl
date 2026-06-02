@@ -11,6 +11,7 @@ import {
   Hr,
 } from "@react-email/components";
 import * as React from "react";
+import { getPublicAppUrl, toSiteUrl } from "@/lib/public-url";
 
 interface LayoutProps {
   preview: string;
@@ -18,7 +19,7 @@ interface LayoutProps {
   unsubscribeUrl?: string;
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev";
+const APP_URL = getPublicAppUrl();
 
 export function EmailLayout({ preview, children, unsubscribeUrl }: LayoutProps) {
   return (
@@ -53,11 +54,11 @@ export function EmailLayout({ preview, children, unsubscribeUrl }: LayoutProps) 
           <Hr style={hr} />
           <Section style={footer}>
             <Text style={footerLinks}>
-              <Link href={`${APP_URL.replace('app.', '')}/terms`} style={footerLink}>
+              <Link href={toSiteUrl("/terms")} style={footerLink}>
                 Terms of Service
               </Link>
               {" · "}
-              <Link href={`${APP_URL.replace('app.', '')}/privacy`} style={footerLink}>
+              <Link href={toSiteUrl("/privacy")} style={footerLink}>
                 Privacy Policy
               </Link>
               {unsubscribeUrl && (

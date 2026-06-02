@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, organization, member, subscription } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { render } from "@react-email/render";
 import { createElement } from "react";
 import { WelcomeEmail } from "@/lib/email/templates/welcome";
-import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
-import { getSiteSetting, isSelfHostedUnlimited } from "@/lib/site-settings";
+import { getSiteSetting } from "@/lib/site-settings";
+import { toAppUrl } from "@/lib/public-url";
 
 const registerSchema = z.object({
   name: z.string().min(1),
@@ -83,45 +83,9 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    // Create default organization
-    const slug = parsed.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-
-    const [org] = await db
-      .insert(organization)
-      .values({
-        name: `${parsed.name}'s Org`,
-        slug: `${slug}-${Date.now().toString(36)}`,
-      })
-      .returning();
-
-    // Add user as owner
-    await db.insert(member).values({
-      organizationId: org.id,
-      userId: user.id,
-      role: "owner",
-    });
-
-    // Create subscription (pro for self-hosted, free otherwise)
-    const selfHosted = isSelfHostedUnlimited();
-    await db.insert(subscription).values({
-      organizationId: org.id,
-      plan: selfHosted ? "pro" : "free",
-      status: "active",
-      ...(selfHosted ? { managedBy: "manual" } : {}),
-    });
-
-    // Send welcome and org-created emails (fire and forget)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
-
-    render(createElement(WelcomeEmail, { userName: parsed.name, loginUrl: `${appUrl}/sign-in` }))
+    // Send welcome email (fire and forget)
+    render(createElement(WelcomeEmail, { userName: parsed.name, loginUrl: toAppUrl("/sign-in") }))
       .then((html) => sendPlatformEmail({ to: parsed.email, subject: "Welcome to dubbl", html }))
-      .catch(() => {});
-
-    render(createElement(OrgCreatedEmail, { userName: parsed.name, orgName: org.name, dashboardUrl: `${appUrl}/dashboard` }))
-      .then((html) => sendPlatformEmail({ to: parsed.email, subject: `${org.name} is ready`, html }))
       .catch(() => {});
 
     return NextResponse.json(

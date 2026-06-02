@@ -5,6 +5,7 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import { EmailLayout } from "./layout";
+import { toAppUrl } from "@/lib/public-url";
 
 interface MemberInviteEmailProps {
   inviterName: string;
@@ -17,7 +18,7 @@ export function MemberInviteEmail({
   inviterName = "Someone",
   orgName = "an organization",
   role = "member",
-  loginUrl = "https://dubbl.dev/sign-in",
+  loginUrl = toAppUrl("/sign-in"),
 }: MemberInviteEmailProps) {
   return (
     <EmailLayout preview={`You've been invited to ${orgName}`}>

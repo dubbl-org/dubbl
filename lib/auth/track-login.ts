@@ -6,6 +6,7 @@ import { render } from "@react-email/render";
 import { createElement } from "react";
 import { LoginAlertEmail } from "@/lib/email/templates/login-alert";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { toAppUrl } from "@/lib/public-url";
 
 function hashValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -76,7 +77,7 @@ export async function trackLogin(opts: {
             dateStyle: "long",
             timeStyle: "short",
           }),
-          securityUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev"}/settings`,
+          securityUrl: toAppUrl("/settings"),
         })
       );
 

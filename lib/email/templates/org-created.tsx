@@ -5,6 +5,7 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import { EmailLayout } from "./layout";
+import { toAppUrl } from "@/lib/public-url";
 
 interface OrgCreatedEmailProps {
   userName: string;
@@ -15,7 +16,7 @@ interface OrgCreatedEmailProps {
 export function OrgCreatedEmail({
   userName = "there",
   orgName = "Your Organization",
-  dashboardUrl = "https://dubbl.dev/dashboard",
+  dashboardUrl = toAppUrl("/dashboard"),
 }: OrgCreatedEmailProps) {
   return (
     <EmailLayout preview={`${orgName} is ready`}>

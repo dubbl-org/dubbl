@@ -5,6 +5,7 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import { EmailLayout } from "./layout";
+import { toAppUrl } from "@/lib/public-url";
 
 interface WelcomeEmailProps {
   userName: string;
@@ -13,7 +14,7 @@ interface WelcomeEmailProps {
 
 export function WelcomeEmail({
   userName = "there",
-  loginUrl = "https://dubbl.dev/sign-in",
+  loginUrl = toAppUrl("/sign-in"),
 }: WelcomeEmailProps) {
   return (
     <EmailLayout preview="Welcome to dubbl">
