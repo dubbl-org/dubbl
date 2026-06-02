@@ -5,6 +5,7 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import { EmailLayout } from "./layout";
+import { toAppUrl } from "@/lib/public-url";
 
 interface LoginAlertEmailProps {
   userName: string;
@@ -21,7 +22,7 @@ export function LoginAlertEmail({
   userAgent = "Unknown browser",
   provider = "credentials",
   timestamp = new Date().toLocaleString(),
-  securityUrl = "https://dubbl.dev/settings",
+  securityUrl = toAppUrl("/settings"),
 }: LoginAlertEmailProps) {
   return (
     <EmailLayout preview={`New sign-in from ${ipAddress}`}>

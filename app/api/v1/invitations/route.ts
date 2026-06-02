@@ -12,6 +12,7 @@ import { render } from "@react-email/render";
 import { createElement } from "react";
 import { MemberInviteEmail } from "@/lib/email/templates/member-invite";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { toAppUrl } from "@/lib/public-url";
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -169,8 +170,7 @@ export async function POST(request: Request) {
       where: eq(organization.id, ctx.organizationId),
     });
     if (inviter && org) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dubbl.dev";
-      const acceptUrl = `${appUrl}/invite/${token}`;
+      const acceptUrl = toAppUrl(`/invite/${token}`);
       render(
         createElement(MemberInviteEmail, {
           inviterName: inviter.name || "A team member",

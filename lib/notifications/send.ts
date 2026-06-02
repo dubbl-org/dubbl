@@ -5,6 +5,7 @@ import { render } from "@react-email/render";
 import { createElement } from "react";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { NotificationDigestEmail } from "@/lib/email/templates/notification-digest";
+import { toAppUrl } from "@/lib/public-url";
 import type { InferInsertModel } from "drizzle-orm";
 
 type NotificationType = InferInsertModel<typeof notification>["type"];
@@ -77,7 +78,7 @@ export async function sendNotification(params: SendNotificationParams) {
               createdAt: "Just now",
             },
           ],
-          dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev"}/notifications`,
+          dashboardUrl: toAppUrl("/notifications"),
         });
 
         const html = await render(element);

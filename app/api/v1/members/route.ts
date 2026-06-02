@@ -11,6 +11,7 @@ import { render } from "@react-email/render";
 import { createElement } from "react";
 import { MemberInviteEmail } from "@/lib/email/templates/member-invite";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { toAppUrl } from "@/lib/public-url";
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -151,12 +152,11 @@ export async function POST(request: Request) {
       where: eq(organization.id, ctx.organizationId),
     });
     if (inviter && org) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
       render(createElement(MemberInviteEmail, {
         inviterName: inviter.name || "A team member",
         orgName: org.name,
         role: parsed.role,
-        loginUrl: `${appUrl}/sign-in`,
+        loginUrl: toAppUrl("/sign-in"),
       }))
         .then((html) => sendPlatformEmail({ to: user.email, subject: `You've been invited to ${org.name}`, html }))
         .catch(() => {});

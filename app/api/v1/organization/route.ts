@@ -16,6 +16,7 @@ import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { seedDefaultAccounts } from "@/lib/db/default-accounts";
+import { toAppUrl } from "@/lib/public-url";
 
 const updateSchema = z
   .object({
@@ -128,11 +129,18 @@ export async function POST(request: Request) {
     // Check if user is allowed to create organizations
     const allowUserOrgCreation = await getSiteSetting("allow_user_org_creation");
     if (allowUserOrgCreation !== "true") {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, session.user.id),
-        columns: { isSiteAdmin: true },
-      });
-      if (!user?.isSiteAdmin) {
+      const [user, existingMembership] = await Promise.all([
+        db.query.users.findFirst({
+          where: eq(users.id, session.user.id),
+          columns: { isSiteAdmin: true },
+        }),
+        db.query.member.findFirst({
+          where: eq(member.userId, session.user.id),
+          columns: { id: true },
+        }),
+      ]);
+
+      if (!user?.isSiteAdmin && existingMembership) {
         return NextResponse.json(
           { error: "Only administrators can create organizations" },
           { status: 403 }
@@ -182,8 +190,7 @@ export async function POST(request: Request) {
       where: eq(users.id, session.user!.id!),
     });
     if (user) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.dubbl.dev";
-      render(createElement(OrgCreatedEmail, { userName: user.name || "there", orgName: parsed.name, dashboardUrl: `${appUrl}/dashboard` }))
+      render(createElement(OrgCreatedEmail, { userName: user.name || "there", orgName: parsed.name, dashboardUrl: toAppUrl("/dashboard") }))
         .then((html) => sendPlatformEmail({ to: user.email, subject: `${parsed.name} is ready`, html }))
         .catch(() => {});
     }
