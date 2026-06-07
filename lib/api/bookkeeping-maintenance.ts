@@ -12,7 +12,6 @@ import {
   organization,
 } from "@/lib/db/schema";
 import { eq, and, sql, lte, isNull } from "drizzle-orm";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { autoReconcileBankTransactions } from "./bank-auto-reconcile";
 import { checkBudgetVariances } from "./budget-alerts";
 import { checkLowBankBalances } from "./bank-balance-alerts";
@@ -376,7 +375,7 @@ export async function processRevenueRecognition(): Promise<{ processed: number; 
   return { processed, skipped };
 }
 
-export async function processBookkeepingCron(): Promise<{
+export async function processBookkeepingMaintenance(): Promise<{
   depreciation: { processed: number; skipped: number };
   loanPayments: { processed: number; skipped: number };
   revenueRecognition: { processed: number; skipped: number };

@@ -4,7 +4,7 @@ import { eq, and, lte, inArray, lt } from "drizzle-orm";
 import { processRecurringTemplates } from "./recurring-generate";
 import { processReminders } from "@/lib/email/reminder-processor";
 
-export async function processInvoicingCron() {
+export async function processInvoicingMaintenance() {
   const today = new Date().toISOString().split("T")[0];
 
   // 1. Process recurring templates per org

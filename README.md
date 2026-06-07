@@ -71,6 +71,10 @@ AUTH_URL=http://localhost:3000
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
+# Trigger.dev background jobs (required for production scheduled tasks/retries)
+TRIGGER_PROJECT_REF=proj_...
+TRIGGER_SECRET_KEY=tr_dev_...
+
 # S3 Storage (optional)
 S3_BUCKET=dubbl-uploads
 S3_REGION=us-east-1
@@ -98,6 +102,16 @@ pnpm dev
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 If you ran the seed script, log in with `demo@dubbl.dev` / `password123`.
+
+### Background Jobs
+
+Dubbl uses Trigger.dev for scheduled maintenance and delayed retries. For production, set `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY`, then deploy the tasks:
+
+```bash
+pnpm trigger:deploy
+```
+
+Without Trigger.dev, scheduled backups, bookkeeping maintenance, invoicing maintenance, trash purge, report schedules, notification digests, Stripe retries, and webhook delivery retries will not run automatically. Webhook retries are scheduled when a delivery fails, so keep `TRIGGER_SECRET_KEY` configured in the app runtime before accepting webhook traffic.
 
 ## Tech Stack
 
