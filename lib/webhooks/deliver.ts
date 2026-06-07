@@ -1,7 +1,9 @@
 import crypto from "crypto";
+import { tasks } from "@trigger.dev/sdk";
 import { db } from "@/lib/db";
 import { webhook, webhookDelivery } from "@/lib/db/schema";
-import { eq, and, lte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { retryWebhookDeliveryTask } from "@/trigger/webhooks";
 
 // Retry backoff schedule in minutes
 const RETRY_BACKOFF = [1, 5, 30, 120, 720]; // 1m, 5m, 30m, 2h, 12h
@@ -52,7 +54,7 @@ export async function deliverWebhook(
     const responseBody = await res.text().catch(() => "");
 
     if (res.ok) {
-      await db
+      const [updated] = await db
         .update(webhookDelivery)
         .set({
           status: "success",
@@ -61,13 +63,19 @@ export async function deliverWebhook(
           attempts: 1,
           deliveredAt: new Date(),
         })
-        .where(eq(webhookDelivery.id, delivery.id));
+        .where(eq(webhookDelivery.id, delivery.id))
+        .returning();
+      return updated;
     } else {
       await scheduleRetry(delivery.id, 1, res.status, responseBody);
     }
   } catch (err) {
     await scheduleRetry(delivery.id, 1, null, String(err));
   }
+
+  return db.query.webhookDelivery.findFirst({
+    where: eq(webhookDelivery.id, delivery.id),
+  });
 }
 
 async function scheduleRetry(
@@ -92,82 +100,99 @@ async function scheduleRetry(
       nextRetryAt: status === "retrying" ? nextRetryAt : null,
     })
     .where(eq(webhookDelivery.id, deliveryId));
+
+  if (status === "retrying") {
+    await triggerWebhookRetry(deliveryId, nextRetryAt);
+  }
 }
 
-/**
- * Called by cron to retry pending deliveries.
- * Queries deliveries where status = "retrying" and nextRetryAt <= now,
- * then attempts redelivery for each.
- */
-export async function retryFailedDeliveries() {
-  const now = new Date();
+async function triggerWebhookRetry(deliveryId: string, nextRetryAt: Date) {
+  if (!process.env.TRIGGER_SECRET_KEY) {
+    return;
+  }
 
-  // 1. Query deliveries ready for retry
-  const pendingDeliveries = await db.query.webhookDelivery.findMany({
-    where: and(
-      eq(webhookDelivery.status, "retrying"),
-      lte(webhookDelivery.nextRetryAt, now),
-    ),
+  try {
+    await tasks.trigger<typeof retryWebhookDeliveryTask>(
+      "webhook-delivery-retry",
+      { deliveryId },
+      {
+        delay: nextRetryAt,
+        idempotencyKey: `webhook-delivery-retry:${deliveryId}:${nextRetryAt.toISOString()}`,
+      }
+    );
+  } catch (err) {
+    console.error(`Failed to schedule Trigger.dev webhook retry ${deliveryId}:`, err);
+  }
+}
+
+export async function retryWebhookDeliveryById(deliveryId: string) {
+  const delivery = await db.query.webhookDelivery.findFirst({
+    where: eq(webhookDelivery.id, deliveryId),
   });
 
-  for (const delivery of pendingDeliveries) {
-    // 2. Fetch the parent webhook
-    const wh = await db.query.webhook.findFirst({
-      where: eq(webhook.id, delivery.webhookId),
+  if (!delivery || delivery.status !== "retrying") {
+    return { deliveryId, skipped: true, reason: "not_retrying" };
+  }
+
+  if (delivery.nextRetryAt && delivery.nextRetryAt > new Date()) {
+    return { deliveryId, skipped: true, reason: "not_due" };
+  }
+
+  const wh = await db.query.webhook.findFirst({
+    where: eq(webhook.id, delivery.webhookId),
+  });
+
+  if (!wh || !wh.isActive) {
+    await db
+      .update(webhookDelivery)
+      .set({ status: "failed", nextRetryAt: null })
+      .where(eq(webhookDelivery.id, delivery.id));
+    return { deliveryId, skipped: true, reason: "webhook_inactive" };
+  }
+
+  const body = JSON.stringify(delivery.payload);
+  const signature = crypto
+    .createHmac("sha256", wh.secret)
+    .update(body)
+    .digest("hex");
+
+  const nextAttempt = delivery.attempts + 1;
+
+  try {
+    const res = await fetch(wh.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Dubbl-Event": delivery.event,
+        "X-Dubbl-Delivery-Id": delivery.id,
+        "X-Dubbl-Signature": signature,
+      },
+      body,
+      signal: AbortSignal.timeout(10_000),
     });
 
-    // Skip if webhook was deleted or deactivated
-    if (!wh || !wh.isActive) {
+    const responseBody = await res.text().catch(() => "");
+
+    if (res.ok) {
       await db
         .update(webhookDelivery)
-        .set({ status: "failed", nextRetryAt: null })
+        .set({
+          status: "success",
+          responseStatus: res.status,
+          responseBody,
+          attempts: nextAttempt,
+          deliveredAt: new Date(),
+          nextRetryAt: null,
+        })
         .where(eq(webhookDelivery.id, delivery.id));
-      continue;
+
+      return { deliveryId, status: "success", attempts: nextAttempt };
     }
 
-    // 3. Sign and send the payload
-    const body = JSON.stringify(delivery.payload);
-    const signature = crypto
-      .createHmac("sha256", wh.secret)
-      .update(body)
-      .digest("hex");
-
-    const nextAttempt = delivery.attempts + 1;
-
-    try {
-      const res = await fetch(wh.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Dubbl-Event": delivery.event,
-          "X-Dubbl-Delivery-Id": delivery.id,
-          "X-Dubbl-Signature": signature,
-        },
-        body,
-        signal: AbortSignal.timeout(10_000),
-      });
-
-      const responseBody = await res.text().catch(() => "");
-
-      if (res.ok) {
-        // 4a. Success - mark delivered
-        await db
-          .update(webhookDelivery)
-          .set({
-            status: "success",
-            responseStatus: res.status,
-            responseBody,
-            attempts: nextAttempt,
-            deliveredAt: new Date(),
-            nextRetryAt: null,
-          })
-          .where(eq(webhookDelivery.id, delivery.id));
-      } else {
-        // 4b. Failed - schedule next retry or mark as failed
-        await scheduleRetry(delivery.id, nextAttempt, res.status, responseBody);
-      }
-    } catch (err) {
-      await scheduleRetry(delivery.id, nextAttempt, null, String(err));
-    }
+    await scheduleRetry(delivery.id, nextAttempt, res.status, responseBody);
+    return { deliveryId, status: "retrying", attempts: nextAttempt };
+  } catch (err) {
+    await scheduleRetry(delivery.id, nextAttempt, null, String(err));
+    return { deliveryId, status: "retrying", attempts: nextAttempt };
   }
 }

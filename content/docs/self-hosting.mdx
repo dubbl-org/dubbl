@@ -79,7 +79,8 @@ volumes:
 | `STRIPE_SECRET_KEY` | No | Stripe API key for billing |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
 | `RESEND_API_KEY` | No | Resend API key for platform emails |
-| `CRON_SECRET` | No | Secret for protecting cron endpoints |
+| `TRIGGER_PROJECT_REF` | Yes | Trigger.dev project reference for production background jobs |
+| `TRIGGER_SECRET_KEY` | Yes | Trigger.dev secret key for scheduled tasks and delayed retries |
 | `S3_BUCKET` | No | S3 bucket for file uploads |
 | `S3_REGION` | No | S3 region |
 | `S3_ACCESS_KEY_ID` | No | S3 access key |
@@ -155,6 +156,31 @@ To enable paid plans, see the [Billing & Stripe Setup](/docs/settings/billing) g
 Platform emails (welcome, invitations, login alerts, notification digests) use [Resend](https://resend.com). Set `RESEND_API_KEY` to enable these. Without it, platform emails are silently skipped.
 
 Organization-level emails (invoices, reminders, statements) use per-org SMTP configuration set up in Settings > Email.
+
+## Background Jobs
+
+Dubbl uses Trigger.dev for scheduled maintenance and delayed retries. Set `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY` in production before accepting traffic.
+
+Scheduled tasks are defined in `trigger/scheduled.ts`:
+
+- Notification digests every 15 minutes
+- Report schedules hourly
+- Stripe retry hourly
+- Invoicing, bookkeeping, trash purge, and backups daily
+
+Webhook delivery failures schedule exact delayed retry runs, so retries happen at their intended backoff time without polling. If `TRIGGER_SECRET_KEY` is missing when a webhook delivery fails, that retry run cannot be scheduled.
+
+For local development:
+
+```bash
+pnpm trigger:dev
+```
+
+For production, deploy the Trigger.dev tasks:
+
+```bash
+pnpm trigger:deploy
+```
 
 ## Database
 

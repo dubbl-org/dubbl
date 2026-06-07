@@ -2,13 +2,14 @@ import { db } from "@/lib/db";
 import { dataBackup } from "@/lib/db/schema";
 import { subscription } from "@/lib/db/schema";
 import { organization } from "@/lib/db/schema";
-import { eq, lt, and } from "drizzle-orm";
+import { eq, lt, and, gte, inArray, isNull } from "drizzle-orm";
 import { createOrgSnapshot } from "./backup-snapshot";
 import { deleteBackupObject } from "./backup-storage";
-import { PLAN_LIMITS } from "@/lib/plans";
 import type { PlanName } from "@/lib/plans";
 
-export async function processBackupCron() {
+const SCHEDULED_BACKUP_INTERVAL_MS = 23 * 60 * 60 * 1000;
+
+export async function processBackupMaintenance() {
   // Get all orgs with their subscriptions via a join
   const orgs = await db
     .select({
@@ -19,10 +20,27 @@ export async function processBackupCron() {
     .leftJoin(subscription, eq(subscription.organizationId, organization.id));
 
   let created = 0;
+  let skipped = 0;
   let purged = 0;
 
   for (const org of orgs) {
     try {
+      const recentCutoff = new Date(Date.now() - SCHEDULED_BACKUP_INTERVAL_MS);
+      const recentScheduledBackup = await db.query.dataBackup.findFirst({
+        where: and(
+          eq(dataBackup.organizationId, org.orgId),
+          eq(dataBackup.type, "scheduled"),
+          inArray(dataBackup.status, ["pending", "completed"]),
+          gte(dataBackup.createdAt, recentCutoff),
+          isNull(dataBackup.deletedAt),
+        ),
+      });
+
+      if (recentScheduledBackup) {
+        skipped++;
+        continue;
+      }
+
       const plan: PlanName = (org.plan as PlanName) || "free";
       const retentionDays = plan === "pro" ? 30 : 7;
 
@@ -61,5 +79,5 @@ export async function processBackupCron() {
     }
   }
 
-  return { created, purged };
+  return { created, skipped, purged };
 }

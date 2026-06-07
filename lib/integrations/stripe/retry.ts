@@ -2,9 +2,6 @@ import { db } from "@/lib/db";
 import { stripeSyncLog, stripeIntegration } from "@/lib/db/schema";
 import { eq, and, gte, lt } from "drizzle-orm";
 import { stripe as _stripeClient } from "@/lib/stripe";
-
-// Non-null wrapper - callers already guard for null stripe
-const stripe = _stripeClient!;
 import { processStripeEvent } from "./sync";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { sendNotification } from "@/lib/notifications/send";
@@ -14,7 +11,19 @@ export async function retryFailedStripeEvents(): Promise<{
   succeeded: number;
   failed: number;
   exhaustedAlerts: number;
+  skipped?: string;
 }> {
+  if (!_stripeClient) {
+    return {
+      retried: 0,
+      succeeded: 0,
+      failed: 0,
+      exhaustedAlerts: 0,
+      skipped: "stripe_not_configured",
+    };
+  }
+
+  const stripe = _stripeClient;
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   // Find failed events from the last 7 days with retryCount < 3
