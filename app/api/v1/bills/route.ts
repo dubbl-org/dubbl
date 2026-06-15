@@ -14,6 +14,7 @@ import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -30,7 +31,7 @@ const createSchema = z.object({
   dueDate: z.string().min(1),
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  currencyCode: currencyCodeSchema.default("USD"),
+  currencyCode: currencyCodeSchema.optional(),
   lines: z.array(lineSchema).min(1),
 });
 
@@ -81,6 +82,13 @@ export async function POST(request: Request) {
 
     await assertNotLocked(ctx.organizationId, parsed.issueDate);
 
+    // Resolve currency: explicit request > contact default > org default > USD.
+    const currencyCode = await resolveDocumentCurrency(
+      ctx.organizationId,
+      parsed.currencyCode,
+      parsed.contactId
+    );
+
     const billNumber = await getNextNumber(ctx.organizationId, "bill", "bill_number", "BILL");
 
     // Preload tax rates
@@ -127,7 +135,7 @@ export async function POST(request: Request) {
         total,
         amountPaid: 0,
         amountDue: total,
-        currencyCode: parsed.currencyCode,
+        currencyCode,
         createdBy: ctx.userId,
       })
       .returning();
