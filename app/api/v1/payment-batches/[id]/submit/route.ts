@@ -117,6 +117,15 @@ export async function POST(
             reference: paymentNumber,
             amount: item.amount,
             date: today,
+            allocations: existingBill
+              ? [
+                  {
+                    amount: item.amount,
+                    currencyCode: existingBill.currencyCode,
+                    issueDate: existingBill.issueDate,
+                  },
+                ]
+              : undefined,
           }
         );
 

@@ -91,6 +91,8 @@ export async function POST(
       amountPaid: number;
       amountDue: number;
       type: "invoice" | "bill";
+      currencyCode: string;
+      issueDate: string;
     }> = [];
 
     for (const allocation of parsed.allocations) {
@@ -116,6 +118,8 @@ export async function POST(
           amountPaid: found.amountPaid,
           amountDue: found.amountDue,
           type: "bill",
+          currencyCode: found.currencyCode,
+          issueDate: found.issueDate,
         });
       } else {
         const found = await db.query.invoice.findFirst({
@@ -139,6 +143,8 @@ export async function POST(
           amountPaid: found.amountPaid,
           amountDue: found.amountDue,
           type: "invoice",
+          currencyCode: found.currencyCode,
+          issueDate: found.issueDate,
         });
       }
     }
@@ -157,6 +163,7 @@ export async function POST(
         type: paymentType,
         date: parsed.date,
         amount: totalAllocated,
+        currencyCode: documents[0].currencyCode,
         method: parsed.method,
         bankAccountId: account.id,
         bankTransactionId: id,
@@ -171,6 +178,12 @@ export async function POST(
       amount: number;
       newStatus: string;
     }> = [];
+
+    const journalAllocations: {
+      amount: number;
+      currencyCode: string;
+      issueDate: string;
+    }[] = [];
 
     for (let i = 0; i < parsed.allocations.length; i++) {
       const allocation = parsed.allocations[i];
@@ -219,13 +232,25 @@ export async function POST(
         amount: allocation.amount,
         newStatus,
       });
+
+      journalAllocations.push({
+        amount: allocation.amount,
+        currencyCode: doc.currencyCode,
+        issueDate: doc.issueDate,
+      });
     }
 
     // Create one journal entry for the total amount
     const journalType = isOutgoing ? "bill" : "invoice";
     const journalEntry = await createPaymentJournalEntry(
       { organizationId: ctx.organizationId, userId: ctx.userId },
-      { type: journalType, reference: paymentNumber, amount: totalAllocated, date: parsed.date }
+      {
+        type: journalType,
+        reference: paymentNumber,
+        amount: totalAllocated,
+        date: parsed.date,
+        allocations: journalAllocations,
+      }
     );
     if (journalEntry) {
       await db.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));

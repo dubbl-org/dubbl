@@ -178,6 +178,7 @@ export async function POST(
         type: "received",
         date: parsed.date,
         amount: parsed.amount,
+        currencyCode: found.currencyCode,
         method: parsed.method,
         bankAccountId: account.id,
         bankTransactionId: id,
@@ -196,7 +197,19 @@ export async function POST(
     // Create journal entry (DR Bank, CR AR)
     const journalEntry = await createPaymentJournalEntry(
       { organizationId: ctx.organizationId, userId: ctx.userId },
-      { type: "invoice", reference: paymentNumber, amount: parsed.amount, date: parsed.date }
+      {
+        type: "invoice",
+        reference: paymentNumber,
+        amount: parsed.amount,
+        date: parsed.date,
+        allocations: [
+          {
+            amount: parsed.amount,
+            currencyCode: found.currencyCode,
+            issueDate: found.issueDate,
+          },
+        ],
+      }
     );
     if (journalEntry) {
       await db.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));

@@ -73,7 +73,13 @@ export async function POST(request: Request) {
       }))
     );
 
-    // Update each allocated document
+    // Update each allocated document, capturing currency + issue date for the
+    // journal entry's base-currency conversion and realised FX.
+    const journalAllocations: {
+      amount: number;
+      currencyCode: string;
+      issueDate: string;
+    }[] = [];
     for (const alloc of parsed.allocations) {
       const allocCents = decimalToCents(alloc.amount);
 
@@ -97,6 +103,11 @@ export async function POST(request: Request) {
               updatedAt: new Date(),
             })
             .where(eq(invoice.id, alloc.documentId));
+          journalAllocations.push({
+            amount: allocCents,
+            currencyCode: existing.currencyCode,
+            issueDate: existing.issueDate,
+          });
         }
       } else if (alloc.documentType === "bill") {
         const existing = await db.query.bill.findFirst({
@@ -118,6 +129,11 @@ export async function POST(request: Request) {
               updatedAt: new Date(),
             })
             .where(eq(bill.id, alloc.documentId));
+          journalAllocations.push({
+            amount: allocCents,
+            currencyCode: existing.currencyCode,
+            issueDate: existing.issueDate,
+          });
         }
       }
     }
@@ -130,6 +146,7 @@ export async function POST(request: Request) {
         reference: paymentNumber,
         amount: totalAmount,
         date: parsed.date,
+        allocations: journalAllocations.length > 0 ? journalAllocations : undefined,
       }
     );
 
