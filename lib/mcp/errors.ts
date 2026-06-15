@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AuthError } from "@/lib/api/auth-context";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { LimitExceededError } from "@/lib/api/check-limit";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -36,6 +37,19 @@ export function wrapTool<T>(
                 error: "Validation error",
                 details: err.issues.map((i) => i.message),
               }),
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (err instanceof LimitExceededError) {
+        // Surface plan-limit messages (e.g. multi-currency) to the agent
+        // instead of masking them as a generic internal error.
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ error: err.message, status: 403 }),
             },
           ],
           isError: true,

@@ -21,6 +21,7 @@ import { registerPeriodCloseTools } from "./period-close";
 import { registerImportExportTools } from "./import-export";
 import { registerTrashTools } from "./trash";
 import { registerBackupTools } from "./backups";
+import { registerCurrencyTools } from "./currencies";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -44,4 +45,5 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerImportExportTools(server, ctx);
   registerTrashTools(server, ctx);
   registerBackupTools(server, ctx);
+  registerCurrencyTools(server, ctx);
 }
