@@ -89,3 +89,49 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: dubbl:${{ github.sha }}
+
+  # On PRs: fail if a schema change was made without a committed migration,
+  # so every change to lib/db/schema ships with its drizzle/ migration.
+  migration-check:
+    name: Migration Drift
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    env:
+      DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - name: Ensure migrations are committed
+        run: |
+          if [ -n "$(git status --porcelain drizzle/)" ]; then
+            echo "::error::Schema changed without a committed migration. Run 'pnpm db:generate' and commit the drizzle/ files."
+            git status --porcelain drizzle/
+            git --no-pager diff -- drizzle/
+            exit 1
+          fi
+
+  # On merge to master: apply pending migrations to the production database.
+  # DATABASE_URL is a repository secret — it is never stored in the repo.
+  migrate:
+    name: Apply Migrations
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
