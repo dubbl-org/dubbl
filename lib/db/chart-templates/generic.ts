@@ -48,6 +48,8 @@ export const GENERIC_ACCOUNTS: AccountTemplate[] = [
   { code: "4100", name: "Interest Income", type: "revenue", subType: "non_operating" },
   { code: "4200", name: "Rental Income", type: "revenue", subType: "non_operating" },
   { code: "4300", name: "Gain on Asset Disposal", type: "revenue", subType: "non_operating" },
+  { code: "4910", name: "Realised Currency Gains", type: "revenue", subType: "non_operating" },
+  { code: "4920", name: "Unrealised Currency Gains", type: "revenue", subType: "non_operating" },
   { code: "4900", name: "Other Revenue", type: "revenue", subType: "non_operating" },
   // Expenses (5xxx)
   { code: "5000", name: "Cost of Goods Sold", type: "expense", subType: "cogs" },
@@ -70,5 +72,7 @@ export const GENERIC_ACCOUNTS: AccountTemplate[] = [
   { code: "5900", name: "Bank Fees & Charges", type: "expense", subType: "operating" },
   { code: "5910", name: "Interest Expense", type: "expense", subType: "non_operating" },
   { code: "5920", name: "Loss on Asset Disposal", type: "expense", subType: "non_operating" },
+  { code: "5930", name: "Realised Currency Losses", type: "expense", subType: "non_operating" },
+  { code: "5940", name: "Unrealised Currency Losses", type: "expense", subType: "non_operating" },
   { code: "5990", name: "Miscellaneous Expense", type: "expense", subType: "operating" },
 ];

@@ -422,9 +422,14 @@ export async function createPaymentJournalEntry(
 }
 
 /**
- * Create journal entry for FX gain/loss.
- * Gain: DR Bank, CR FX Gain (4200)
- * Loss: DR FX Loss (5200), CR Bank
+ * Create journal entry for realised FX gain/loss.
+ * Gain: DR Bank, CR Realised Currency Gains (4910)
+ * Loss: DR Realised Currency Losses (5930), CR Bank
+ *
+ * NOTE: posts in the org's base currency. This requires callers to pass a
+ * base-currency `amount`; wiring this into settlement also requires the GL
+ * postings to convert document amounts to base (not yet done — see the
+ * currency overhaul notes).
  */
 export async function createFxGainLossEntry(
   ctx: JournalAutomationContext,
@@ -437,9 +442,9 @@ export async function createFxGainLossEntry(
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
 
-  // FX Gain account "4200" (revenue), FX Loss account "5200" (expense)
+  // Realised Currency Gains "4910" (revenue), Realised Currency Losses "5930" (expense)
   const isGain = data.amount > 0;
-  const fxAccount = await findAccountByCode(ctx.organizationId, isGain ? "4200" : "5200");
+  const fxAccount = await findAccountByCode(ctx.organizationId, isGain ? "4910" : "5930");
   const bankAccount = await findAccountByCode(ctx.organizationId, "1100");
 
   if (!fxAccount || !bankAccount) return null;
