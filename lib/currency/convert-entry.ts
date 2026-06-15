@@ -118,3 +118,47 @@ export function realizedSettlementLegs(
 
   return legs;
 }
+
+/**
+ * Unrealised FX revaluation legs for an open foreign monetary balance, in base
+ * currency minor units. `delta` is the current period-end base value minus the
+ * carried (issue-rate) base value of the open balance.
+ *
+ * - kind "receivable" (AR / invoices): a higher base value is a gain.
+ * - kind "payable" (AP / bills): a higher base value is a loss.
+ *
+ * Roles: `counter` is the AR/AP control account; `fxGain`/`fxLoss` are the
+ * UNrealised accounts (distinct from realised). Legs balance by construction.
+ */
+export function revaluationLegs(
+  kind: "receivable" | "payable",
+  delta: number
+): SettlementLeg[] {
+  if (delta === 0) return [];
+  const legs: SettlementLeg[] = [];
+  const mag = Math.abs(delta);
+
+  if (kind === "receivable") {
+    if (delta > 0) {
+      legs.push({ role: "counter", debit: mag, credit: 0 });
+      legs.push({ role: "fxGain", debit: 0, credit: mag });
+    } else {
+      legs.push({ role: "counter", debit: 0, credit: mag });
+      legs.push({ role: "fxLoss", debit: mag, credit: 0 });
+    }
+  } else {
+    if (delta > 0) {
+      legs.push({ role: "counter", debit: 0, credit: mag });
+      legs.push({ role: "fxLoss", debit: mag, credit: 0 });
+    } else {
+      legs.push({ role: "counter", debit: mag, credit: 0 });
+      legs.push({ role: "fxGain", debit: 0, credit: mag });
+    }
+  }
+  return legs;
+}
+
+/** Reverse a set of legs (swap debit/credit) — for reverse-and-rebook entries. */
+export function reverseLegs(legs: SettlementLeg[]): SettlementLeg[] {
+  return legs.map((l) => ({ role: l.role, debit: l.credit, credit: l.debit }));
+}
