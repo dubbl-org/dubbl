@@ -47,3 +47,14 @@ test("converted total matches the document total converted as a whole", () => {
   assert.equal(sum(out, "creditAmount"), 13842);
   assert.equal(sum(out, "debitAmount"), 13842);
 });
+
+test("balance holds when a side contains negative lines (residual not dropped)", () => {
+  // balanced in document currency: debits -500 + 1500 = 1000 ; credits 1000
+  const lines: L[] = [
+    { debitAmount: -500, creditAmount: 0 },
+    { debitAmount: 1500, creditAmount: 0 },
+    { debitAmount: 0, creditAmount: 1000 },
+  ];
+  const out = convertLinesToBase(lines, 833_337); // rounding-heavy rate
+  assert.equal(sum(out, "debitAmount"), sum(out, "creditAmount"));
+});

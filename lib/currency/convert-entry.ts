@@ -52,19 +52,19 @@ function absorbResidual<T extends ConvertibleLine>(
   const residual = target - sum;
   if (residual === 0) return;
 
-  // Add the residual to the largest line on this side (most material, least
-  // distortion). Only lines that actually carry an amount on this side qualify.
-  let idx = -1;
-  let max = -1;
+  // Add the residual to the line with the largest magnitude on this side (most
+  // material, least distortion). Using absolute magnitude keeps this correct
+  // even when every value is negative, so the residual is never dropped.
+  let idx = 0;
+  let max = -Infinity;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i][field] > max) {
-      max = lines[i][field];
+    const mag = Math.abs(lines[i][field]);
+    if (mag > max) {
+      max = mag;
       idx = i;
     }
   }
-  if (idx >= 0) {
-    lines[idx][field] += residual;
-  }
+  lines[idx][field] += residual;
 }
 
 /** Resolve the document->base conversion rate, defaulting to 1:1. */

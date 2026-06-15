@@ -163,15 +163,6 @@ export async function createInvoiceJournalEntry(
 
   const lines: (typeof journalLine.$inferInsert)[] = [];
 
-  // DR Accounts Receivable for total
-  lines.push({
-    journalEntryId: entry.id,
-    accountId: arAccount.id,
-    description: `Invoice ${invoiceData.invoiceNumber}`,
-    debitAmount: invoiceData.total,
-    creditAmount: 0,
-  });
-
   // CR Revenue accounts per line
   for (const line of invoiceData.lines) {
     if (line.accountId && line.amount > 0) {
@@ -199,7 +190,19 @@ export async function createInvoiceJournalEntry(
     }
   }
 
-  if (lines.length > 0) {
+  // DR Accounts Receivable for the sum of the offsetting credit legs, so the
+  // entry balances in document currency even if a line lacks an account or the
+  // tax account is missing — otherwise FX conversion would scale the imbalance.
+  const arTotal = lines.reduce((s, l) => s + (l.creditAmount ?? 0), 0);
+  if (arTotal > 0) {
+    lines.unshift({
+      journalEntryId: entry.id,
+      accountId: arAccount.id,
+      description: `Invoice ${invoiceData.invoiceNumber}`,
+      debitAmount: arTotal,
+      creditAmount: 0,
+    });
+
     const { currency, rate } = await resolveBaseRate(
       ctx.organizationId,
       invoiceData.currencyCode,
@@ -277,16 +280,19 @@ export async function createBillJournalEntry(
     }
   }
 
-  // CR Accounts Payable for total
-  lines.push({
-    journalEntryId: entry.id,
-    accountId: apAccount.id,
-    description: `Bill ${billData.billNumber}`,
-    debitAmount: 0,
-    creditAmount: billData.total,
-  });
+  // CR Accounts Payable for the sum of the offsetting debit legs, so the entry
+  // balances in document currency even if a line lacks an account or the tax
+  // account is missing — otherwise FX conversion would scale the imbalance.
+  const apTotal = lines.reduce((s, l) => s + (l.debitAmount ?? 0), 0);
+  if (apTotal > 0) {
+    lines.push({
+      journalEntryId: entry.id,
+      accountId: apAccount.id,
+      description: `Bill ${billData.billNumber}`,
+      debitAmount: 0,
+      creditAmount: apTotal,
+    });
 
-  if (lines.length > 0) {
     const { currency, rate } = await resolveBaseRate(
       ctx.organizationId,
       billData.currencyCode,
@@ -512,8 +518,13 @@ export async function createPaymentJournalEntry(
   const isInvoice = paymentData.type === "invoice";
   const desc = `Payment for ${paymentData.reference}`;
 
-  // Multi-currency settlement: convert to base and book realised FX.
-  if (paymentData.allocations && paymentData.allocations.length > 0) {
+  // Multi-currency settlement: convert to base and book realised FX. Only when
+  // the allocations fully cover the payment cash — otherwise an unapplied
+  // remainder (overpayment / on-account) would understate the bank, so fall
+  // back to the legacy entry which posts the full cash amount.
+  const allocs = paymentData.allocations ?? [];
+  const allocSum = allocs.reduce((s, a) => s + a.amount, 0);
+  if (allocs.length > 0 && allocSum === paymentData.amount) {
     const org = await db.query.organization.findFirst({
       where: eq(organization.id, ctx.organizationId),
       columns: { defaultCurrency: true },
@@ -522,7 +533,7 @@ export async function createPaymentJournalEntry(
 
     let bankTotal = 0;
     let counterTotal = 0;
-    for (const a of paymentData.allocations) {
+    for (const a of allocs) {
       const currency = a.currencyCode || base;
       if (currency === base) {
         bankTotal += a.amount;
@@ -547,27 +558,12 @@ export async function createPaymentJournalEntry(
     const fxLossAcct = needLoss ? await ensureFxAccount(ctx.organizationId, "fxLoss", base) : null;
 
     if ((needGain && !fxGainAcct) || (needLoss && !fxLossAcct)) {
-      // Could not resolve an FX account — post a balanced base entry without
-      // splitting out FX rather than fail the settlement.
-      await db.insert(journalLine).values([
-        {
-          journalEntryId: entry.id,
-          accountId: isInvoice ? bankAccount.id : counterAccount.id,
-          description: desc,
-          debitAmount: bankTotal,
-          creditAmount: 0,
-          currencyCode: base,
-        },
-        {
-          journalEntryId: entry.id,
-          accountId: isInvoice ? counterAccount.id : bankAccount.id,
-          description: desc,
-          debitAmount: 0,
-          creditAmount: bankTotal,
-          currencyCode: base,
-        },
-      ]);
-      return entry;
+      // Cannot resolve an FX account to book the realised gain/loss. Relieving
+      // AR/AP at the payment-rate value would corrupt the control account, so
+      // fail the entry instead. (ensureFxAccount normally creates the account,
+      // making this effectively unreachable.)
+      await db.delete(journalEntry).where(eq(journalEntry.id, entry.id));
+      return null;
     }
 
     const accountFor = (role: SettlementRole) =>
