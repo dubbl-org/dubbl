@@ -6,6 +6,7 @@ import { processTrashPurgeMaintenance } from "@/lib/api/trash-purge-maintenance"
 import { retryFailedStripeEvents } from "@/lib/integrations/stripe/retry";
 import { processDigests } from "@/lib/notifications/digest-processor";
 import { processReportSchedules } from "@/lib/reports/schedule-processor";
+import { processExchangeRateSync } from "@/lib/currency/rate-sync";
 
 const retry = {
   maxAttempts: 3,
@@ -62,4 +63,11 @@ export const backupTask = schedules.task({
   cron: "0 4 * * *",
   retry,
   run: async () => processBackupMaintenance(),
+});
+
+export const exchangeRateSyncTask = schedules.task({
+  id: "exchange-rate-sync",
+  cron: "0 6 * * *", // daily, after ECB has published the prior day's rates
+  retry,
+  run: async () => processExchangeRateSync(),
 });

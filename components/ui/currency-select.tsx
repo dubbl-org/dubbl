@@ -1,14 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 interface Currency {
   id: string;
@@ -44,34 +52,83 @@ export function CurrencySelect({
   disabled,
   compact,
 }: CurrencySelectProps) {
+  const [open, setOpen] = useState(false);
   const [currencies, setCurrencies] = useState<Currency[]>(currencyCache ?? []);
 
   useEffect(() => {
     fetchCurrencies().then(setCurrencies);
   }, []);
 
+  const selected = currencies.find((c) => c.code === value);
+
   return (
-    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger className={cn(compact && "w-[90px]", className)}>
-        <SelectValue placeholder="Currency" />
-      </SelectTrigger>
-      <SelectContent className="max-h-[280px]">
-        {currencies.map((c) => (
-          <SelectItem key={c.code} value={c.code}>
-            {compact ? (
-              c.code
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            "justify-between font-normal",
+            compact ? "w-[110px]" : "w-full",
+            !value && "text-muted-foreground",
+            className
+          )}
+        >
+          {value ? (
+            compact ? (
+              <span className="font-mono text-xs">{value}</span>
             ) : (
-              <span className="flex items-center gap-2">
-                <span className="font-mono text-xs text-muted-foreground w-8">
-                  {c.code}
+              <span className="flex items-center gap-2 truncate">
+                <span className="font-mono text-xs text-muted-foreground">
+                  {value}
                 </span>
-                <span>{c.symbol}</span>
-                <span className="truncate">{c.name}</span>
+                {selected && <span>{selected.symbol}</span>}
+                <span className="truncate">{selected?.name}</span>
               </span>
-            )}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+            )
+          ) : (
+            "Currency"
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search currency..." />
+          <CommandList>
+            <CommandEmpty>No currency found.</CommandEmpty>
+            <CommandGroup>
+              {currencies.map((c) => (
+                <CommandItem
+                  key={c.code}
+                  value={`${c.code} ${c.name}`}
+                  onSelect={() => {
+                    onValueChange(c.code);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === c.code ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground w-8">
+                      {c.code}
+                    </span>
+                    <span className="w-5 text-center">{c.symbol}</span>
+                    <span className="truncate">{c.name}</span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

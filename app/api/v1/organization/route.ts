@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { organization, member, users, subscription } from "@/lib/db/schema";
+import { organization, member, users, subscription, journalEntry } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { isValidCurrencyCode } from "@/lib/currency/iso4217";
 import { auth } from "@/lib/auth";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -225,6 +226,31 @@ export async function PATCH(request: Request) {
     const existing = await db.query.organization.findFirst({
       where: eq(organization.id, ctx.organizationId),
     });
+
+    // Base (functional) currency is the pivot every report is measured in.
+    // Validate it, and treat it as immutable once the books have activity —
+    // changing it would corrupt all historical functional-currency values.
+    if (parsed.defaultCurrency && parsed.defaultCurrency !== existing?.defaultCurrency) {
+      if (!isValidCurrencyCode(parsed.defaultCurrency)) {
+        return NextResponse.json(
+          { error: `${parsed.defaultCurrency} is not a recognized currency code` },
+          { status: 400 }
+        );
+      }
+      const [activity] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(journalEntry)
+        .where(eq(journalEntry.organizationId, ctx.organizationId));
+      if ((activity?.count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Base currency can't be changed once transactions exist — it's the functional currency all reports are measured in.",
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const [updated] = await db
       .update(organization)
