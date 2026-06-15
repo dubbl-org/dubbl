@@ -11,6 +11,7 @@ import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { getNextNumber } from "@/lib/api/numbering";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
+import { isValidCurrencyCode } from "@/lib/currency/iso4217";
 import { z } from "zod";
 
 const allocationSchema = z.object({
@@ -28,6 +29,8 @@ const createSchema = z.object({
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   bankAccountId: z.string().nullable().optional(),
+  // Optional — normally derived from the settled documents. Validated below.
+  currencyCode: z.string().length(3).optional(),
   allocations: z.array(allocationSchema).min(1),
 });
 
@@ -92,6 +95,54 @@ export async function POST(request: Request) {
       );
     }
 
+    // Resolve the payment currency from the documents it settles. A single
+    // payment can only settle documents of one currency.
+    const docCurrencies = new Set<string>();
+    for (const alloc of parsed.allocations) {
+      if (alloc.documentType === "invoice") {
+        const doc = await db.query.invoice.findFirst({
+          where: and(
+            eq(invoice.id, alloc.documentId),
+            eq(invoice.organizationId, ctx.organizationId)
+          ),
+          columns: { currencyCode: true },
+        });
+        if (doc?.currencyCode) docCurrencies.add(doc.currencyCode);
+      } else {
+        const doc = await db.query.bill.findFirst({
+          where: and(
+            eq(bill.id, alloc.documentId),
+            eq(bill.organizationId, ctx.organizationId)
+          ),
+          columns: { currencyCode: true },
+        });
+        if (doc?.currencyCode) docCurrencies.add(doc.currencyCode);
+      }
+    }
+
+    if (docCurrencies.size > 1) {
+      return NextResponse.json(
+        { error: "All settled documents must share the same currency" },
+        { status: 400 }
+      );
+    }
+
+    const docCurrency = [...docCurrencies][0];
+    const providedCurrency = parsed.currencyCode?.toUpperCase();
+    if (providedCurrency && !isValidCurrencyCode(providedCurrency)) {
+      return NextResponse.json(
+        { error: `${providedCurrency} is not a recognized currency code` },
+        { status: 400 }
+      );
+    }
+    if (providedCurrency && docCurrency && providedCurrency !== docCurrency) {
+      return NextResponse.json(
+        { error: "Payment currency must match the settled documents' currency" },
+        { status: 400 }
+      );
+    }
+    const currencyCode = providedCurrency ?? docCurrency ?? "USD";
+
     // Generate payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
@@ -105,6 +156,7 @@ export async function POST(request: Request) {
         type: parsed.type,
         date: parsed.date,
         amount: parsed.amount,
+        currencyCode,
         method: parsed.method,
         reference: parsed.reference || null,
         notes: parsed.notes || null,

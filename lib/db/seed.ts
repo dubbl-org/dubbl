@@ -90,39 +90,11 @@ import {
 import { eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { DEFAULT_ACCOUNTS } from "./default-accounts";
+import { getIsoCurrencies } from "../currency/iso4217";
 
-const CURRENCIES = [
-  { code: "USD", name: "US Dollar", symbol: "$", decimalPlaces: 2 },
-  { code: "EUR", name: "Euro", symbol: "\u20ac", decimalPlaces: 2 },
-  { code: "GBP", name: "British Pound", symbol: "\u00a3", decimalPlaces: 2 },
-  { code: "JPY", name: "Japanese Yen", symbol: "\u00a5", decimalPlaces: 0 },
-  { code: "CHF", name: "Swiss Franc", symbol: "CHF", decimalPlaces: 2 },
-  { code: "CAD", name: "Canadian Dollar", symbol: "C$", decimalPlaces: 2 },
-  { code: "AUD", name: "Australian Dollar", symbol: "A$", decimalPlaces: 2 },
-  { code: "CNY", name: "Chinese Yuan", symbol: "\u00a5", decimalPlaces: 2 },
-  { code: "INR", name: "Indian Rupee", symbol: "\u20b9", decimalPlaces: 2 },
-  { code: "BRL", name: "Brazilian Real", symbol: "R$", decimalPlaces: 2 },
-  { code: "KRW", name: "South Korean Won", symbol: "\u20a9", decimalPlaces: 0 },
-  { code: "MXN", name: "Mexican Peso", symbol: "MX$", decimalPlaces: 2 },
-  { code: "SGD", name: "Singapore Dollar", symbol: "S$", decimalPlaces: 2 },
-  { code: "HKD", name: "Hong Kong Dollar", symbol: "HK$", decimalPlaces: 2 },
-  { code: "NOK", name: "Norwegian Krone", symbol: "kr", decimalPlaces: 2 },
-  { code: "SEK", name: "Swedish Krona", symbol: "kr", decimalPlaces: 2 },
-  { code: "DKK", name: "Danish Krone", symbol: "kr", decimalPlaces: 2 },
-  { code: "NZD", name: "New Zealand Dollar", symbol: "NZ$", decimalPlaces: 2 },
-  { code: "ZAR", name: "South African Rand", symbol: "R", decimalPlaces: 2 },
-  { code: "PLN", name: "Polish Zloty", symbol: "z\u0142", decimalPlaces: 2 },
-  { code: "TRY", name: "Turkish Lira", symbol: "\u20ba", decimalPlaces: 2 },
-  { code: "THB", name: "Thai Baht", symbol: "\u0e3f", decimalPlaces: 2 },
-  { code: "IDR", name: "Indonesian Rupiah", symbol: "Rp", decimalPlaces: 0 },
-  { code: "HUF", name: "Hungarian Forint", symbol: "Ft", decimalPlaces: 0 },
-  { code: "CZK", name: "Czech Koruna", symbol: "K\u010d", decimalPlaces: 2 },
-  { code: "ILS", name: "Israeli Shekel", symbol: "\u20aa", decimalPlaces: 2 },
-  { code: "PHP", name: "Philippine Peso", symbol: "\u20b1", decimalPlaces: 2 },
-  { code: "AED", name: "UAE Dirham", symbol: "AED", decimalPlaces: 2 },
-  { code: "SAR", name: "Saudi Riyal", symbol: "SAR", decimalPlaces: 2 },
-  { code: "TWD", name: "Taiwan Dollar", symbol: "NT$", decimalPlaces: 0 },
-];
+// The full active ISO 4217 set (codes/names/symbols/minor units from ICU),
+// so the demo seed and the runtime self-heal share one source of truth.
+const CURRENCIES = getIsoCurrencies();
 
 // Chart of Accounts template (imported from shared module)
 const ACCOUNTS = DEFAULT_ACCOUNTS;
@@ -162,10 +134,16 @@ const TAX_RATES = [
 async function seed() {
   console.log("Seeding dubbl demo data...\n");
 
-  // 1. Currencies
+  // 1. Currencies — upsert so codes are present and metadata stays correct.
   console.log("Seeding currencies...");
   for (const c of CURRENCIES) {
-    await db.insert(currency).values(c).onConflictDoNothing({ target: currency.code });
+    await db
+      .insert(currency)
+      .values(c)
+      .onConflictDoUpdate({
+        target: currency.code,
+        set: { name: c.name, symbol: c.symbol, decimalPlaces: c.decimalPlaces },
+      });
   }
   console.log(`  ${CURRENCIES.length} currencies`);
 
