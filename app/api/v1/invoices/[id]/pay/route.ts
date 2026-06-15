@@ -85,6 +85,13 @@ export async function POST(
         reference: paymentNumber,
         amount: parsed.amount,
         date: parsed.date,
+        allocations: [
+          {
+            amount: parsed.amount,
+            currencyCode: found.currencyCode,
+            issueDate: found.issueDate,
+          },
+        ],
       }
     );
 

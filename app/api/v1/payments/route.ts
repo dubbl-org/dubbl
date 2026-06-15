@@ -95,9 +95,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Resolve the payment currency from the documents it settles. A single
-    // payment can only settle documents of one currency.
+    // Resolve the payment currency from the documents it settles, and capture
+    // each document's currency + issue date so the journal entry can convert to
+    // base currency and book realised FX. A payment settles one currency only.
     const docCurrencies = new Set<string>();
+    const journalAllocations: {
+      amount: number;
+      currencyCode: string;
+      issueDate: string;
+    }[] = [];
     for (const alloc of parsed.allocations) {
       if (alloc.documentType === "invoice") {
         const doc = await db.query.invoice.findFirst({
@@ -105,18 +111,28 @@ export async function POST(request: Request) {
             eq(invoice.id, alloc.documentId),
             eq(invoice.organizationId, ctx.organizationId)
           ),
-          columns: { currencyCode: true },
+          columns: { currencyCode: true, issueDate: true },
         });
         if (doc?.currencyCode) docCurrencies.add(doc.currencyCode);
+        journalAllocations.push({
+          amount: alloc.amount,
+          currencyCode: doc?.currencyCode ?? "USD",
+          issueDate: doc?.issueDate ?? parsed.date,
+        });
       } else {
         const doc = await db.query.bill.findFirst({
           where: and(
             eq(bill.id, alloc.documentId),
             eq(bill.organizationId, ctx.organizationId)
           ),
-          columns: { currencyCode: true },
+          columns: { currencyCode: true, issueDate: true },
         });
         if (doc?.currencyCode) docCurrencies.add(doc.currencyCode);
+        journalAllocations.push({
+          amount: alloc.amount,
+          currencyCode: doc?.currencyCode ?? "USD",
+          issueDate: doc?.issueDate ?? parsed.date,
+        });
       }
     }
 
@@ -230,6 +246,7 @@ export async function POST(request: Request) {
         reference: paymentNumber,
         amount: parsed.amount,
         date: parsed.date,
+        allocations: journalAllocations,
       }
     );
 

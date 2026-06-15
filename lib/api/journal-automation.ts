@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import { journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getExchangeRate } from "@/lib/currency/converter";
-import { convertLinesToBase } from "@/lib/currency/convert-entry";
+import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
+import { convertLinesToBase, realizedSettlementLegs } from "@/lib/currency/convert-entry";
+import type { SettlementRole } from "@/lib/currency/convert-entry";
 
 interface JournalAutomationContext {
   organizationId: string;
@@ -52,6 +53,49 @@ function toBaseLines(
     currencyCode: currency,
     exchangeRate: rate,
   }));
+}
+
+const FX_ACCOUNTS = {
+  fxGain: {
+    code: "4910",
+    name: "Realised Currency Gains",
+    type: "revenue" as const,
+    subType: "non_operating",
+  },
+  fxLoss: {
+    code: "5930",
+    name: "Realised Currency Losses",
+    type: "expense" as const,
+    subType: "non_operating",
+  },
+};
+
+/**
+ * Return the org's realised-FX gain/loss account, creating it on demand for
+ * organizations whose chart predates these system accounts.
+ */
+async function ensureFxAccount(
+  organizationId: string,
+  role: "fxGain" | "fxLoss",
+  baseCurrency: string
+) {
+  const def = FX_ACCOUNTS[role];
+  const existing = await findAccountByCode(organizationId, def.code);
+  if (existing) return existing;
+  await db
+    .insert(chartAccount)
+    .values({
+      organizationId,
+      code: def.code,
+      name: def.name,
+      type: def.type,
+      subType: def.subType,
+      currencyCode: baseCurrency,
+    })
+    .onConflictDoNothing({
+      target: [chartAccount.organizationId, chartAccount.code],
+    });
+  return findAccountByCode(organizationId, def.code);
 }
 
 /**
@@ -429,6 +473,13 @@ export async function createPaymentJournalEntry(
     amount: number;
     date: string;
     bankAccountCode?: string;
+    /**
+     * The documents this payment settles, with each document's currency and
+     * recognition (issue) date. When supplied and any are in a foreign
+     * currency, the entry is posted in base currency with realised FX booked.
+     * When omitted, the legacy single-currency 2-line entry is posted.
+     */
+    allocations?: { amount: number; currencyCode: string; issueDate: string }[];
   }
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
@@ -459,19 +510,102 @@ export async function createPaymentJournalEntry(
     .returning();
 
   const isInvoice = paymentData.type === "invoice";
+  const desc = `Payment for ${paymentData.reference}`;
 
+  // Multi-currency settlement: convert to base and book realised FX.
+  if (paymentData.allocations && paymentData.allocations.length > 0) {
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+      columns: { defaultCurrency: true },
+    });
+    const base = org?.defaultCurrency ?? "USD";
+
+    let bankTotal = 0;
+    let counterTotal = 0;
+    for (const a of paymentData.allocations) {
+      const currency = a.currencyCode || base;
+      if (currency === base) {
+        bankTotal += a.amount;
+        counterTotal += a.amount;
+        continue;
+      }
+      const paymentRate =
+        (await getExchangeRate(ctx.organizationId, currency, base, paymentData.date)) ??
+        RATE_SCALE;
+      const issueRate =
+        (await getExchangeRate(ctx.organizationId, currency, base, a.issueDate)) ??
+        paymentRate;
+      bankTotal += convertAmount(a.amount, paymentRate);
+      counterTotal += convertAmount(a.amount, issueRate);
+    }
+
+    const legs = realizedSettlementLegs(paymentData.type, bankTotal, counterTotal);
+
+    const needGain = legs.some((l) => l.role === "fxGain");
+    const needLoss = legs.some((l) => l.role === "fxLoss");
+    const fxGainAcct = needGain ? await ensureFxAccount(ctx.organizationId, "fxGain", base) : null;
+    const fxLossAcct = needLoss ? await ensureFxAccount(ctx.organizationId, "fxLoss", base) : null;
+
+    if ((needGain && !fxGainAcct) || (needLoss && !fxLossAcct)) {
+      // Could not resolve an FX account — post a balanced base entry without
+      // splitting out FX rather than fail the settlement.
+      await db.insert(journalLine).values([
+        {
+          journalEntryId: entry.id,
+          accountId: isInvoice ? bankAccount.id : counterAccount.id,
+          description: desc,
+          debitAmount: bankTotal,
+          creditAmount: 0,
+          currencyCode: base,
+        },
+        {
+          journalEntryId: entry.id,
+          accountId: isInvoice ? counterAccount.id : bankAccount.id,
+          description: desc,
+          debitAmount: 0,
+          creditAmount: bankTotal,
+          currencyCode: base,
+        },
+      ]);
+      return entry;
+    }
+
+    const accountFor = (role: SettlementRole) =>
+      role === "bank"
+        ? bankAccount.id
+        : role === "counter"
+        ? counterAccount.id
+        : role === "fxGain"
+        ? fxGainAcct!.id
+        : fxLossAcct!.id;
+
+    await db.insert(journalLine).values(
+      legs.map((l) => ({
+        journalEntryId: entry.id,
+        accountId: accountFor(l.role),
+        description: desc,
+        debitAmount: l.debit,
+        creditAmount: l.credit,
+        currencyCode: base,
+      }))
+    );
+
+    return entry;
+  }
+
+  // Legacy single-currency path (no allocation detail supplied).
   await db.insert(journalLine).values([
     {
       journalEntryId: entry.id,
       accountId: isInvoice ? bankAccount.id : counterAccount.id,
-      description: `Payment for ${paymentData.reference}`,
+      description: desc,
       debitAmount: paymentData.amount,
       creditAmount: 0,
     },
     {
       journalEntryId: entry.id,
       accountId: isInvoice ? counterAccount.id : bankAccount.id,
-      description: `Payment for ${paymentData.reference}`,
+      description: desc,
       debitAmount: 0,
       creditAmount: paymentData.amount,
     },
