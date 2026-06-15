@@ -71,3 +71,50 @@ function absorbResidual<T extends ConvertibleLine>(
 export function isUnitRate(rate: number): boolean {
   return rate === RATE_SCALE;
 }
+
+export type SettlementRole = "bank" | "counter" | "fxGain" | "fxLoss";
+
+export interface SettlementLeg {
+  role: SettlementRole;
+  debit: number;
+  credit: number;
+}
+
+/**
+ * Base-currency journal legs for settling a foreign-currency document, booking
+ * the realised FX difference (reverse-and-rebook). All amounts are in base
+ * currency minor units.
+ *
+ * - `amountBaseAtPayment`: settled amount converted at the payment-date rate
+ *   (what actually hit/left the bank in base).
+ * - `amountBaseAtIssue`: settled amount converted at the recognition rate
+ *   (what AR/AP was carried at in base).
+ *
+ * The realised gain/loss is the difference. Legs always balance by
+ * construction. `counter` is Accounts Receivable (invoice) or Accounts
+ * Payable (bill).
+ */
+export function realizedSettlementLegs(
+  type: "invoice" | "bill",
+  amountBaseAtPayment: number,
+  amountBaseAtIssue: number
+): SettlementLeg[] {
+  const fx = amountBaseAtPayment - amountBaseAtIssue;
+  const legs: SettlementLeg[] = [];
+
+  if (type === "invoice") {
+    // Receivable: DR Bank (received), CR AR (carried), FX balances.
+    legs.push({ role: "bank", debit: amountBaseAtPayment, credit: 0 });
+    legs.push({ role: "counter", debit: 0, credit: amountBaseAtIssue });
+    if (fx > 0) legs.push({ role: "fxGain", debit: 0, credit: fx });
+    else if (fx < 0) legs.push({ role: "fxLoss", debit: -fx, credit: 0 });
+  } else {
+    // Payable: DR AP (carried), CR Bank (paid), FX balances.
+    legs.push({ role: "counter", debit: amountBaseAtIssue, credit: 0 });
+    legs.push({ role: "bank", debit: 0, credit: amountBaseAtPayment });
+    if (fx > 0) legs.push({ role: "fxLoss", debit: fx, credit: 0 });
+    else if (fx < 0) legs.push({ role: "fxGain", debit: 0, credit: -fx });
+  }
+
+  return legs;
+}
