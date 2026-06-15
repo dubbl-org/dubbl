@@ -95,6 +95,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // A "received" payment settles invoices (AR); a "made" payment settles bills
+    // (AP). Reject inconsistent allocations so the journal posts to the correct
+    // control account and realised-FX direction.
+    const expectedDocType = parsed.type === "received" ? "invoice" : "bill";
+    if (parsed.allocations.some((a) => a.documentType !== expectedDocType)) {
+      return NextResponse.json(
+        { error: `A '${parsed.type}' payment can only settle ${expectedDocType}s` },
+        { status: 400 }
+      );
+    }
+
     // Resolve the payment currency from the documents it settles, and capture
     // each document's currency + issue date so the journal entry can convert to
     // base currency and book realised FX. A payment settles one currency only.
@@ -113,11 +124,17 @@ export async function POST(request: Request) {
           ),
           columns: { currencyCode: true, issueDate: true },
         });
-        if (doc?.currencyCode) docCurrencies.add(doc.currencyCode);
+        if (!doc) {
+          return NextResponse.json(
+            { error: `Invoice ${alloc.documentId} not found` },
+            { status: 404 }
+          );
+        }
+        docCurrencies.add(doc.currencyCode);
         journalAllocations.push({
           amount: alloc.amount,
-          currencyCode: doc?.currencyCode ?? "USD",
-          issueDate: doc?.issueDate ?? parsed.date,
+          currencyCode: doc.currencyCode,
+          issueDate: doc.issueDate,
         });
       } else {
         const doc = await db.query.bill.findFirst({
@@ -127,11 +144,17 @@ export async function POST(request: Request) {
           ),
           columns: { currencyCode: true, issueDate: true },
         });
-        if (doc?.currencyCode) docCurrencies.add(doc.currencyCode);
+        if (!doc) {
+          return NextResponse.json(
+            { error: `Bill ${alloc.documentId} not found` },
+            { status: 404 }
+          );
+        }
+        docCurrencies.add(doc.currencyCode);
         journalAllocations.push({
           amount: alloc.amount,
-          currencyCode: doc?.currencyCode ?? "USD",
-          issueDate: doc?.issueDate ?? parsed.date,
+          currencyCode: doc.currencyCode,
+          issueDate: doc.issueDate,
         });
       }
     }

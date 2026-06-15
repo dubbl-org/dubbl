@@ -149,6 +149,14 @@ export async function POST(
       }
     }
 
+    // All settled documents must share one currency for a single journal entry.
+    if (new Set(documents.map((d) => d.currencyCode)).size > 1) {
+      return NextResponse.json(
+        { error: "All settled documents must share the same currency" },
+        { status: 400 }
+      );
+    }
+
     // Generate one payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 

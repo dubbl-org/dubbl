@@ -32,6 +32,17 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = batchSchema.parse(body);
 
+    // A "received" batch settles invoices (AR); a "made" batch settles bills
+    // (AP). Reject inconsistent allocations so the journal posts to the correct
+    // control account and realised-FX direction.
+    const expectedDocType = parsed.type === "received" ? "invoice" : "bill";
+    if (parsed.allocations.some((a) => a.documentType !== expectedDocType)) {
+      return NextResponse.json(
+        { error: `${parsed.type} payments can only settle ${expectedDocType}s` },
+        { status: 400 }
+      );
+    }
+
     // Calculate total amount from allocations (convert decimal to cents)
     const totalAmount = parsed.allocations.reduce(
       (sum, a) => sum + decimalToCents(a.amount),
@@ -136,6 +147,21 @@ export async function POST(request: Request) {
           });
         }
       }
+    }
+
+    // All settled documents must share one currency for a single journal entry.
+    const batchCurrencies = new Set(journalAllocations.map((a) => a.currencyCode));
+    if (batchCurrencies.size > 1) {
+      return NextResponse.json(
+        { error: "All settled documents must share the same currency" },
+        { status: 400 }
+      );
+    }
+    if (batchCurrencies.size === 1) {
+      await db
+        .update(payment)
+        .set({ currencyCode: [...batchCurrencies][0] })
+        .where(eq(payment.id, created.id));
     }
 
     // Create journal entry
