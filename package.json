@@ -10,6 +10,7 @@
     "trigger:dev": "trigger dev",
     "trigger:deploy": "trigger deploy",
     "lint": "eslint",
+    "test": "node --import tsx --test tests/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx scripts/db-migrate.ts",
