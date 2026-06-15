@@ -7,10 +7,11 @@ import { handleError, ok, created, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   amount: z.number().int().min(1),
-  currency: z.string().max(3).optional(),
+  currency: currencyCodeSchema.optional(),
   description: z.string().optional(),
   invoiceNumber: z.string().optional(),
   periodStart: z.string().optional(),

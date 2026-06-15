@@ -8,6 +8,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -15,7 +16,7 @@ const createSchema = z.object({
   company: z.string().optional(),
   taxId: z.string().optional(),
   hourlyRate: z.number().int().optional(),
-  currency: z.string().max(3).optional(),
+  currency: currencyCodeSchema.optional(),
   bankAccountNumber: z.string().optional(),
 });
 

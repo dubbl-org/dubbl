@@ -7,6 +7,7 @@ import { handleError, ok, created } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -14,7 +15,7 @@ const createSchema = z.object({
   minSalary: z.number().int(),
   midSalary: z.number().int(),
   maxSalary: z.number().int(),
-  currency: z.string().max(3).optional(),
+  currency: currencyCodeSchema.optional(),
 });
 
 export async function GET(request: Request) {

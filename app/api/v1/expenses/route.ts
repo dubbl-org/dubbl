@@ -11,6 +11,7 @@ import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const itemSchema = z.object({
   date: z.string().min(1),
@@ -25,7 +26,7 @@ const itemSchema = z.object({
 const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   items: z.array(itemSchema).min(1),
 });
 

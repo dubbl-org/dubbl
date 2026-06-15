@@ -7,6 +7,7 @@ import { ok, created, handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 export async function GET(request: Request) {
   try {
@@ -95,7 +96,7 @@ const createSchema = z.object({
   contactId: z.string().uuid().nullable().optional(),
   title: z.string().min(1),
   valueCents: z.number().int().min(0).optional(),
-  currency: z.string().optional(),
+  currency: currencyCodeSchema.optional(),
   probability: z.number().int().min(0).max(100).optional(),
   expectedCloseDate: z.string().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),

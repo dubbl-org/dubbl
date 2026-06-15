@@ -10,6 +10,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { checkResourceLimit } from "@/lib/api/check-limit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -23,7 +24,7 @@ const createSchema = z.object({
   hourlyRate: z.number().int().min(0).default(0),
   fixedPrice: z.number().int().min(0).default(0),
   estimatedHours: z.number().int().min(0).default(0),
-  currency: z.string().default("USD"),
+  currency: currencyCodeSchema.default("USD"),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   category: z.string().nullable().optional(),

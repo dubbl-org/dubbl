@@ -9,12 +9,13 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   billId: z.string().min(1),
   contactId: z.string().min(1),
   amount: z.number().int().positive(),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   scheduledDate: z.string().min(1),
   notes: z.string().nullable().optional(),
 });
