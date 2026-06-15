@@ -1,10 +1,57 @@
 import { db } from "@/lib/db";
-import { journalEntry, journalLine, chartAccount } from "@/lib/db/schema";
+import { journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { getExchangeRate } from "@/lib/currency/converter";
+import { convertLinesToBase } from "@/lib/currency/convert-entry";
 
 interface JournalAutomationContext {
   organizationId: string;
   userId: string;
+}
+
+const RATE_SCALE = 1_000_000;
+
+/**
+ * Resolve the document -> base currency rate for posting to the GL.
+ * Returns 1:1 when the document is already in the base currency or when no
+ * rate is available (so posting falls back to today's behaviour rather than
+ * failing the operation).
+ */
+async function resolveBaseRate(
+  organizationId: string,
+  currencyCode: string | undefined,
+  date: string
+): Promise<{ base: string; currency: string; rate: number }> {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { defaultCurrency: true },
+  });
+  const base = org?.defaultCurrency ?? "USD";
+  const currency = currencyCode ?? base;
+  if (currency === base) return { base, currency, rate: RATE_SCALE };
+  const rate = await getExchangeRate(organizationId, currency, base, date);
+  return { base, currency, rate: rate ?? RATE_SCALE };
+}
+
+/**
+ * Convert built journal lines to base currency (balance-preserving) and stamp
+ * the original document currency + rate on each line.
+ */
+function toBaseLines(
+  lines: (typeof journalLine.$inferInsert)[],
+  currency: string,
+  rate: number
+): (typeof journalLine.$inferInsert)[] {
+  const normalized = lines.map((l) => ({
+    ...l,
+    debitAmount: l.debitAmount ?? 0,
+    creditAmount: l.creditAmount ?? 0,
+  }));
+  return convertLinesToBase(normalized, rate).map((l) => ({
+    ...l,
+    currencyCode: currency,
+    exchangeRate: rate,
+  }));
 }
 
 /**
@@ -45,6 +92,7 @@ export async function createInvoiceJournalEntry(
     subtotal: number;
     lines: { accountId: string | null; amount: number; taxAmount: number }[];
     date: string;
+    currencyCode?: string;
   }
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
@@ -108,7 +156,12 @@ export async function createInvoiceJournalEntry(
   }
 
   if (lines.length > 0) {
-    await db.insert(journalLine).values(lines);
+    const { currency, rate } = await resolveBaseRate(
+      ctx.organizationId,
+      invoiceData.currencyCode,
+      invoiceData.date
+    );
+    await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
   }
 
   return entry;
@@ -128,6 +181,7 @@ export async function createBillJournalEntry(
     taxTotal: number;
     lines: { accountId: string | null; amount: number; taxAmount: number }[];
     date: string;
+    currencyCode?: string;
   }
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
@@ -189,7 +243,12 @@ export async function createBillJournalEntry(
   });
 
   if (lines.length > 0) {
-    await db.insert(journalLine).values(lines);
+    const { currency, rate } = await resolveBaseRate(
+      ctx.organizationId,
+      billData.currencyCode,
+      billData.date
+    );
+    await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
   }
 
   return entry;

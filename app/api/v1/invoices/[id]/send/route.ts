@@ -160,6 +160,7 @@ export async function POST(
           taxAmount: l.taxAmount,
         })),
         date: found.issueDate,
+        currencyCode: found.currencyCode,
       }
     );
 
