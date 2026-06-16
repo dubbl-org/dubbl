@@ -8,8 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { z } from "zod";
 
 const updateSchema = z.object({
-  rate: z.number().int().positive().optional(),
-  source: z.enum(["manual", "api"]).optional(),
+  rate: z.number().int().positive(),
 });
 
 export async function PUT(
@@ -33,9 +32,11 @@ export async function PUT(
 
     if (!existing) return notFound("Exchange rate");
 
+    // Editing a rate by hand makes it a manual override: pin source so it both
+    // wins over and is protected from the automatic daily sync.
     const [updated] = await db
       .update(exchangeRate)
-      .set(parsed)
+      .set({ rate: parsed.rate, source: "manual" })
       .where(eq(exchangeRate.id, id))
       .returning();
 
