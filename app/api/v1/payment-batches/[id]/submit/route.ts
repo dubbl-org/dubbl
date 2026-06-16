@@ -52,7 +52,11 @@ export async function POST(
     let processed = 0;
 
     for (const item of existing.items) {
-      if (!item.billId || !item.contactId) continue;
+      // Capture into locals: narrowing of item.* properties is not preserved
+      // inside the transaction closure below.
+      const billId = item.billId;
+      const contactId = item.contactId;
+      if (!billId || !contactId) continue;
 
       try {
         // Generate payment number
@@ -63,88 +67,102 @@ export async function POST(
           "PAY"
         );
 
-        // Create payment record
-        const [createdPayment] = await db
-          .insert(payment)
-          .values({
-            organizationId: ctx.organizationId,
-            contactId: item.contactId,
-            paymentNumber,
-            type: "made",
-            date: today,
-            amount: item.amount,
-            method: "bank_transfer",
-            createdBy: ctx.userId,
-          })
-          .returning();
-
-        // Create allocation
-        await db.insert(paymentAllocation).values({
-          paymentId: createdPayment.id,
-          documentType: "bill",
-          documentId: item.billId,
-          amount: item.amount,
-        });
-
-        // Update bill
+        // Read the bill before opening the transaction so the write sequence
+        // only contains writes.
         const existingBill = await db.query.bill.findFirst({
           where: and(
-            eq(bill.id, item.billId),
+            eq(bill.id, billId),
             eq(bill.organizationId, ctx.organizationId)
           ),
         });
 
-        if (existingBill) {
-          const newAmountPaid = existingBill.amountPaid + item.amount;
-          const newAmountDue = existingBill.amountDue - item.amount;
-          const newStatus = newAmountDue <= 0 ? "paid" : "partial";
-          await db
-            .update(bill)
-            .set({
-              amountPaid: newAmountPaid,
-              amountDue: Math.max(0, newAmountDue),
-              status: newStatus,
-              updatedAt: new Date(),
+        // Atomic per-item write sequence: payment + allocation + bill balance
+        // update + GL journal entry + journalEntryId link all commit together,
+        // or roll back together (e.g. on MissingExchangeRateError). One item's
+        // rollback does not affect other items — each runs in its own tx.
+        await db.transaction(async (tx) => {
+          // Create payment record
+          const [createdPayment] = await tx
+            .insert(payment)
+            .values({
+              organizationId: ctx.organizationId,
+              contactId: contactId,
+              paymentNumber,
+              type: "made",
+              date: today,
+              amount: item.amount,
+              method: "bank_transfer",
+              createdBy: ctx.userId,
             })
-            .where(eq(bill.id, item.billId));
-        }
+            .returning();
 
-        // Create journal entry
-        const journalEntry = await createPaymentJournalEntry(
-          { organizationId: ctx.organizationId, userId: ctx.userId },
-          {
-            type: "bill",
-            reference: paymentNumber,
+          // Create allocation
+          await tx.insert(paymentAllocation).values({
+            paymentId: createdPayment.id,
+            documentType: "bill",
+            documentId: billId,
             amount: item.amount,
-            date: today,
-            allocations: existingBill
-              ? [
-                  {
-                    amount: item.amount,
-                    currencyCode: existingBill.currencyCode,
-                    issueDate: existingBill.issueDate,
-                  },
-                ]
-              : undefined,
+          });
+
+          // Update bill
+          if (existingBill) {
+            const newAmountPaid = existingBill.amountPaid + item.amount;
+            const newAmountDue = existingBill.amountDue - item.amount;
+            const newStatus = newAmountDue <= 0 ? "paid" : "partial";
+            await tx
+              .update(bill)
+              .set({
+                amountPaid: newAmountPaid,
+                amountDue: Math.max(0, newAmountDue),
+                status: newStatus,
+                updatedAt: new Date(),
+              })
+              .where(eq(bill.id, billId));
           }
-        );
 
-        if (journalEntry) {
-          await db
-            .update(payment)
-            .set({ journalEntryId: journalEntry.id, updatedAt: new Date() })
-            .where(eq(payment.id, createdPayment.id));
-        }
+          // Create journal entry
+          const journalEntry = await createPaymentJournalEntry(
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+              type: "bill",
+              reference: paymentNumber,
+              amount: item.amount,
+              date: today,
+              allocations: existingBill
+                ? [
+                    {
+                      amount: item.amount,
+                      currencyCode: existingBill.currencyCode,
+                      issueDate: existingBill.issueDate,
+                    },
+                  ]
+                : undefined,
+            },
+            tx
+          );
 
-        // Mark batch item as completed
+          if (journalEntry) {
+            await tx
+              .update(payment)
+              .set({ journalEntryId: journalEntry.id, updatedAt: new Date() })
+              .where(eq(payment.id, createdPayment.id));
+          }
+        });
+
+        // Mark batch item as completed (after the tx commits)
         await db
           .update(paymentBatchItem)
           .set({ status: "completed" })
           .where(eq(paymentBatchItem.id, item.id));
 
         processed++;
-      } catch {
-        // Mark item as failed
+      } catch (err) {
+        // The per-item payment tx rolled back (no orphaned writes). Record the
+        // failure reason and mark the item failed, then continue the batch.
+        console.error(
+          `Failed to process payment batch item ${item.id}:`,
+          err
+        );
         await db
           .update(paymentBatchItem)
           .set({ status: "failed" })

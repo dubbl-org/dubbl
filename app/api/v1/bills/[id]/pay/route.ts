@@ -51,67 +51,77 @@ export async function POST(
     // Generate payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
-    // Create payment record
-    const [created] = await db
-      .insert(payment)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: found.contactId,
-        paymentNumber,
-        type: "made",
-        date: parsed.date,
-        amount: parsed.amount,
-        method: parsed.method,
-        reference: parsed.reference || null,
-        createdBy: ctx.userId,
-      })
-      .returning();
+    // Atomically write the payment, allocation, GL journal entry, the
+    // payment->journalEntry link, and the bill balance/status update. If
+    // createPaymentJournalEntry throws (e.g. MissingExchangeRateError), the
+    // whole sequence rolls back so we never leave an orphaned payment or a
+    // bill marked paid without a ledger entry.
+    const { created, updated } = await db.transaction(async (tx) => {
+      // Create payment record
+      const [created] = await tx
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: found.contactId,
+          paymentNumber,
+          type: "made",
+          date: parsed.date,
+          amount: parsed.amount,
+          method: parsed.method,
+          reference: parsed.reference || null,
+          createdBy: ctx.userId,
+        })
+        .returning();
 
-    // Create allocation linking payment to this bill
-    await db.insert(paymentAllocation).values({
-      paymentId: created.id,
-      documentType: "bill",
-      documentId: id,
-      amount: parsed.amount,
-    });
-
-    // Create payment journal entry
-    const journalEntry = await createPaymentJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        type: "bill",
-        reference: paymentNumber,
+      // Create allocation linking payment to this bill
+      await tx.insert(paymentAllocation).values({
+        paymentId: created.id,
+        documentType: "bill",
+        documentId: id,
         amount: parsed.amount,
-        date: parsed.date,
-        allocations: [
-          {
-            amount: parsed.amount,
-            currencyCode: found.currencyCode,
-            issueDate: found.issueDate,
-          },
-        ],
+      });
+
+      // Create payment journal entry
+      const journalEntry = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          type: "bill",
+          reference: paymentNumber,
+          amount: parsed.amount,
+          date: parsed.date,
+          allocations: [
+            {
+              amount: parsed.amount,
+              currencyCode: found.currencyCode,
+              issueDate: found.issueDate,
+            },
+          ],
+        },
+        tx
+      );
+
+      if (journalEntry) {
+        await tx
+          .update(payment)
+          .set({ journalEntryId: journalEntry.id })
+          .where(eq(payment.id, created.id));
       }
-    );
 
-    if (journalEntry) {
-      await db
-        .update(payment)
-        .set({ journalEntryId: journalEntry.id })
-        .where(eq(payment.id, created.id));
-    }
+      // Update bill amounts
+      const [updated] = await tx
+        .update(bill)
+        .set({
+          amountPaid: newAmountPaid,
+          amountDue: Math.max(0, newAmountDue),
+          status: newStatus,
+          paidAt: newStatus === "paid" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(bill.id, id))
+        .returning();
 
-    // Update bill amounts
-    const [updated] = await db
-      .update(bill)
-      .set({
-        amountPaid: newAmountPaid,
-        amountDue: Math.max(0, newAmountDue),
-        status: newStatus,
-        paidAt: newStatus === "paid" ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(bill.id, id))
-      .returning();
+      return { created, updated };
+    });
 
     logAudit({ ctx, action: "pay", entityType: "bill", entityId: id, changes: { previousStatus: found.status }, request });
 

@@ -160,118 +160,128 @@ export async function POST(
     // Generate one payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
-    // Create one payment record
+    // Create payment, allocations, document updates, the GL entry, and the
+    // bank-transaction reconcile in one transaction so they all commit together
+    // or roll back together (e.g. a thrown MissingExchangeRateError leaves no
+    // orphaned payment or documents marked paid without a ledger entry).
     const paymentType = isOutgoing ? "made" : "received";
-    const [created] = await db
-      .insert(payment)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: documents[0].contactId,
-        paymentNumber,
-        type: paymentType,
-        date: parsed.date,
-        amount: totalAllocated,
-        currencyCode: documents[0].currencyCode,
-        method: parsed.method,
-        bankAccountId: account.id,
-        bankTransactionId: id,
-        createdBy: ctx.userId,
-      })
-      .returning();
-
-    // Create payment allocations and update documents
-    const results: Array<{
-      documentType: string;
-      documentId: string;
-      amount: number;
-      newStatus: string;
-    }> = [];
-
-    const journalAllocations: {
-      amount: number;
-      currencyCode: string;
-      issueDate: string;
-    }[] = [];
-
-    for (let i = 0; i < parsed.allocations.length; i++) {
-      const allocation = parsed.allocations[i];
-      const doc = documents[i];
-
-      // Create allocation record
-      await db.insert(paymentAllocation).values({
-        paymentId: created.id,
-        documentType: allocation.documentType,
-        documentId: allocation.documentId,
-        amount: allocation.amount,
-      });
-
-      // Update document amounts
-      const newAmountPaid = doc.amountPaid + allocation.amount;
-      const newAmountDue = doc.total - newAmountPaid;
-      const newStatus = newAmountDue <= 0 ? "paid" : "partial";
-
-      if (allocation.documentType === "bill") {
-        await db
-          .update(bill)
-          .set({
-            amountPaid: newAmountPaid,
-            amountDue: Math.max(0, newAmountDue),
-            status: newStatus,
-            paidAt: newStatus === "paid" ? new Date() : null,
-            updatedAt: new Date(),
-          })
-          .where(eq(bill.id, allocation.documentId));
-      } else {
-        await db
-          .update(invoice)
-          .set({
-            amountPaid: newAmountPaid,
-            amountDue: Math.max(0, newAmountDue),
-            status: newStatus,
-            paidAt: newStatus === "paid" ? new Date() : null,
-            updatedAt: new Date(),
-          })
-          .where(eq(invoice.id, allocation.documentId));
-      }
-
-      results.push({
-        documentType: allocation.documentType,
-        documentId: allocation.documentId,
-        amount: allocation.amount,
-        newStatus,
-      });
-
-      journalAllocations.push({
-        amount: allocation.amount,
-        currencyCode: doc.currencyCode,
-        issueDate: doc.issueDate,
-      });
-    }
-
-    // Create one journal entry for the total amount
     const journalType = isOutgoing ? "bill" : "invoice";
-    const journalEntry = await createPaymentJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        type: journalType,
-        reference: paymentNumber,
-        amount: totalAllocated,
-        date: parsed.date,
-        allocations: journalAllocations,
-      }
-    );
-    if (journalEntry) {
-      await db.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
-    }
 
-    // Mark transaction as reconciled
-    await db
-      .update(bankTransaction)
-      .set({
-        status: "reconciled",
-        journalEntryId: journalEntry?.id || null,
-      })
-      .where(eq(bankTransaction.id, id));
+    const { created, results } = await db.transaction(async (tx) => {
+      // Create one payment record
+      const [created] = await tx
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: documents[0].contactId,
+          paymentNumber,
+          type: paymentType,
+          date: parsed.date,
+          amount: totalAllocated,
+          currencyCode: documents[0].currencyCode,
+          method: parsed.method,
+          bankAccountId: account.id,
+          bankTransactionId: id,
+          createdBy: ctx.userId,
+        })
+        .returning();
+
+      // Create payment allocations and update documents
+      const results: Array<{
+        documentType: string;
+        documentId: string;
+        amount: number;
+        newStatus: string;
+      }> = [];
+
+      const journalAllocations: {
+        amount: number;
+        currencyCode: string;
+        issueDate: string;
+      }[] = [];
+
+      for (let i = 0; i < parsed.allocations.length; i++) {
+        const allocation = parsed.allocations[i];
+        const doc = documents[i];
+
+        // Create allocation record
+        await tx.insert(paymentAllocation).values({
+          paymentId: created.id,
+          documentType: allocation.documentType,
+          documentId: allocation.documentId,
+          amount: allocation.amount,
+        });
+
+        // Update document amounts
+        const newAmountPaid = doc.amountPaid + allocation.amount;
+        const newAmountDue = doc.total - newAmountPaid;
+        const newStatus = newAmountDue <= 0 ? "paid" : "partial";
+
+        if (allocation.documentType === "bill") {
+          await tx
+            .update(bill)
+            .set({
+              amountPaid: newAmountPaid,
+              amountDue: Math.max(0, newAmountDue),
+              status: newStatus,
+              paidAt: newStatus === "paid" ? new Date() : null,
+              updatedAt: new Date(),
+            })
+            .where(eq(bill.id, allocation.documentId));
+        } else {
+          await tx
+            .update(invoice)
+            .set({
+              amountPaid: newAmountPaid,
+              amountDue: Math.max(0, newAmountDue),
+              status: newStatus,
+              paidAt: newStatus === "paid" ? new Date() : null,
+              updatedAt: new Date(),
+            })
+            .where(eq(invoice.id, allocation.documentId));
+        }
+
+        results.push({
+          documentType: allocation.documentType,
+          documentId: allocation.documentId,
+          amount: allocation.amount,
+          newStatus,
+        });
+
+        journalAllocations.push({
+          amount: allocation.amount,
+          currencyCode: doc.currencyCode,
+          issueDate: doc.issueDate,
+        });
+      }
+
+      // Create one journal entry for the total amount
+      const journalEntry = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          type: journalType,
+          reference: paymentNumber,
+          amount: totalAllocated,
+          date: parsed.date,
+          allocations: journalAllocations,
+        },
+        tx
+      );
+      if (journalEntry) {
+        await tx.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
+      }
+
+      // Mark transaction as reconciled
+      await tx
+        .update(bankTransaction)
+        .set({
+          status: "reconciled",
+          journalEntryId: journalEntry?.id || null,
+        })
+        .where(eq(bankTransaction.id, id));
+
+      return { created, results };
+    });
 
     // Audit log
     await db.insert(auditLog).values({

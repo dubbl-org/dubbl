@@ -218,69 +218,74 @@ export async function POST(
 
       const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
-      const [created] = await db
-        .insert(payment)
-        .values({
-          organizationId: ctx.organizationId,
-          contactId: found.contactId,
-          paymentNumber,
-          type: "received",
-          date: parsed.date,
-          amount: parsed.amount,
-          currencyCode: found.currencyCode,
-          method: parsed.method,
-          bankAccountId: account.id,
-          bankTransactionId: id,
-          createdBy: ctx.userId,
-        })
-        .returning();
-
-      await db.insert(paymentAllocation).values({
-        paymentId: created.id,
-        documentType: "invoice",
-        documentId,
-        amount: parsed.amount,
-      });
-
-      const je = await createPaymentJournalEntry(
-        { organizationId: ctx.organizationId, userId: ctx.userId },
-        {
-          type: "invoice",
-          reference: paymentNumber,
-          amount: parsed.amount,
-          date: parsed.date,
-          allocations: [
-            {
-              amount: parsed.amount,
-              currencyCode: found.currencyCode,
-              issueDate: found.issueDate,
-            },
-          ],
-        }
-      );
-      if (je) {
-        await db.update(payment).set({ journalEntryId: je.id }).where(eq(payment.id, created.id));
-      }
-
       const newAmountPaid = found.amountPaid + parsed.amount;
       const newAmountDue = found.total - newAmountPaid;
       const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
-      await db
-        .update(invoice)
-        .set({
-          amountPaid: newAmountPaid,
-          amountDue: Math.max(0, newAmountDue),
-          status: newStatus,
-          paidAt: newStatus === "paid" ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(invoice.id, documentId));
+      const { created } = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(payment)
+          .values({
+            organizationId: ctx.organizationId,
+            contactId: found.contactId,
+            paymentNumber,
+            type: "received",
+            date: parsed.date,
+            amount: parsed.amount,
+            currencyCode: found.currencyCode,
+            method: parsed.method,
+            bankAccountId: account.id,
+            bankTransactionId: id,
+            createdBy: ctx.userId,
+          })
+          .returning();
 
-      await db
-        .update(bankTransaction)
-        .set({ status: "reconciled", journalEntryId: je?.id || null })
-        .where(eq(bankTransaction.id, id));
+        await tx.insert(paymentAllocation).values({
+          paymentId: created.id,
+          documentType: "invoice",
+          documentId,
+          amount: parsed.amount,
+        });
+
+        const je = await createPaymentJournalEntry(
+          { organizationId: ctx.organizationId, userId: ctx.userId },
+          {
+            type: "invoice",
+            reference: paymentNumber,
+            amount: parsed.amount,
+            date: parsed.date,
+            allocations: [
+              {
+                amount: parsed.amount,
+                currencyCode: found.currencyCode,
+                issueDate: found.issueDate,
+              },
+            ],
+          },
+          tx
+        );
+        if (je) {
+          await tx.update(payment).set({ journalEntryId: je.id }).where(eq(payment.id, created.id));
+        }
+
+        await tx
+          .update(invoice)
+          .set({
+            amountPaid: newAmountPaid,
+            amountDue: Math.max(0, newAmountDue),
+            status: newStatus,
+            paidAt: newStatus === "paid" ? new Date() : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(invoice.id, documentId));
+
+        await tx
+          .update(bankTransaction)
+          .set({ status: "reconciled", journalEntryId: je?.id || null })
+          .where(eq(bankTransaction.id, id));
+
+        return { created };
+      });
 
       await db.insert(auditLog).values({
         organizationId: ctx.organizationId,
@@ -312,69 +317,74 @@ export async function POST(
 
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
-    const [created] = await db
-      .insert(payment)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: found.contactId,
-        paymentNumber,
-        type: "made",
-        date: parsed.date,
-        amount: parsed.amount,
-        currencyCode: found.currencyCode,
-        method: parsed.method,
-        bankAccountId: account.id,
-        bankTransactionId: id,
-        createdBy: ctx.userId,
-      })
-      .returning();
-
-    await db.insert(paymentAllocation).values({
-      paymentId: created.id,
-      documentType: "bill",
-      documentId,
-      amount: parsed.amount,
-    });
-
-    const journalEntry = await createPaymentJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        type: "bill",
-        reference: paymentNumber,
-        amount: parsed.amount,
-        date: parsed.date,
-        allocations: [
-          {
-            amount: parsed.amount,
-            currencyCode: found.currencyCode,
-            issueDate: found.issueDate,
-          },
-        ],
-      }
-    );
-    if (journalEntry) {
-      await db.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
-    }
-
     const newAmountPaid = found.amountPaid + parsed.amount;
     const newAmountDue = found.total - newAmountPaid;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
-    await db
-      .update(bill)
-      .set({
-        amountPaid: newAmountPaid,
-        amountDue: Math.max(0, newAmountDue),
-        status: newStatus,
-        paidAt: newStatus === "paid" ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(bill.id, documentId));
+    const { created } = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: found.contactId,
+          paymentNumber,
+          type: "made",
+          date: parsed.date,
+          amount: parsed.amount,
+          currencyCode: found.currencyCode,
+          method: parsed.method,
+          bankAccountId: account.id,
+          bankTransactionId: id,
+          createdBy: ctx.userId,
+        })
+        .returning();
 
-    await db
-      .update(bankTransaction)
-      .set({ status: "reconciled", journalEntryId: journalEntry?.id || null })
-      .where(eq(bankTransaction.id, id));
+      await tx.insert(paymentAllocation).values({
+        paymentId: created.id,
+        documentType: "bill",
+        documentId,
+        amount: parsed.amount,
+      });
+
+      const journalEntry = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          type: "bill",
+          reference: paymentNumber,
+          amount: parsed.amount,
+          date: parsed.date,
+          allocations: [
+            {
+              amount: parsed.amount,
+              currencyCode: found.currencyCode,
+              issueDate: found.issueDate,
+            },
+          ],
+        },
+        tx
+      );
+      if (journalEntry) {
+        await tx.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
+      }
+
+      await tx
+        .update(bill)
+        .set({
+          amountPaid: newAmountPaid,
+          amountDue: Math.max(0, newAmountDue),
+          status: newStatus,
+          paidAt: newStatus === "paid" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(bill.id, documentId));
+
+      await tx
+        .update(bankTransaction)
+        .set({ status: "reconciled", journalEntryId: journalEntry?.id || null })
+        .where(eq(bankTransaction.id, id));
+
+      return { created };
+    });
 
     await db.insert(auditLog).values({
       organizationId: ctx.organizationId,

@@ -13,6 +13,16 @@ interface JournalAutomationContext {
 const RATE_SCALE = 1_000_000;
 
 /**
+ * A transaction handle, derived from db.transaction's callback parameter.
+ * createPaymentJournalEntry takes one so its journal-entry/line writes commit
+ * (or roll back) together with the caller's payment + document updates.
+ */
+type Tx = Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
+
+/** Either the pool or an open transaction — for helpers that must honor a tx. */
+type DbOrTx = typeof db | Tx;
+
+/**
  * Resolve the document -> base currency rate for posting to the GL.
  * Returns 1:1 when the document is already in the base currency. When the
  * document is in a foreign currency but no rate is available, throws
@@ -120,12 +130,16 @@ const FX_ACCOUNTS = {
 async function ensureFxAccount(
   organizationId: string,
   role: "fxGain" | "fxLoss",
-  baseCurrency: string
+  baseCurrency: string,
+  exec: DbOrTx = db
 ) {
   const def = FX_ACCOUNTS[role];
-  const existing = await findAccountByCode(organizationId, def.code);
+  const existing = await findAccountByCode(organizationId, def.code, exec);
   if (existing) return existing;
-  await db
+  // Use the caller's executor so creating this account on demand commits/rolls
+  // back with the surrounding settlement transaction (no orphaned account if
+  // the payment is rolled back).
+  await exec
     .insert(chartAccount)
     .values({
       organizationId,
@@ -138,14 +152,14 @@ async function ensureFxAccount(
     .onConflictDoNothing({
       target: [chartAccount.organizationId, chartAccount.code],
     });
-  return findAccountByCode(organizationId, def.code);
+  return findAccountByCode(organizationId, def.code, exec);
 }
 
 /**
  * Find or create a system account by code/type for the given org.
  */
-async function findAccountByCode(organizationId: string, code: string) {
-  return db.query.chartAccount.findFirst({
+async function findAccountByCode(organizationId: string, code: string, exec: DbOrTx = db) {
+  return exec.query.chartAccount.findFirst({
     where: and(
       eq(chartAccount.organizationId, organizationId),
       eq(chartAccount.code, code)
@@ -533,7 +547,10 @@ export async function createPaymentJournalEntry(
      * When omitted, the legacy single-currency 2-line entry is posted.
      */
     allocations?: { amount: number; currencyCode: string; issueDate: string }[];
-  }
+  },
+  // Required: the caller's open transaction, so the GL entry commits/rolls back
+  // atomically with the payment, allocations, and document-status updates.
+  tx: Tx
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
   const bankAccount = await findAccountByCode(
@@ -547,7 +564,7 @@ export async function createPaymentJournalEntry(
 
   if (!bankAccount || !counterAccount) return null;
 
-  const [entry] = await db
+  const [entry] = await tx
     .insert(journalEntry)
     .values({
       organizationId: ctx.organizationId,
@@ -587,15 +604,13 @@ export async function createPaymentJournalEntry(
         counterTotal += a.amount;
         continue;
       }
-      // NOTE: payment routes commit the payment + allocations + document-status
-      // updates BEFORE calling this helper and are not wrapped in a DB
-      // transaction, so throwing here would orphan those rows / leave documents
-      // marked paid with no entry. Until those routes are made transactional we
-      // fall back to the payment-date rate (and 1:1 only as a last resort) here,
-      // and enforce a rate at *recognition* time instead (see resolveBaseRate).
-      const paymentRate =
-        (await getExchangeRate(ctx.organizationId, currency, base, paymentData.date)) ??
-        RATE_SCALE;
+      // Require a rate to settle a foreign-currency document. The caller runs
+      // this inside a transaction, so throwing rolls back the payment, the
+      // allocations, and the document-status updates together — no orphans.
+      const paymentRate = await getExchangeRate(ctx.organizationId, currency, base, paymentData.date);
+      if (paymentRate == null) {
+        throw new MissingExchangeRateError(currency, base, paymentData.date);
+      }
       const issueRate =
         (await getExchangeRate(ctx.organizationId, currency, base, a.issueDate)) ??
         paymentRate;
@@ -607,15 +622,15 @@ export async function createPaymentJournalEntry(
 
     const needGain = legs.some((l) => l.role === "fxGain");
     const needLoss = legs.some((l) => l.role === "fxLoss");
-    const fxGainAcct = needGain ? await ensureFxAccount(ctx.organizationId, "fxGain", base) : null;
-    const fxLossAcct = needLoss ? await ensureFxAccount(ctx.organizationId, "fxLoss", base) : null;
+    const fxGainAcct = needGain ? await ensureFxAccount(ctx.organizationId, "fxGain", base, tx) : null;
+    const fxLossAcct = needLoss ? await ensureFxAccount(ctx.organizationId, "fxLoss", base, tx) : null;
 
     if ((needGain && !fxGainAcct) || (needLoss && !fxLossAcct)) {
       // Cannot resolve an FX account to book the realised gain/loss. Relieving
       // AR/AP at the payment-rate value would corrupt the control account, so
       // fail the entry instead. (ensureFxAccount normally creates the account,
       // making this effectively unreachable.)
-      await db.delete(journalEntry).where(eq(journalEntry.id, entry.id));
+      await tx.delete(journalEntry).where(eq(journalEntry.id, entry.id));
       return null;
     }
 
@@ -628,7 +643,7 @@ export async function createPaymentJournalEntry(
         ? fxGainAcct!.id
         : fxLossAcct!.id;
 
-    await db.insert(journalLine).values(
+    await tx.insert(journalLine).values(
       legs.map((l) => ({
         journalEntryId: entry.id,
         accountId: accountFor(l.role),
@@ -643,7 +658,7 @@ export async function createPaymentJournalEntry(
   }
 
   // Legacy single-currency path (no allocation detail supplied).
-  await db.insert(journalLine).values([
+  await tx.insert(journalLine).values([
     {
       journalEntryId: entry.id,
       accountId: isInvoice ? bankAccount.id : counterAccount.id,
