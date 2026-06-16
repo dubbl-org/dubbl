@@ -35,6 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
+import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -78,6 +79,7 @@ interface BaseAmounts {
     subtotal: number | null;
     taxTotal: number | null;
   };
+  status?: RateInfo;
 }
 
 const statusConfig: Record<string, { class: string; bg: string }> = {
@@ -634,14 +636,21 @@ export default function InvoiceDetailPage() {
                   <span className="font-mono tabular-nums">{formatMoney(inv.total, inv.currencyCode)}</span>
                 </div>
                 {base && base.baseCurrency !== inv.currencyCode && (
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>In {base.baseCurrency}</span>
-                    <span className="font-mono tabular-nums">
-                      {base.amounts.total == null
-                        ? "—"
-                        : `≈ ${formatMoney(base.amounts.total, base.baseCurrency)}`}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>In {base.baseCurrency}</span>
+                      <span className="font-mono tabular-nums">
+                        {base.amounts.total == null
+                          ? "—"
+                          : `≈ ${formatMoney(base.amounts.total, base.baseCurrency)}`}
+                      </span>
+                    </div>
+                    <RateNote
+                      currency={inv.currencyCode}
+                      baseCurrency={base.baseCurrency}
+                      status={base.status}
+                    />
+                  </>
                 )}
               </div>
             </div>

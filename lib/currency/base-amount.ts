@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { organization } from "@/lib/db/schema";
-import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
+import { convertAmount } from "@/lib/currency/converter";
+import { getRateStatus, type RateStatus } from "@/lib/currency/rate-status";
 
 const RATE_SCALE = 1_000_000;
 
@@ -11,6 +12,8 @@ export interface BaseConversion {
   rate: number | null;
   /** the input amounts converted to base minor units (null when no rate). */
   amounts: Record<string, number | null>;
+  /** freshness/source of the rate used, so the UI can show it / warn / prompt. */
+  status: RateStatus;
 }
 
 /**
@@ -36,14 +39,16 @@ export async function toBaseAmounts(
     baseCurrency = org?.defaultCurrency ?? "USD";
   }
 
+  const status = await getRateStatus(orgId, currencyCode, baseCurrency, date);
+  const rate = status.rate;
+
   if (currencyCode === baseCurrency) {
-    return { baseCurrency, rate: RATE_SCALE, amounts: { ...amounts } };
+    return { baseCurrency, rate: RATE_SCALE, amounts: { ...amounts }, status };
   }
 
-  const rate = await getExchangeRate(orgId, currencyCode, baseCurrency, date);
   const converted: Record<string, number | null> = {};
   for (const [key, value] of Object.entries(amounts)) {
     converted[key] = rate == null ? null : convertAmount(value, rate);
   }
-  return { baseCurrency, rate, amounts: converted };
+  return { baseCurrency, rate, amounts: converted, status };
 }

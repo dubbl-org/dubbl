@@ -17,6 +17,7 @@ import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
+import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import Link from "next/link";
 
 interface BillDetail {
@@ -37,6 +38,7 @@ interface BaseAmounts {
     subtotal: number | null;
     taxTotal: number | null;
   };
+  status?: RateInfo;
 }
 
 const statusConfig: Record<string, { class: string }> = {
@@ -257,14 +259,21 @@ export default function BillDetailPage() {
                   <span className="font-mono tabular-nums">{formatMoney(b.total, b.currencyCode)}</span>
                 </div>
                 {base && base.baseCurrency !== b.currencyCode && (
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>In {base.baseCurrency}</span>
-                    <span className="font-mono tabular-nums">
-                      {base.amounts.total == null
-                        ? "—"
-                        : `≈ ${formatMoney(base.amounts.total, base.baseCurrency)}`}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>In {base.baseCurrency}</span>
+                      <span className="font-mono tabular-nums">
+                        {base.amounts.total == null
+                          ? "—"
+                          : `≈ ${formatMoney(base.amounts.total, base.baseCurrency)}`}
+                      </span>
+                    </div>
+                    <RateNote
+                      currency={b.currencyCode}
+                      baseCurrency={base.baseCurrency}
+                      status={base.status}
+                    />
+                  </>
                 )}
               </div>
             </div>

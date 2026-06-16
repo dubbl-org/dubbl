@@ -624,15 +624,20 @@ export default function CurrenciesPage() {
                     </span>
                   </div>
                   <Badge
-                    variant={rate.source === "api" ? "default" : "secondary"}
+                    variant={rate.source === "manual" ? "default" : "secondary"}
                     className={cn(
                       "text-[10px] uppercase",
-                      rate.source === "api"
+                      rate.source === "manual"
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
                         : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                     )}
+                    title={
+                      rate.source === "manual"
+                        ? "Rate you entered manually"
+                        : "Rate fetched automatically from the exchange-rate feed"
+                    }
                   >
-                    {rate.source}
+                    {rate.source === "manual" ? "Manual" : "Auto"}
                   </Badge>
                 </div>
               </div>
