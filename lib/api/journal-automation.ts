@@ -1,17 +1,165 @@
 import { db } from "@/lib/db";
-import { journalEntry, journalLine, chartAccount } from "@/lib/db/schema";
+import { journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { getExchangeRate, convertAmount, MissingExchangeRateError } from "@/lib/currency/converter";
+import { convertLinesToBase, realizedSettlementLegs } from "@/lib/currency/convert-entry";
+import type { SettlementRole } from "@/lib/currency/convert-entry";
 
 interface JournalAutomationContext {
   organizationId: string;
   userId: string;
 }
 
+const RATE_SCALE = 1_000_000;
+
+/**
+ * A transaction handle, derived from db.transaction's callback parameter.
+ * createPaymentJournalEntry takes one so its journal-entry/line writes commit
+ * (or roll back) together with the caller's payment + document updates.
+ */
+type Tx = Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
+
+/** Either the pool or an open transaction — for helpers that must honor a tx. */
+type DbOrTx = typeof db | Tx;
+
+/**
+ * Resolve the document -> base currency rate for posting to the GL.
+ * Returns 1:1 when the document is already in the base currency. When the
+ * document is in a foreign currency but no rate is available, throws
+ * MissingExchangeRateError rather than silently booking at 1:1 (which would
+ * put wrong numbers in the ledger) — the caller surfaces it so the user can
+ * enter a custom rate.
+ */
+async function resolveBaseRate(
+  organizationId: string,
+  currencyCode: string | undefined,
+  date: string
+): Promise<{ base: string; currency: string; rate: number }> {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { defaultCurrency: true },
+  });
+  const base = org?.defaultCurrency ?? "USD";
+  const currency = currencyCode ?? base;
+  if (currency === base) return { base, currency, rate: RATE_SCALE };
+  const rate = await getExchangeRate(organizationId, currency, base, date);
+  if (rate == null) throw new MissingExchangeRateError(currency, base, date);
+  return { base, currency, rate };
+}
+
+/**
+ * Pre-flight guard: throw MissingExchangeRateError if a foreign-currency
+ * document can't be converted to the base currency on `date`. Call this at the
+ * top of a posting route — before any emails or DB writes — so a missing rate
+ * fails cleanly (HTTP 422, "set a custom rate") with no side effects, rather
+ * than part-way through. No-op when the document is already in the base currency.
+ */
+export async function assertBaseRateAvailable(
+  organizationId: string,
+  currencyCode: string | undefined,
+  date: string
+): Promise<void> {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { defaultCurrency: true },
+  });
+  const base = org?.defaultCurrency ?? "USD";
+  const currency = currencyCode ?? base;
+  if (currency === base) return;
+  const rate = await getExchangeRate(organizationId, currency, base, date);
+  if (rate == null) throw new MissingExchangeRateError(currency, base, date);
+}
+
+/**
+ * Convert built journal lines to base currency (balance-preserving) and stamp
+ * the original document currency + rate on each line.
+ */
+function toBaseLines(
+  lines: (typeof journalLine.$inferInsert)[],
+  currency: string,
+  rate: number
+): (typeof journalLine.$inferInsert)[] {
+  const normalized = lines.map((l) => ({
+    ...l,
+    debitAmount: l.debitAmount ?? 0,
+    creditAmount: l.creditAmount ?? 0,
+  }));
+  return convertLinesToBase(normalized, rate).map((l) => ({
+    ...l,
+    currencyCode: currency,
+    exchangeRate: rate,
+  }));
+}
+
+/**
+ * Run rate-dependent posting work for an already-inserted entry header. If it
+ * throws (e.g. MissingExchangeRateError), delete the header first so we never
+ * leave an orphaned, empty "posted" entry behind, then re-throw for the caller.
+ */
+async function postLinesOrCleanup(
+  entryId: string,
+  build: () => Promise<void>
+): Promise<void> {
+  try {
+    await build();
+  } catch (err) {
+    await db.delete(journalEntry).where(eq(journalEntry.id, entryId));
+    throw err;
+  }
+}
+
+const FX_ACCOUNTS = {
+  fxGain: {
+    code: "4910",
+    name: "Realised Currency Gains",
+    type: "revenue" as const,
+    subType: "non_operating",
+  },
+  fxLoss: {
+    code: "5930",
+    name: "Realised Currency Losses",
+    type: "expense" as const,
+    subType: "non_operating",
+  },
+};
+
+/**
+ * Return the org's realised-FX gain/loss account, creating it on demand for
+ * organizations whose chart predates these system accounts.
+ */
+async function ensureFxAccount(
+  organizationId: string,
+  role: "fxGain" | "fxLoss",
+  baseCurrency: string,
+  exec: DbOrTx = db
+) {
+  const def = FX_ACCOUNTS[role];
+  const existing = await findAccountByCode(organizationId, def.code, exec);
+  if (existing) return existing;
+  // Use the caller's executor so creating this account on demand commits/rolls
+  // back with the surrounding settlement transaction (no orphaned account if
+  // the payment is rolled back).
+  await exec
+    .insert(chartAccount)
+    .values({
+      organizationId,
+      code: def.code,
+      name: def.name,
+      type: def.type,
+      subType: def.subType,
+      currencyCode: baseCurrency,
+    })
+    .onConflictDoNothing({
+      target: [chartAccount.organizationId, chartAccount.code],
+    });
+  return findAccountByCode(organizationId, def.code, exec);
+}
+
 /**
  * Find or create a system account by code/type for the given org.
  */
-async function findAccountByCode(organizationId: string, code: string) {
-  return db.query.chartAccount.findFirst({
+async function findAccountByCode(organizationId: string, code: string, exec: DbOrTx = db) {
+  return exec.query.chartAccount.findFirst({
     where: and(
       eq(chartAccount.organizationId, organizationId),
       eq(chartAccount.code, code)
@@ -45,6 +193,7 @@ export async function createInvoiceJournalEntry(
     subtotal: number;
     lines: { accountId: string | null; amount: number; taxAmount: number }[];
     date: string;
+    currencyCode?: string;
   }
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
@@ -70,15 +219,6 @@ export async function createInvoiceJournalEntry(
     .returning();
 
   const lines: (typeof journalLine.$inferInsert)[] = [];
-
-  // DR Accounts Receivable for total
-  lines.push({
-    journalEntryId: entry.id,
-    accountId: arAccount.id,
-    description: `Invoice ${invoiceData.invoiceNumber}`,
-    debitAmount: invoiceData.total,
-    creditAmount: 0,
-  });
 
   // CR Revenue accounts per line
   for (const line of invoiceData.lines) {
@@ -107,8 +247,27 @@ export async function createInvoiceJournalEntry(
     }
   }
 
-  if (lines.length > 0) {
-    await db.insert(journalLine).values(lines);
+  // DR Accounts Receivable for the sum of the offsetting credit legs, so the
+  // entry balances in document currency even if a line lacks an account or the
+  // tax account is missing — otherwise FX conversion would scale the imbalance.
+  const arTotal = lines.reduce((s, l) => s + (l.creditAmount ?? 0), 0);
+  if (arTotal > 0) {
+    lines.unshift({
+      journalEntryId: entry.id,
+      accountId: arAccount.id,
+      description: `Invoice ${invoiceData.invoiceNumber}`,
+      debitAmount: arTotal,
+      creditAmount: 0,
+    });
+
+    await postLinesOrCleanup(entry.id, async () => {
+      const { currency, rate } = await resolveBaseRate(
+        ctx.organizationId,
+        invoiceData.currencyCode,
+        invoiceData.date
+      );
+      await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+    });
   }
 
   return entry;
@@ -128,6 +287,7 @@ export async function createBillJournalEntry(
     taxTotal: number;
     lines: { accountId: string | null; amount: number; taxAmount: number }[];
     date: string;
+    currencyCode?: string;
   }
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
@@ -179,17 +339,27 @@ export async function createBillJournalEntry(
     }
   }
 
-  // CR Accounts Payable for total
-  lines.push({
-    journalEntryId: entry.id,
-    accountId: apAccount.id,
-    description: `Bill ${billData.billNumber}`,
-    debitAmount: 0,
-    creditAmount: billData.total,
-  });
+  // CR Accounts Payable for the sum of the offsetting debit legs, so the entry
+  // balances in document currency even if a line lacks an account or the tax
+  // account is missing — otherwise FX conversion would scale the imbalance.
+  const apTotal = lines.reduce((s, l) => s + (l.debitAmount ?? 0), 0);
+  if (apTotal > 0) {
+    lines.push({
+      journalEntryId: entry.id,
+      accountId: apAccount.id,
+      description: `Bill ${billData.billNumber}`,
+      debitAmount: 0,
+      creditAmount: apTotal,
+    });
 
-  if (lines.length > 0) {
-    await db.insert(journalLine).values(lines);
+    await postLinesOrCleanup(entry.id, async () => {
+      const { currency, rate } = await resolveBaseRate(
+        ctx.organizationId,
+        billData.currencyCode,
+        billData.date
+      );
+      await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+    });
   }
 
   return entry;
@@ -370,7 +540,17 @@ export async function createPaymentJournalEntry(
     amount: number;
     date: string;
     bankAccountCode?: string;
-  }
+    /**
+     * The documents this payment settles, with each document's currency and
+     * recognition (issue) date. When supplied and any are in a foreign
+     * currency, the entry is posted in base currency with realised FX booked.
+     * When omitted, the legacy single-currency 2-line entry is posted.
+     */
+    allocations?: { amount: number; currencyCode: string; issueDate: string }[];
+  },
+  // Required: the caller's open transaction, so the GL entry commits/rolls back
+  // atomically with the payment, allocations, and document-status updates.
+  tx: Tx
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
   const bankAccount = await findAccountByCode(
@@ -384,7 +564,7 @@ export async function createPaymentJournalEntry(
 
   if (!bankAccount || !counterAccount) return null;
 
-  const [entry] = await db
+  const [entry] = await tx
     .insert(journalEntry)
     .values({
       organizationId: ctx.organizationId,
@@ -400,19 +580,96 @@ export async function createPaymentJournalEntry(
     .returning();
 
   const isInvoice = paymentData.type === "invoice";
+  const desc = `Payment for ${paymentData.reference}`;
 
-  await db.insert(journalLine).values([
+  // Multi-currency settlement: convert to base and book realised FX. Only when
+  // the allocations fully cover the payment cash — otherwise an unapplied
+  // remainder (overpayment / on-account) would understate the bank, so fall
+  // back to the legacy entry which posts the full cash amount.
+  const allocs = paymentData.allocations ?? [];
+  const allocSum = allocs.reduce((s, a) => s + a.amount, 0);
+  if (allocs.length > 0 && allocSum === paymentData.amount) {
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+      columns: { defaultCurrency: true },
+    });
+    const base = org?.defaultCurrency ?? "USD";
+
+    let bankTotal = 0;
+    let counterTotal = 0;
+    for (const a of allocs) {
+      const currency = a.currencyCode || base;
+      if (currency === base) {
+        bankTotal += a.amount;
+        counterTotal += a.amount;
+        continue;
+      }
+      // Require a rate to settle a foreign-currency document. The caller runs
+      // this inside a transaction, so throwing rolls back the payment, the
+      // allocations, and the document-status updates together — no orphans.
+      const paymentRate = await getExchangeRate(ctx.organizationId, currency, base, paymentData.date);
+      if (paymentRate == null) {
+        throw new MissingExchangeRateError(currency, base, paymentData.date);
+      }
+      const issueRate =
+        (await getExchangeRate(ctx.organizationId, currency, base, a.issueDate)) ??
+        paymentRate;
+      bankTotal += convertAmount(a.amount, paymentRate);
+      counterTotal += convertAmount(a.amount, issueRate);
+    }
+
+    const legs = realizedSettlementLegs(paymentData.type, bankTotal, counterTotal);
+
+    const needGain = legs.some((l) => l.role === "fxGain");
+    const needLoss = legs.some((l) => l.role === "fxLoss");
+    const fxGainAcct = needGain ? await ensureFxAccount(ctx.organizationId, "fxGain", base, tx) : null;
+    const fxLossAcct = needLoss ? await ensureFxAccount(ctx.organizationId, "fxLoss", base, tx) : null;
+
+    if ((needGain && !fxGainAcct) || (needLoss && !fxLossAcct)) {
+      // Cannot resolve an FX account to book the realised gain/loss. Relieving
+      // AR/AP at the payment-rate value would corrupt the control account, so
+      // fail the entry instead. (ensureFxAccount normally creates the account,
+      // making this effectively unreachable.)
+      await tx.delete(journalEntry).where(eq(journalEntry.id, entry.id));
+      return null;
+    }
+
+    const accountFor = (role: SettlementRole) =>
+      role === "bank"
+        ? bankAccount.id
+        : role === "counter"
+        ? counterAccount.id
+        : role === "fxGain"
+        ? fxGainAcct!.id
+        : fxLossAcct!.id;
+
+    await tx.insert(journalLine).values(
+      legs.map((l) => ({
+        journalEntryId: entry.id,
+        accountId: accountFor(l.role),
+        description: desc,
+        debitAmount: l.debit,
+        creditAmount: l.credit,
+        currencyCode: base,
+      }))
+    );
+
+    return entry;
+  }
+
+  // Legacy single-currency path (no allocation detail supplied).
+  await tx.insert(journalLine).values([
     {
       journalEntryId: entry.id,
       accountId: isInvoice ? bankAccount.id : counterAccount.id,
-      description: `Payment for ${paymentData.reference}`,
+      description: desc,
       debitAmount: paymentData.amount,
       creditAmount: 0,
     },
     {
       journalEntryId: entry.id,
       accountId: isInvoice ? counterAccount.id : bankAccount.id,
-      description: `Payment for ${paymentData.reference}`,
+      description: desc,
       debitAmount: 0,
       creditAmount: paymentData.amount,
     },
@@ -422,9 +679,14 @@ export async function createPaymentJournalEntry(
 }
 
 /**
- * Create journal entry for FX gain/loss.
- * Gain: DR Bank, CR FX Gain (4200)
- * Loss: DR FX Loss (5200), CR Bank
+ * Create journal entry for realised FX gain/loss.
+ * Gain: DR Bank, CR Realised Currency Gains (4910)
+ * Loss: DR Realised Currency Losses (5930), CR Bank
+ *
+ * NOTE: posts in the org's base currency. This requires callers to pass a
+ * base-currency `amount`; wiring this into settlement also requires the GL
+ * postings to convert document amounts to base (not yet done — see the
+ * currency overhaul notes).
  */
 export async function createFxGainLossEntry(
   ctx: JournalAutomationContext,
@@ -437,9 +699,9 @@ export async function createFxGainLossEntry(
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId);
 
-  // FX Gain account "4200" (revenue), FX Loss account "5200" (expense)
+  // Realised Currency Gains "4910" (revenue), Realised Currency Losses "5930" (expense)
   const isGain = data.amount > 0;
-  const fxAccount = await findAccountByCode(ctx.organizationId, isGain ? "4200" : "5200");
+  const fxAccount = await findAccountByCode(ctx.organizationId, isGain ? "4910" : "5930");
   const bankAccount = await findAccountByCode(ctx.organizationId, "1100");
 
   if (!fxAccount || !bankAccount) return null;

@@ -44,6 +44,7 @@ interface Bill {
   status: string;
   total: number;
   amountDue: number;
+  currencyCode: string;
   contact: { name: string } | null;
 }
 
@@ -139,7 +140,7 @@ function buildColumns(): Column<Bill>[] {
       className: "w-28 text-right",
       render: (r) => (
         <span className="font-mono text-sm tabular-nums">
-          {formatMoney(r.total)}
+          {formatMoney(r.total, r.currencyCode)}
         </span>
       ),
     },
@@ -153,7 +154,7 @@ function buildColumns(): Column<Bill>[] {
           r.amountDue > 0 && r.status !== "draft" ? "text-amber-600" : "";
         return (
           <span className={`font-mono text-sm tabular-nums ${color}`}>
-            {formatMoney(r.amountDue)}
+            {formatMoney(r.amountDue, r.currencyCode)}
           </span>
         );
       },

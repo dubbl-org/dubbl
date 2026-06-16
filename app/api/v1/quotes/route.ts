@@ -12,6 +12,7 @@ import { decimalToCents } from "@/lib/money";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -28,7 +29,7 @@ const createSchema = z.object({
   expiryDate: z.string().min(1),
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   lines: z.array(lineSchema).min(1),
 });
 

@@ -52,61 +52,77 @@ export async function POST(
     // Generate payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
-    // Create payment record
-    const [created] = await db
-      .insert(payment)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: found.contactId,
-        paymentNumber,
-        type: "received",
-        date: parsed.date,
-        amount: parsed.amount,
-        method: parsed.method,
-        reference: parsed.reference || null,
-        bankAccountId: parsed.bankAccountId || null,
-        createdBy: ctx.userId,
-      })
-      .returning();
+    // Wrap the payment, allocation, journal entry, journal-entry link, and
+    // invoice balance/status updates in a single transaction so they all commit
+    // together or roll back together. A thrown MissingExchangeRateError (or any
+    // error) leaves no orphaned payment / invoice-marked-paid-without-ledger.
+    const { created, updated } = await db.transaction(async (tx) => {
+      // Create payment record
+      const [created] = await tx
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: found.contactId,
+          paymentNumber,
+          type: "received",
+          date: parsed.date,
+          amount: parsed.amount,
+          method: parsed.method,
+          reference: parsed.reference || null,
+          bankAccountId: parsed.bankAccountId || null,
+          createdBy: ctx.userId,
+        })
+        .returning();
 
-    // Create allocation linking payment to this invoice
-    await db.insert(paymentAllocation).values({
-      paymentId: created.id,
-      documentType: "invoice",
-      documentId: id,
-      amount: parsed.amount,
-    });
-
-    // Create payment journal entry
-    const journalEntry = await createPaymentJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        type: "invoice",
-        reference: paymentNumber,
+      // Create allocation linking payment to this invoice
+      await tx.insert(paymentAllocation).values({
+        paymentId: created.id,
+        documentType: "invoice",
+        documentId: id,
         amount: parsed.amount,
-        date: parsed.date,
+      });
+
+      // Create payment journal entry
+      const journalEntry = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          type: "invoice",
+          reference: paymentNumber,
+          amount: parsed.amount,
+          date: parsed.date,
+          allocations: [
+            {
+              amount: parsed.amount,
+              currencyCode: found.currencyCode,
+              issueDate: found.issueDate,
+            },
+          ],
+        },
+        tx
+      );
+
+      if (journalEntry) {
+        await tx
+          .update(payment)
+          .set({ journalEntryId: journalEntry.id })
+          .where(eq(payment.id, created.id));
       }
-    );
 
-    if (journalEntry) {
-      await db
-        .update(payment)
-        .set({ journalEntryId: journalEntry.id })
-        .where(eq(payment.id, created.id));
-    }
+      // Update invoice amounts
+      const [updated] = await tx
+        .update(invoice)
+        .set({
+          amountPaid: newAmountPaid,
+          amountDue: Math.max(0, newAmountDue),
+          status: newStatus,
+          paidAt: newStatus === "paid" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(invoice.id, id))
+        .returning();
 
-    // Update invoice amounts
-    const [updated] = await db
-      .update(invoice)
-      .set({
-        amountPaid: newAmountPaid,
-        amountDue: Math.max(0, newAmountDue),
-        status: newStatus,
-        paidAt: newStatus === "paid" ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(invoice.id, id))
-      .returning();
+      return { created, updated };
+    });
 
     logAudit({ ctx, action: "pay", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
 

@@ -8,6 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -18,7 +19,7 @@ const updateSchema = z.object({
   paymentTermsDays: z.number().int().min(0).optional(),
   addresses: z.any().optional(),
   notes: z.string().nullable().optional(),
-  currencyCode: z.string().optional(),
+  currencyCode: currencyCodeSchema.optional(),
   creditLimit: z.number().int().min(0).nullable().optional(),
   isTaxExempt: z.boolean().optional(),
   defaultRevenueAccountId: z.string().uuid().nullable().optional(),

@@ -35,7 +35,11 @@ export async function POST(request: Request) {
     let processed = 0;
 
     for (const sp of duePayments) {
-      if (!sp.billId || !sp.contactId) continue;
+      // Capture into locals: narrowing of sp.* properties is not preserved
+      // inside the transaction closure below.
+      const billId = sp.billId;
+      const contactId = sp.contactId;
+      if (!billId || !contactId) continue;
 
       // Mark as processing
       await db
@@ -52,72 +56,89 @@ export async function POST(request: Request) {
           "PAY"
         );
 
-        // Create payment record
-        const [createdPayment] = await db
-          .insert(payment)
-          .values({
-            organizationId: ctx.organizationId,
-            contactId: sp.contactId,
-            paymentNumber,
-            type: "made",
-            date: sp.scheduledDate,
-            amount: sp.amount,
-            method: "bank_transfer",
-            notes: sp.notes,
-            createdBy: ctx.userId,
-          })
-          .returning();
-
-        // Create allocation
-        await db.insert(paymentAllocation).values({
-          paymentId: createdPayment.id,
-          documentType: "bill",
-          documentId: sp.billId,
-          amount: sp.amount,
-        });
-
-        // Update bill
+        // Load the bill before opening the write transaction (read).
         const existingBill = await db.query.bill.findFirst({
           where: and(
-            eq(bill.id, sp.billId),
+            eq(bill.id, billId),
             eq(bill.organizationId, ctx.organizationId)
           ),
         });
 
-        if (existingBill) {
-          const newAmountPaid = existingBill.amountPaid + sp.amount;
-          const newAmountDue = existingBill.amountDue - sp.amount;
-          const newStatus = newAmountDue <= 0 ? "paid" : "partial";
-          await db
-            .update(bill)
-            .set({
-              amountPaid: newAmountPaid,
-              amountDue: Math.max(0, newAmountDue),
-              status: newStatus,
-              updatedAt: new Date(),
+        // Atomically write this item's payment, allocation, bill balance, GL
+        // entry, and journal link. A thrown MissingExchangeRateError (or any
+        // error) rolls back ONLY this item's writes — no orphaned payment or
+        // bill marked paid without a ledger entry. Other items are unaffected.
+        await db.transaction(async (tx) => {
+          // Create payment record
+          const [createdPayment] = await tx
+            .insert(payment)
+            .values({
+              organizationId: ctx.organizationId,
+              contactId: contactId,
+              paymentNumber,
+              type: "made",
+              date: sp.scheduledDate,
+              amount: sp.amount,
+              method: "bank_transfer",
+              notes: sp.notes,
+              createdBy: ctx.userId,
             })
-            .where(eq(bill.id, sp.billId));
-        }
+            .returning();
 
-        // Create journal entry
-        const journalEntry = await createPaymentJournalEntry(
-          { organizationId: ctx.organizationId, userId: ctx.userId },
-          {
-            type: "bill",
-            reference: paymentNumber,
+          // Create allocation
+          await tx.insert(paymentAllocation).values({
+            paymentId: createdPayment.id,
+            documentType: "bill",
+            documentId: billId,
             amount: sp.amount,
-            date: sp.scheduledDate,
+          });
+
+          // Update bill
+          if (existingBill) {
+            const newAmountPaid = existingBill.amountPaid + sp.amount;
+            const newAmountDue = existingBill.amountDue - sp.amount;
+            const newStatus = newAmountDue <= 0 ? "paid" : "partial";
+            await tx
+              .update(bill)
+              .set({
+                amountPaid: newAmountPaid,
+                amountDue: Math.max(0, newAmountDue),
+                status: newStatus,
+                updatedAt: new Date(),
+              })
+              .where(eq(bill.id, billId));
           }
-        );
 
-        if (journalEntry) {
-          await db
-            .update(payment)
-            .set({ journalEntryId: journalEntry.id, updatedAt: new Date() })
-            .where(eq(payment.id, createdPayment.id));
-        }
+          // Create journal entry
+          const journalEntry = await createPaymentJournalEntry(
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+              type: "bill",
+              reference: paymentNumber,
+              amount: sp.amount,
+              date: sp.scheduledDate,
+              allocations: existingBill
+                ? [
+                    {
+                      amount: sp.amount,
+                      currencyCode: existingBill.currencyCode,
+                      issueDate: existingBill.issueDate,
+                    },
+                  ]
+                : undefined,
+            },
+            tx
+          );
 
-        // Mark scheduled payment as completed
+          if (journalEntry) {
+            await tx
+              .update(payment)
+              .set({ journalEntryId: journalEntry.id, updatedAt: new Date() })
+              .where(eq(payment.id, createdPayment.id));
+          }
+        });
+
+        // Mark scheduled payment as completed (after the write tx commits)
         await db
           .update(scheduledPayment)
           .set({
@@ -128,8 +149,14 @@ export async function POST(request: Request) {
           .where(eq(scheduledPayment.id, sp.id));
 
         processed++;
-      } catch {
-        // Mark as failed on error
+      } catch (err) {
+        // The per-item write tx rolled back; record the failure reason and
+        // continue to the next item. (No dedicated error column on the row, so
+        // log it.) Already-processed items stay committed.
+        console.error(
+          `Failed to process scheduled payment ${sp.id}:`,
+          err
+        );
         await db
           .update(scheduledPayment)
           .set({ status: "failed", updatedAt: new Date() })

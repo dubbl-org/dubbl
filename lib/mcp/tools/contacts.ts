@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 import { db } from "@/lib/db";
 import { contact } from "@/lib/db/schema";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
@@ -183,7 +184,7 @@ export function registerContactTools(server: McpServer, ctx: AuthContext) {
         .optional()
         .describe("New payment terms in days"),
       notes: z.string().optional().describe("New notes"),
-      currencyCode: z.string().optional().describe("New currency code"),
+      currencyCode: currencyCodeSchema.optional().describe("New currency code"),
     },
     (params) =>
       wrapTool(ctx, async () => {

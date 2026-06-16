@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -23,7 +24,7 @@ const createSchema = z.object({
   memberId: z.string().uuid().nullable().optional(),
   compensationType: z.enum(["salary", "hourly", "milestone", "commission"]).default("salary"),
   hourlyRate: z.number().int().min(0).nullable().optional(),
-  currency: z.string().max(3).default("USD"),
+  currency: currencyCodeSchema.default("USD"),
 });
 
 export async function GET(request: Request) {

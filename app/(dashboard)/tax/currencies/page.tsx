@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { formatMoney } from "@/lib/money";
 import {
   Plus,
   Search,
@@ -52,6 +53,26 @@ interface ExchangeRate {
 
 function formatRate(rate: number): string {
   return (rate / 1_000_000).toFixed(6);
+}
+
+interface UnrealizedFxItem {
+  type: "invoice" | "bill";
+  id: string;
+  number: string;
+  currencyCode: string;
+  amountDue: number;
+  unrealizedGainLoss: number | null;
+}
+
+interface UnrealizedFxReport {
+  defaultCurrency: string;
+  items: UnrealizedFxItem[];
+  summary: {
+    totalItems: number;
+    totalUnrealizedGain: number;
+    totalUnrealizedLoss: number;
+    netUnrealizedGainLoss: number;
+  };
 }
 
 function AddCurrencySheet({
@@ -292,6 +313,7 @@ export default function CurrenciesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [refOpen, setRefOpen] = useState(false);
+  const [fxReport, setFxReport] = useState<UnrealizedFxReport | null>(null);
   useDocumentTitle("Tax · Currencies");
 
   const orgId =
@@ -341,11 +363,26 @@ export default function CurrenciesPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  async function fetchFxReport() {
+    if (!orgId) return;
+    try {
+      const res = await fetch("/api/v1/reports/unrealized-gains-losses", {
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.summary) setFxReport(data);
+    } catch {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     fetchOrganization();
     fetchExchangeRates();
     fetchCurrencies();
+    fetchFxReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
 
   const filtered = useMemo(() => {
@@ -442,6 +479,107 @@ export default function CurrenciesPage() {
         </div>
       </div>
 
+      {/* Unrealised FX Gains & Losses */}
+      {fxReport && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="size-4 text-muted-foreground" />
+            <h3 className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+              Unrealised FX Gains &amp; Losses
+            </h3>
+            <span className="text-[11px] text-muted-foreground/70">
+              open foreign-currency balances revalued at today&apos;s rate, in{" "}
+              {fxReport.defaultCurrency}
+            </span>
+          </div>
+
+          {fxReport.summary.totalItems === 0 ? (
+            <div className="rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
+              No open foreign-currency invoices or bills to revalue.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Net Unrealised
+                  </p>
+                  <p
+                    className={`mt-1 text-xl font-bold tabular-nums ${
+                      fxReport.summary.netUnrealizedGainLoss >= 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {formatMoney(
+                      fxReport.summary.netUnrealizedGainLoss,
+                      fxReport.defaultCurrency
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Gains
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {formatMoney(
+                      fxReport.summary.totalUnrealizedGain,
+                      fxReport.defaultCurrency
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Losses
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-red-600 dark:text-red-400">
+                    {formatMoney(
+                      fxReport.summary.totalUnrealizedLoss,
+                      fxReport.defaultCurrency
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="divide-y rounded-lg border bg-card">
+                {fxReport.items.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    className="flex items-center justify-between px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                        {item.type}
+                      </span>
+                      <span className="font-mono text-sm font-medium">
+                        {item.number}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatMoney(item.amountDue, item.currencyCode)} due
+                      </span>
+                    </div>
+                    <span
+                      className={`font-mono text-sm tabular-nums ${
+                        (item.unrealizedGainLoss ?? 0) >= 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {item.unrealizedGainLoss === null
+                        ? "—"
+                        : formatMoney(
+                            item.unrealizedGainLoss,
+                            fxReport.defaultCurrency
+                          )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Exchange Rates Section */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
@@ -486,15 +624,20 @@ export default function CurrenciesPage() {
                     </span>
                   </div>
                   <Badge
-                    variant={rate.source === "api" ? "default" : "secondary"}
+                    variant={rate.source === "manual" ? "default" : "secondary"}
                     className={cn(
                       "text-[10px] uppercase",
-                      rate.source === "api"
+                      rate.source === "manual"
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
                         : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                     )}
+                    title={
+                      rate.source === "manual"
+                        ? "Rate you entered manually"
+                        : "Rate fetched automatically from the exchange-rate feed"
+                    }
                   >
-                    {rate.source}
+                    {rate.source === "manual" ? "Manual" : "Auto"}
                   </Badge>
                 </div>
               </div>

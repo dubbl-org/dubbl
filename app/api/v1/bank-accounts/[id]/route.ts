@@ -8,12 +8,13 @@ import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const updateSchema = z.object({
   accountName: z.string().min(1).optional(),
   accountNumber: z.string().nullable().optional(),
   bankName: z.string().nullable().optional(),
-  currencyCode: z.string().optional(),
+  currencyCode: currencyCodeSchema.optional(),
   countryCode: z.string().length(2).nullable().optional(),
   accountType: z
     .enum(["checking", "savings", "credit_card", "cash", "loan", "investment", "other"])

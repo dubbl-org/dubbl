@@ -11,6 +11,7 @@ import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { getNextNumber } from "@/lib/api/numbering";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
+import { isValidCurrencyCode } from "@/lib/currency/iso4217";
 import { z } from "zod";
 
 const allocationSchema = z.object({
@@ -28,6 +29,8 @@ const createSchema = z.object({
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   bankAccountId: z.string().nullable().optional(),
+  // Optional — normally derived from the settled documents. Validated below.
+  currencyCode: z.string().length(3).optional(),
   allocations: z.array(allocationSchema).min(1),
 });
 
@@ -92,102 +95,202 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate payment number
-    const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
+    // A "received" payment settles invoices (AR); a "made" payment settles bills
+    // (AP). Reject inconsistent allocations so the journal posts to the correct
+    // control account and realised-FX direction.
+    const expectedDocType = parsed.type === "received" ? "invoice" : "bill";
+    if (parsed.allocations.some((a) => a.documentType !== expectedDocType)) {
+      return NextResponse.json(
+        { error: `A '${parsed.type}' payment can only settle ${expectedDocType}s` },
+        { status: 400 }
+      );
+    }
 
-    // Create payment record
-    const [created] = await db
-      .insert(payment)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: parsed.contactId,
-        paymentNumber,
-        type: parsed.type,
-        date: parsed.date,
-        amount: parsed.amount,
-        method: parsed.method,
-        reference: parsed.reference || null,
-        notes: parsed.notes || null,
-        bankAccountId: parsed.bankAccountId || null,
-        createdBy: ctx.userId,
-      })
-      .returning();
-
-    // Insert allocation rows
-    await db.insert(paymentAllocation).values(
-      parsed.allocations.map((a) => ({
-        paymentId: created.id,
-        documentType: a.documentType,
-        documentId: a.documentId,
-        amount: a.amount,
-      }))
-    );
-
-    // Update allocated documents
+    // Resolve the payment currency from the documents it settles, and capture
+    // each document's currency + issue date so the journal entry can convert to
+    // base currency and book realised FX. A payment settles one currency only.
+    const docCurrencies = new Set<string>();
+    const journalAllocations: {
+      amount: number;
+      currencyCode: string;
+      issueDate: string;
+    }[] = [];
     for (const alloc of parsed.allocations) {
       if (alloc.documentType === "invoice") {
-        const existing = await db.query.invoice.findFirst({
+        const doc = await db.query.invoice.findFirst({
           where: and(
             eq(invoice.id, alloc.documentId),
             eq(invoice.organizationId, ctx.organizationId)
           ),
+          columns: { currencyCode: true, issueDate: true },
         });
-        if (existing) {
-          const newAmountPaid = existing.amountPaid + alloc.amount;
-          const newAmountDue = existing.amountDue - alloc.amount;
-          const newStatus = newAmountDue <= 0 ? "paid" : "partial";
-          await db
-            .update(invoice)
-            .set({
-              amountPaid: newAmountPaid,
-              amountDue: Math.max(0, newAmountDue),
-              status: newStatus,
-              updatedAt: new Date(),
-            })
-            .where(eq(invoice.id, alloc.documentId));
+        if (!doc) {
+          return NextResponse.json(
+            { error: `Invoice ${alloc.documentId} not found` },
+            { status: 404 }
+          );
         }
-      } else if (alloc.documentType === "bill") {
-        const existing = await db.query.bill.findFirst({
+        docCurrencies.add(doc.currencyCode);
+        journalAllocations.push({
+          amount: alloc.amount,
+          currencyCode: doc.currencyCode,
+          issueDate: doc.issueDate,
+        });
+      } else {
+        const doc = await db.query.bill.findFirst({
           where: and(
             eq(bill.id, alloc.documentId),
             eq(bill.organizationId, ctx.organizationId)
           ),
+          columns: { currencyCode: true, issueDate: true },
         });
-        if (existing) {
-          const newAmountPaid = existing.amountPaid + alloc.amount;
-          const newAmountDue = existing.amountDue - alloc.amount;
-          const newStatus = newAmountDue <= 0 ? "paid" : "partial";
-          await db
-            .update(bill)
-            .set({
-              amountPaid: newAmountPaid,
-              amountDue: Math.max(0, newAmountDue),
-              status: newStatus,
-              updatedAt: new Date(),
-            })
-            .where(eq(bill.id, alloc.documentId));
+        if (!doc) {
+          return NextResponse.json(
+            { error: `Bill ${alloc.documentId} not found` },
+            { status: 404 }
+          );
+        }
+        docCurrencies.add(doc.currencyCode);
+        journalAllocations.push({
+          amount: alloc.amount,
+          currencyCode: doc.currencyCode,
+          issueDate: doc.issueDate,
+        });
+      }
+    }
+
+    if (docCurrencies.size > 1) {
+      return NextResponse.json(
+        { error: "All settled documents must share the same currency" },
+        { status: 400 }
+      );
+    }
+
+    const docCurrency = [...docCurrencies][0];
+    const providedCurrency = parsed.currencyCode?.toUpperCase();
+    if (providedCurrency && !isValidCurrencyCode(providedCurrency)) {
+      return NextResponse.json(
+        { error: `${providedCurrency} is not a recognized currency code` },
+        { status: 400 }
+      );
+    }
+    if (providedCurrency && docCurrency && providedCurrency !== docCurrency) {
+      return NextResponse.json(
+        { error: "Payment currency must match the settled documents' currency" },
+        { status: 400 }
+      );
+    }
+    const currencyCode = providedCurrency ?? docCurrency ?? "USD";
+
+    // Generate payment number
+    const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
+
+    // Atomically write the payment, its allocations, the settled-document
+    // balance/status updates, the GL journal entry, and the payment→journal
+    // link. createPaymentJournalEntry can throw MissingExchangeRateError (422)
+    // when a foreign-currency allocation lacks a rate; wrapping everything in a
+    // single transaction ensures that — or any other failure — rolls the whole
+    // settlement back together instead of leaving orphaned/inconsistent rows.
+    const { created } = await db.transaction(async (tx) => {
+      // Create payment record
+      const [created] = await tx
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: parsed.contactId,
+          paymentNumber,
+          type: parsed.type,
+          date: parsed.date,
+          amount: parsed.amount,
+          currencyCode,
+          method: parsed.method,
+          reference: parsed.reference || null,
+          notes: parsed.notes || null,
+          bankAccountId: parsed.bankAccountId || null,
+          createdBy: ctx.userId,
+        })
+        .returning();
+
+      // Insert allocation rows
+      await tx.insert(paymentAllocation).values(
+        parsed.allocations.map((a) => ({
+          paymentId: created.id,
+          documentType: a.documentType,
+          documentId: a.documentId,
+          amount: a.amount,
+        }))
+      );
+
+      // Update allocated documents
+      for (const alloc of parsed.allocations) {
+        if (alloc.documentType === "invoice") {
+          const existing = await tx.query.invoice.findFirst({
+            where: and(
+              eq(invoice.id, alloc.documentId),
+              eq(invoice.organizationId, ctx.organizationId)
+            ),
+          });
+          if (existing) {
+            const newAmountPaid = existing.amountPaid + alloc.amount;
+            const newAmountDue = existing.amountDue - alloc.amount;
+            const newStatus = newAmountDue <= 0 ? "paid" : "partial";
+            await tx
+              .update(invoice)
+              .set({
+                amountPaid: newAmountPaid,
+                amountDue: Math.max(0, newAmountDue),
+                status: newStatus,
+                updatedAt: new Date(),
+              })
+              .where(eq(invoice.id, alloc.documentId));
+          }
+        } else if (alloc.documentType === "bill") {
+          const existing = await tx.query.bill.findFirst({
+            where: and(
+              eq(bill.id, alloc.documentId),
+              eq(bill.organizationId, ctx.organizationId)
+            ),
+          });
+          if (existing) {
+            const newAmountPaid = existing.amountPaid + alloc.amount;
+            const newAmountDue = existing.amountDue - alloc.amount;
+            const newStatus = newAmountDue <= 0 ? "paid" : "partial";
+            await tx
+              .update(bill)
+              .set({
+                amountPaid: newAmountPaid,
+                amountDue: Math.max(0, newAmountDue),
+                status: newStatus,
+                updatedAt: new Date(),
+              })
+              .where(eq(bill.id, alloc.documentId));
+          }
         }
       }
-    }
 
-    // Create journal entry
-    const journalEntry = await createPaymentJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        type: parsed.type === "received" ? "invoice" : "bill",
-        reference: paymentNumber,
-        amount: parsed.amount,
-        date: parsed.date,
+      // Create journal entry
+      const journalEntry = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          type: parsed.type === "received" ? "invoice" : "bill",
+          reference: paymentNumber,
+          amount: parsed.amount,
+          date: parsed.date,
+          allocations: journalAllocations,
+        },
+        tx
+      );
+
+      // Link journal entry to payment
+      if (journalEntry) {
+        await tx
+          .update(payment)
+          .set({ journalEntryId: journalEntry.id, updatedAt: new Date() })
+          .where(eq(payment.id, created.id));
       }
-    );
 
-    // Link journal entry to payment
-    if (journalEntry) {
-      await db
-        .update(payment)
-        .set({ journalEntryId: journalEntry.id, updatedAt: new Date() })
-        .where(eq(payment.id, created.id));
-    }
+      return { created, journalEntry };
+    });
 
     const result = await db.query.payment.findFirst({
       where: eq(payment.id, created.id),

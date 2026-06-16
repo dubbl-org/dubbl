@@ -9,12 +9,13 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   accountName: z.string().min(1),
   accountNumber: z.string().nullable().optional(),
   bankName: z.string().nullable().optional(),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   countryCode: z.string().length(2).nullable().optional(),
   accountType: z
     .enum(["checking", "savings", "credit_card", "cash", "loan", "investment", "other"])

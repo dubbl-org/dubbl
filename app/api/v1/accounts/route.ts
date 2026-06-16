@@ -6,6 +6,7 @@ import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   code: z.string().min(1),
@@ -13,7 +14,7 @@ const createSchema = z.object({
   type: z.enum(["asset", "liability", "equity", "revenue", "expense"]),
   subType: z.string().nullable().optional(),
   parentId: z.string().nullable().optional(),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   description: z.string().nullable().optional(),
 });
 

@@ -9,13 +9,14 @@ import { centsToDecimal } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { checkMonthlyLimit } from "@/lib/api/check-limit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const lineSchema = z.object({
   accountId: z.string().min(1),
   description: z.string().nullable().optional(),
   debitAmount: z.number().int().min(0).default(0),
   creditAmount: z.number().int().min(0).default(0),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   exchangeRate: z.number().int().default(1000000),
 });
 

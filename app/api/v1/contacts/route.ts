@@ -10,6 +10,7 @@ import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -20,7 +21,7 @@ const createSchema = z.object({
   paymentTermsDays: z.number().int().min(0).default(30),
   addresses: z.any().optional(),
   notes: z.string().nullable().optional(),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
 });
 
 export async function GET(request: Request) {

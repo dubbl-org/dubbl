@@ -7,14 +7,18 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 import { z } from "zod";
 
 const rateSchema = z.object({
-  baseCurrency: z.string().min(1).max(10),
-  targetCurrency: z.string().min(1).max(10),
+  baseCurrency: currencyCodeSchema,
+  targetCurrency: currencyCodeSchema,
   rate: z.number().int().positive(),
   date: z.string().min(1),
-  source: z.enum(["manual", "api"]).default("manual"),
+  // Rates entered through the API are user overrides; force `manual` so they're
+  // protected from (and win over) the automatic daily sync. The sync is the
+  // only writer allowed to set `api`.
+  source: z.literal("manual").default("manual"),
 });
 
 const createSchema = z.object({
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
       targetCurrency: r.targetCurrency,
       rate: r.rate,
       date: r.date,
-      source: r.source as "manual" | "api",
+      source: "manual" as const,
     }));
 
     const created = await db

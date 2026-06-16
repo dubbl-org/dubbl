@@ -3,6 +3,26 @@ import { exchangeRate } from "@/lib/db/schema";
 import { eq, and, lte, desc } from "drizzle-orm";
 
 /**
+ * Thrown when a foreign-currency document must be converted to the base
+ * currency but no exchange rate is available. Posting at a fake 1:1 would put
+ * wrong numbers in the ledger, so callers surface this and prompt the user to
+ * enter a custom rate instead. Mapped to HTTP 422 in lib/api/response.ts.
+ */
+export class MissingExchangeRateError extends Error {
+  constructor(
+    public from: string,
+    public to: string,
+    public date: string
+  ) {
+    super(
+      `No exchange rate for ${from}→${to} on ${date}. Add one under ` +
+        `Settings → Currencies (rates also sync automatically each day).`
+    );
+    this.name = "MissingExchangeRateError";
+  }
+}
+
+/**
  * Get exchange rate for a currency pair on or before a given date.
  * Returns rate as integer (6 decimal places, 1000000 = 1.0)
  */

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { toBaseAmounts } from "@/lib/currency/base-amount";
 
 export async function GET(
   request: Request,
@@ -51,7 +52,21 @@ export async function GET(
         method: a.payment.method,
       }));
 
-    return NextResponse.json({ invoice: found, payments });
+    // Base-currency equivalents (for dual-currency display) at the issue rate.
+    const base = await toBaseAmounts(
+      ctx.organizationId,
+      found.currencyCode,
+      found.issueDate,
+      {
+        total: found.total,
+        amountDue: found.amountDue,
+        amountPaid: found.amountPaid,
+        subtotal: found.subtotal,
+        taxTotal: found.taxTotal,
+      }
+    );
+
+    return NextResponse.json({ invoice: found, payments, base });
   } catch (err) {
     return handleError(err);
   }

@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const componentSchema = z.object({
   description: z.string().min(1),
@@ -20,7 +21,7 @@ const createSchema = z.object({
   billId: z.string().nullable().optional(),
   purchaseOrderId: z.string().nullable().optional(),
   allocationMethod: z.enum(["by_value", "by_quantity", "by_weight", "manual"]).default("by_value"),
-  currencyCode: z.string().default("USD"),
+  currencyCode: currencyCodeSchema.default("USD"),
   components: z.array(componentSchema).min(1),
 });
 

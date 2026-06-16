@@ -169,63 +169,84 @@ export async function POST(
     // Generate payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
-    const [created] = await db
-      .insert(payment)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: found.contactId,
-        paymentNumber,
-        type: "received",
-        date: parsed.date,
-        amount: parsed.amount,
-        method: parsed.method,
-        bankAccountId: account.id,
-        bankTransactionId: id,
-        createdBy: ctx.userId,
-      })
-      .returning();
-
-    // Create allocation
-    await db.insert(paymentAllocation).values({
-      paymentId: created.id,
-      documentType: "invoice",
-      documentId: parsed.invoiceId,
-      amount: parsed.amount,
-    });
-
-    // Create journal entry (DR Bank, CR AR)
-    const journalEntry = await createPaymentJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      { type: "invoice", reference: paymentNumber, amount: parsed.amount, date: parsed.date }
-    );
-    if (journalEntry) {
-      await db.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
-    }
-
     // Update invoice amounts
     const newAmountPaid = found.amountPaid + parsed.amount;
     const newAmountDue = found.total - newAmountPaid;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
-    await db
-      .update(invoice)
-      .set({
-        amountPaid: newAmountPaid,
-        amountDue: Math.max(0, newAmountDue),
-        status: newStatus,
-        paidAt: newStatus === "paid" ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(invoice.id, parsed.invoiceId));
+    // Commit the payment, allocation, journal entry, document-status update, and
+    // bank-transaction reconcile together so a thrown MissingExchangeRateError
+    // (or any error) rolls back the whole settlement instead of leaving orphans.
+    const { created } = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(payment)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: found.contactId,
+          paymentNumber,
+          type: "received",
+          date: parsed.date,
+          amount: parsed.amount,
+          currencyCode: found.currencyCode,
+          method: parsed.method,
+          bankAccountId: account.id,
+          bankTransactionId: id,
+          createdBy: ctx.userId,
+        })
+        .returning();
 
-    // Mark bank transaction as reconciled
-    await db
-      .update(bankTransaction)
-      .set({
-        status: "reconciled",
-        journalEntryId: journalEntry?.id || null,
-      })
-      .where(eq(bankTransaction.id, id));
+      // Create allocation
+      await tx.insert(paymentAllocation).values({
+        paymentId: created.id,
+        documentType: "invoice",
+        documentId: parsed.invoiceId,
+        amount: parsed.amount,
+      });
+
+      // Create journal entry (DR Bank, CR AR)
+      const journalEntry = await createPaymentJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          type: "invoice",
+          reference: paymentNumber,
+          amount: parsed.amount,
+          date: parsed.date,
+          allocations: [
+            {
+              amount: parsed.amount,
+              currencyCode: found.currencyCode,
+              issueDate: found.issueDate,
+            },
+          ],
+        },
+        tx
+      );
+      if (journalEntry) {
+        await tx.update(payment).set({ journalEntryId: journalEntry.id }).where(eq(payment.id, created.id));
+      }
+
+      await tx
+        .update(invoice)
+        .set({
+          amountPaid: newAmountPaid,
+          amountDue: Math.max(0, newAmountDue),
+          status: newStatus,
+          paidAt: newStatus === "paid" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(invoice.id, parsed.invoiceId));
+
+      // Mark bank transaction as reconciled
+      await tx
+        .update(bankTransaction)
+        .set({
+          status: "reconciled",
+          journalEntryId: journalEntry?.id || null,
+        })
+        .where(eq(bankTransaction.id, id));
+
+      return { created, journalEntry };
+    });
 
     // Audit log
     await db.insert(auditLog).values({
