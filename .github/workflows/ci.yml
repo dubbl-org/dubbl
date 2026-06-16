@@ -5,6 +5,9 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  # Allows running the drift check and the migrate job by hand from the
+  # Actions tab ("Run workflow"), e.g. to re-apply migrations after a fix.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -111,7 +114,7 @@ jobs:
   migration-check:
     name: Migration Drift
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     env:
       DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
     steps:
@@ -132,13 +135,16 @@ jobs:
             exit 1
           fi
 
-  # On merge to master: apply pending migrations to the production database.
-  # DATABASE_URL is a repository secret — it is never stored in the repo.
+  # On merge to master (or a manual run): apply pending migrations to the
+  # production database. DATABASE_URL is an environment secret — never in the repo.
   migrate:
     name: Apply Migrations
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+    # DATABASE_URL is stored as a secret on this environment (Settings ->
+    # Environments). The job must declare the environment to read it.
+    environment: "dubbl / production"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
