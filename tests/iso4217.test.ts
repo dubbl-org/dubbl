@@ -30,6 +30,15 @@ test("excludes non-cash codes", () => {
   }
 });
 
+test("prefers narrow glyphs over the 3-letter code as the symbol", () => {
+  const list = getIsoCurrencies();
+  const symbolOf = (code: string) => list.find((c) => c.code === code)?.symbol;
+  // Currencies that DO have a distinct glyph should not fall back to the code.
+  assert.equal(symbolOf("HUF"), "Ft", "HUF uses its narrow glyph");
+  assert.equal(symbolOf("USD"), "$");
+  assert.equal(symbolOf("EUR"), "€");
+});
+
 test("validation is case-insensitive and rejects bogus codes", () => {
   assert.ok(isValidCurrencyCode("usd"));
   assert.ok(!isValidCurrencyCode("ZZZ"));

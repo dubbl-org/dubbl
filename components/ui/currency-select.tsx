@@ -85,7 +85,9 @@ export function CurrencySelect({
                 <span className="font-mono text-xs text-muted-foreground">
                   {value}
                 </span>
-                {selected && <span>{selected.symbol}</span>}
+                {selected && selected.symbol !== selected.code && (
+                  <span className="text-muted-foreground">{selected.symbol}</span>
+                )}
                 <span className="truncate">{selected?.name}</span>
               </span>
             )
@@ -116,11 +118,13 @@ export function CurrencySelect({
                       value === c.code ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <span className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground w-8">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="w-9 shrink-0 font-mono text-xs text-muted-foreground">
                       {c.code}
                     </span>
-                    <span className="w-5 text-center">{c.symbol}</span>
+                    <span className="w-8 shrink-0 text-center text-muted-foreground">
+                      {c.symbol && c.symbol !== c.code ? c.symbol : ""}
+                    </span>
                     <span className="truncate">{c.name}</span>
                   </span>
                 </CommandItem>

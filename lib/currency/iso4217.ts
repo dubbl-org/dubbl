@@ -73,7 +73,16 @@ function buildList(): IsoCurrency[] {
     let decimalPlaces = 2;
     let symbol = code;
     try {
-      const nf = new Intl.NumberFormat("en", { style: "currency", currency: code });
+      // `narrowSymbol` prefers a real glyph (HUF -> "Ft", SEK -> "kr",
+      // PLN -> "zł") over the default "symbol" display, which returns the
+      // 3-letter code for many currencies. Currencies with no distinct glyph
+      // (CHF, KWD, AED, ...) still come back as the code; the picker hides the
+      // symbol when it just repeats the code.
+      const nf = new Intl.NumberFormat("en", {
+        style: "currency",
+        currency: code,
+        currencyDisplay: "narrowSymbol",
+      });
       decimalPlaces = nf.resolvedOptions().maximumFractionDigits ?? 2;
       symbol = nf.formatToParts(0).find((p) => p.type === "currency")?.value ?? code;
     } catch {

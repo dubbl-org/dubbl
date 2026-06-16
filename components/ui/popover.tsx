@@ -4,6 +4,7 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { useScrollLockSafeRef } from "@/lib/hooks/use-scroll-lock-safe-ref"
 
 function Popover({
   ...props
@@ -21,11 +22,17 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  ref,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  // Keep scrollable popover content (e.g. long combobox lists) scrollable when
+  // the popover is opened inside a Dialog/Sheet whose scroll lock would
+  // otherwise cancel wheel/touch over this portaled content.
+  const composedRef = useScrollLockSafeRef<HTMLDivElement>(ref)
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+        ref={composedRef}
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}

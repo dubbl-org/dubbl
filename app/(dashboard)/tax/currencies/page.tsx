@@ -714,9 +714,11 @@ export default function CurrenciesPage() {
                           <span className="font-mono text-base font-bold tracking-wide">
                             {c.code}
                           </span>
-                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                            {c.symbol}
-                          </span>
+                          {c.symbol && c.symbol !== c.code && (
+                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                              {c.symbol}
+                            </span>
+                          )}
                         </div>
                         <p className="mt-2 truncate text-[13px] text-muted-foreground">
                           {c.name}
