@@ -16,13 +16,27 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, centsToDecimal } from "@/lib/money";
+import { DualAmount } from "@/components/ui/dual-amount";
 import Link from "next/link";
 
 interface BillDetail {
   id: string; billNumber: string; issueDate: string; dueDate: string; status: string;
   subtotal: number; taxTotal: number; total: number; amountPaid: number; amountDue: number;
+  currencyCode: string;
   notes: string | null; contact: { name: string } | null;
   lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; account: { code: string; name: string } | null }[];
+}
+
+interface BaseAmounts {
+  baseCurrency: string;
+  rate: number | null;
+  amounts: {
+    total: number | null;
+    amountDue: number | null;
+    amountPaid: number | null;
+    subtotal: number | null;
+    taxTotal: number | null;
+  };
 }
 
 const statusConfig: Record<string, { class: string }> = {
@@ -38,6 +52,7 @@ export default function BillDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [b, setB] = useState<BillDetail | null>(null);
+  const [base, setBase] = useState<BaseAmounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
@@ -51,7 +66,7 @@ export default function BillDetailPage() {
     if (!orgId) return;
     fetch(`/api/v1/bills/${id}`, { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
-      .then((data) => { if (data.bill) setB(data.bill); })
+      .then((data) => { if (data.bill) setB(data.bill); if (data.base) setBase(data.base); })
       .finally(() => setLoading(false));
   }, [id, orgId]);
 
@@ -214,8 +229,8 @@ export default function BillDetailPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono tabular-nums">{(line.quantity / 100).toFixed(0)}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(line.unitPrice)}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums font-medium sm:pr-6">{formatMoney(line.amount)}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(line.unitPrice, b.currencyCode)}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums font-medium sm:pr-6">{formatMoney(line.amount, b.currencyCode)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -228,19 +243,29 @@ export default function BillDetailPage() {
               <div className="w-full max-w-xs space-y-1.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-mono tabular-nums">{formatMoney(b.subtotal)}</span>
+                  <span className="font-mono tabular-nums">{formatMoney(b.subtotal, b.currencyCode)}</span>
                 </div>
                 {b.taxTotal > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax</span>
-                    <span className="font-mono tabular-nums">{formatMoney(b.taxTotal)}</span>
+                    <span className="font-mono tabular-nums">{formatMoney(b.taxTotal, b.currencyCode)}</span>
                   </div>
                 )}
                 <div className="h-px bg-border my-1" />
                 <div className="flex justify-between text-sm font-semibold">
                   <span>Total</span>
-                  <span className="font-mono tabular-nums">{formatMoney(b.total)}</span>
+                  <span className="font-mono tabular-nums">{formatMoney(b.total, b.currencyCode)}</span>
                 </div>
+                {base && base.baseCurrency !== b.currencyCode && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>In {base.baseCurrency}</span>
+                    <span className="font-mono tabular-nums">
+                      {base.amounts.total == null
+                        ? "—"
+                        : `≈ ${formatMoney(base.amounts.total, base.baseCurrency)}`}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -262,15 +287,29 @@ export default function BillDetailPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-[11px] text-muted-foreground">Total</p>
-                <p className="text-sm font-mono font-semibold tabular-nums mt-0.5">{formatMoney(b.total)}</p>
+                <div className="text-sm font-mono font-semibold mt-0.5">
+                  <DualAmount
+                    amount={b.total}
+                    currency={b.currencyCode}
+                    baseCurrency={base?.baseCurrency}
+                    baseAmount={base?.amounts.total ?? null}
+                  />
+                </div>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Paid</p>
-                <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 mt-0.5">{formatMoney(b.amountPaid)}</p>
+                <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 mt-0.5">{formatMoney(b.amountPaid, b.currencyCode)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Due</p>
-                <p className="text-sm font-mono font-semibold tabular-nums text-amber-600 mt-0.5">{formatMoney(b.amountDue)}</p>
+                <div className="text-sm font-mono font-semibold text-amber-600 mt-0.5">
+                  <DualAmount
+                    amount={b.amountDue}
+                    currency={b.currencyCode}
+                    baseCurrency={base?.baseCurrency}
+                    baseAmount={base?.amounts.amountDue ?? null}
+                  />
+                </div>
               </div>
             </div>
           </div>

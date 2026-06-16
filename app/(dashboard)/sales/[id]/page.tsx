@@ -34,6 +34,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 import { formatMoney, centsToDecimal } from "@/lib/money";
+import { DualAmount } from "@/components/ui/dual-amount";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -52,6 +53,7 @@ interface InvoiceDetail {
   total: number;
   amountPaid: number;
   amountDue: number;
+  currencyCode: string;
   reference: string | null;
   notes: string | null;
   contactId: string;
@@ -64,6 +66,18 @@ interface InvoiceDetail {
     amount: number;
     account: { code: string; name: string; id: string } | null;
   }[];
+}
+
+interface BaseAmounts {
+  baseCurrency: string;
+  rate: number | null;
+  amounts: {
+    total: number | null;
+    amountDue: number | null;
+    amountPaid: number | null;
+    subtotal: number | null;
+    taxTotal: number | null;
+  };
 }
 
 const statusConfig: Record<string, { class: string; bg: string }> = {
@@ -125,6 +139,7 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [inv, setInv] = useState<InvoiceDetail | null>(null);
+  const [base, setBase] = useState<BaseAmounts | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [payAmount, setPayAmount] = useState("");
@@ -167,6 +182,7 @@ export default function InvoiceDetailPage() {
       .then((data) => {
         if (data.invoice) setInv(data.invoice);
         if (data.payments) setPayments(data.payments);
+        if (data.base) setBase(data.base);
       })
       .finally(() => setLoading(false));
 
@@ -590,8 +606,8 @@ export default function InvoiceDetailPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono tabular-nums">{(line.quantity / 100).toFixed(0)}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(line.unitPrice)}</td>
-                    <td className="px-6 py-3 text-right font-mono tabular-nums font-medium">{formatMoney(line.amount)}</td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(line.unitPrice, inv.currencyCode)}</td>
+                    <td className="px-6 py-3 text-right font-mono tabular-nums font-medium">{formatMoney(line.amount, inv.currencyCode)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -604,19 +620,29 @@ export default function InvoiceDetailPage() {
               <div className="w-full max-w-xs space-y-1.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-mono tabular-nums">{formatMoney(inv.subtotal)}</span>
+                  <span className="font-mono tabular-nums">{formatMoney(inv.subtotal, inv.currencyCode)}</span>
                 </div>
                 {inv.taxTotal > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax</span>
-                    <span className="font-mono tabular-nums">{formatMoney(inv.taxTotal)}</span>
+                    <span className="font-mono tabular-nums">{formatMoney(inv.taxTotal, inv.currencyCode)}</span>
                   </div>
                 )}
                 <div className="h-px bg-border my-1" />
                 <div className="flex justify-between text-sm font-semibold">
                   <span>Total</span>
-                  <span className="font-mono tabular-nums">{formatMoney(inv.total)}</span>
+                  <span className="font-mono tabular-nums">{formatMoney(inv.total, inv.currencyCode)}</span>
                 </div>
+                {base && base.baseCurrency !== inv.currencyCode && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>In {base.baseCurrency}</span>
+                    <span className="font-mono tabular-nums">
+                      {base.amounts.total == null
+                        ? "—"
+                        : `≈ ${formatMoney(base.amounts.total, base.baseCurrency)}`}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -640,15 +666,29 @@ export default function InvoiceDetailPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-[11px] text-muted-foreground">Total</p>
-                <p className="text-sm font-mono font-semibold tabular-nums mt-0.5">{formatMoney(inv.total)}</p>
+                <div className="text-sm font-mono font-semibold mt-0.5">
+                  <DualAmount
+                    amount={inv.total}
+                    currency={inv.currencyCode}
+                    baseCurrency={base?.baseCurrency}
+                    baseAmount={base?.amounts.total ?? null}
+                  />
+                </div>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Paid</p>
-                <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 mt-0.5">{formatMoney(inv.amountPaid)}</p>
+                <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 mt-0.5">{formatMoney(inv.amountPaid, inv.currencyCode)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Due</p>
-                <p className="text-sm font-mono font-semibold tabular-nums text-amber-600 mt-0.5">{formatMoney(inv.amountDue)}</p>
+                <div className="text-sm font-mono font-semibold text-amber-600 mt-0.5">
+                  <DualAmount
+                    amount={inv.amountDue}
+                    currency={inv.currencyCode}
+                    baseCurrency={base?.baseCurrency}
+                    baseAmount={base?.amounts.amountDue ?? null}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -799,7 +839,7 @@ export default function InvoiceDetailPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">{formatDate(p.date)}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-mono font-semibold text-emerald-600 shrink-0">{formatMoney(p.amount)}</span>
+                  <span className="text-sm font-mono font-semibold text-emerald-600 shrink-0">{formatMoney(p.amount, inv.currencyCode)}</span>
                 </div>
               ))}
             </div>
