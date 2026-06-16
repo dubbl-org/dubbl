@@ -33,6 +33,7 @@ interface Invoice {
   status: string;
   total: number;
   amountDue: number;
+  currencyCode: string;
   contact: { name: string } | null;
 }
 
@@ -134,7 +135,7 @@ function buildColumns(): Column<Invoice>[] {
       sortKey: "total",
       className: "w-28 text-right",
       render: (r) => (
-        <span className="font-mono text-sm tabular-nums">{formatMoney(r.total)}</span>
+        <span className="font-mono text-sm tabular-nums">{formatMoney(r.total, r.currencyCode)}</span>
       ),
     },
     {
@@ -150,7 +151,7 @@ function buildColumns(): Column<Invoice>[] {
             : "";
         return (
           <span className={`font-mono text-sm tabular-nums ${color}`}>
-            {formatMoney(r.amountDue)}
+            {formatMoney(r.amountDue, r.currencyCode)}
           </span>
         );
       },
