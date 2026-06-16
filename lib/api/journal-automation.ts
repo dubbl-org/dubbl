@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
+import { getExchangeRate, convertAmount, MissingExchangeRateError } from "@/lib/currency/converter";
 import { convertLinesToBase, realizedSettlementLegs } from "@/lib/currency/convert-entry";
 import type { SettlementRole } from "@/lib/currency/convert-entry";
 
@@ -14,9 +14,11 @@ const RATE_SCALE = 1_000_000;
 
 /**
  * Resolve the document -> base currency rate for posting to the GL.
- * Returns 1:1 when the document is already in the base currency or when no
- * rate is available (so posting falls back to today's behaviour rather than
- * failing the operation).
+ * Returns 1:1 when the document is already in the base currency. When the
+ * document is in a foreign currency but no rate is available, throws
+ * MissingExchangeRateError rather than silently booking at 1:1 (which would
+ * put wrong numbers in the ledger) — the caller surfaces it so the user can
+ * enter a custom rate.
  */
 async function resolveBaseRate(
   organizationId: string,
@@ -31,7 +33,31 @@ async function resolveBaseRate(
   const currency = currencyCode ?? base;
   if (currency === base) return { base, currency, rate: RATE_SCALE };
   const rate = await getExchangeRate(organizationId, currency, base, date);
-  return { base, currency, rate: rate ?? RATE_SCALE };
+  if (rate == null) throw new MissingExchangeRateError(currency, base, date);
+  return { base, currency, rate };
+}
+
+/**
+ * Pre-flight guard: throw MissingExchangeRateError if a foreign-currency
+ * document can't be converted to the base currency on `date`. Call this at the
+ * top of a posting route — before any emails or DB writes — so a missing rate
+ * fails cleanly (HTTP 422, "set a custom rate") with no side effects, rather
+ * than part-way through. No-op when the document is already in the base currency.
+ */
+export async function assertBaseRateAvailable(
+  organizationId: string,
+  currencyCode: string | undefined,
+  date: string
+): Promise<void> {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { defaultCurrency: true },
+  });
+  const base = org?.defaultCurrency ?? "USD";
+  const currency = currencyCode ?? base;
+  if (currency === base) return;
+  const rate = await getExchangeRate(organizationId, currency, base, date);
+  if (rate == null) throw new MissingExchangeRateError(currency, base, date);
 }
 
 /**
@@ -53,6 +79,23 @@ function toBaseLines(
     currencyCode: currency,
     exchangeRate: rate,
   }));
+}
+
+/**
+ * Run rate-dependent posting work for an already-inserted entry header. If it
+ * throws (e.g. MissingExchangeRateError), delete the header first so we never
+ * leave an orphaned, empty "posted" entry behind, then re-throw for the caller.
+ */
+async function postLinesOrCleanup(
+  entryId: string,
+  build: () => Promise<void>
+): Promise<void> {
+  try {
+    await build();
+  } catch (err) {
+    await db.delete(journalEntry).where(eq(journalEntry.id, entryId));
+    throw err;
+  }
 }
 
 const FX_ACCOUNTS = {
@@ -203,12 +246,14 @@ export async function createInvoiceJournalEntry(
       creditAmount: 0,
     });
 
-    const { currency, rate } = await resolveBaseRate(
-      ctx.organizationId,
-      invoiceData.currencyCode,
-      invoiceData.date
-    );
-    await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+    await postLinesOrCleanup(entry.id, async () => {
+      const { currency, rate } = await resolveBaseRate(
+        ctx.organizationId,
+        invoiceData.currencyCode,
+        invoiceData.date
+      );
+      await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+    });
   }
 
   return entry;
@@ -293,12 +338,14 @@ export async function createBillJournalEntry(
       creditAmount: apTotal,
     });
 
-    const { currency, rate } = await resolveBaseRate(
-      ctx.organizationId,
-      billData.currencyCode,
-      billData.date
-    );
-    await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+    await postLinesOrCleanup(entry.id, async () => {
+      const { currency, rate } = await resolveBaseRate(
+        ctx.organizationId,
+        billData.currencyCode,
+        billData.date
+      );
+      await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+    });
   }
 
   return entry;
@@ -540,6 +587,12 @@ export async function createPaymentJournalEntry(
         counterTotal += a.amount;
         continue;
       }
+      // NOTE: payment routes commit the payment + allocations + document-status
+      // updates BEFORE calling this helper and are not wrapped in a DB
+      // transaction, so throwing here would orphan those rows / leave documents
+      // marked paid with no entry. Until those routes are made transactional we
+      // fall back to the payment-date rate (and 1:1 only as a last resort) here,
+      // and enforce a rate at *recognition* time instead (see resolveBaseRate).
       const paymentRate =
         (await getExchangeRate(ctx.organizationId, currency, base, paymentData.date)) ??
         RATE_SCALE;

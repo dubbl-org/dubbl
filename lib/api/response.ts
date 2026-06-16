@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthError } from "./auth-context";
 import { PeriodLockedError } from "./period-lock";
 import { LimitExceededError } from "./check-limit";
+import { MissingExchangeRateError } from "@/lib/currency/converter";
 
 /** 200 OK response */
 export function ok<T>(data: T) {
@@ -39,6 +40,9 @@ export function handleError(err: unknown) {
   }
   if (err instanceof LimitExceededError) {
     return NextResponse.json({ error: err.message }, { status: 403 });
+  }
+  if (err instanceof MissingExchangeRateError) {
+    return NextResponse.json({ error: err.message }, { status: 422 });
   }
   if (err instanceof z.ZodError) {
     const message = err.issues.map((i) => i.message).join(", ");
