@@ -34,6 +34,16 @@ const statusColors: Record<string, string> = {
   converted: "border-purple-200 bg-purple-50 text-purple-700",
 };
 
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "sent",
+  accepted: "accepted",
+  declined: "declined",
+  expired: "expired",
+  converted: "turned into an invoice",
+};
+
 const columns: Column<Quote>[] = [
   {
     key: "number",
@@ -66,7 +76,7 @@ const columns: Column<Quote>[] = [
     className: "w-24",
     render: (r) => (
       <Badge variant="outline" className={statusColors[r.status] || ""}>
-        {r.status}
+        {statusLabels[r.status] || r.status}
       </Badge>
     ),
   },
@@ -133,7 +143,7 @@ export default function QuotesPage() {
               </div>
               <h2 className="mt-4 text-lg sm:text-2xl font-semibold tracking-tight">Send quotes, win deals</h2>
               <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-md">
-                Create detailed proposals with line items and pricing. When your customer accepts, convert it to an invoice with one click.
+                Create detailed proposals with line items and pricing. When your customer accepts, turn it into an invoice with one click.
               </p>
               <div className="mt-6 flex items-center gap-3">
                 <Button
@@ -193,7 +203,7 @@ export default function QuotesPage() {
                 <div className="flex flex-col items-center gap-1 text-muted-foreground/40">
                   <div className="h-4 w-px bg-current" />
                   <ArrowRightLeft className="size-4 rotate-90" />
-                  <span className="text-[10px] font-medium">Convert</span>
+                  <span className="text-[10px] font-medium">Turn into invoice</span>
                 </div>
               </div>
 

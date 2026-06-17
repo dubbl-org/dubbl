@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine, contact, organization } from "@/lib/db/schema";
-import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { invoice, invoiceLine, contact, organization, customerCredit, inventoryItem } from "@/lib/db/schema";
+import { eq, and, desc, asc, gte, lte, ne, inArray, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -16,14 +16,25 @@ import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
+import { resolvePrice } from "@/lib/api/pricing";
 
 const lineSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().default(1),
-  unitPrice: z.number().default(0),
+  // Decimal unit price (e.g. 12.50). When omitted for an inventory-item line,
+  // the price is resolved from the line/document price list (falling back to the
+  // item's default sale price). An explicit value here always wins.
+  unitPrice: z.number().optional(),
   accountId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),
   discountPercent: z.number().int().min(0).max(10000).default(0),
+  costCenterId: z.string().nullable().optional(),
+  projectId: z.string().nullable().optional(),
+  // When set, sending this invoice relieves inventory and posts COGS for the item.
+  inventoryItemId: z.string().nullable().optional(),
+  warehouseId: z.string().nullable().optional(),
+  // Per-line price list override; falls back to the document-level priceListId.
+  priceListId: z.string().nullable().optional(),
 });
 
 const createSchema = z.object({
@@ -33,7 +44,12 @@ const createSchema = z.object({
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   currencyCode: currencyCodeSchema.optional(),
+  // Default price list applied to inventory-item lines that don't carry their own.
+  priceListId: z.string().nullable().optional(),
   lines: z.array(lineSchema).min(1),
+  // When true, exceeding the customer's credit limit hard-blocks the create
+  // (HTTP 403) instead of returning a soft warning. Wired from an org policy.
+  enforceCreditLimit: z.boolean().optional(),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,10 +161,58 @@ export async function POST(request: Request) {
     const taxRateIds = parsed.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
     const ratesMap = await preloadTaxRates(taxRateIds);
 
+    // Resolve default unit prices (integer cents) for inventory-item lines that
+    // don't carry an explicit unitPrice: prefer the line/document price list,
+    // then fall back to the item's default sale price. Lines with an explicit
+    // unitPrice are unaffected. Item default prices are preloaded in one query.
+    const itemIds = [
+      ...new Set(
+        parsed.lines
+          .filter((l) => l.inventoryItemId && l.unitPrice === undefined)
+          .map((l) => l.inventoryItemId as string)
+      ),
+    ];
+    const itemPriceMap = new Map<string, number>();
+    if (itemIds.length > 0) {
+      const items = await db.query.inventoryItem.findMany({
+        where: and(
+          eq(inventoryItem.organizationId, ctx.organizationId),
+          inArray(inventoryItem.id, itemIds)
+        ),
+        columns: { id: true, salePrice: true },
+      });
+      for (const it of items) itemPriceMap.set(it.id, it.salePrice);
+    }
+
+    // unitPriceCents per line, in the same order as parsed.lines.
+    const unitPricesCents = await Promise.all(
+      parsed.lines.map(async (l) => {
+        // Explicit price always wins (caller override).
+        if (l.unitPrice !== undefined) return decimalToCents(l.unitPrice);
+        if (l.inventoryItemId) {
+          const listId = l.priceListId || parsed.priceListId || null;
+          if (listId) {
+            const resolved = await resolvePrice(
+              ctx.organizationId,
+              l.inventoryItemId,
+              listId,
+              l.quantity || 1,
+              parsed.issueDate
+            );
+            if (resolved) return resolved.unitPrice;
+          }
+          // Fall back to the item's default sale price.
+          return itemPriceMap.get(l.inventoryItemId) ?? 0;
+        }
+        return 0;
+      })
+    );
+
     // Calculate totals
     let subtotal = 0;
     const processedLines = parsed.lines.map((l, i) => {
-      const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+      const unitPriceCents = unitPricesCents[i];
+      const grossAmount = Math.round(l.quantity * unitPriceCents);
       const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
       const amount = grossAmount - discountAmount;
       subtotal += amount;
@@ -157,18 +221,91 @@ export async function POST(request: Request) {
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
-        unitPrice: decimalToCents(l.unitPrice),
+        unitPrice: unitPriceCents,
         accountId: l.accountId || null,
         taxRateId,
         discountPercent: l.discountPercent,
         taxAmount,
         amount,
+        costCenterId: l.costCenterId || null,
+        projectId: l.projectId || null,
+        inventoryItemId: l.inventoryItemId || null,
+        warehouseId: l.warehouseId || null,
         sortOrder: i,
       };
     });
 
     const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
     const total = subtotal + taxTotal;
+
+    // Credit-limit check: outstanding = sum of non-void invoice.amountDue, less
+    // any unapplied customer credit, plus the invoice being created. Compared to
+    // the contact's creditLimit (null = no limit). Soft-warning by default; the
+    // caller may pass enforceCreditLimit:true (e.g. an org policy) to hard-block.
+    let creditLimitWarning: {
+      creditLimit: number;
+      currentOutstanding: number;
+      projectedOutstanding: number;
+      exceededBy: number;
+    } | null = null;
+    {
+      const contactRecord = await db.query.contact.findFirst({
+        where: and(
+          eq(contact.id, parsed.contactId),
+          eq(contact.organizationId, ctx.organizationId)
+        ),
+        columns: { creditLimit: true },
+      });
+      const creditLimit = contactRecord?.creditLimit ?? null;
+      if (creditLimit != null) {
+        const [dueRow] = await db
+          .select({
+            total: sql<number>`coalesce(sum(${invoice.amountDue}), 0)`.mapWith(Number),
+          })
+          .from(invoice)
+          .where(
+            and(
+              eq(invoice.organizationId, ctx.organizationId),
+              eq(invoice.contactId, parsed.contactId),
+              ne(invoice.status, "void"),
+              notDeleted(invoice.deletedAt)
+            )
+          );
+        const [creditRow] = await db
+          .select({
+            total: sql<number>`coalesce(sum(${customerCredit.amountRemaining}), 0)`.mapWith(Number),
+          })
+          .from(customerCredit)
+          .where(
+            and(
+              eq(customerCredit.organizationId, ctx.organizationId),
+              eq(customerCredit.contactId, parsed.contactId),
+              ne(customerCredit.status, "void"),
+              notDeleted(customerCredit.deletedAt)
+            )
+          );
+        const currentOutstanding =
+          Number(dueRow?.total || 0) - Number(creditRow?.total || 0);
+        const projectedOutstanding = currentOutstanding + total;
+        if (projectedOutstanding > creditLimit) {
+          creditLimitWarning = {
+            creditLimit,
+            currentOutstanding,
+            projectedOutstanding,
+            exceededBy: projectedOutstanding - creditLimit,
+          };
+          if (parsed.enforceCreditLimit) {
+            return NextResponse.json(
+              {
+                error: `Credit limit exceeded: this invoice would put the customer at ${projectedOutstanding} cents against a limit of ${creditLimit} cents`,
+                creditLimitWarning,
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+    }
 
     const [created] = await db
       .insert(invoice)
@@ -199,7 +336,7 @@ export async function POST(request: Request) {
 
     logAudit({ ctx, action: "create", entityType: "invoice", entityId: created.id, request });
 
-    return NextResponse.json({ invoice: created }, { status: 201 });
+    return NextResponse.json({ invoice: created, creditLimitWarning }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }

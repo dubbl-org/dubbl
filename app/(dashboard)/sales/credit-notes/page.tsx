@@ -47,6 +47,14 @@ const statusColors: Record<string, string> = {
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "sent",
+  applied: "used",
+  void: "cancelled",
+};
+
 function buildColumns(): Column<CreditNote>[] {
   return [
     {
@@ -78,7 +86,7 @@ function buildColumns(): Column<CreditNote>[] {
       className: "w-24",
       render: (r) => (
         <Badge variant="outline" className={statusColors[r.status] || ""}>
-          {r.status}
+          {statusLabels[r.status] || r.status}
         </Badge>
       ),
     },
@@ -376,8 +384,8 @@ export default function CreditNotesPage() {
               <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
               <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
               <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
-              <TabsTrigger value="applied" className="whitespace-nowrap">Applied</TabsTrigger>
-              <TabsTrigger value="void" className="whitespace-nowrap">Void</TabsTrigger>
+              <TabsTrigger value="applied" className="whitespace-nowrap" title="Credit notes you've used against an invoice">Used</TabsTrigger>
+              <TabsTrigger value="void" className="whitespace-nowrap">Cancelled</TabsTrigger>
             </TabsList>
           </Tabs>
 

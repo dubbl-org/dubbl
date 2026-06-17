@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,6 +112,16 @@ const methodLabels: Record<string, string> = {
   check: "Check",
   card: "Card",
   other: "Other",
+};
+
+// Plain-language status labels (end users aren't accountants — avoid "void").
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "sent",
+  partial: "part paid",
+  paid: "paid",
+  overdue: "overdue",
+  void: "cancelled",
 };
 
 interface PaymentRecord {
@@ -352,9 +362,9 @@ export default function InvoiceDetailPage() {
   async function handleVoid() {
     if (!orgId) return;
     await confirm({
-      title: "Void this invoice?",
-      description: "This will mark the invoice as void. This action cannot be undone.",
-      confirmLabel: "Void Invoice",
+      title: "Cancel this invoice?",
+      description: "This stops the invoice from counting toward what you're owed. You can't undo this.",
+      confirmLabel: "Cancel invoice",
       destructive: true,
       onConfirm: async () => {
         const res = await fetch(`/api/v1/invoices/${id}/void`, {
@@ -364,7 +374,32 @@ export default function InvoiceDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setInv((prev) => prev ? { ...prev, ...data.invoice } : prev);
-          toast.success("Invoice voided");
+          toast.success("Invoice cancelled");
+        }
+      },
+    });
+  }
+
+  async function handleWriteOff() {
+    if (!orgId) return;
+    await confirm({
+      title: "Give up on collecting this invoice?",
+      description:
+        "Use this when a customer won't pay. The unpaid amount is recorded as a loss (a 'bad debt') and the invoice no longer counts toward what you're owed. You can't undo this.",
+      confirmLabel: "Write off the unpaid amount",
+      destructive: true,
+      onConfirm: async () => {
+        const res = await fetch(`/api/v1/invoices/${id}/write-off`, {
+          method: "POST",
+          headers: { "x-organization-id": orgId },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setInv((prev) => prev ? { ...prev, ...data.invoice } : prev);
+          toast.success("Unpaid amount written off as a loss");
+        } else {
+          const data = await res.json().catch(() => ({}));
+          toast.error(typeof data.error === "string" ? data.error : "Couldn't write off this invoice");
         }
       },
     });
@@ -424,7 +459,7 @@ export default function InvoiceDetailPage() {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-semibold tracking-tight">{inv.invoiceNumber}</h1>
-                <Badge variant="outline" className={sc.class}>{inv.status}</Badge>
+                <Badge variant="outline" className={sc.class}>{statusLabels[inv.status] || inv.status}</Badge>
                 {overdueInfo && (
                   <span className={`text-xs font-medium ${overdueInfo.class}`}>{overdueInfo.label}</span>
                 )}
@@ -506,12 +541,24 @@ export default function InvoiceDetailPage() {
             <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
               <Download className="mr-2 size-4" />Download PDF
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDuplicate} loading={duplicating}>
-              <Copy className="mr-2 size-4" />Duplicate
+            <Button variant="outline" size="sm" onClick={handleDuplicate} loading={duplicating} title="Make a copy of this invoice you can edit and send again">
+              <Copy className="mr-2 size-4" />Make a copy
             </Button>
+            {["sent", "partial", "overdue"].includes(inv.status) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleWriteOff}
+                className="text-red-600"
+                title="Customer won't pay? Record the unpaid amount as a loss so it stops counting toward what you're owed."
+              >
+                <FileX className="mr-2 size-4" />Mark as won&apos;t be paid{" "}
+                <span className="ml-1 text-muted-foreground">(write off as bad debt)</span>
+              </Button>
+            )}
             {inv.status !== "void" && inv.status !== "paid" && (
-              <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600">
-                <Ban className="mr-2 size-4" />Void
+              <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600" title="Stop this invoice from counting toward what you're owed">
+                <Ban className="mr-2 size-4" />Cancel invoice
               </Button>
             )}
           </div>
@@ -524,7 +571,7 @@ export default function InvoiceDetailPage() {
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Invoice Compliance</p>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Before you send this invoice</p>
                   <ul className="mt-1.5 space-y-1">
                     {complianceWarnings.map((w, i) => (
                       <li key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
