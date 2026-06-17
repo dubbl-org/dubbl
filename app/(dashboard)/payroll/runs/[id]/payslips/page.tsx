@@ -78,11 +78,11 @@ export default function RunPayslipsPage() {
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Gross</p>
+                  <p className="text-xs text-muted-foreground">Before deductions</p>
                   <p className="text-sm font-mono tabular-nums">{formatMoney(ps.grossAmount)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Net</p>
+                  <p className="text-xs text-muted-foreground">Take-home</p>
                   <p className="text-sm font-mono tabular-nums font-medium">{formatMoney(ps.netAmount)}</p>
                 </div>
                 <Badge variant="outline" className="text-[10px]">{ps.status}</Badge>

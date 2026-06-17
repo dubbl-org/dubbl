@@ -1,11 +1,23 @@
 import { db } from "@/lib/db";
-import { payrollRun, payrollItem, payrollEmployee } from "@/lib/db/schema";
+import {
+  payrollRun,
+  payrollItem,
+  payrollEmployee,
+  payrollSettings,
+  payrollItemTaxBreakdown,
+  payrollItemEmployerTax,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, created, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { postPayrollRun } from "@/lib/api/payroll-posting";
+import {
+  computeEmployeeWithholding,
+  getEmployeeYtdWage,
+} from "@/lib/api/payroll-withholding";
 import { z } from "zod";
 
 const terminationSchema = z.object({
@@ -55,63 +67,133 @@ export async function POST(request: Request) {
     }
 
     const totalGross = grossAmount + ptoAmount;
-    const taxAmount = Math.round((totalGross * emp.taxRate) / 10000);
+
+    // Run the same withholding/FICA engine the regular run uses, so the final
+    // paycheck withholds progressive income tax + FICA (against YTD wages / SS
+    // cap) and computes employer-side taxes — not a flat emp.taxRate. Final pay
+    // and PTO payout are one taxable wage for this period, so the engine is run
+    // ONCE on the combined gross to apply the SS/FICA cap correctly; the
+    // breakdown is attached to the final-pay item (the PTO item carries 0 tax).
+    const settings = await db.query.payrollSettings.findFirst({
+      where: eq(payrollSettings.organizationId, ctx.organizationId),
+    });
+    const ytdWage = await getEmployeeYtdWage(
+      ctx.organizationId,
+      emp.id,
+      parsed.payPeriodStart
+    );
+    const withholding = await computeEmployeeWithholding(
+      ctx.organizationId,
+      emp,
+      settings ?? undefined,
+      totalGross, // no pre-tax deductions on a termination run
+      ytdWage,
+      parsed.payPeriodStart
+    );
+    const taxAmount = withholding.totalTax;
     const totalNet = totalGross - taxAmount;
 
-    const [run] = await db
-      .insert(payrollRun)
-      .values({
-        organizationId: ctx.organizationId,
-        payPeriodStart: parsed.payPeriodStart,
-        payPeriodEnd: parsed.payPeriodEnd,
-        runType: "termination",
-        notes: parsed.notes || `Termination pay for ${emp.name}`,
-        totalGross,
-        totalDeductions: taxAmount,
-        totalNet,
-      })
-      .returning();
+    // Create the run + items, post its journal entry, and complete it atomically.
+    const run = await db.transaction(async (tx) => {
+      const [createdRun] = await tx
+        .insert(payrollRun)
+        .values({
+          organizationId: ctx.organizationId,
+          payPeriodStart: parsed.payPeriodStart,
+          payPeriodEnd: parsed.payPeriodEnd,
+          runType: "termination",
+          notes: parsed.notes || `Termination pay for ${emp.name}`,
+          totalGross,
+          totalDeductions: taxAmount,
+          totalNet,
+        })
+        .returning();
 
-    const items = [];
-    if (grossAmount > 0) {
-      items.push({
-        payrollRunId: run.id,
-        employeeId: emp.id,
-        type: "regular_salary" as const,
-        description: "Final pay",
-        grossAmount,
-        taxAmount: Math.round((grossAmount * emp.taxRate) / 10000),
-        deductions: Math.round((grossAmount * emp.taxRate) / 10000),
-        netAmount: grossAmount - Math.round((grossAmount * emp.taxRate) / 10000),
-      });
-    }
-    if (ptoAmount > 0) {
-      items.push({
-        payrollRunId: run.id,
-        employeeId: emp.id,
-        type: "reimbursement" as const,
-        description: `PTO payout (${emp.ptoBalanceHours}h)`,
-        grossAmount: ptoAmount,
-        taxAmount: Math.round((ptoAmount * emp.taxRate) / 10000),
-        deductions: Math.round((ptoAmount * emp.taxRate) / 10000),
-        netAmount: ptoAmount - Math.round((ptoAmount * emp.taxRate) / 10000),
-      });
-    }
+      // The final-pay item carries the whole period's withholding; if there is
+      // no final-pay line (PTO-only payout), the PTO item carries it instead.
+      const taxOnFinalPay = grossAmount > 0;
+      const items = [];
+      if (grossAmount > 0) {
+        items.push({
+          payrollRunId: createdRun.id,
+          employeeId: emp.id,
+          type: "regular_salary" as const,
+          description: "Final pay",
+          grossAmount,
+          taxAmount,
+          deductions: taxAmount,
+          netAmount: grossAmount - taxAmount,
+        });
+      }
+      if (ptoAmount > 0) {
+        const ptoTax = taxOnFinalPay ? 0 : taxAmount;
+        items.push({
+          payrollRunId: createdRun.id,
+          employeeId: emp.id,
+          type: "reimbursement" as const,
+          description: `PTO payout (${emp.ptoBalanceHours}h)`,
+          grossAmount: ptoAmount,
+          taxAmount: ptoTax,
+          deductions: ptoTax,
+          netAmount: ptoAmount - ptoTax,
+        });
+      }
 
-    if (items.length > 0) {
-      await db.insert(payrollItem).values(items);
-    }
+      const insertedItems =
+        items.length > 0
+          ? await tx
+              .insert(payrollItem)
+              .values(items)
+              .returning({ id: payrollItem.id })
+          : [];
 
-    // Deactivate and set termination date
-    await db
-      .update(payrollEmployee)
-      .set({
-        isActive: false,
-        terminationDate: parsed.payPeriodEnd,
-        terminationReason: parsed.notes || "Termination",
-        updatedAt: new Date(),
-      })
-      .where(eq(payrollEmployee.id, emp.id));
+      // Persist the per-jurisdiction breakdown so postPayrollRun buckets the
+      // withholding to the right liabilities (FICA → 2235, income tax → 2220)
+      // and W-2 boxes are right. Attach to the item that carries the tax.
+      const taxItemId = insertedItems[0]?.id;
+      if (taxItemId) {
+        const taxRows = withholding.breakdown.map((line) => ({
+          payrollItemId: taxItemId,
+          ...line,
+        }));
+        const employerRows = withholding.employerBreakdown.map((line) => ({
+          payrollItemId: taxItemId,
+          ...line,
+        }));
+        if (taxRows.length > 0)
+          await tx.insert(payrollItemTaxBreakdown).values(taxRows);
+        if (employerRows.length > 0)
+          await tx.insert(payrollItemEmployerTax).values(employerRows);
+      }
+
+      // Post the balanced journal entry (gross DR; withholding CR to the proper
+      // liability accounts, never the VAT account; net pay CR to bank) and mark
+      // the run completed.
+      const journalEntryId = await postPayrollRun(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        createdRun.id,
+        tx
+      );
+
+      const [completed] = await tx
+        .update(payrollRun)
+        .set({ status: "completed", processedAt: new Date() })
+        .where(eq(payrollRun.id, createdRun.id))
+        .returning();
+
+      // Deactivate and set termination date
+      await tx
+        .update(payrollEmployee)
+        .set({
+          isActive: false,
+          terminationDate: parsed.payPeriodEnd,
+          terminationReason: parsed.notes || "Termination",
+          updatedAt: new Date(),
+        })
+        .where(eq(payrollEmployee.id, emp.id));
+
+      return { ...completed, journalEntryId };
+    });
 
     logAudit({ ctx, action: "create_termination_run", entityType: "payrollRun", entityId: run.id, request });
 

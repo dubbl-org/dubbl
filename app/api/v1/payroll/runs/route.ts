@@ -5,10 +5,10 @@ import {
   payrollItem,
   payrollEmployee,
   payrollSettings,
+  payrollItemTaxBreakdown,
+  payrollItemEmployerTax,
   employeeDeduction,
-  deductionType,
   timesheet,
-  timesheetEntry,
 } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
@@ -17,6 +17,12 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
+import {
+  computeEmployeeWithholding,
+  getEmployeeYtdWage,
+  type TaxBreakdownLine,
+  type EmployerTaxLine,
+} from "@/lib/api/payroll-withholding";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -160,6 +166,11 @@ export async function POST(request: Request) {
       timesheetId: string | null;
       currency: string;
       fxRate: number;
+      // Per-jurisdiction tax breakdown produced by the withholding engine; these
+      // are persisted into payrollItemTaxBreakdown / payrollItemEmployerTax once
+      // the items have ids so the journal can split them correctly.
+      taxBreakdown: TaxBreakdownLine[];
+      employerTaxBreakdown: EmployerTaxLine[];
     }> = [];
 
     for (const emp of employees) {
@@ -276,11 +287,32 @@ export async function POST(request: Request) {
         }
       }
 
-      // Pre-tax deductions reduce taxable income
+      // Pre-tax deductions reduce taxable income.
       const taxableIncome = Math.max(0, grossAmount - preTaxDeductionTotal);
-      const taxAmount = Math.round((taxableIncome * emp.taxRate) / 10000);
 
-      // Total deductions = tax + pre-tax + post-tax
+      // Run the withholding engine: progressive federal income tax (IRS Pub
+      // 15-T percentage method) using the employee's filing status / allowances
+      // and the org's active bracket schedule, plus employee FICA against the
+      // employee's YTD wages and the org's SS wage-base cap. Also computes the
+      // employer-side taxes (FICA match, FUTA, SUTA). When no bracket schedule
+      // is configured yet the engine falls back to the employee's flat taxRate.
+      const ytdWage = await getEmployeeYtdWage(
+        ctx.organizationId,
+        emp.id,
+        parsed.payPeriodStart
+      );
+      const withholding = await computeEmployeeWithholding(
+        ctx.organizationId,
+        emp,
+        settings ?? undefined,
+        taxableIncome,
+        ytdWage,
+        parsed.payPeriodStart
+      );
+      const taxAmount = withholding.totalTax;
+
+      // Total deductions = employee tax (income + FICA) + pre-tax + post-tax.
+      // Employer taxes are NOT deducted from the employee — they post separately.
       const totalItemDeductions = taxAmount + preTaxDeductionTotal + postTaxDeductionTotal;
       const netAmount = grossAmount - totalItemDeductions;
 
@@ -323,6 +355,8 @@ export async function POST(request: Request) {
         timesheetId: linkedTimesheetId,
         currency: empCurrency,
         fxRate,
+        taxBreakdown: withholding.breakdown,
+        employerTaxBreakdown: withholding.employerBreakdown,
       });
     }
 
@@ -333,27 +367,56 @@ export async function POST(request: Request) {
       );
     }
 
-    const [run] = await db
-      .insert(payrollRun)
-      .values({
-        organizationId: ctx.organizationId,
-        payPeriodStart: parsed.payPeriodStart,
-        payPeriodEnd: parsed.payPeriodEnd,
-        runType: (parsed.runType as typeof payrollRun.runType.enumValues[number]) ?? "regular",
-        totalGross,
-        totalDeductions,
-        totalNet,
-      })
-      .returning();
+    // Persist the run, its items, and the per-item tax breakdowns atomically so a
+    // payslip / W-2 / journal always sees a consistent FIT-vs-FICA-vs-employer
+    // split (or none at all on failure).
+    const run = await db.transaction(async (tx) => {
+      const [createdRun] = await tx
+        .insert(payrollRun)
+        .values({
+          organizationId: ctx.organizationId,
+          payPeriodStart: parsed.payPeriodStart,
+          payPeriodEnd: parsed.payPeriodEnd,
+          runType: (parsed.runType as typeof payrollRun.runType.enumValues[number]) ?? "regular",
+          totalGross,
+          totalDeductions,
+          totalNet,
+        })
+        .returning();
 
-    // Insert payroll items
-    await db.insert(payrollItem).values(
-      items.map((item) => ({
-        payrollRunId: run.id,
-        ...item,
-      }))
-    );
+      // Insert items, capturing ids so we can attach the tax breakdown rows. The
+      // taxBreakdown/employerTaxBreakdown fields are persisted separately below,
+      // so they are stripped from the column values here.
+      const insertedItems = await tx
+        .insert(payrollItem)
+        .values(
+          items.map((item) => {
+            const { taxBreakdown, employerTaxBreakdown, ...columns } = item;
+            void taxBreakdown;
+            void employerTaxBreakdown;
+            return { payrollRunId: createdRun.id, ...columns };
+          })
+        )
+        .returning({ id: payrollItem.id });
 
+      // Persist per-jurisdiction employee + employer tax breakdown rows aligned
+      // by index with the items just inserted.
+      const taxRows: (typeof payrollItemTaxBreakdown.$inferInsert)[] = [];
+      const employerRows: (typeof payrollItemEmployerTax.$inferInsert)[] = [];
+      items.forEach((item, idx) => {
+        const payrollItemId = insertedItems[idx].id;
+        for (const line of item.taxBreakdown) {
+          taxRows.push({ payrollItemId, ...line });
+        }
+        for (const line of item.employerTaxBreakdown) {
+          employerRows.push({ payrollItemId, ...line });
+        }
+      });
+      if (taxRows.length > 0) await tx.insert(payrollItemTaxBreakdown).values(taxRows);
+      if (employerRows.length > 0) await tx.insert(payrollItemEmployerTax).values(employerRows);
+
+      return createdRun;
+    });
 
     return NextResponse.json({ run }, { status: 201 });
   } catch (err) {

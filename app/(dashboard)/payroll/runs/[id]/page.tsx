@@ -79,6 +79,15 @@ const statusColors: Record<string, string> = {
   pending_approval: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
 };
 
+// Plain-language payroll status labels for non-accountants.
+const statusLabels: Record<string, string> = {
+  draft: "Not finished",
+  processing: "Finishing",
+  completed: "Finished & recorded",
+  void: "Cancelled",
+  pending_approval: "Waiting for sign-off",
+};
+
 const bonusTypes = [
   { value: "performance", label: "Performance" },
   { value: "signing", label: "Signing" },
@@ -149,9 +158,10 @@ export default function PayrollRunDetailPage() {
 
   async function handleProcess() {
     const confirmed = await confirm({
-      title: "Process this payroll run?",
-      description: "This will create journal entries and cannot be undone.",
-      confirmLabel: "Process",
+      title: "Finish this payroll and record it?",
+      description:
+        "This locks in the pay amounts and records the wages and taxes in your books. It can't be undone.",
+      confirmLabel: "Finish and record",
       destructive: true,
     });
     if (!confirmed) return;
@@ -168,10 +178,10 @@ export default function PayrollRunDetailPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed");
       }
-      toast.success("Payroll run processed");
+      toast.success("Payroll finished and recorded");
       window.location.reload();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to process payroll");
+      toast.error(err instanceof Error ? err.message : "Couldn't finish the payroll");
     } finally {
       setProcessing(false);
     }
@@ -191,10 +201,10 @@ export default function PayrollRunDetailPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed");
       }
-      toast.success("Submitted for approval");
+      toast.success("Sent for sign-off");
       window.location.reload();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit for approval");
+      toast.error(err instanceof Error ? err.message : "Couldn't send for sign-off");
     } finally {
       setSubmittingApproval(false);
     }
@@ -202,8 +212,8 @@ export default function PayrollRunDetailPage() {
 
   async function handleApprove() {
     const confirmed = await confirm({
-      title: "Approve this payroll run?",
-      description: "This will mark the run as approved and ready for processing.",
+      title: "Approve this payroll?",
+      description: "This marks the payroll as approved and ready to finish.",
       confirmLabel: "Approve",
     });
     if (!confirmed) return;
@@ -220,10 +230,10 @@ export default function PayrollRunDetailPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed");
       }
-      toast.success("Payroll run approved");
+      toast.success("Payroll approved");
       window.location.reload();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to approve");
+      toast.error(err instanceof Error ? err.message : "Couldn't approve the payroll");
     } finally {
       setApproving(false);
     }
@@ -381,7 +391,7 @@ export default function PayrollRunDetailPage() {
                 {run.payPeriodStart} to {run.payPeriodEnd}
               </h1>
               <Badge variant="outline" className={statusColors[run.status] || ""}>
-                {run.status.replace(/_/g, " ")}
+                {statusLabels[run.status] || run.status.replace(/_/g, " ")}
               </Badge>
               {run.runType && run.runType !== "regular" && (
                 <Badge variant="outline" className="capitalize">
@@ -398,7 +408,7 @@ export default function PayrollRunDetailPage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              {run.processedAt ? `Processed ${run.processedAt}` : "Draft payroll run"}
+              {run.processedAt ? `Finished and recorded ${run.processedAt}` : "Not finished yet"}
             </p>
           </div>
         </div>
@@ -410,18 +420,20 @@ export default function PayrollRunDetailPage() {
                 size="sm"
                 onClick={handleSubmitForApproval}
                 disabled={submittingApproval}
+                title="Send this payroll to someone for sign-off before it's finished"
               >
                 <Send className="mr-1.5 size-3.5" />
-                {submittingApproval ? "Submitting..." : "Submit for Approval"}
+                {submittingApproval ? "Sending..." : "Send for sign-off"}
               </Button>
               <Button
                 size="sm"
                 onClick={handleProcess}
                 disabled={processing}
                 className="bg-emerald-600 hover:bg-emerald-700"
+                title="Lock in the pay amounts and record the wages and taxes in your books"
               >
                 <Play className="mr-1.5 size-3.5" />
-                {processing ? "Processing..." : "Process Payroll"}
+                {processing ? "Finishing..." : "Finish & record payroll"}
               </Button>
             </>
           )}
@@ -453,15 +465,15 @@ export default function PayrollRunDetailPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Gross</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pay before deductions</p>
           <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(run.totalGross)}</p>
         </motion.div>
         <motion.div {...anim(0.05)} className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Deductions</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Taxes &amp; deductions</p>
           <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate text-red-600 dark:text-red-400">{formatMoney(run.totalDeductions)}</p>
         </motion.div>
         <motion.div {...anim(0.09)} className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Net Pay</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Take-home pay</p>
           <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{formatMoney(run.totalNet)}</p>
         </motion.div>
       </div>
@@ -529,7 +541,7 @@ export default function PayrollRunDetailPage() {
                     </Badge>
                   )}
                   <div className="hidden sm:block text-right">
-                    <p className="text-xs text-muted-foreground">Gross</p>
+                    <p className="text-xs text-muted-foreground">Before deductions</p>
                     <p className="text-sm font-mono tabular-nums">{formatMoney(item.grossAmount, item.currency ?? "USD")}</p>
                   </div>
                   <div className="hidden sm:block text-right">
@@ -537,11 +549,11 @@ export default function PayrollRunDetailPage() {
                     <p className="text-sm font-mono tabular-nums">{formatMoney(item.taxAmount, item.currency ?? "USD")}</p>
                   </div>
                   <div className="hidden sm:block text-right">
-                    <p className="text-xs text-muted-foreground">Deductions</p>
+                    <p className="text-xs text-muted-foreground">Other deductions</p>
                     <p className="text-sm font-mono tabular-nums">{formatMoney(item.deductions, item.currency ?? "USD")}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Net</p>
+                    <p className="text-xs text-muted-foreground">Take-home</p>
                     <p className="text-sm font-mono tabular-nums font-medium">{formatMoney(item.netAmount, item.currency ?? "USD")}</p>
                   </div>
                 </div>
