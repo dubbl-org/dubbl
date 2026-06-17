@@ -119,10 +119,62 @@ export const projectMember = pgTable("project_member", {
     .notNull()
     .references(() => member.id, { onDelete: "cascade" }),
   role: projectMemberRoleEnum("role").notNull().default("contributor"),
-  hourlyRate: integer("hourly_rate"), // cents, null = use project default
+  hourlyRate: integer("hourly_rate"), // cents, BILLING rate, null = use project default
+  // Internal staff COST rate (cents/hour) used for job-costing labor cost in the
+  // profitability report. Distinct from hourlyRate (what the client is billed).
+  // null = unknown/zero cost.
+  costRate: integer("cost_rate"), // cents per hour, null = no labor cost recognized
   teamAssignmentId: uuid("team_assignment_id"), // tracks which team assignment added this member
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+// Billable expense / cost link — records a bill line (or other source cost line)
+// that should be on-billed to the project's client. Job-costing source lines
+// (bill_line, journal_line, expense_item) live in other schema modules and are
+// not editable from here, so this table carries the billable/billed state and
+// the optional markup, referencing the source line by id + type (plain uuids,
+// no cross-module FK to avoid an import cycle). When the project is invoiced,
+// the matching link is stamped with the invoice it was billed on.
+export const projectBillableSourceEnum = pgEnum("project_billable_source", [
+  "bill_line",
+  "expense_item",
+  "journal_line",
+]);
+
+export const projectBillableItem = pgTable(
+  "project_billable_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    sourceType: projectBillableSourceEnum("source_type").notNull(),
+    // Id of the source cost line (bill_line.id / expense_item.id / journal_line.id).
+    sourceLineId: uuid("source_line_id").notNull(),
+    description: text("description").notNull(),
+    // Original cost charged to the project (cents, tax-exclusive).
+    costAmount: integer("cost_amount").notNull().default(0),
+    // Markup applied when on-billing, in basis points (1000 = 10%). Snapshot of
+    // the markup chosen for this line; the billed amount = round(cost*(1+mk)).
+    markupBasisPoints: integer("markup_basis_points").notNull().default(0),
+    // Set once on-billed: the invoice this item was billed on + the amount billed.
+    billedInvoiceId: uuid("billed_invoice_id").references(() => invoice.id),
+    billedAmount: integer("billed_amount").notNull().default(0), // cents actually invoiced
+    billedAt: timestamp("billed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    // A given source line can only be registered as billable once per project.
+    uniqueIndex("project_billable_item_source_unique_idx").on(
+      table.projectId,
+      table.sourceType,
+      table.sourceLineId
+    ),
+  ]
+);
 
 export const projectTeam = pgTable("project_team", {
   id: uuid("id")
@@ -342,6 +394,7 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   teams: many(projectTeam),
   labels: many(projectLabel),
   teamAssignments: many(projectTeamAssignment),
+  billableItems: many(projectBillableItem),
 }));
 
 export const projectMemberRelations = relations(projectMember, ({ one }) => ({
@@ -496,5 +549,16 @@ export const runningTimerRelations = relations(runningTimer, ({ one }) => ({
   task: one(projectTask, {
     fields: [runningTimer.taskId],
     references: [projectTask.id],
+  }),
+}));
+
+export const projectBillableItemRelations = relations(projectBillableItem, ({ one }) => ({
+  project: one(project, {
+    fields: [projectBillableItem.projectId],
+    references: [project.id],
+  }),
+  billedInvoice: one(invoice, {
+    fields: [projectBillableItem.billedInvoiceId],
+    references: [invoice.id],
   }),
 }));

@@ -34,6 +34,22 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// Per-user TOTP (RFC 6238) two-factor authentication. Opt-in: a row exists
+// once a user begins enrollment; `enabled` flips true only after the first
+// successful code verification. `secret` is the base32 TOTP secret. `backupCodes`
+// holds bcrypt-hashed single-use recovery codes (consumed by removal on use).
+export const userTotp = pgTable("user_totp", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  secret: text("secret").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  backupCodes: jsonb("backup_codes").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const accounts = pgTable(
   "accounts",
   {
@@ -131,6 +147,15 @@ export const organization = pgTable("organization", {
   peppolScheme: text("peppol_scheme"), // e.g. "0088" (EAN), "9925" (VAT)
   taxLookupEnabled: integer("tax_lookup_enabled").default(0), // 0 = disabled, 1 = enabled
   taxLookupProvider: text("tax_lookup_provider"), // "taxjar", "manual"
+  // Year-end close target (plain uuid, no cross-schema FK to avoid an import
+  // cycle with bookkeeping.ts; resolver validates it is an equity account).
+  retainedEarningsAccountId: uuid("retained_earnings_account_id"),
+  // VAT/GST scheme: 'accrual' (default) or 'cash' (recognise tax at payment).
+  vatScheme: text("vat_scheme").notNull().default("accrual"),
+  // Tax regime that drives the country tax profile: vat | gst | us_sales_tax | none.
+  taxRegime: text("tax_regime"),
+  // Duplicate supplier-invoice handling: 'off' | 'warn' | 'block' | 'hold'.
+  duplicateBillStrategy: text("duplicate_bill_strategy").notNull().default("warn"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
@@ -192,10 +217,15 @@ export const teamMember = pgTable(
 );
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
   members: many(member),
+  totp: one(userTotp, { fields: [users.id], references: [userTotp.userId] }),
+}));
+
+export const userTotpRelations = relations(userTotp, ({ one }) => ({
+  user: one(users, { fields: [userTotp.userId], references: [users.id] }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({

@@ -33,6 +33,20 @@ export const taxTypeEnum = pgEnum("tax_type", [
   "both",
 ]);
 
+// How a tax rate behaves for input-tax recovery and posting. Drives whether the
+// tax on a purchase is reclaimable (input VAT control), absorbed into cost
+// (blocked / irrecoverable), self-accounted (reverse charge), or a gross
+// non-recoverable US sales tax. See [[bank-feed-bookkeeping-gaps]].
+export const taxRateKindEnum = pgEnum("tax_rate_kind", [
+  "standard", // normal recoverable VAT/GST (recoverablePercent applies)
+  "blocked", // fully irrecoverable input tax (entertainment, certain cars) — absorbed into cost
+  "partial_block", // partly recoverable (e.g. 50% car lease) — recoverablePercent applies
+  "exempt", // exempt supply — no tax, no recovery
+  "reverse_charge", // buyer self-accounts output + input VAT (cross-border B2B, domestic DRC)
+  "no_vat", // outside scope / no VAT
+  "sales_tax_us", // US sales/use tax — collected gross on sales, non-recoverable on purchases
+]);
+
 // Currency
 export const currency = pgTable("currency", {
   id: uuid("id")
@@ -79,6 +93,17 @@ export const chartAccount = pgTable(
       .default("USD"),
     isActive: boolean("is_active").notNull().default(true),
     description: text("description"),
+    // Default tax rate applied to lines coded to this account (Xero-style
+    // account-driven tax defaulting).
+    defaultTaxRateId: uuid("default_tax_rate_id").references(() => taxRate.id),
+    // Portion of activity on this account that is tax-disallowable for income
+    // tax (add-back), in basis points (10000 = 100% disallowed).
+    taxDisallowedPercent: integer("tax_disallowed_percent").notNull().default(0),
+    // Optional reporting/report-code mapping for cross-client report packs.
+    reportingCode: text("reporting_code"),
+    // System control accounts (AR/AP/bank/tax/retained earnings) must not be
+    // retyped or deleted.
+    isSystem: boolean("is_system").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { mode: "date" }),
   },
@@ -112,6 +137,11 @@ export const journalEntry = pgTable(
     postedAt: timestamp("posted_at", { mode: "date" }),
     voidedAt: timestamp("voided_at", { mode: "date" }),
     voidReason: text("void_reason"),
+    // Auto-reversing journals: if set, a mirror reversing entry is posted on this
+    // date (accruals/prepayments). Self-referential links track the pair.
+    autoReverseDate: date("auto_reverse_date"),
+    reversedByEntryId: uuid("reversed_by_entry_id"),
+    reversesEntryId: uuid("reverses_entry_id"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { mode: "date" }),
@@ -166,6 +196,10 @@ export const journalLine = pgTable("journal_line", {
   currencyCode: text("currency_code").notNull().default("USD"),
   exchangeRate: integer("exchange_rate").notNull().default(1000000), // 6 decimal places as int (1.000000 = 1000000)
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  // Project/job dimension (alongside cost center) for job-costing & tracking
+  // reports. Plain uuid (project lives in ./projects) to avoid a schema import
+  // cycle; joined by id in queries.
+  projectId: uuid("project_id"),
 });
 
 // Tax Rate
@@ -179,6 +213,10 @@ export const taxRate = pgTable("tax_rate", {
   name: text("name").notNull(),
   rate: integer("rate").notNull(), // basis points: 1000 = 10.00%
   type: taxTypeEnum("type").notNull().default("both"),
+  kind: taxRateKindEnum("kind").notNull().default("standard"),
+  // Share of input tax that is recoverable, in basis points (10000 = 100%).
+  // 0 = fully blocked/absorbed into cost; 5000 = 50% (e.g. UK car lease).
+  recoverablePercent: integer("recoverable_percent").notNull().default(10000),
   isDefault: boolean("is_default").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -209,6 +247,9 @@ export const periodLock = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     lockDate: date("lock_date").notNull(),
+    // Stricter advisor/hard lock: staff are blocked at lockDate, advisors (with
+    // bypass:period-lock) only at advisorLockDate. Null = same as lockDate.
+    advisorLockDate: date("advisor_lock_date"),
     lockedBy: uuid("locked_by").references(() => users.id),
     reason: text("reason"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

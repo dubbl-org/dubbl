@@ -12,6 +12,8 @@ import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
 import { contact } from "./contacts";
 import { journalEntry, chartAccount, taxRate, costCenter } from "./bookkeeping";
+import { inventoryItem, warehouse } from "./inventory";
+import { bankAccount } from "./banking";
 
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "draft",
@@ -35,6 +37,27 @@ export const creditNoteStatusEnum = pgEnum("credit_note_status", [
   "draft",
   "sent",
   "applied",
+  "void",
+]);
+
+// Sales Receipt (cash sale): records payment + revenue in one step, no AR.
+export const salesReceiptStatusEnum = pgEnum("sales_receipt_status", [
+  "draft",
+  "paid",
+  "void",
+]);
+
+// Customer Credit: prepayments/deposits/overpayments held on account.
+export const customerCreditSourceEnum = pgEnum("customer_credit_source", [
+  "prepayment",
+  "overpayment",
+  "credit_note",
+]);
+
+export const customerCreditStatusEnum = pgEnum("customer_credit_status", [
+  "open",
+  "applied",
+  "refunded",
   "void",
 ]);
 
@@ -68,6 +91,7 @@ export const invoice = pgTable("invoice", {
   sentAt: timestamp("sent_at", { mode: "date" }),
   paidAt: timestamp("paid_at", { mode: "date" }),
   voidedAt: timestamp("voided_at", { mode: "date" }),
+  writtenOffAt: timestamp("written_off_at", { mode: "date" }), // bad-debt write-off marker
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -91,6 +115,11 @@ export const invoiceLine = pgTable("invoice_line", {
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0), // qty * unitPrice - discount (before tax)
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  // Job-costing dimension. Project lives in ./projects; plain uuid (no FK) to avoid import cycle.
+  projectId: uuid("project_id"),
+  // When set, selling this line relieves inventory and posts COGS for the item.
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItem.id),
+  warehouseId: uuid("warehouse_id").references(() => warehouse.id),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -114,6 +143,7 @@ export const quote = pgTable("quote", {
   subtotal: integer("subtotal").notNull().default(0),
   taxTotal: integer("tax_total").notNull().default(0),
   total: integer("total").notNull().default(0),
+  billedTotal: integer("billed_total").notNull().default(0), // cents already invoiced via progress/milestone billing
   currencyCode: text("currency_code").notNull().default("USD"),
   convertedInvoiceId: uuid("converted_invoice_id"),
   sentAt: timestamp("sent_at", { mode: "date" }),
@@ -193,6 +223,86 @@ export const creditNoteLine = pgTable("credit_note_line", {
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
   sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Sales Receipt (cash sale - mirrors invoice shape, but settles immediately to a bank/deposit account)
+export const salesReceipt = pgTable("sales_receipt", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  contactId: uuid("contact_id")
+    .notNull()
+    .references(() => contact.id),
+  receiptNumber: text("receipt_number").notNull(),
+  date: date("date").notNull(),
+  status: salesReceiptStatusEnum("status").notNull().default("draft"),
+  reference: text("reference"),
+  notes: text("notes"),
+  subtotal: integer("subtotal").notNull().default(0),
+  taxTotal: integer("tax_total").notNull().default(0),
+  total: integer("total").notNull().default(0),
+  currencyCode: text("currency_code").notNull().default("USD"),
+  // Money lands in a bank account (preferred) or, failing that, a chart-of-accounts deposit account.
+  bankAccountId: uuid("bank_account_id").references(() => bankAccount.id),
+  depositAccountId: uuid("deposit_account_id").references(() => chartAccount.id),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
+  voidedAt: timestamp("voided_at", { mode: "date" }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+// Sales Receipt Line (mirrors invoice line, incl. inventory/COGS dimensions)
+export const salesReceiptLine = pgTable("sales_receipt_line", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  salesReceiptId: uuid("sales_receipt_id")
+    .notNull()
+    .references(() => salesReceipt.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: integer("quantity").notNull().default(100), // 2 decimal as int (1.00 = 100)
+  unitPrice: integer("unit_price").notNull().default(0), // cents
+  accountId: uuid("account_id").references(() => chartAccount.id),
+  taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
+  taxAmount: integer("tax_amount").notNull().default(0),
+  amount: integer("amount").notNull().default(0), // qty * unitPrice - discount (before tax)
+  costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  projectId: uuid("project_id"), // job-costing dimension (plain uuid; project lives in ./projects)
+  // When set, selling this line relieves inventory and posts COGS for the item.
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItem.id),
+  warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Customer Credit (prepayments / customer deposits / overpayments held on account)
+export const customerCredit = pgTable("customer_credit", {
+  id: uuid("id")
+    .primaryKey()
+    .defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  contactId: uuid("contact_id")
+    .notNull()
+    .references(() => contact.id),
+  date: date("date").notNull(),
+  currencyCode: text("currency_code").notNull().default("USD"),
+  originalAmount: integer("original_amount").notNull().default(0), // cents
+  amountRemaining: integer("amount_remaining").notNull().default(0), // cents unapplied/available
+  sourceType: customerCreditSourceEnum("source_type").notNull(),
+  status: customerCreditStatusEnum("status").notNull().default("open"),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
 
 // Signature
@@ -340,5 +450,71 @@ export const creditNoteLineRelations = relations(creditNoteLine, ({ one }) => ({
   costCenter: one(costCenter, {
     fields: [creditNoteLine.costCenterId],
     references: [costCenter.id],
+  }),
+}));
+
+export const salesReceiptRelations = relations(salesReceipt, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [salesReceipt.organizationId],
+    references: [organization.id],
+  }),
+  contact: one(contact, {
+    fields: [salesReceipt.contactId],
+    references: [contact.id],
+  }),
+  bankAccount: one(bankAccount, {
+    fields: [salesReceipt.bankAccountId],
+    references: [bankAccount.id],
+  }),
+  depositAccount: one(chartAccount, {
+    fields: [salesReceipt.depositAccountId],
+    references: [chartAccount.id],
+  }),
+  journalEntry: one(journalEntry, {
+    fields: [salesReceipt.journalEntryId],
+    references: [journalEntry.id],
+  }),
+  createdByUser: one(users, {
+    fields: [salesReceipt.createdBy],
+    references: [users.id],
+  }),
+  lines: many(salesReceiptLine),
+}));
+
+export const salesReceiptLineRelations = relations(salesReceiptLine, ({ one }) => ({
+  salesReceipt: one(salesReceipt, {
+    fields: [salesReceiptLine.salesReceiptId],
+    references: [salesReceipt.id],
+  }),
+  account: one(chartAccount, {
+    fields: [salesReceiptLine.accountId],
+    references: [chartAccount.id],
+  }),
+  taxRate: one(taxRate, {
+    fields: [salesReceiptLine.taxRateId],
+    references: [taxRate.id],
+  }),
+  costCenter: one(costCenter, {
+    fields: [salesReceiptLine.costCenterId],
+    references: [costCenter.id],
+  }),
+}));
+
+export const customerCreditRelations = relations(customerCredit, ({ one }) => ({
+  organization: one(organization, {
+    fields: [customerCredit.organizationId],
+    references: [organization.id],
+  }),
+  contact: one(contact, {
+    fields: [customerCredit.contactId],
+    references: [contact.id],
+  }),
+  journalEntry: one(journalEntry, {
+    fields: [customerCredit.journalEntryId],
+    references: [journalEntry.id],
+  }),
+  createdByUser: one(users, {
+    fields: [customerCredit.createdBy],
+    references: [users.id],
   }),
 }));

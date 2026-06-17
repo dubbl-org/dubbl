@@ -9,6 +9,7 @@ export * from "./budgets";
 export * from "./expenses";
 export * from "./audit";
 export * from "./inventory";
+export * from "./pricing";
 export * from "./projects";
 export * from "./fixed-assets";
 export * from "./payroll";
