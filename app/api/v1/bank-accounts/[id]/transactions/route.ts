@@ -37,15 +37,28 @@ export async function GET(
       );
     }
 
-    const transactions = await db.query.bankTransaction.findMany({
+    const rows = await db.query.bankTransaction.findMany({
       where: and(...conditions),
       orderBy: desc(bankTransaction.date),
       limit,
       offset,
       with: {
         import: true,
+        // Linked ledger account (set when the transaction is categorized/matched);
+        // used to surface the account code+name in the UI.
+        account: {
+          columns: { id: true, code: true, name: true },
+        },
       },
     });
+
+    // Flatten the linked account into accountCode/accountName while keeping the
+    // existing fields (accountId, journalEntryId, reconciliationId are columns).
+    const transactions = rows.map(({ account, ...tx }) => ({
+      ...tx,
+      accountCode: account?.code ?? null,
+      accountName: account?.name ?? null,
+    }));
 
     const [countResult] = await db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })

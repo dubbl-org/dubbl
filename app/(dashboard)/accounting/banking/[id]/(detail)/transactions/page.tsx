@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { Clock3, Search, X } from "lucide-react";
+import { Clock3, LayoutList, Search, Table2, X } from "lucide-react";
 import { motion } from "motion/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,26 +15,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "../layout";
-import { TransactionRow } from "../../_components";
+import { TransactionRow, CashCodingGrid } from "../../_components";
 
 export default function BankTransactionsPage() {
   const {
     account,
     transactions,
     summary,
+    refetch,
     handleReconcile,
     handleExclude,
     handleOpenMatch,
     handleOpenExpense,
+    handleOpenCategorize,
+    handleOpenMatchInvoice,
+    handleOpenMatchUnified,
+    handleOpenTransfer,
+    handleOpenSplit,
   } = useBankAccountContext();
 
   const cur = account.currencyCode;
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useDocumentTitle("Accounting \u00B7 Bank Transactions");
 
+  const [viewMode, setViewMode] = useState<"list" | "cash-coding">("list");
   const [statusFilter, setStatusFilter] = useState("all");
   const [txSearch, setTxSearch] = useState("");
   const debouncedTxSearch = useDebounce(txSearch);
@@ -70,17 +79,51 @@ export default function BankTransactionsPage() {
 
   return (
     <div className="space-y-4">
+      {/* View toggle: list vs cash-coding grid */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg border p-0.5">
+          {[
+            { value: "list" as const, label: "List", icon: LayoutList },
+            { value: "cash-coding" as const, label: "Assign in bulk", icon: Table2 },
+          ].map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setViewMode(value)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                viewMode === value
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {viewMode === "cash-coding" ? (
+        <CashCodingGrid
+          transactions={transactions}
+          currencyCode={cur}
+          orgId={orgId}
+          onDone={refetch}
+        />
+      ) : (
+      <div className="space-y-4">
       {/* Status tabs + search */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs value={statusFilter} onValueChange={setStatusFilter}>
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="unreconciled">
-              Unreconciled
+            <TabsTrigger value="unreconciled" title="Transactions you haven't dealt with yet">
+              To do
               {summary.unreconciled > 0 && <span className="ml-1 tabular-nums text-amber-600">{summary.unreconciled}</span>}
             </TabsTrigger>
-            <TabsTrigger value="reconciled">Reconciled</TabsTrigger>
-            <TabsTrigger value="excluded">Excluded</TabsTrigger>
+            <TabsTrigger value="reconciled" title="Transactions you've already dealt with">Done</TabsTrigger>
+            <TabsTrigger value="excluded" title="Transactions left out of your books">Ignored</TabsTrigger>
           </TabsList>
         </Tabs>
         <div className="relative w-full sm:max-w-xs">
@@ -144,7 +187,9 @@ export default function BankTransactionsPage() {
         {statusFilter !== "all" && (
           <>
             <span className="text-border">·</span>
-            <span className="capitalize">{statusFilter}</span>
+            <span>
+              {statusFilter === "unreconciled" ? "To do" : statusFilter === "reconciled" ? "Done" : "Ignored"}
+            </span>
           </>
         )}
       </div>
@@ -176,9 +221,16 @@ export default function BankTransactionsPage() {
               onExclude={handleExclude}
               onMatchBill={handleOpenMatch}
               onCreateExpense={handleOpenExpense}
+              onCategorize={handleOpenCategorize}
+              onMatchInvoice={handleOpenMatchInvoice}
+              onMatch={handleOpenMatchUnified}
+              onTransfer={handleOpenTransfer}
+              onSplit={handleOpenSplit}
             />
           ))}
         </motion.div>
+      )}
+      </div>
       )}
     </div>
   );

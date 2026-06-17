@@ -149,8 +149,8 @@ export default function BankingPage() {
                 },
                 {
                   step: "3",
-                  label: "Reconcile",
-                  sub: "Match transactions to invoices and bills",
+                  label: "Sort your transactions",
+                  sub: "Match them to invoices and bills, or assign a category",
                   icon: ChevronRight,
                   color: "bg-emerald-500",
                   ring: "ring-emerald-200 dark:ring-emerald-900",

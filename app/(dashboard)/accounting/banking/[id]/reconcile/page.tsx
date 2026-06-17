@@ -31,6 +31,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { ReconciliationReport, type ReconciliationData } from "../_components";
 
 interface BankAccountDetail {
   id: string;
@@ -47,6 +48,17 @@ interface Transaction {
   amount: number;
   balance: number | null;
   status: "unreconciled" | "reconciled" | "excluded";
+  accountId?: string | null;
+  accountCode?: string | null;
+  accountName?: string | null;
+  journalEntryId?: string | null;
+  reconciliationId?: string | null;
+}
+
+// A statement line should be categorized/matched (its journal entry recorded)
+// before it's reconciled, so the books stay in sync with the bank.
+function isCategorized(t: Transaction): boolean {
+  return Boolean(t.journalEntryId);
 }
 
 interface Reconciliation {
@@ -65,6 +77,7 @@ export default function ReconcilePage() {
   const [account, setAccount] = useState<BankAccountDetail | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
+  const [report, setReport] = useState<ReconciliationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -83,25 +96,45 @@ export default function ReconcilePage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  useDocumentTitle("Accounting \u00B7 Reconciliation");
+  useDocumentTitle("Accounting \u00B7 Match statement to your books");
 
   const fetchData = useCallback(() => {
     if (!orgId) return;
     const headers = { "x-organization-id": orgId };
 
+    // Pull both the still-to-review lines (status=unreconciled) and the
+    // categorized/matched lines (status=reconciled — categorize/match flip the
+    // status while recording a journal entry) so the latter can be ticked off
+    // into a statement reconciliation. Lines already part of a completed
+    // statement reconciliation (reconciliationId set) are filtered out below.
     Promise.all([
       fetch(`/api/v1/bank-accounts/${id}`, { headers }).then((r) => r.json()),
       fetch(`/api/v1/bank-accounts/${id}/transactions?status=unreconciled&limit=100`, {
         headers,
       }).then((r) => r.json()),
+      fetch(`/api/v1/bank-accounts/${id}/transactions?status=reconciled&limit=100`, {
+        headers,
+      }).then((r) => r.json()),
       fetch(`/api/v1/bank-accounts/${id}/reconciliations`, {
         headers,
       }).then((r) => r.json()),
+      // Statement-vs-GL report: end balance, GL balance, running difference and
+      // the reconciled / unreconciled splits, scoped to the latest reconciliation.
+      fetch(`/api/v1/bank-accounts/${id}/reconciliation`, { headers })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
     ])
-      .then(([accountData, txData, recData]) => {
+      .then(([accountData, unreconciledData, reconciledData, recData, reportData]) => {
         if (accountData.bankAccount) setAccount(accountData.bankAccount);
-        if (txData.data) setTransactions(txData.data);
+        const unreconciled: Transaction[] = unreconciledData.data ?? [];
+        // Categorized lines that haven't yet been rolled into a completed
+        // statement reconciliation.
+        const categorized: Transaction[] = (reconciledData.data ?? []).filter(
+          (t: Transaction) => t.journalEntryId && !t.reconciliationId
+        );
+        setTransactions([...unreconciled, ...categorized]);
         if (recData.data) setReconciliations(recData.data);
+        setReport(reportData && reportData.bankAccountId ? reportData : null);
       })
       .finally(() => setLoading(false));
   }, [id, orgId]);
@@ -120,20 +153,31 @@ export default function ReconcilePage() {
     );
   });
 
-  function toggleSelect(txId: string) {
+  // Only categorized/matched lines may be included in a reconciliation.
+  const selectableTransactions = filteredTransactions.filter(isCategorized);
+  const uncategorizedCount = filteredTransactions.length - selectableTransactions.length;
+
+  function toggleSelect(tx: Transaction) {
+    if (!isCategorized(tx)) {
+      toast.error("Add this transaction to your books before matching it to the statement.");
+      return;
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(txId)) next.delete(txId);
-      else next.add(txId);
+      if (next.has(tx.id)) next.delete(tx.id);
+      else next.add(tx.id);
       return next;
     });
   }
 
   function selectAll() {
-    if (selectedIds.size === filteredTransactions.length) {
+    if (
+      selectableTransactions.length > 0 &&
+      selectedIds.size === selectableTransactions.length
+    ) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredTransactions.map((t) => t.id)));
+      setSelectedIds(new Set(selectableTransactions.map((t) => t.id)));
     }
   }
 
@@ -159,7 +203,7 @@ export default function ReconcilePage() {
       }
     }
 
-    const label = action === "reconcile" ? "Reconciled" : "Excluded";
+    const label = action === "reconcile" ? "Matched" : "Ignored";
     toast.success(`${label} ${success} transaction${success !== 1 ? "s" : ""}`);
     setSelectedIds(new Set());
     setActing(false);
@@ -184,13 +228,13 @@ export default function ReconcilePage() {
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      toast.success("Reconciliation created");
+      toast.success("Statement check started");
       setSheetOpen(false);
       setRecForm({ startDate: "", endDate: "", startBalance: "", endBalance: "" });
       fetchData();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create reconciliation"
+        err instanceof Error ? err.message : "Couldn't start the statement check"
       );
     } finally {
       setSavingRec(false);
@@ -218,14 +262,14 @@ export default function ReconcilePage() {
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-semibold tracking-tight truncate">
-            Reconcile {account?.accountName}
+            Match statement to your books · {account?.accountName}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Review and match unreconciled transactions
+            Tick off transactions that appear on your bank statement
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setSheetOpen(true)}>
-          New Reconciliation
+          Check a statement
         </Button>
       </div>
 
@@ -233,13 +277,13 @@ export default function ReconcilePage() {
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="grid grid-cols-3 divide-x">
           <div className="p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Statement Balance</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Account balance</p>
             <p className="mt-1 text-xl font-semibold font-mono tabular-nums">
               {formatMoney(account?.balance || 0)}
             </p>
           </div>
           <div className="p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Unreconciled</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Still to match</p>
             <p className="mt-1 text-xl font-semibold font-mono tabular-nums">
               {transactions.length}
               <span className="text-sm font-normal text-muted-foreground ml-1.5">
@@ -271,18 +315,20 @@ export default function ReconcilePage() {
               onClick={() => bulkAction("reconcile")}
               disabled={acting}
               className="bg-emerald-600 hover:bg-emerald-700"
+              title="Tick off these lines as appearing on your bank statement"
             >
               <CheckCircle className="mr-1.5 size-3.5" />
-              Reconcile {selectedIds.size}
+              Mark {selectedIds.size} as on statement
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => bulkAction("exclude")}
               disabled={acting}
+              title="Leave these lines out of your books"
             >
               <XCircle className="mr-1.5 size-3.5" />
-              Exclude {selectedIds.size}
+              Ignore {selectedIds.size}
             </Button>
             <div className="flex-1" />
             <button
@@ -296,13 +342,24 @@ export default function ReconcilePage() {
         )}
       </div>
 
+      {/* Statement vs GL report + running difference + adjustment */}
+      {report && account && (
+        <ReconciliationReport
+          data={report}
+          currencyCode={account.currencyCode}
+          orgId={orgId}
+          bankAccountId={id}
+          onChanged={fetchData}
+        />
+      )}
+
       {/* Transaction list */}
       {filteredTransactions.length === 0 && transactions.length === 0 ? (
         <div className="rounded-xl border border-dashed py-16 text-center">
           <CheckCircle className="size-8 text-emerald-500 mx-auto" />
           <h3 className="mt-3 text-sm font-semibold">All caught up</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            No unreconciled transactions to review.
+            Nothing left to match to your statement.
           </p>
         </div>
       ) : (
@@ -319,40 +376,58 @@ export default function ReconcilePage() {
             </div>
             <button
               type="button"
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
               onClick={selectAll}
+              disabled={selectableTransactions.length === 0}
             >
-              {selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0
+              {selectableTransactions.length > 0 &&
+              selectedIds.size === selectableTransactions.length
                 ? "Deselect all"
                 : "Select all"}
             </button>
           </div>
 
+          {uncategorizedCount > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <span className="font-medium">
+                {uncategorizedCount} transaction{uncategorizedCount !== 1 ? "s" : ""} not in your books yet.
+              </span>{" "}
+              Assign {uncategorizedCount !== 1 ? "them" : "it"} to a category or match {uncategorizedCount !== 1 ? "them" : "it"} from the
+              bank account page first — only lines that are in your books can be matched to the statement.
+            </div>
+          )}
+
           <div className="rounded-lg border divide-y">
             {filteredTransactions.map((tx) => {
               const selected = selectedIds.has(tx.id);
               const isIncome = tx.amount >= 0;
+              const categorized = isCategorized(tx);
               return (
                 <button
                   key={tx.id}
                   type="button"
-                  onClick={() => toggleSelect(tx.id)}
+                  onClick={() => toggleSelect(tx)}
+                  aria-disabled={!categorized}
                   className={cn(
                     "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
-                    selected
-                      ? "bg-emerald-50/50 dark:bg-emerald-950/20"
-                      : "hover:bg-muted/40"
+                    !categorized
+                      ? "cursor-not-allowed opacity-60 hover:bg-muted/20"
+                      : selected
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/20"
+                        : "hover:bg-muted/40"
                   )}
                 >
                   <div
                     className={cn(
                       "flex size-5 shrink-0 items-center justify-center rounded transition-colors",
-                      selected
-                        ? "bg-emerald-600 text-white"
-                        : "border border-muted-foreground/25"
+                      !categorized
+                        ? "border border-dashed border-muted-foreground/30"
+                        : selected
+                          ? "bg-emerald-600 text-white"
+                          : "border border-muted-foreground/25"
                     )}
                   >
-                    {selected && <Check className="size-3" />}
+                    {selected && categorized && <Check className="size-3" />}
                   </div>
 
                   <div className={cn(
@@ -365,13 +440,28 @@ export default function ReconcilePage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{tx.description}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{tx.description}</p>
+                      {categorized && tx.accountName && (
+                        <span className="text-xs text-muted-foreground truncate shrink min-w-0">
+                          &rarr; {tx.accountName}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">{tx.date}</span>
                       {tx.reference && (
                         <>
                           <span className="text-muted-foreground/30">·</span>
                           <span className="text-xs text-muted-foreground">{tx.reference}</span>
+                        </>
+                      )}
+                      {!categorized && (
+                        <>
+                          <span className="text-muted-foreground/30">·</span>
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Add to your books first
+                          </span>
                         </>
                       )}
                     </div>
@@ -393,7 +483,7 @@ export default function ReconcilePage() {
       {/* Past reconciliations */}
       {reconciliations.length > 0 && (
         <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold">Past Reconciliations</h3>
+          <h3 className="text-sm font-semibold">Past statement checks</h3>
           <div className="rounded-lg border divide-y">
             {reconciliations.map((rec) => (
               <div key={rec.id} className="flex items-center gap-4 px-4 py-3">
@@ -427,9 +517,9 @@ export default function ReconcilePage() {
         <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div>
-              <SheetTitle className="text-lg">New Reconciliation</SheetTitle>
+              <SheetTitle className="text-lg">Check a statement</SheetTitle>
               <SheetDescription>
-                Enter your bank statement dates and balances to start reconciling.
+                Enter your bank statement dates and balances to start checking it against your books.
               </SheetDescription>
             </div>
           </SheetHeader>
@@ -503,7 +593,7 @@ export default function ReconcilePage() {
               disabled={!recForm.startDate || !recForm.endDate || savingRec}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
-              {savingRec ? "Creating..." : "Create Reconciliation"}
+              {savingRec ? "Starting..." : "Start checking"}
             </Button>
           </div>
         </SheetContent>

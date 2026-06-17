@@ -3,7 +3,6 @@
 import { Clock3, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "./layout";
 import { TransactionRow, ImportRow } from "../_components";
@@ -18,6 +17,11 @@ export default function BankAccountOverviewPage() {
     handleExclude,
     handleOpenMatch,
     handleOpenExpense,
+    handleOpenCategorize,
+    handleOpenMatchInvoice,
+    handleOpenMatchUnified,
+    handleOpenTransfer,
+    handleOpenSplit,
     openImport,
   } = useBankAccountContext();
 
@@ -31,9 +35,9 @@ export default function BankAccountOverviewPage() {
       <div>
         <div className="flex items-center gap-6 text-[13px]">
           {[
-            { label: "Unreconciled", count: summary.unreconciled, dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
-            { label: "Reconciled", count: summary.reconciled, dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
-            { label: "Excluded", count: summary.excluded, dot: "bg-gray-400", text: "text-muted-foreground" },
+            { label: "To do", count: summary.unreconciled, dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+            { label: "Done", count: summary.reconciled, dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Ignored", count: summary.excluded, dot: "bg-gray-400", text: "text-muted-foreground" },
           ].map(({ label, count, dot, text }) => (
             <div key={label} className="flex items-center gap-2">
               <span className={cn("size-2 rounded-full", dot)} />
@@ -85,6 +89,11 @@ export default function BankAccountOverviewPage() {
                 onExclude={handleExclude}
                 onMatchBill={handleOpenMatch}
                 onCreateExpense={handleOpenExpense}
+                onCategorize={handleOpenCategorize}
+                onMatchInvoice={handleOpenMatchInvoice}
+                onMatch={handleOpenMatchUnified}
+                onTransfer={handleOpenTransfer}
+                onSplit={handleOpenSplit}
               />
             ))}
           </div>

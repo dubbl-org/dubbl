@@ -10,17 +10,58 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 
-const createSchema = z.object({
-  name: z.string().min(1),
-  priority: z.number().int().default(0),
-  matchField: z.string().default("description"),
-  matchType: z.enum(["contains", "equals", "starts_with", "ends_with"]),
-  matchValue: z.string().min(1),
-  accountId: z.string().nullable().optional(),
-  contactId: z.string().nullable().optional(),
-  taxRateId: z.string().nullable().optional(),
-  autoReconcile: z.boolean().default(false),
+// A single multi-condition test. Text ops match case-insensitively; amount ops
+// compare integer cents (`between` value is "min,max").
+const conditionSchema = z.object({
+  field: z.enum(["description", "reference", "amount", "payee", "counterparty"]),
+  op: z.enum([
+    "contains",
+    "equals",
+    "starts_with",
+    "ends_with",
+    "gt",
+    "lt",
+    "between",
+  ]),
+  value: z.string().min(1),
 });
+
+// Split a matched transaction across several accounts. `amount` (integer cents)
+// takes precedence over `percent` (0-100); the last allocation absorbs any
+// rounding remainder so splits always sum to the transaction total.
+const splitAllocationSchema = z.object({
+  accountId: z.string().min(1),
+  percent: z.number().min(0).max(100).optional(),
+  amount: z.number().int().optional(),
+  taxRateId: z.string().optional(),
+});
+
+const createSchema = z
+  .object({
+    name: z.string().min(1),
+    priority: z.number().int().default(0),
+    matchField: z.string().default("description"),
+    // Legacy single condition. Optional when `conditions` is provided.
+    matchType: z
+      .enum(["contains", "equals", "starts_with", "ends_with"])
+      .optional(),
+    matchValue: z.string().min(1).optional(),
+    // Multi-condition rule. When non-empty it supersedes the legacy fields.
+    conditions: z.array(conditionSchema).default([]),
+    matchAll: z.boolean().default(true),
+    splitAllocations: z.array(splitAllocationSchema).nullable().optional(),
+    accountId: z.string().nullable().optional(),
+    contactId: z.string().nullable().optional(),
+    taxRateId: z.string().nullable().optional(),
+    autoReconcile: z.boolean().default(false),
+  })
+  .refine(
+    (v) => v.conditions.length > 0 || (v.matchType != null && v.matchValue != null),
+    {
+      message:
+        "Provide either `conditions` or the legacy `matchType` and `matchValue`.",
+    }
+  );
 
 export async function GET(request: Request) {
   try {
@@ -68,8 +109,13 @@ export async function POST(request: Request) {
         name: parsed.name,
         priority: parsed.priority,
         matchField: parsed.matchField,
-        matchType: parsed.matchType,
-        matchValue: parsed.matchValue,
+        // matchType/matchValue are NOT NULL columns; when a multi-condition rule
+        // is used they're superseded by `conditions`, so store harmless defaults.
+        matchType: parsed.matchType ?? "contains",
+        matchValue: parsed.matchValue ?? "",
+        conditions: parsed.conditions,
+        matchAll: parsed.matchAll,
+        splitAllocations: parsed.splitAllocations ?? null,
         accountId: parsed.accountId || null,
         contactId: parsed.contactId || null,
         taxRateId: parsed.taxRateId || null,
