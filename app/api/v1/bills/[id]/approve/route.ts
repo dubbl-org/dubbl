@@ -7,7 +7,14 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
-import { createBillJournalEntry } from "@/lib/api/journal-automation";
+import {
+  createBillJournalEntry,
+  mapBillLinesForPosting,
+  recordBillStockReceipts,
+  assertBaseRateAvailable,
+} from "@/lib/api/journal-automation";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { postBillReceipt, ProcurementBlockedError } from "../../_procurement";
 
 export async function POST(
   request: Request,
@@ -35,21 +42,38 @@ export async function POST(
       );
     }
 
-    // Create journal entry
-    const entry = await createBillJournalEntry(
+    // Pre-flight guards before any posting/side effects: the posting date must
+    // not fall in a locked period, and a foreign-currency bill must have a base
+    // rate on its issue date (fail cleanly as 422 with no partial writes).
+    await assertNotLocked(ctx.organizationId, found.issueDate, ctx);
+    await assertBaseRateAvailable(ctx.organizationId, found.currencyCode, found.issueDate);
+
+    // Post the bill: main entry (unmatched lines + full tax → AP) plus, for any
+    // line linked to a goods receipt / PO line, clear GRNI (DR 2150) and book
+    // purchase price variance (5050). Enforces three-way-match tolerances —
+    // a hard violation throws ProcurementBlockedError (422 below).
+    const { entryId, grniEntryId, warnings } = await postBillReceipt(
       { organizationId: ctx.organizationId, userId: ctx.userId },
       {
         billNumber: found.billNumber,
-        total: found.total,
+        issueDate: found.issueDate,
+        currencyCode: found.currencyCode,
         taxTotal: found.taxTotal,
+        total: found.total,
         lines: found.lines.map((l) => ({
-          accountId: l.accountId,
+          id: l.id,
+          description: l.description,
           amount: l.amount,
+          quantity: l.quantity,
+          accountId: l.accountId,
+          inventoryItemId: l.inventoryItemId,
+          warehouseId: l.warehouseId,
+          goodsReceiptLineId: l.goodsReceiptLineId,
+          taxRateId: l.taxRateId,
           taxAmount: l.taxAmount,
         })),
-        date: found.issueDate,
-        currencyCode: found.currencyCode,
-      }
+      },
+      { createBillJournalEntry, mapBillLinesForPosting, recordBillStockReceipts }
     );
 
     const [updated] = await db
@@ -58,7 +82,7 @@ export async function POST(
         status: "received",
         approvedBy: ctx.userId,
         approvedAt: new Date(),
-        journalEntryId: entry?.id || null,
+        journalEntryId: entryId || null,
         updatedAt: new Date(),
       })
       .where(eq(bill.id, id))
@@ -66,8 +90,11 @@ export async function POST(
 
     logAudit({ ctx, action: "approve", entityType: "bill", entityId: id, changes: { previousStatus: found.status }, request });
 
-    return NextResponse.json({ bill: updated });
+    return NextResponse.json({ bill: updated, grniEntryId, warnings });
   } catch (err) {
+    if (err instanceof ProcurementBlockedError) {
+      return NextResponse.json({ error: err.message, issues: err.issues }, { status: 422 });
+    }
     return handleError(err);
   }
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, ShoppingCart, Pencil, Trash2, Plus, Package } from "lucide-react";
+import { ArrowLeft, Send, ShoppingCart, Pencil, Trash2, Plus, Package, PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,8 @@ interface PODetail {
     id: string;
     description: string;
     quantity: number;
+    quantityReceived: number;
+    quantityBilled: number;
     unitPrice: number;
     amount: number;
     account: { id: string; code: string; name: string } | null;
@@ -67,6 +69,16 @@ const statusConfig: Record<string, { class: string }> = {
   received: { class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
   closed: { class: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300" },
   void: { class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300" },
+};
+
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "ordered",
+  partial: "some items in",
+  received: "all items in",
+  closed: "fully billed",
+  void: "cancelled",
 };
 
 // ---------------------------------------------------------------------------
@@ -347,10 +359,52 @@ export default function PODetailPage() {
     const res = await fetch(`/api/v1/purchase-orders/${id}/convert`, { method: "POST", headers: { "x-organization-id": orgId } });
     if (res.ok) {
       const data = await res.json();
-      toast.success("Converted to bill");
+      toast.success("Bill created from this order");
       router.push(`/purchases/${data.bill.id}`);
     } else {
-      toast.error("Failed to convert");
+      toast.error("Couldn't create a bill from this order");
+    }
+  }
+
+  // Record that the items you ordered have arrived (for the quantities still
+  // outstanding on each line). Adds stock you track to your inventory.
+  async function handleReceiveItems() {
+    if (!orgId || !po) return;
+    const linesToReceive = po.lines
+      .map((l) => ({
+        purchaseOrderLineId: l.id,
+        quantity: (l.quantity - l.quantityReceived) / 100,
+      }))
+      .filter((l) => l.quantity > 0);
+
+    if (linesToReceive.length === 0) {
+      toast.info("All items on this order are already marked as received");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: "Mark all items as received?",
+      description:
+        "Records that everything still outstanding on this order has arrived. Anything you track as stock is added to your inventory.",
+      confirmLabel: "Mark items as received",
+    });
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/v1/goods-receipts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+      body: JSON.stringify({
+        purchaseOrderId: id,
+        date: new Date().toISOString().split("T")[0],
+        lines: linesToReceive,
+      }),
+    });
+    if (res.ok) {
+      toast.success("Items marked as received");
+      loadPO();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Couldn't record the items as received");
     }
   }
 
@@ -403,7 +457,7 @@ export default function PODetailPage() {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-semibold tracking-tight">{po.poNumber}</h1>
-                <Badge variant="outline" className={sc.class}>{po.status}</Badge>
+                <Badge variant="outline" className={sc.class}>{statusLabels[po.status] || po.status}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {po.contact?.name || "Unknown supplier"}
@@ -425,9 +479,19 @@ export default function PODetailPage() {
                 </Button>
               </>
             )}
-            {["sent", "received"].includes(po.status) && (
-              <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700">
-                <ShoppingCart className="mr-2 size-3.5" />Convert to Bill
+            {["sent", "partial"].includes(po.status) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReceiveItems}
+                title="Record that the items you ordered have arrived. Anything you track as stock is added to your inventory."
+              >
+                <PackageCheck className="mr-2 size-3.5" />Mark items as received
+              </Button>
+            )}
+            {["sent", "partial", "received"].includes(po.status) && (
+              <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700" title="Turn this order into a bill you can pay">
+                <ShoppingCart className="mr-2 size-3.5" />Create a bill from this order
               </Button>
             )}
           </div>

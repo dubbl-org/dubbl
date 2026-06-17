@@ -8,7 +8,7 @@ const TABS = [
   { href: "/purchases/expenses", label: "Expenses", icon: CreditCard },
   { href: "/purchases/orders", label: "Purchase Orders", icon: ClipboardList },
   { href: "/purchases/requisitions", label: "Requisitions", icon: ClipboardCheck },
-  { href: "/purchases/landed-costs", label: "Landed Costs", icon: PackageOpen },
+  { href: "/purchases/landed-costs", label: "Landed Costs", icon: PackageOpen, title: "Extra costs like freight & duty added to the cost of stock" },
 ];
 
 export default function PurchasesLayout({

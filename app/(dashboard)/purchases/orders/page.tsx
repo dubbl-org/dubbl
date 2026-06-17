@@ -55,6 +55,16 @@ const statusColors: Record<string, string> = {
   void: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "ordered",
+  partial: "some items in",
+  received: "all items in",
+  closed: "fully billed",
+  void: "cancelled",
+};
+
 function buildColumns(): Column<PO>[] {
   return [
     {
@@ -90,7 +100,7 @@ function buildColumns(): Column<PO>[] {
       className: "w-24",
       render: (r) => (
         <Badge variant="outline" className={statusColors[r.status] || ""}>
-          {r.status}
+          {statusLabels[r.status] || r.status}
         </Badge>
       ),
     },
@@ -278,7 +288,7 @@ export default function PurchaseOrdersPage() {
                 icon: Truck,
                 step: "2",
                 label: "Send to Supplier",
-                desc: "Send the PO directly to your supplier for fulfillment",
+                desc: "Send the purchase order directly to your supplier for fulfillment",
                 color: "text-amber-600 dark:text-amber-400",
                 bg: "bg-amber-50 dark:bg-amber-950/40",
                 top: "bg-amber-500",
@@ -361,7 +371,7 @@ export default function PurchaseOrdersPage() {
             className="bg-emerald-600 hover:bg-emerald-700"
           >
             <Plus className="mr-2 size-4" />
-            New PO
+            New purchase order
           </Button>
         </PageHeader>
 
@@ -408,10 +418,10 @@ export default function PurchaseOrdersPage() {
               <TabsList>
                 <TabsTrigger value="all" className="whitespace-nowrap">All ({countsData?.total || 0})</TabsTrigger>
                 <TabsTrigger value="draft" className="whitespace-nowrap">Draft ({statusCounts.draft || 0})</TabsTrigger>
-                <TabsTrigger value="sent" className="whitespace-nowrap">Sent ({statusCounts.sent || 0})</TabsTrigger>
-                <TabsTrigger value="partial" className="whitespace-nowrap">Partial ({statusCounts.partial || 0})</TabsTrigger>
-                <TabsTrigger value="received" className="whitespace-nowrap">Received ({statusCounts.received || 0})</TabsTrigger>
-                <TabsTrigger value="closed" className="whitespace-nowrap">Closed ({statusCounts.closed || 0})</TabsTrigger>
+                <TabsTrigger value="sent" className="whitespace-nowrap">Ordered ({statusCounts.sent || 0})</TabsTrigger>
+                <TabsTrigger value="partial" className="whitespace-nowrap">Some items in ({statusCounts.partial || 0})</TabsTrigger>
+                <TabsTrigger value="received" className="whitespace-nowrap">All items in ({statusCounts.received || 0})</TabsTrigger>
+                <TabsTrigger value="closed" className="whitespace-nowrap" title="Fully turned into bills">Fully billed ({statusCounts.closed || 0})</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>

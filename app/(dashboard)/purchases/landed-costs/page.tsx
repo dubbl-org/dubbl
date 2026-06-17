@@ -217,7 +217,7 @@ export default function LandedCostsPage() {
             Landed Costs
           </h1>
           <p className="text-sm text-muted-foreground">
-            Allocate additional costs to purchase orders
+            Extra costs like freight &amp; duty added to the cost of stock.
           </p>
         </div>
         <Button
