@@ -16,7 +16,7 @@ const createSchema = z.object({
   parentId: z.string().nullable().optional(),
   currencyCode: currencyCodeSchema.default("USD"),
   description: z.string().nullable().optional(),
-  // Account-driven tax defaulting (Xero-style): lines coded to this account
+  // Account-driven tax defaulting: lines coded to this account
   // pick up this tax rate by default.
   defaultTaxRateId: z.string().uuid().nullable().optional(),
   // Portion of activity disallowable for income tax, in basis points (10000 = 100%).

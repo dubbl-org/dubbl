@@ -93,8 +93,8 @@ export const chartAccount = pgTable(
       .default("USD"),
     isActive: boolean("is_active").notNull().default(true),
     description: text("description"),
-    // Default tax rate applied to lines coded to this account (Xero-style
-    // account-driven tax defaulting).
+    // Default tax rate applied to lines coded to this account
+    // (account-driven tax defaulting).
     defaultTaxRateId: uuid("default_tax_rate_id").references(() => taxRate.id),
     // Portion of activity on this account that is tax-disallowable for income
     // tax (add-back), in basis points (10000 = 100% disallowed).

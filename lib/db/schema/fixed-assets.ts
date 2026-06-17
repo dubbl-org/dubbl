@@ -41,7 +41,7 @@ export const assetStatusEnum = pgEnum("asset_status", [
 ]);
 
 // Asset Category — a reusable template of depreciation + posting defaults that
-// can be copied onto each asset at creation time (Sage-style asset classes).
+// can be copied onto each asset at creation time (reusable asset classes).
 export const assetCategory = pgTable("asset_category", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")

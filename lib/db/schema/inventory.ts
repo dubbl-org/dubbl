@@ -31,7 +31,7 @@ export const serialStatusEnum = pgEnum("serial_status", [
 
 // Cost-flow method for perpetual inventory valuation.
 export const costMethodEnum = pgEnum("cost_method", [
-  "average", // moving weighted average (default; Xero-style)
+  "average", // moving weighted average (default)
   "fifo", // first-in-first-out cost layers
   "standard", // standard cost + purchase-price variance (deferred; gated)
 ]);
