@@ -184,10 +184,10 @@ export default function InventoryItemDetailsPage() {
 
         <div className="h-px bg-border" />
 
-        <Section title="Pricing" description="Purchase cost and sale price for this item.">
+        <Section title="Pricing" description="What this item costs you and what you sell it for.">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="purchasePrice">Purchase Price</Label>
+              <Label className="text-xs" htmlFor="purchasePrice">What it costs you</Label>
               <CurrencyInput
                 id="purchasePrice"
                 prefix="$"
@@ -196,7 +196,7 @@ export default function InventoryItemDetailsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="salePrice">Sale Price</Label>
+              <Label className="text-xs" htmlFor="salePrice">What you sell it for</Label>
               <CurrencyInput
                 id="salePrice"
                 prefix="$"
@@ -209,10 +209,10 @@ export default function InventoryItemDetailsPage() {
 
         <div className="h-px bg-border" />
 
-        <Section title="Stock" description="Reorder point for low stock alerts.">
+        <Section title="Stock" description="Get an alert when you're running low.">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="reorderPoint">Reorder Point</Label>
+              <Label className="text-xs" htmlFor="reorderPoint">Alert me when stock drops to</Label>
               <Input
                 id="reorderPoint"
                 name="reorderPoint"
@@ -263,7 +263,7 @@ export default function InventoryItemDetailsPage() {
         <>
           <div className="h-px bg-border mt-10" />
           <div className="mt-10">
-          <Section title="Stock by Warehouse" description="Quantity breakdown across warehouses.">
+          <Section title="Stock by location" description="How many units you have at each location.">
             <div className="rounded-lg border divide-y">
               {warehouseStocks.map((ws) => (
                 <div key={ws.id} className="flex items-center justify-between px-4 py-3">

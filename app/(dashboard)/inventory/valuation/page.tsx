@@ -81,7 +81,7 @@ export default function InventoryValuationPage() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
-  useDocumentTitle("Inventory · Valuation");
+  useDocumentTitle("Inventory · Stock value");
 
   const orgId =
     typeof window !== "undefined"
@@ -191,10 +191,10 @@ export default function InventoryValuationPage() {
 
   const stats = [
     { label: "Total Items", value: String(summary.totalItems), icon: Package },
-    { label: "Total Cost", value: formatMoney(summary.totalCost), icon: DollarSign },
-    { label: "Retail Value", value: formatMoney(summary.totalRetailValue), icon: BarChart3, color: "text-emerald-600 dark:text-emerald-400" },
+    { label: "What it cost you", value: formatMoney(summary.totalCost), icon: DollarSign },
+    { label: "What it could sell for", value: formatMoney(summary.totalRetailValue), icon: BarChart3, color: "text-emerald-600 dark:text-emerald-400" },
     {
-      label: "Avg Margin",
+      label: "Avg profit margin",
       value: summary.totalMargin > 0 ? `${summary.totalMargin.toFixed(1)}%` : "-",
       icon: TrendingUp,
       color: summary.totalMargin > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined,
@@ -204,8 +204,8 @@ export default function InventoryValuationPage() {
   return (
     <ContentReveal className="space-y-6">
       <PageHeader
-        title="Inventory Valuation"
-        description="Analyze the cost, retail value, and margin of every item in your inventory."
+        title="Stock value"
+        description="See what your stock cost you, what it could sell for, and the profit in between."
       >
         {items.length > 0 && (
           <div className="relative w-full sm:w-64">
@@ -232,7 +232,7 @@ export default function InventoryValuationPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-muted-foreground">
               <BarChart3 className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Valuation</span>
+              <span className="text-xs font-medium uppercase tracking-wide">Stock value</span>
             </div>
             <Button
               variant="outline"
@@ -247,11 +247,11 @@ export default function InventoryValuationPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Total Cost</p>
+              <p className="text-xs text-muted-foreground mb-0.5">What it cost you</p>
               <p className="text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(summary.totalCost)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Retail Value</p>
+              <p className="text-xs text-muted-foreground mb-0.5">What it could sell for</p>
               <p className="text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{formatMoney(summary.totalRetailValue)}</p>
             </div>
           </div>
@@ -272,7 +272,7 @@ export default function InventoryValuationPage() {
               </div>
               <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" />Cost ({formatMoney(summary.totalCost)})</span>
-                <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-300 dark:bg-emerald-700" />Margin ({formatMoney(profitAmount)})</span>
+                <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-300 dark:bg-emerald-700" />Profit ({formatMoney(profitAmount)})</span>
               </div>
             </div>
           )}
@@ -311,7 +311,7 @@ export default function InventoryValuationPage() {
       {items.length === 0 ? (
         <div className="rounded-xl border bg-card overflow-hidden">
           <div className="bg-muted/30 px-5 py-3 border-b flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Valuation Preview</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stock value preview</p>
             <Button
               onClick={() => openDrawer("inventory")}
               size="sm"

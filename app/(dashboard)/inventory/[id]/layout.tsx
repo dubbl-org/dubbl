@@ -3,17 +3,19 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { ArrowLeft, Package, ArrowUpDown, Power, PowerOff, Settings2, Clock, Truck, Layers } from "lucide-react";
+import { ArrowLeft, Package, ArrowUpDown, Power, PowerOff, Settings2, Clock, Truck, Layers, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -35,6 +37,7 @@ export interface InventoryItemDetail {
   salePrice: number;
   quantityOnHand: number;
   reorderPoint: number;
+  totalValue?: number;
   isActive: boolean;
 }
 
@@ -68,6 +71,11 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustment, setAdjustment] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
+  // "Write down value" sheet: lower the book value without changing the count.
+  const [writeDownOpen, setWriteDownOpen] = useState(false);
+  const [writeDownAmount, setWriteDownAmount] = useState("");
+  const [writeDownReason, setWriteDownReason] = useState("");
+  const [writeDownBusy, setWriteDownBusy] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -119,9 +127,44 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
       setAdjustOpen(false);
       setAdjustment("");
       setAdjustReason("");
-      toast.success(`Quantity adjusted by ${adj > 0 ? "+" : ""}${adj}`);
+      toast.success(`Count changed by ${adj > 0 ? "+" : ""}${adj}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to adjust quantity");
+      toast.error(err instanceof Error ? err.message : "Couldn't change the count");
+    }
+  }
+
+  async function handleWriteDown() {
+    if (!orgId) return;
+    const amount = Math.round(parseFloat(writeDownAmount || "0") * 100);
+    if (!amount || amount <= 0 || !writeDownReason.trim()) {
+      toast.error("Enter how much to write off and why");
+      return;
+    }
+    setWriteDownBusy(true);
+    try {
+      const res = await fetch(`/api/v1/inventory/${id}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          adjustmentType: "write_down",
+          valueDelta: amount,
+          reason: writeDownReason,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Couldn't write down the value");
+      }
+      const data = await res.json();
+      setItemRaw(data.inventoryItem);
+      setWriteDownOpen(false);
+      setWriteDownAmount("");
+      setWriteDownReason("");
+      toast.success("Value written down");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't write down the value");
+    } finally {
+      setWriteDownBusy(false);
     }
   }
 
@@ -136,9 +179,9 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
       if (!res.ok) throw new Error();
       const data = await res.json();
       setItemRaw(data.inventoryItem);
-      toast.success(data.inventoryItem.isActive ? "Item activated" : "Item deactivated");
+      toast.success(data.inventoryItem.isActive ? "Item is now shown" : "Item is now hidden");
     } catch {
-      toast.error("Failed to update status");
+      toast.error("Couldn't update the item");
     }
   }
 
@@ -205,8 +248,8 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold">{item.name}</h1>
                 {isLowStock && (
-                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                    Low Stock
+                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300" title="You're running low — at or below your reorder level">
+                    Running low
                   </Badge>
                 )}
                 <Badge variant="outline" className={
@@ -214,7 +257,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                     : ""
                 }>
-                  {item.isActive ? "Active" : "Inactive"}
+                  {item.isActive ? "Shown" : "Hidden"}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -223,16 +266,35 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={handleToggleActive}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleToggleActive}
+              title={item.isActive ? "Hide this item so it stops showing in lists and pickers" : "Show this item again in lists and pickers"}
+            >
               {item.isActive ? (
-                <><PowerOff className="mr-1.5 size-3.5" />Deactivate</>
+                <><PowerOff className="mr-1.5 size-3.5" />Hide item</>
               ) : (
-                <><Power className="mr-1.5 size-3.5" />Activate</>
+                <><Power className="mr-1.5 size-3.5" />Show item</>
               )}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setWriteDownOpen(true)}
+              title="The stock is worth less than you paid (damaged, expired, can't sell) — lower its value in your books without changing the count"
+            >
+              <TrendingDown className="mr-1.5 size-3.5" />
+              Write down value
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAdjustOpen(true)}
+              title="Change the number of units you have on hand (e.g. after a count, breakage, or finding extra)"
+            >
               <ArrowUpDown className="mr-1.5 size-3.5" />
-              Adjust Stock
+              Change the count
             </Button>
           </div>
         </div>
@@ -245,7 +307,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
           >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">On Hand</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Units on hand</p>
             <p className={cn(
               "mt-1.5 text-2xl font-bold font-mono tabular-nums truncate",
               isLowStock && "text-amber-600 dark:text-amber-400"
@@ -275,7 +337,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
           >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Stock Value</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Value of stock</p>
             <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums truncate">
               {formatMoney(stockValue)}
             </p>
@@ -289,7 +351,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
           >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sale Price</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Selling price</p>
             <p className="mt-1.5 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">
               {formatMoney(item.salePrice)}
             </p>
@@ -303,7 +365,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
           >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Margin</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Profit margin</p>
             <p className={cn(
               "mt-1.5 text-2xl font-bold font-mono tabular-nums truncate",
               margin > 0 ? "text-emerald-600 dark:text-emerald-400" : margin < 0 ? "text-red-600" : ""
@@ -344,28 +406,32 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
           {children}
         </ContentReveal>
 
-        {/* Adjust stock sheet */}
+        {/* Change the count sheet */}
         <Sheet open={adjustOpen} onOpenChange={setAdjustOpen}>
           <SheetContent>
             <SheetHeader>
-              <SheetTitle>Adjust Stock</SheetTitle>
+              <SheetTitle>Change the count</SheetTitle>
+              <SheetDescription>
+                Use this when your actual units on hand don&apos;t match what&apos;s
+                shown — for example after a count, breakage, or finding extra.
+              </SheetDescription>
             </SheetHeader>
             <div className="space-y-4 px-4">
               <div className="rounded-lg bg-muted p-3">
-                <p className="text-xs text-muted-foreground">Current Quantity</p>
+                <p className="text-xs text-muted-foreground">Units on hand now</p>
                 <p className="text-xl font-bold font-mono tabular-nums truncate">{item.quantityOnHand}</p>
               </div>
               <div className="space-y-2">
-                <Label>Adjustment (positive or negative)</Label>
+                <Label>Add or remove units</Label>
                 <Input
                   type="number"
                   value={adjustment}
                   onChange={(e) => setAdjustment(e.target.value)}
-                  placeholder="e.g. 10 or -5"
+                  placeholder="e.g. 10 to add, -5 to remove"
                 />
                 {adjustment && parseInt(adjustment) !== 0 && (
                   <p className="text-xs text-muted-foreground">
-                    New quantity: <span className="font-mono font-medium">{item.quantityOnHand + parseInt(adjustment)}</span>
+                    New count: <span className="font-mono font-medium">{item.quantityOnHand + parseInt(adjustment)}</span>
                   </p>
                 )}
               </div>
@@ -374,14 +440,58 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
                 <Input
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}
-                  placeholder="Reason for adjustment"
+                  placeholder="e.g. Stock count, breakage, found extra"
                 />
               </div>
             </div>
             <SheetFooter>
               <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
               <Button onClick={handleAdjust} className="bg-emerald-600 hover:bg-emerald-700">
-                Apply Adjustment
+                Save new count
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
+        {/* Write down value sheet */}
+        <Sheet open={writeDownOpen} onOpenChange={setWriteDownOpen}>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Write down value</SheetTitle>
+              <SheetDescription>
+                Use this when your stock is worth less than you paid (damaged,
+                expired, or hard to sell). The count stays the same — only its
+                value in your books goes down.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 px-4">
+              <div className="rounded-lg bg-muted p-3">
+                <p className="text-xs text-muted-foreground">Current value in your books</p>
+                <p className="text-xl font-bold font-mono tabular-nums truncate">
+                  {formatMoney(item.totalValue ?? item.quantityOnHand * item.purchasePrice)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>How much to write off</Label>
+                <CurrencyInput
+                  prefix="$"
+                  value={writeDownAmount}
+                  onChange={setWriteDownAmount}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Reason *</Label>
+                <Input
+                  value={writeDownReason}
+                  onChange={(e) => setWriteDownReason(e.target.value)}
+                  placeholder="e.g. Damaged, expired, can't sell at full price"
+                />
+              </div>
+            </div>
+            <SheetFooter>
+              <Button variant="outline" onClick={() => setWriteDownOpen(false)}>Cancel</Button>
+              <Button onClick={handleWriteDown} disabled={writeDownBusy} className="bg-emerald-600 hover:bg-emerald-700">
+                Write down value
               </Button>
             </SheetFooter>
           </SheetContent>
