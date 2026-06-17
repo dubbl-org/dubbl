@@ -63,11 +63,11 @@ function getFilingStatus(period: TaxPeriod): {
 } {
   if (period.status === "filed") {
     return {
-      label: "Filed",
+      label: "Submitted",
       variant: "filed",
       daysText: period.filedAt
-        ? `Filed ${new Date(period.filedAt).toLocaleDateString()}`
-        : "Filed",
+        ? `Submitted ${new Date(period.filedAt).toLocaleDateString()}`
+        : "Submitted",
     };
   }
 
@@ -271,12 +271,12 @@ function FileSheet({
         body: JSON.stringify({ filedReference: reference || undefined }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success("Tax period marked as filed");
+      toast.success("Marked as submitted");
       onClose();
       setReference("");
       onFiled();
     } catch {
-      toast.error("Failed to file tax period");
+      toast.error("Couldn't mark this period as submitted");
     } finally {
       setSaving(false);
     }
@@ -291,15 +291,15 @@ function FileSheet({
     >
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>File Tax Period</SheetTitle>
+          <SheetTitle>Mark as submitted</SheetTitle>
         </SheetHeader>
         <form onSubmit={handleFile} className="space-y-4 px-4">
           <p className="text-sm text-muted-foreground">
-            Mark &quot;{period?.name}&quot; as filed. This action cannot be
-            undone.
+            Mark &quot;{period?.name}&quot; as submitted to the tax office. Use this once
+            you&apos;ve sent it in. This can&apos;t be undone.
           </p>
           <div className="space-y-2">
-            <Label>Filing Reference (optional)</Label>
+            <Label>Reference number (optional)</Label>
             <Input
               value={reference}
               onChange={(e) => setReference(e.target.value)}
@@ -311,7 +311,7 @@ function FileSheet({
             disabled={saving}
             className="w-full bg-emerald-600 hover:bg-emerald-700"
           >
-            {saving ? "Filing..." : "Mark as Filed"}
+            {saving ? "Saving..." : "Mark as submitted"}
           </Button>
         </form>
       </SheetContent>
@@ -522,7 +522,7 @@ export default function TaxPeriodsPage() {
                 <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Filed</p>
+                <p className="text-xs text-muted-foreground">Submitted</p>
                 <p className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
                   {filedCount}
                 </p>
@@ -532,7 +532,7 @@ export default function TaxPeriodsPage() {
             {/* Progress */}
             <div className="flex flex-col justify-center gap-2 rounded-xl border bg-card px-4 py-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">Filing Progress</p>
+                <p className="text-xs text-muted-foreground">Submitted so far</p>
                 <p className="text-xs font-medium tabular-nums">
                   {progressPercent}%
                 </p>
@@ -544,7 +544,7 @@ export default function TaxPeriodsPage() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                {filedCount} of {periods.length} periods filed
+                {filedCount} of {periods.length} periods submitted
               </p>
             </div>
           </div>
@@ -572,7 +572,7 @@ export default function TaxPeriodsPage() {
                     Status
                   </th>
                   <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground sm:table-cell">
-                    Due / Filed
+                    Due / Submitted
                   </th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
                     Actions
@@ -650,7 +650,7 @@ export default function TaxPeriodsPage() {
                               onClick={() => setFiling(p)}
                             >
                               <FileCheck className="mr-1 size-3" />
-                              File
+                              Mark submitted
                             </Button>
                           )}
                           <Button

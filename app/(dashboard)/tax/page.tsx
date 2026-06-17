@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Scale, Percent, Pencil } from "lucide-react";
+import { Plus, Scale, Percent, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,14 +29,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface TaxComponent {
+  id?: string;
+  name: string;
+  rate: number;
+  accountId?: string | null;
+}
+
 interface TaxRate {
   id: string;
   name: string;
   rate: number;
   type: string;
+  kind: string;
+  recoverablePercent: number;
   isDefault: boolean;
   isActive: boolean;
+  components?: TaxComponent[];
 }
+
+// Plain-language labels — the user is not an accountant. Each maps to the
+// taxRateKindEnum value persisted on the server.
+const KIND_OPTIONS: { value: string; label: string; help: string }[] = [
+  { value: "standard", label: "Standard (fully reclaimable)", help: "Normal VAT/GST you can claim back in full." },
+  { value: "partial_block", label: "Partly reclaimable", help: "You can only claim back part of the tax (set the % below)." },
+  { value: "blocked", label: "Not reclaimable", help: "Tax cannot be claimed back — it's absorbed into the cost." },
+  { value: "reverse_charge", label: "Reverse charge", help: "You account for both sides of the tax yourself (cross-border / domestic reverse charge)." },
+  { value: "exempt", label: "Exempt", help: "Exempt supply — no tax charged and none reclaimable." },
+  { value: "no_vat", label: "No tax", help: "Outside the scope of VAT/GST." },
+  { value: "sales_tax_us", label: "US sales tax", help: "US sales/use tax — charged on sales, not reclaimable on purchases." },
+];
+
+// recoverablePercent only matters for these kinds; for everything else it is
+// implied (100% standard, 0% blocked/exempt, etc.).
+const RECOVERABLE_KINDS = new Set(["standard", "partial_block"]);
 
 const TYPE_COLORS = {
   sales: {
@@ -61,10 +88,146 @@ const TYPE_COLORS = {
   },
 } as const;
 
+// Compound-tax editor: lets the user split a rate into named sub-components
+// (e.g. GST + PST), each with its own % and optional ledger account.
+function ComponentsEditor({ components, setComponents }: { components: TaxComponent[]; setComponents: (c: TaxComponent[]) => void }) {
+  function update(i: number, patch: Partial<TaxComponent>) {
+    setComponents(components.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
+  }
+  function remove(i: number) {
+    setComponents(components.filter((_, idx) => idx !== i));
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Compound parts (optional)</Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setComponents([...components, { name: "", rate: 0, accountId: null }])}
+        >
+          <Plus className="mr-1 size-3" />Add part
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Split this tax into separate parts (for example GST and PST) when each part needs its own rate or ledger account.
+      </p>
+      {components.length > 0 && (
+        <div className="space-y-3 rounded-md border p-3">
+          {components.map((c, i) => (
+            <div key={i} className="space-y-2 rounded-md bg-muted/30 p-2">
+              <div className="flex items-end gap-2">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Part name</Label>
+                  <Input value={c.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="e.g. PST" />
+                </div>
+                <div className="w-24 space-y-1">
+                  <Label className="text-xs">Rate (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={c.rate === 0 ? "" : (c.rate / 100).toString()}
+                    onChange={(e) => update(i, { rate: e.target.value ? Math.round(parseFloat(e.target.value) * 100) : 0 })}
+                    placeholder="0.00"
+                  />
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="size-9 text-muted-foreground hover:text-destructive" onClick={() => remove(i)}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Posts to account (optional)</Label>
+                <AccountPicker value={c.accountId ?? ""} onChange={(id) => update(i, { accountId: id || null })} placeholder="Default tax account" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Shared editable fields for both the create and edit sheets.
+function TaxRateFormFields({
+  name, setName, rate, setRate, type, setType, kind, setKind,
+  recoverable, setRecoverable, components, setComponents,
+}: {
+  name: string; setName: (v: string) => void;
+  rate: string; setRate: (v: string) => void;
+  type: string; setType: (v: string) => void;
+  kind: string; setKind: (v: string) => void;
+  recoverable: string; setRecoverable: (v: string) => void;
+  components: TaxComponent[]; setComponents: (c: TaxComponent[]) => void;
+}) {
+  const kindHelp = KIND_OPTIONS.find((k) => k.value === kind)?.help;
+  return (
+    <>
+      <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GST 10%" required /></div>
+      <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required /></div>
+      <div className="space-y-2"><Label>Applies to</Label>
+        <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2"><Label>Tax treatment</Label>
+        <Select value={kind} onValueChange={setKind}><SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {KIND_OPTIONS.map((k) => (<SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>))}
+          </SelectContent>
+        </Select>
+        {kindHelp && <p className="text-xs text-muted-foreground">{kindHelp}</p>}
+      </div>
+      {RECOVERABLE_KINDS.has(kind) && (
+        <div className="space-y-2">
+          <Label>Reclaimable amount (%)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={recoverable}
+            onChange={(e) => setRecoverable(e.target.value)}
+            placeholder="100"
+          />
+          <p className="text-xs text-muted-foreground">How much of the tax on purchases you can claim back. 100 = all of it, 50 = half.</p>
+        </div>
+      )}
+      <ComponentsEditor components={components} setComponents={setComponents} />
+    </>
+  );
+}
+
+// Build the request body shared by create/edit. recoverablePercent defaults to
+// 100% (standard) or 0% (everything else) when the field is hidden.
+function buildPayload(opts: {
+  name: string; rate: string; type: string; kind: string; recoverable: string; components: TaxComponent[];
+}) {
+  const recoverablePercent = RECOVERABLE_KINDS.has(opts.kind)
+    ? Math.max(0, Math.min(10000, Math.round((parseFloat(opts.recoverable) || 0) * 100)))
+    : opts.kind === "standard"
+      ? 10000
+      : 0;
+  return {
+    name: opts.name,
+    rate: Math.round(parseFloat(opts.rate) * 100),
+    type: opts.type,
+    kind: opts.kind,
+    recoverablePercent,
+    components: opts.components
+      .filter((c) => c.name.trim())
+      .map((c) => ({ name: c.name.trim(), rate: c.rate, accountId: c.accountId || null })),
+  };
+}
+
 function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolean; setOpen: (v: boolean) => void; onCreated: () => void; orgId: string | null }) {
   const [name, setName] = useState("");
   const [rate, setRate] = useState("");
   const [type, setType] = useState("both");
+  const [kind, setKind] = useState("standard");
+  const [recoverable, setRecoverable] = useState("100");
+  const [components, setComponents] = useState<TaxComponent[]>([]);
   const [saving, setSaving] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
@@ -75,13 +238,17 @@ function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolea
       const res = await fetch("/api/v1/tax-rates", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ name, rate: Math.round(parseFloat(rate) * 100), type }),
+        body: JSON.stringify(buildPayload({ name, rate, type, kind, recoverable, components })),
       });
       if (!res.ok) throw new Error("Failed");
       toast.success("Tax rate created");
       setOpen(false);
       setName("");
       setRate("");
+      setType("both");
+      setKind("standard");
+      setRecoverable("100");
+      setComponents([]);
       onCreated();
     } catch { toast.error("Failed to create tax rate"); }
     finally { setSaving(false); }
@@ -94,16 +261,17 @@ function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolea
           <Plus className="mr-1.5 size-3.5" />Add Tax Rate
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent className="overflow-y-auto">
         <SheetHeader><SheetTitle>New Tax Rate</SheetTitle></SheetHeader>
-        <form onSubmit={handleCreate} className="space-y-4 px-4">
-          <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GST 10%" required /></div>
-          <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required /></div>
-          <div className="space-y-2"><Label>Type</Label>
-            <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
-            </Select>
-          </div>
+        <form onSubmit={handleCreate} className="space-y-4 px-4 pb-6">
+          <TaxRateFormFields
+            name={name} setName={setName}
+            rate={rate} setRate={setRate}
+            type={type} setType={setType}
+            kind={kind} setKind={setKind}
+            recoverable={recoverable} setRecoverable={setRecoverable}
+            components={components} setComponents={setComponents}
+          />
           <Button type="submit" disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700">{saving ? "Creating..." : "Create"}</Button>
         </form>
       </SheetContent>
@@ -119,6 +287,9 @@ export default function TaxRatesPage() {
   const [editName, setEditName] = useState("");
   const [editRate, setEditRate] = useState("");
   const [editType, setEditType] = useState("both");
+  const [editKind, setEditKind] = useState("standard");
+  const [editRecoverable, setEditRecoverable] = useState("100");
+  const [editComponents, setEditComponents] = useState<TaxComponent[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   useDocumentTitle("Tax · Tax Rates");
 
@@ -147,6 +318,11 @@ export default function TaxRatesPage() {
     setEditName(rate.name);
     setEditRate((rate.rate / 100).toFixed(2));
     setEditType(rate.type);
+    setEditKind(rate.kind || "standard");
+    setEditRecoverable(((rate.recoverablePercent ?? 10000) / 100).toString());
+    setEditComponents(
+      (rate.components ?? []).map((c) => ({ id: c.id, name: c.name, rate: c.rate, accountId: c.accountId ?? null }))
+    );
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -157,7 +333,7 @@ export default function TaxRatesPage() {
       const res = await fetch(`/api/v1/tax-rates/${editing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ name: editName, rate: Math.round(parseFloat(editRate) * 100), type: editType }),
+        body: JSON.stringify(buildPayload({ name: editName, rate: editRate, type: editType, kind: editKind, recoverable: editRecoverable, components: editComponents })),
       });
       if (!res.ok) throw new Error("Failed");
       setEditing(null);
@@ -274,16 +450,17 @@ export default function TaxRatesPage() {
       )}
 
       <Sheet open={!!editing} onOpenChange={(v) => { if (!v) setEditing(null); }}>
-        <SheetContent>
+        <SheetContent className="overflow-y-auto">
           <SheetHeader><SheetTitle>Edit Tax Rate</SheetTitle></SheetHeader>
           <form onSubmit={handleEdit} className="space-y-4 px-4">
-            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} required /></div>
-            <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={editRate} onChange={(e) => setEditRate(e.target.value)} required /></div>
-            <div className="space-y-2"><Label>Type</Label>
-              <Select value={editType} onValueChange={setEditType}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
-              </Select>
-            </div>
+            <TaxRateFormFields
+              name={editName} setName={setEditName}
+              rate={editRate} setRate={setEditRate}
+              type={editType} setType={setEditType}
+              kind={editKind} setKind={setEditKind}
+              recoverable={editRecoverable} setRecoverable={setEditRecoverable}
+              components={editComponents} setComponents={setEditComponents}
+            />
           </form>
           <SheetFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
