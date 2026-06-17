@@ -5,8 +5,46 @@ import {
   journalLine,
   chartAccount,
   periodLock,
+  organization,
 } from "@/lib/db/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
+
+/**
+ * Resolve the org's Retained Earnings account for year-end close. Precedence:
+ *  1. organization.retainedEarningsAccountId (explicit setting, must be equity)
+ *  2. the first equity account with subType 'retained'
+ *  3. account code '3100' (Retained Earnings in the standard chart)
+ * Returns null if none found. NOTE: the old code hardcoded '3200', which is
+ * "Owner's Drawings" in the chart — a real bug that posted net income to the
+ * wrong account.
+ */
+export async function getRetainedEarningsAccount(organizationId: string) {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { retainedEarningsAccountId: true },
+  });
+  if (org?.retainedEarningsAccountId) {
+    const chosen = await db.query.chartAccount.findFirst({
+      where: and(
+        eq(chartAccount.id, org.retainedEarningsAccountId),
+        eq(chartAccount.organizationId, organizationId),
+        eq(chartAccount.type, "equity")
+      ),
+    });
+    if (chosen) return chosen;
+  }
+  const bySubType = await db.query.chartAccount.findFirst({
+    where: and(
+      eq(chartAccount.organizationId, organizationId),
+      eq(chartAccount.type, "equity"),
+      eq(chartAccount.subType, "retained")
+    ),
+  });
+  if (bySubType) return bySubType;
+  return db.query.chartAccount.findFirst({
+    where: and(eq(chartAccount.organizationId, organizationId), eq(chartAccount.code, "3100")),
+  });
+}
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -72,16 +110,11 @@ export async function closeFiscalYear(
     )
     .groupBy(chartAccount.id, chartAccount.type);
 
-  // Find Retained Earnings account (code "3200")
-  const retainedEarnings = await db.query.chartAccount.findFirst({
-    where: and(
-      eq(chartAccount.organizationId, organizationId),
-      eq(chartAccount.code, "3200")
-    ),
-  });
+  // Resolve Retained Earnings (configurable; defaults to subType 'retained' / code 3100)
+  const retainedEarnings = await getRetainedEarningsAccount(organizationId);
 
   if (!retainedEarnings) {
-    return { success: false, error: "Retained Earnings account (code 3200) not found" };
+    return { success: false, error: "Retained Earnings account not found. Set one in organization settings or add an equity account with subType 'retained'." };
   }
 
   const closingLines: {
