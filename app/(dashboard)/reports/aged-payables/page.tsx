@@ -78,8 +78,8 @@ export default function AgedPayablesPage() {
       </Link>
 
       <PageHeader
-        title="Aged Payables"
-        description="Outstanding bills grouped by aging buckets."
+        title="What you owe (and when it's due)"
+        description="Unpaid supplier bills, grouped by how soon they're due."
       >
         <ExportButton
           data={allBills}
@@ -105,7 +105,7 @@ export default function AgedPayablesPage() {
           </div>
 
           <div className="rounded-lg border bg-card p-3 sm:p-4 mt-4">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Outstanding</p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">Total you owe</p>
             <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(grandTotal)}</p>
           </div>
 

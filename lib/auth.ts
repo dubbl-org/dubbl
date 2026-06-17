@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
@@ -14,11 +14,23 @@ import { trackLogin } from "./auth/track-login";
 import { getAppleClientSecret } from "./auth/apple-secret";
 import { getSiteSetting } from "./site-settings";
 import { sql } from "drizzle-orm";
+import { isTwoFactorEnabled, verifyTwoFactor } from "./auth/two-factor";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  // Optional second factor. Only consulted when the user has 2FA enabled, so
+  // password-only login is unaffected for everyone else (2FA is opt-in).
+  totp: z.string().optional(),
 });
+
+// Thrown from authorize() when a 2FA-enabled user signs in with a correct
+// password but no TOTP code. Extends CredentialsSignin so NextAuth surfaces the
+// `code` to the client (res.code === "TwoFactorRequired"), letting the sign-in
+// page prompt for a code instead of showing a generic error.
+export class TwoFactorRequiredError extends CredentialsSignin {
+  code = "TwoFactorRequired";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   // Generate Apple client secret from .p8 key if configured,
@@ -51,6 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totp: { label: "2FA Code", type: "text" },
       },
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
@@ -67,6 +80,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           user.passwordHash
         );
         if (!valid) return null;
+
+        // Opt-in second factor: only enforced when the user has enabled 2FA.
+        if (await isTwoFactorEnabled(user.id)) {
+          const code = parsed.data.totp?.trim();
+          if (!code) throw new TwoFactorRequiredError();
+          const ok = await verifyTwoFactor(user.id, code);
+          if (!ok) return null;
+        }
 
         return { id: user.id, name: user.name, email: user.email, image: user.image };
       },

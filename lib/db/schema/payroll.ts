@@ -183,6 +183,30 @@ export const payrollSettings = pgTable("payroll_settings", {
   taxPayableAccountCode: text("tax_payable_account_code").default("2200"),
   bankAccountCode: text("bank_account_code").default("1100"),
   autoApprovalEnabled: boolean("auto_approval_enabled").notNull().default(false),
+  // ── FICA / statutory payroll-tax parameters (basis points + cents) ──
+  // These drive the withholding engine (lib/api/payroll-tax.ts → computeFica)
+  // and the employer-match calculation (computeEmployerTaxes). All "rate"
+  // columns are basis points (10000 = 100%); all "...Cents" columns are annual
+  // amounts in integer cents.
+  ssWageBaseCents: integer("ss_wage_base_cents").notNull().default(16810000), // 2026 SS wage base ($168,100)
+  ssRateBp: integer("ss_rate_bp").notNull().default(620), // 6.2%
+  medicareRateBp: integer("medicare_rate_bp").notNull().default(145), // 1.45%
+  addlMedicareThresholdCents: integer("addl_medicare_threshold_cents")
+    .notNull()
+    .default(20000000), // $200,000 YTD threshold for Additional Medicare
+  addlMedicareRateBp: integer("addl_medicare_rate_bp").notNull().default(90), // 0.9%
+  // ── Employer-side tax parameters ──
+  // Employer FICA usually matches the employee SS/Medicare rates above, but a
+  // separate flag lets an org disable the match (e.g. exempt entities).
+  employerFicaEnabled: boolean("employer_fica_enabled").notNull().default(true),
+  // FUTA (federal unemployment): rate on wages up to the annual FUTA wage base.
+  futaRateBp: integer("futa_rate_bp").notNull().default(60), // 0.6% net (after SUTA credit)
+  futaWageBaseCents: integer("futa_wage_base_cents").notNull().default(70000), // $7,000
+  // SUTA (state unemployment): rate on wages up to the state wage base.
+  sutaRateBp: integer("suta_rate_bp").notNull().default(0),
+  sutaWageBaseCents: integer("suta_wage_base_cents").notNull().default(0),
+  // Default tax year used when an employee/jurisdiction has no explicit config.
+  defaultTaxYear: integer("default_tax_year"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -554,6 +578,13 @@ export const compensationReviewEntry = pgTable("compensation_review_entry", {
 });
 
 // ─── Tax Configuration ──────────────────────────────────────────────
+// A single marginal bracket. The progressive withholding engine
+// (lib/api/payroll-tax.ts) loads the active brackets for an org's
+// jurisdiction/filingStatus/taxYear and applies them marginally:
+//   tentativeAnnualTax = baseAmountCents + (annualWage − minIncome) × rate
+// where baseAmountCents is the cumulative tax on all lower brackets
+// (IRS Pub 15-T column C). filingStatus = null means the bracket applies to
+// every filing status (useful for flat state schedules).
 export const taxBracket = pgTable("tax_bracket", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -562,10 +593,96 @@ export const taxBracket = pgTable("tax_bracket", {
   name: text("name").notNull(),
   jurisdictionLevel: taxJurisdictionLevelEnum("jurisdiction_level").notNull().default("federal"),
   jurisdiction: text("jurisdiction"), // e.g. "CA", "NY"
-  minIncome: integer("min_income").notNull(), // cents (annual)
-  maxIncome: integer("max_income"), // cents (null = no limit)
+  // null = applies to all filing statuses
+  filingStatus: filingStatusEnum("filing_status"),
+  // Tax year these brackets are effective for (e.g. 2026). null = any year.
+  taxYear: integer("tax_year"),
+  minIncome: integer("min_income").notNull(), // cents (annual) — bracket floor
+  maxIncome: integer("max_income"), // cents (null = no limit) — bracket ceiling
   rate: integer("rate").notNull(), // basis points
+  // Pub 15-T column C: cumulative tax owed on all income up to minIncome.
+  baseAmountCents: integer("base_amount_cents"), // cents (null = derive from lower brackets)
+  // Optional per-bracket-set standard deduction (annual, cents). Usually carried
+  // on taxAllowanceConfig, but allowed here for self-contained schedules.
+  standardDeductionCents: integer("standard_deduction_cents"), // cents
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+// Per-jurisdiction withholding parameters for a tax year: the value of one
+// withholding allowance and the standard deduction subtracted from the
+// annualized wage before the brackets are applied.
+export const taxAllowanceConfig = pgTable("tax_allowance_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  jurisdictionLevel: taxJurisdictionLevelEnum("jurisdiction_level").notNull().default("federal"),
+  jurisdiction: text("jurisdiction"), // e.g. "CA", "NY" (null = federal/default)
+  taxYear: integer("tax_year").notNull(),
+  allowanceValueCents: integer("allowance_value_cents").notNull().default(0), // cents per allowance, annual
+  standardDeductionCents: integer("standard_deduction_cents").notNull().default(0), // cents, annual
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+// Per-payroll-item withholding breakdown, one row per jurisdiction/tax kind, so
+// a payslip or report can show FIT vs state vs FICA splits rather than a single
+// lumped taxAmount.
+export const payrollItemTaxBreakdown = pgTable("payroll_item_tax_breakdown", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payrollItemId: uuid("payroll_item_id")
+    .notNull()
+    .references(() => payrollItem.id, { onDelete: "cascade" }),
+  jurisdictionLevel: taxJurisdictionLevelEnum("jurisdiction_level").notNull().default("federal"),
+  jurisdiction: text("jurisdiction"), // null for federal/FICA
+  // e.g. "income_tax", "social_security", "medicare", "additional_medicare"
+  taxKind: text("tax_kind").notNull(),
+  amount: integer("amount").notNull(), // cents withheld this period
+});
+
+// Per-payroll-item EMPLOYER-side tax, one row per jurisdiction/tax kind. Mirrors
+// payrollItemTaxBreakdown but for taxes the EMPLOYER owes on top of gross wages
+// (employer FICA match, FUTA, SUTA, employer NIC). These never reduce employee
+// net pay; the journal debits Employer Payroll Taxes Expense (5120) and credits
+// the matching liability (e.g. 2235). taxKind examples: "employer_social_security",
+// "employer_medicare", "futa", "suta", "employer_nic".
+export const payrollItemEmployerTax = pgTable("payroll_item_employer_tax", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payrollItemId: uuid("payroll_item_id")
+    .notNull()
+    .references(() => payrollItem.id, { onDelete: "cascade" }),
+  jurisdictionLevel: taxJurisdictionLevelEnum("jurisdiction_level").notNull().default("federal"),
+  jurisdiction: text("jurisdiction"), // null for federal/FICA
+  taxKind: text("tax_kind").notNull(),
+  amount: integer("amount").notNull(), // cents employer owes this period
+});
+
+// A remittance of withheld + employer payroll taxes to a tax authority for a
+// period/jurisdiction. The remittance route (built by another agent) inserts a
+// row here and posts a journal entry (DR the liability accounts, CR bank), then
+// stamps journalEntryId. amount is the total cash remitted in integer cents.
+export const payrollTaxPayment = pgTable("payroll_tax_payment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  jurisdictionLevel: taxJurisdictionLevelEnum("jurisdiction_level").notNull().default("federal"),
+  jurisdiction: text("jurisdiction"), // e.g. "CA", "NY" (null = federal)
+  // What this remittance covers, e.g. "941" (FIT+FICA), "940" (FUTA), "state_income".
+  taxKind: text("tax_kind"),
+  amount: integer("amount").notNull(), // cents remitted
+  currency: text("currency").default("USD"),
+  bankAccountId: uuid("bank_account_id"), // chartAccount id paid from
+  reference: text("reference"), // confirmation / EFTPS number
+  notes: text("notes"),
+  status: contractorPaymentStatusEnum("status").notNull().default("pending"),
+  paidAt: timestamp("paid_at", { mode: "date" }),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
+  createdBy: uuid("created_by").references(() => member.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
@@ -762,6 +879,8 @@ export const payrollItemRelations = relations(payrollItem, ({ one, many }) => ({
     references: [payrollItemOvertime.payrollItemId],
   }),
   deductionBreakdowns: many(payrollItemDeduction),
+  taxBreakdowns: many(payrollItemTaxBreakdown),
+  employerTaxBreakdowns: many(payrollItemEmployerTax),
 }));
 
 export const deductionTypeRelations = relations(deductionType, ({ one, many }) => ({
@@ -961,6 +1080,42 @@ export const taxBracketRelations = relations(taxBracket, ({ one }) => ({
   organization: one(organization, {
     fields: [taxBracket.organizationId],
     references: [organization.id],
+  }),
+}));
+
+export const taxAllowanceConfigRelations = relations(taxAllowanceConfig, ({ one }) => ({
+  organization: one(organization, {
+    fields: [taxAllowanceConfig.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+export const payrollItemTaxBreakdownRelations = relations(payrollItemTaxBreakdown, ({ one }) => ({
+  payrollItem: one(payrollItem, {
+    fields: [payrollItemTaxBreakdown.payrollItemId],
+    references: [payrollItem.id],
+  }),
+}));
+
+export const payrollItemEmployerTaxRelations = relations(payrollItemEmployerTax, ({ one }) => ({
+  payrollItem: one(payrollItem, {
+    fields: [payrollItemEmployerTax.payrollItemId],
+    references: [payrollItem.id],
+  }),
+}));
+
+export const payrollTaxPaymentRelations = relations(payrollTaxPayment, ({ one }) => ({
+  organization: one(organization, {
+    fields: [payrollTaxPayment.organizationId],
+    references: [organization.id],
+  }),
+  journalEntry: one(journalEntry, {
+    fields: [payrollTaxPayment.journalEntryId],
+    references: [journalEntry.id],
+  }),
+  createdByMember: one(member, {
+    fields: [payrollTaxPayment.createdBy],
+    references: [member.id],
   }),
 }));
 

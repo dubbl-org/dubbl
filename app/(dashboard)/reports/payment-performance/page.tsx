@@ -71,7 +71,7 @@ export default function PaymentPerformancePage() {
         <ArrowLeft className="size-3.5" /> Back to reports
       </Link>
 
-      <PageHeader title="Payment Performance" description="Average collection and payment times by contact.">
+      <PageHeader title="How fast you get paid" description="Average time customers take to pay you, and you take to pay suppliers.">
         <ExportButton
           data={[...receivables.map((r) => ({ ...r, type: "receivable" })), ...payables.map((p) => ({ ...p, type: "payable" }))]}
           columns={["type", "contactName", "avgDays", "avgTermDays", "lateCount", "onTimeRate"]}
@@ -86,14 +86,14 @@ export default function PaymentPerformancePage() {
       ) : (
         <ContentReveal>
           <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard title="Avg Days to Collect" value={`${avgCollect}d`} icon={TrendingDown} changeType={avgCollect <= 30 ? "positive" : "negative"} />
-            <StatCard title="Avg Days to Pay" value={`${avgPay}d`} icon={TrendingUp} changeType={avgPay <= 30 ? "positive" : "neutral"} />
+            <StatCard title="Average days customers take to pay you" value={`${avgCollect}d`} icon={TrendingDown} changeType={avgCollect <= 30 ? "positive" : "negative"} />
+            <StatCard title="Average days you take to pay suppliers" value={`${avgPay}d`} icon={TrendingUp} changeType={avgPay <= 30 ? "positive" : "neutral"} />
           </div>
 
           {receivables.length > 0 && (
             <div className="mt-4">
               <PerformanceTable
-                title="Collection Performance (Receivables)"
+                title="How quickly customers pay you"
                 entries={receivables}
                 countLabel="Invoices"
                 totalLabel="Collected"
@@ -105,7 +105,7 @@ export default function PaymentPerformancePage() {
           {payables.length > 0 && (
             <div className="mt-4">
               <PerformanceTable
-                title="Payment Performance (Payables)"
+                title="How quickly you pay suppliers"
                 entries={payables}
                 countLabel="Bills"
                 totalLabel="Paid"

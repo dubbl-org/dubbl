@@ -64,6 +64,16 @@ const methodLabels: Record<string, string> = {
   other: "Other",
 };
 
+// Plain-language status labels (end users aren't accountants — avoid "void").
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "sent",
+  partial: "part paid",
+  paid: "paid",
+  overdue: "overdue",
+  void: "cancelled",
+};
+
 function getOverdueInfo(dueDate: string, status: string) {
   if (status === "paid" || status === "void" || status === "draft") return null;
   const now = new Date();
@@ -125,7 +135,7 @@ function buildColumns(): Column<Invoice>[] {
       className: "w-24",
       render: (r) => (
         <Badge variant="outline" className={statusColors[r.status] || ""}>
-          {r.status}
+          {statusLabels[r.status] || r.status}
         </Badge>
       ),
     },

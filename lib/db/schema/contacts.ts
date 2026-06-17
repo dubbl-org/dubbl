@@ -45,6 +45,19 @@ export const contact = pgTable("contact", {
   defaultTaxRateId: uuid("default_tax_rate_id").references(() => taxRate.id),
   peppolId: text("peppol_id"), // PEPPOL participant identifier
   peppolScheme: text("peppol_scheme"), // e.g. "0088" (EAN), "9925" (VAT)
+  // US 1099 / W-9 tracking for vendors (US tax reporting).
+  is1099Vendor: boolean("is_1099_vendor").notNull().default(false),
+  // W-9 federal tax classification, e.g. "individual", "c_corp", "s_corp",
+  // "partnership", "trust_estate", "llc".
+  w9TaxClassification: text("w9_tax_classification"),
+  // TIN/SSN/EIN as reported on the W-9.
+  taxIdentifier: text("tax_identifier"),
+  // Subject to 24% backup withholding (e.g. missing/invalid TIN).
+  backupWithholding: boolean("backup_withholding").notNull().default(false),
+  // When set, this contact represents another organization inside the same
+  // consolidation group, marking transactions with it as intercompany so they
+  // can be eliminated on consolidation. Nullable = external (third-party) contact.
+  linkedOrgId: uuid("linked_org_id").references(() => organization.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),

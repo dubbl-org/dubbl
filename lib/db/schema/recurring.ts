@@ -5,6 +5,7 @@ import {
   timestamp,
   integer,
   date,
+  boolean,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -36,10 +37,12 @@ export const recurringTemplate = pgTable("recurring_template", {
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  type: text("type").notNull(), // "invoice" or "bill"
-  contactId: uuid("contact_id")
-    .notNull()
-    .references(() => contact.id),
+  type: text("type").notNull(), // "invoice" | "bill" | "expense" | "journal"
+  // Journal templates have no counterparty; contact is nullable so a
+  // type='journal' template can materialize a manual journal entry on a
+  // schedule without a contact. Invoice/bill/expense templates still require
+  // one (enforced in the create route).
+  contactId: uuid("contact_id").references(() => contact.id),
   frequency: recurringFrequencyEnum("frequency").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date"), // nullable = run indefinitely
@@ -51,6 +54,15 @@ export const recurringTemplate = pgTable("recurring_template", {
   reference: text("reference"),
   notes: text("notes"),
   currencyCode: text("currency_code").notNull().default("USD"),
+  // Recurring-invoice automation. When autoSend is true the generator posts the
+  // invoice GL (status -> sent) and runs the existing send pipeline (email) on
+  // each occurrence. createAsApproved (a.k.a. create-as-approved) likewise posts
+  // the GL and marks the invoice sent, but WITHOUT emailing — useful for
+  // back-office invoices that should hit the ledger immediately but be delivered
+  // out of band. Both default false (legacy: generate as draft). Only meaningful
+  // for type='invoice'.
+  autoSend: boolean("auto_send").notNull().default(false),
+  createAsApproved: boolean("create_as_approved").notNull().default(false),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -72,6 +84,12 @@ export const recurringTemplateLine = pgTable("recurring_template_line", {
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
   discountPercent: integer("discount_percent").notNull().default(0), // basis points: 1000 = 10%
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  // Journal-template legs (type='journal'). The line's debit/credit (integer
+  // cents) is posted verbatim to `accountId`; quantity/unitPrice/tax/discount
+  // are ignored for journal templates. Default 0 keeps invoice/bill/expense
+  // templates (which use quantity*unitPrice) unaffected.
+  debitAmount: integer("debit_amount").notNull().default(0),
+  creditAmount: integer("credit_amount").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 

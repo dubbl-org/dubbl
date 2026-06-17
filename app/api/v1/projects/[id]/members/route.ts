@@ -11,7 +11,10 @@ import { z } from "zod";
 const addMemberSchema = z.object({
   memberId: z.string().min(1),
   role: z.enum(["manager", "contributor", "viewer"]).default("contributor"),
+  // Client BILLING rate (cents/hr); null/omitted = use project default.
   hourlyRate: z.number().int().min(0).optional(),
+  // Internal staff COST rate (cents/hr) used for job-costing profitability.
+  costRate: z.number().int().min(0).optional(),
 });
 
 export async function GET(
@@ -96,10 +99,69 @@ export async function POST(
         memberId: parsed.memberId,
         role: parsed.role,
         hourlyRate: parsed.hourlyRate ?? null,
+        costRate: parsed.costRate ?? null,
       })
       .returning();
 
     return NextResponse.json({ projectMember: created }, { status: 201 });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+const updateMemberSchema = z.object({
+  memberId: z.string().min(1),
+  role: z.enum(["manager", "contributor", "viewer"]).optional(),
+  hourlyRate: z.number().int().min(0).nullable().optional(),
+  costRate: z.number().int().min(0).nullable().optional(),
+});
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:projects");
+
+    const body = await request.json();
+    const parsed = updateMemberSchema.parse(body);
+
+    const proj = await db.query.project.findFirst({
+      where: and(
+        eq(project.id, id),
+        eq(project.organizationId, ctx.organizationId),
+        notDeleted(project.deletedAt)
+      ),
+    });
+    if (!proj) return notFound("Project");
+
+    const existing = await db.query.projectMember.findFirst({
+      where: and(
+        eq(projectMember.projectId, id),
+        eq(projectMember.memberId, parsed.memberId)
+      ),
+    });
+    if (!existing) return notFound("Project member");
+
+    const updates: Partial<typeof projectMember.$inferInsert> = {};
+    if (parsed.role !== undefined) updates.role = parsed.role;
+    if (parsed.hourlyRate !== undefined) updates.hourlyRate = parsed.hourlyRate;
+    if (parsed.costRate !== undefined) updates.costRate = parsed.costRate;
+
+    const [updated] = await db
+      .update(projectMember)
+      .set(updates)
+      .where(
+        and(
+          eq(projectMember.projectId, id),
+          eq(projectMember.memberId, parsed.memberId)
+        )
+      )
+      .returning();
+
+    return NextResponse.json({ projectMember: updated });
   } catch (err) {
     return handleError(err);
   }

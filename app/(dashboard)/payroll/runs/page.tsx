@@ -66,8 +66,8 @@ type SortKey = "date" | "gross" | "net";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "date", label: "Date" },
-  { value: "gross", label: "Gross" },
-  { value: "net", label: "Net" },
+  { value: "gross", label: "Before deductions" },
+  { value: "net", label: "Take-home" },
 ];
 
 const statusColors: Record<string, string> = {
@@ -76,6 +76,15 @@ const statusColors: Record<string, string> = {
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
   pending_approval: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
+};
+
+// Plain-language payroll status labels for non-accountants.
+const statusLabels: Record<string, string> = {
+  draft: "Not finished",
+  processing: "Finishing",
+  completed: "Finished & recorded",
+  void: "Cancelled",
+  pending_approval: "Waiting for sign-off",
 };
 
 const runTypeLabels: Record<string, string> = {
@@ -276,9 +285,9 @@ export default function PayrollRunsPage() {
               <div className="absolute top-1/2 left-4 right-4 h-px bg-muted-foreground/15 -translate-y-1/2" />
               <div className="flex items-center justify-between relative">
                 {[
-                  { icon: FileText, label: "Create", delay: 0.15, active: true },
-                  { icon: ArrowUpDown, label: "Process", delay: 0.25, active: false },
-                  { icon: Search, label: "Review", delay: 0.35, active: false },
+                  { icon: FileText, label: "Set up", delay: 0.15, active: true },
+                  { icon: Search, label: "Review", delay: 0.25, active: false },
+                  { icon: ArrowUpDown, label: "Finish & record", delay: 0.35, active: false },
                 ].map((step, i) => (
                   <motion.div
                     key={step.label}
@@ -325,7 +334,7 @@ export default function PayrollRunsPage() {
               transition={{ duration: 0.4, delay: 0.45 }}
               className="mt-2 max-w-sm text-sm text-muted-foreground text-center leading-relaxed"
             >
-              Create a pay run with a period range, review the calculated amounts for each employee, then process it to finalize payments.
+              Set up a pay run for a date range, check each employee&apos;s pay, then finish it to lock in the amounts and record the wages.
             </motion.p>
 
             <motion.div
@@ -398,10 +407,10 @@ export default function PayrollRunsPage() {
           <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
             <TabsList className="flex-wrap">
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="draft">Draft</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="pending_approval">Pending Approval</TabsTrigger>
-              <TabsTrigger value="void">Void</TabsTrigger>
+              <TabsTrigger value="draft">Not finished</TabsTrigger>
+              <TabsTrigger value="completed">Finished</TabsTrigger>
+              <TabsTrigger value="pending_approval">Waiting for sign-off</TabsTrigger>
+              <TabsTrigger value="void">Cancelled</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -417,20 +426,20 @@ export default function PayrollRunsPage() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-                  Off-cycle
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" title="A one-off payment outside your normal payday">
+                  One-off payment
                   <ChevronDown className="size-3" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("termination")}>
-                  Termination Run
+                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("termination")} title="A final pay for someone leaving">
+                  Final pay (someone leaving)
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("bonus-only")}>
-                  Bonus Run
+                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("bonus-only")} title="A one-off bonus payment">
+                  Bonus only
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("correction")}>
-                  Correction Run
+                <DropdownMenuItem onClick={() => handleCreateOffCycleRun("correction")} title="Fix a mistake in a past payroll">
+                  Fix a past payroll
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -532,7 +541,7 @@ export default function PayrollRunsPage() {
                       </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <Badge variant="outline" className={cn("text-[11px]", statusColors[run.status] || "")}>
-                          {run.status}
+                          {statusLabels[run.status] || run.status}
                         </Badge>
                         {run.runType && run.runType !== "regular" && (
                           <Badge variant="outline" className={cn("text-[11px]", runTypeColors[run.runType] || "")}>
@@ -545,15 +554,15 @@ export default function PayrollRunsPage() {
 
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="hidden sm:block text-right">
-                      <p className="text-xs text-muted-foreground">Gross</p>
+                      <p className="text-xs text-muted-foreground">Before deductions</p>
                       <p className="text-sm font-mono tabular-nums">{formatMoney(run.totalGross)}</p>
                     </div>
                     <div className="hidden sm:block text-right">
-                      <p className="text-xs text-muted-foreground">Deductions</p>
+                      <p className="text-xs text-muted-foreground">Taxes &amp; deductions</p>
                       <p className="text-sm font-mono tabular-nums text-red-600 dark:text-red-400">{formatMoney(run.totalDeductions)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Net</p>
+                      <p className="text-xs text-muted-foreground">Take-home</p>
                       <p className="text-sm font-mono tabular-nums font-medium">{formatMoney(run.totalNet)}</p>
                     </div>
                   </div>

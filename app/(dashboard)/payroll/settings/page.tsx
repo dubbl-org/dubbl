@@ -821,7 +821,7 @@ export default function PayrollSettingsPage() {
               </div>
               <div>
                 <SheetTitle>Add Leave Policy</SheetTitle>
-                <SheetDescription>Configure a new PTO or leave accrual rule.</SheetDescription>
+                <SheetDescription>Set up how staff earn paid time off (PTO).</SheetDescription>
               </div>
             </div>
           </SheetHeader>
@@ -848,7 +848,7 @@ export default function PayrollSettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Accrual Method</Label>
+                  <Label>How time off builds up</Label>
                   <Select value={newLeave.accrualMethod} onValueChange={(v) => setNewLeave({ ...newLeave, accrualMethod: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -860,7 +860,7 @@ export default function PayrollSettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Accrual Rate (hours)</Label>
+                  <Label>Hours earned</Label>
                   <Input type="number" step="0.5" value={newLeave.accrualRate} onChange={(e) => setNewLeave({ ...newLeave, accrualRate: e.target.value })} />
                 </div>
                 <div className="space-y-2">

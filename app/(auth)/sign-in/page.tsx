@@ -70,6 +70,10 @@ function SignInContent() {
   const [loading, setLoading] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [providers, setProviders] = useState<ProvidersConfig | null>(null);
+  // Two-factor: once the server asks for a code we reveal the input and keep it
+  // across retries.
+  const [needsTotp, setNeedsTotp] = useState(false);
+  const [totp, setTotp] = useState("");
 
   useEffect(() => {
     fetch("/api/auth/providers-config")
@@ -89,11 +93,20 @@ function SignInContent() {
     const res = await signIn("credentials", {
       email,
       password,
+      ...(needsTotp && totp ? { totp } : {}),
       redirect: false,
     });
 
     if (res?.error) {
-      setError("Invalid email or password");
+      if (res.code === "TwoFactorRequired") {
+        // Password was correct; the account has 2FA. Reveal the code field.
+        setNeedsTotp(true);
+        setError("");
+      } else if (needsTotp) {
+        setError("Invalid authentication code");
+      } else {
+        setError("Invalid email or password");
+      }
       setLoading(false);
     } else {
       router.push(callbackUrl);
@@ -253,6 +266,29 @@ function SignInContent() {
             className="h-11 rounded-lg"
           />
         </div>
+
+        {needsTotp && (
+          <div className="space-y-2">
+            <Label htmlFor="totp" className="text-xs font-medium">
+              Authentication code
+            </Label>
+            <Input
+              id="totp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={totp}
+              onChange={(e) => setTotp(e.target.value)}
+              placeholder="6-digit code or backup code"
+              required
+              autoFocus
+              className="h-11 rounded-lg"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the code from your authenticator app, or a backup code.
+            </p>
+          </div>
+        )}
 
         <Button
           type="submit"

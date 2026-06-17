@@ -9,12 +9,36 @@ import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
+const conditionSchema = z.object({
+  field: z.enum(["description", "reference", "amount", "payee", "counterparty"]),
+  op: z.enum([
+    "contains",
+    "equals",
+    "starts_with",
+    "ends_with",
+    "gt",
+    "lt",
+    "between",
+  ]),
+  value: z.string().min(1),
+});
+
+const splitAllocationSchema = z.object({
+  accountId: z.string().min(1),
+  percent: z.number().min(0).max(100).optional(),
+  amount: z.number().int().optional(),
+  taxRateId: z.string().optional(),
+});
+
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   priority: z.number().int().optional(),
   matchField: z.string().optional(),
   matchType: z.enum(["contains", "equals", "starts_with", "ends_with"]).optional(),
   matchValue: z.string().min(1).optional(),
+  conditions: z.array(conditionSchema).optional(),
+  matchAll: z.boolean().optional(),
+  splitAllocations: z.array(splitAllocationSchema).nullable().optional(),
   accountId: z.string().nullable().optional(),
   contactId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),

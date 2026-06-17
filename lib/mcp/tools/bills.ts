@@ -82,7 +82,7 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "create_bill",
-    "Create a new bill (accounts payable). Unit prices are decimal numbers (e.g. 12.50 for $12.50). The system calculates totals and assigns a bill number automatically.",
+    "Create a new bill (accounts payable). Unit prices are decimal numbers (e.g. 12.50 for $12.50). The system calculates totals and assigns a bill number automatically. A line with inventoryItemId is a stock purchase: on posting it capitalises into the item's Inventory account and increases on-hand quantity/value (optionally into warehouseId) instead of expensing. Pass projectId on a line to job-cost it against a project.",
     {
       contactId: z.string().describe("Supplier contact UUID"),
       issueDate: z.string().describe("Issue date (YYYY-MM-DD)"),
@@ -125,8 +125,23 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
               .min(0)
               .max(10000)
               .optional()
-              .default(0)
               .describe("Discount in basis points (1000 = 10%)"),
+            inventoryItemId: z
+              .string()
+              .optional()
+              .describe(
+                "Inventory item UUID. Marks this line as a stock purchase: on bill posting it capitalises into the item's Inventory account and increases on-hand quantity/value instead of expensing."
+              ),
+            warehouseId: z
+              .string()
+              .optional()
+              .describe(
+                "Warehouse UUID the stock is received into (used with inventoryItemId)."
+              ),
+            projectId: z
+              .string()
+              .optional()
+              .describe("Project UUID for job-costing this line against a project."),
           })
         )
         .min(1)
@@ -150,8 +165,9 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
 
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
+          const discountPercent = l.discountPercent ?? 0;
           const grossAmount = decimalToCents(l.quantity * l.unitPrice);
-          const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+          const discountAmount = discountPercent ? Math.round(grossAmount * discountPercent / 10000) : 0;
           const amount = grossAmount - discountAmount;
           subtotal += amount;
           const taxRateId = l.taxRateId ?? null;
@@ -162,9 +178,12 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
             unitPrice: decimalToCents(l.unitPrice),
             accountId: l.accountId ?? null,
             taxRateId,
-            discountPercent: l.discountPercent,
+            discountPercent,
             taxAmount,
             amount,
+            inventoryItemId: l.inventoryItemId ?? null,
+            warehouseId: l.warehouseId ?? null,
+            projectId: l.projectId ?? null,
             sortOrder: i,
           };
         });

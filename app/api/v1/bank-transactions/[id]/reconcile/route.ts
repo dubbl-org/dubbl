@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, auditLog } from "@/lib/db/schema";
+import {
+  bankTransaction,
+  bankAccount,
+  bankReconciliation,
+  journalEntry,
+  auditLog,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -50,6 +56,28 @@ export async function POST(
 
     const body = await request.json();
     const parsed = reconcileSchema.parse(body);
+
+    // Validate that any supplied journalEntry / reconciliation belong to THIS
+    // org before stamping them onto the bank line — otherwise a caller could
+    // point a line at another org's records.
+    if (parsed.journalEntryId) {
+      const je = await db.query.journalEntry.findFirst({
+        where: and(
+          eq(journalEntry.id, parsed.journalEntryId),
+          eq(journalEntry.organizationId, ctx.organizationId)
+        ),
+      });
+      if (!je) return notFound("Journal entry");
+    }
+    if (parsed.reconciliationId) {
+      const rec = await db.query.bankReconciliation.findFirst({
+        where: and(
+          eq(bankReconciliation.id, parsed.reconciliationId),
+          eq(bankReconciliation.bankAccountId, account.id)
+        ),
+      });
+      if (!rec) return notFound("Reconciliation");
+    }
 
     const [updated] = await db
       .update(bankTransaction)

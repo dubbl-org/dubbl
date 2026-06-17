@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { chartAccount } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { chartAccount, taxRate } from "@/lib/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
@@ -16,14 +16,42 @@ const createSchema = z.object({
   parentId: z.string().nullable().optional(),
   currencyCode: currencyCodeSchema.default("USD"),
   description: z.string().nullable().optional(),
+  // Account-driven tax defaulting: lines coded to this account
+  // pick up this tax rate by default.
+  defaultTaxRateId: z.string().uuid().nullable().optional(),
+  // Portion of activity disallowable for income tax, in basis points (10000 = 100%).
+  taxDisallowedPercent: z.number().int().min(0).max(10000).optional(),
+  // Optional reporting/report-code mapping for cross-client report packs.
+  reportingCode: z.string().nullable().optional(),
 });
+
+/**
+ * Returns true when the tax rate id is null/undefined (nothing to validate) or
+ * exists and belongs to the org. Returns false for a foreign/unknown id.
+ */
+async function isTaxRateInOrg(
+  organizationId: string,
+  taxRateId: string | null | undefined
+): Promise<boolean> {
+  if (!taxRateId) return true;
+  const rate = await db.query.taxRate.findFirst({
+    where: and(
+      eq(taxRate.id, taxRateId),
+      eq(taxRate.organizationId, organizationId)
+    ),
+  });
+  return !!rate;
+}
 
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
 
     const accounts = await db.query.chartAccount.findMany({
-      where: eq(chartAccount.organizationId, ctx.organizationId),
+      where: and(
+        eq(chartAccount.organizationId, ctx.organizationId),
+        isNull(chartAccount.deletedAt)
+      ),
       orderBy: chartAccount.code,
     });
 
@@ -55,6 +83,14 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Account code already exists" },
         { status: 409 }
+      );
+    }
+
+    // Validate the default tax rate belongs to this org (if supplied)
+    if (!(await isTaxRateInOrg(ctx.organizationId, parsed.defaultTaxRateId))) {
+      return NextResponse.json(
+        { error: "Tax rate not found" },
+        { status: 400 }
       );
     }
 

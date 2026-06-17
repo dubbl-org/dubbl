@@ -64,6 +64,14 @@ const statusColors: Record<string, string> = {
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  sent: "sent",
+  applied: "used",
+  void: "cancelled",
+};
+
 interface InvoiceOption {
   id: string;
   invoiceNumber: string;
@@ -153,10 +161,10 @@ export default function CreditNoteDetailPage() {
         setApplyOpen(false);
         setApplyInvoiceId("");
         setApplyAmount("");
-        toast.success("Credit note applied to invoice");
+        toast.success("Credit used to reduce the invoice");
       } else {
         const data = await res.json();
-        toast.error(typeof data.error === "string" ? data.error : "Failed to apply credit note");
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't use this credit");
       }
     } finally {
       setApplyLoading(false);
@@ -166,9 +174,9 @@ export default function CreditNoteDetailPage() {
   async function handleVoid() {
     if (!orgId) return;
     await confirm({
-      title: "Void this credit note?",
-      description: "This will mark the credit note as void. This action cannot be undone.",
-      confirmLabel: "Void Credit Note",
+      title: "Cancel this credit note?",
+      description: "This stops the credit from being used against any invoice. You can't undo this.",
+      confirmLabel: "Cancel credit note",
       destructive: true,
       onConfirm: async () => {
         const res = await fetch(`/api/v1/credit-notes/${id}/void`, {
@@ -178,7 +186,7 @@ export default function CreditNoteDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setCn((prev) => prev ? { ...prev, ...data.creditNote } : prev);
-          toast.success("Credit note voided");
+          toast.success("Credit note cancelled");
         }
       },
     });
@@ -201,13 +209,13 @@ export default function CreditNoteDetailPage() {
         {cn.status === "sent" && cn.amountRemaining > 0 && (
           <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-                <FileText className="mr-2 size-4" />Apply to Invoice
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" title="Use this credit to reduce what a customer owes on an invoice">
+                <FileText className="mr-2 size-4" />Use against an invoice
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Apply Credit Note</DialogTitle>
+                <DialogTitle>Use this credit against an invoice</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -248,22 +256,22 @@ export default function CreditNoteDetailPage() {
                   disabled={!applyInvoiceId}
                   className="w-full bg-emerald-600 hover:bg-emerald-700"
                 >
-                  Apply Credit
+                  Reduce the invoice
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         )}
         {cn.status !== "void" && (
-          <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600">
-            <Ban className="mr-2 size-4" />Void
+          <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600" title="Stop this credit from being used against any invoice">
+            <Ban className="mr-2 size-4" />Cancel credit note
           </Button>
         )}
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge variant="outline" className={statusColors[cn.status] || ""}>
-          {cn.status}
+          {statusLabels[cn.status] || cn.status}
         </Badge>
         <span className="text-xs sm:text-sm text-muted-foreground">
           Issued {cn.issueDate}

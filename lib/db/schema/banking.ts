@@ -165,6 +165,13 @@ export const bankTransaction = pgTable("bank_transaction", {
   accountId: uuid("account_id").references(() => chartAccount.id),
   contactId: uuid("contact_id").references(() => contact.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
+  // Inter-account transfer pairing: the matched line in the other bank account,
+  // and a shared group id so both legs are recognised as one transfer (B1).
+  transferTransactionId: uuid("transfer_transaction_id"),
+  transferGroupId: uuid("transfer_group_id"),
+  // Tracking dimensions captured at categorization (mirror journalLine).
+  costCenterId: uuid("cost_center_id"),
+  projectId: uuid("project_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -197,6 +204,18 @@ export const bankRule = pgTable("bank_rule", {
   matchField: text("match_field").notNull().default("description"), // "description" or "reference"
   matchType: bankRuleMatchEnum("match_type").notNull().default("contains"),
   matchValue: text("match_value").notNull(),
+  // Multi-condition rules: each condition tests a field with an operator. When
+  // `conditions` is non-empty it supersedes the legacy single matchField/Type/
+  // Value. matchAll = AND (all must match) vs OR (any). Optional split actions
+  // code one transaction across several accounts (percent or fixed cents).
+  conditions: jsonb("conditions")
+    .$type<{ field: string; op: string; value: string }[]>()
+    .notNull()
+    .default([]),
+  matchAll: boolean("match_all").notNull().default(true),
+  splitAllocations: jsonb("split_allocations").$type<
+    { accountId: string; percent?: number; amount?: number; taxRateId?: string }[]
+  >(),
   accountId: uuid("account_id").references(() => chartAccount.id),
   contactId: uuid("contact_id").references(() => contact.id),
   taxRateId: uuid("tax_rate_id").references(() => taxRate.id),

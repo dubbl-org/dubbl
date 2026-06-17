@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
-import { createInvoiceJournalEntry, assertBaseRateAvailable } from "@/lib/api/journal-automation";
+import { createInvoiceJournalEntry, createCogsJournalEntry, assertBaseRateAvailable } from "@/lib/api/journal-automation";
 import { buildSenderSnapshot, buildRecipientSnapshot } from "@/lib/documents/snapshots";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
@@ -151,42 +151,69 @@ export async function POST(
       });
     }
 
-    // Create journal entry
-    const entry = await createInvoiceJournalEntry(
-      { organizationId: ctx.organizationId, userId: ctx.userId },
-      {
-        invoiceNumber: found.invoiceNumber,
-        total: found.total,
-        taxTotal: found.taxTotal,
-        subtotal: found.subtotal,
-        lines: found.lines.map((l) => ({
-          accountId: l.accountId,
-          amount: l.amount,
-          taxAmount: l.taxAmount,
-        })),
-        date: found.issueDate,
-        currencyCode: found.currencyCode,
-      }
-    );
-
     // Snapshot org and contact details at send time
     const senderSnapshot = await buildSenderSnapshot(ctx.organizationId);
     const recipientSnapshot = found.contact
       ? buildRecipientSnapshot(found.contact)
       : { name: "Unknown", email: null, address: null, taxNumber: null };
 
-    const [updated] = await db
-      .update(invoice)
-      .set({
-        status: "sent",
-        sentAt: new Date(),
-        journalEntryId: entry?.id || null,
-        senderSnapshot,
-        recipientSnapshot,
-        updatedAt: new Date(),
-      })
-      .where(eq(invoice.id, id))
-      .returning();
+    const stockLines = found.lines.filter((l) => l.inventoryItemId);
+
+    // Post recognition + COGS + the status/journalEntryId update in ONE
+    // transaction so a mid-post failure can't leave an orphaned journal entry,
+    // a sent invoice with no GL, or relieved inventory without a posted sale.
+    const updated = await db.transaction(async (tx) => {
+      // Create journal entry (DR AR, CR Revenue, CR Output VAT).
+      const entry = await createInvoiceJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          invoiceNumber: found.invoiceNumber,
+          total: found.total,
+          taxTotal: found.taxTotal,
+          subtotal: found.subtotal,
+          lines: found.lines.map((l) => ({
+            accountId: l.accountId,
+            amount: l.amount,
+            taxAmount: l.taxAmount,
+          })),
+          date: found.issueDate,
+          currencyCode: found.currencyCode,
+        },
+        tx
+      );
+
+      // Cost of goods sold: relieve inventory + post COGS for any stock lines.
+      if (stockLines.length > 0) {
+        await createCogsJournalEntry(
+          { organizationId: ctx.organizationId, userId: ctx.userId },
+          {
+            reference: found.invoiceNumber,
+            date: found.issueDate,
+            currencyCode: found.currencyCode,
+            lines: stockLines.map((l) => ({
+              inventoryItemId: l.inventoryItemId as string,
+              quantity: l.quantity,
+              warehouseId: l.warehouseId,
+            })),
+          },
+          tx
+        );
+      }
+
+      const [row] = await tx
+        .update(invoice)
+        .set({
+          status: "sent",
+          sentAt: new Date(),
+          journalEntryId: entry?.id || null,
+          senderSnapshot,
+          recipientSnapshot,
+          updatedAt: new Date(),
+        })
+        .where(eq(invoice.id, id))
+        .returning();
+      return row;
+    });
 
     logAudit({ ctx, action: "send", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
 

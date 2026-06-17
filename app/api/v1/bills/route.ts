@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bill, billLine } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { bill, billLine, organization, taxRate } from "@/lib/db/schema";
+import { eq, and, desc, sql, ne, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -15,6 +15,7 @@ import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
+import { linkBillToPurchaseOrders } from "./_procurement";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -23,16 +24,30 @@ const lineSchema = z.object({
   accountId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),
   discountPercent: z.number().int().min(0).max(10000).default(0),
+  // FU-SURFACE: procurement / inventory / job-costing dimensions.
+  inventoryItemId: z.string().nullable().optional(),
+  warehouseId: z.string().nullable().optional(),
+  projectId: z.string().nullable().optional(),
+  // Link to a goods-receipt line for three-way match / GRNI clearing.
+  goodsReceiptLineId: z.string().nullable().optional(),
 });
 
 const createSchema = z.object({
   contactId: z.string().min(1),
   issueDate: z.string().min(1),
   dueDate: z.string().min(1),
+  // Optional supplier invoice number (their reference) — drives duplicate
+  // detection. When omitted we auto-number with getNextNumber.
+  billNumber: z.string().nullable().optional(),
   reference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   currencyCode: currencyCodeSchema.optional(),
+  // Optional purchase orders this bill draws from (join-table linkage).
+  purchaseOrderIds: z.array(z.string()).optional(),
   lines: z.array(lineSchema).min(1),
+  // When the client has acknowledged a duplicate warning, pass true to post
+  // anyway (only relevant under the 'warn' strategy).
+  confirmDuplicate: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -89,14 +104,80 @@ export async function POST(request: Request) {
       parsed.contactId
     );
 
-    const billNumber = await getNextNumber(ctx.organizationId, "bill", "bill_number", "BILL");
+    // A supplier-supplied invoice number drives duplicate detection; otherwise
+    // we auto-number (auto-numbered bills are unique by construction).
+    const billNumber =
+      parsed.billNumber?.trim() ||
+      (await getNextNumber(ctx.organizationId, "bill", "bill_number", "BILL"));
+
+    // DUPLICATE-BILL DETECTION: same org + contact + bill number on a non-void
+    // bill. Honour the org's duplicateBillStrategy ('off' | 'warn' | 'block' |
+    // 'hold'), defaulting to 'warn'.
+    let heldForDuplicate = false;
+    if (parsed.billNumber?.trim()) {
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, ctx.organizationId),
+        columns: { duplicateBillStrategy: true },
+      });
+      const strategy = org?.duplicateBillStrategy ?? "warn";
+      if (strategy !== "off") {
+        const dup = await db.query.bill.findFirst({
+          where: and(
+            eq(bill.organizationId, ctx.organizationId),
+            eq(bill.contactId, parsed.contactId),
+            eq(bill.billNumber, billNumber),
+            ne(bill.status, "void"),
+            notDeleted(bill.deletedAt)
+          ),
+          columns: { id: true, billNumber: true, total: true },
+        });
+        if (dup) {
+          if (strategy === "block") {
+            return NextResponse.json(
+              {
+                error: `A bill with number "${billNumber}" already exists for this supplier`,
+                duplicate: { id: dup.id, billNumber: dup.billNumber },
+              },
+              { status: 409 }
+            );
+          }
+          if (strategy === "warn" && !parsed.confirmDuplicate) {
+            return NextResponse.json(
+              {
+                error: `A bill with number "${billNumber}" already exists for this supplier`,
+                warning: "duplicate_bill",
+                duplicate: { id: dup.id, billNumber: dup.billNumber },
+                hint: "Resubmit with confirmDuplicate=true to create it anyway",
+              },
+              { status: 409 }
+            );
+          }
+          // strategy === 'hold' (or confirmed 'warn'): create, flagging holds.
+          if (strategy === "hold") heldForDuplicate = true;
+        }
+      }
+    }
 
     // Preload tax rates
     const taxRateIds = parsed.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
     const ratesMap = await preloadTaxRates(taxRateIds);
+    // Preload each line's tax KIND so we can detect reverse-charge: the supplier
+    // charges no VAT on a reverse-charge line (the buyer self-accounts it), so
+    // that VAT must NOT be part of the amount payable to the supplier.
+    const kindMap = new Map<string, string>();
+    if (taxRateIds.length > 0) {
+      const kinds = await db
+        .select({ id: taxRate.id, kind: taxRate.kind })
+        .from(taxRate)
+        .where(inArray(taxRate.id, [...new Set(taxRateIds)]));
+      for (const k of kinds) kindMap.set(k.id, k.kind);
+    }
 
     // Calculate totals
     let subtotal = 0;
+    // VAT that is self-accounted (reverse charge) — included in taxTotal/total
+    // for reporting, but NETTED OUT of amountDue because the supplier is paid net.
+    let reverseChargeVat = 0;
     const processedLines = parsed.lines.map((l, i) => {
       const grossAmount = decimalToCents(l.quantity * l.unitPrice);
       const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
@@ -104,6 +185,9 @@ export async function POST(request: Request) {
       subtotal += amount;
       const taxRateId = l.taxRateId || null;
       const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
+      if (taxRateId && kindMap.get(taxRateId) === "reverse_charge") {
+        reverseChargeVat += taxAmount;
+      }
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
@@ -113,12 +197,21 @@ export async function POST(request: Request) {
         discountPercent: l.discountPercent,
         taxAmount,
         amount,
+        // FU-SURFACE: persist inventory / warehouse / project / GRN dimensions.
+        inventoryItemId: l.inventoryItemId || null,
+        warehouseId: l.warehouseId || null,
+        projectId: l.projectId || null,
+        goodsReceiptLineId: l.goodsReceiptLineId || null,
         sortOrder: i,
       };
     });
 
     const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
     const total = subtotal + taxTotal;
+    // The supplier is paid NET of any reverse-charge VAT (that VAT never goes to
+    // the supplier — the buyer self-accounts it), so a full payment must settle
+    // the net amount and not over-debit Accounts Payable.
+    const amountDue = total - reverseChargeVat;
 
     const [created] = await db
       .insert(bill)
@@ -128,13 +221,16 @@ export async function POST(request: Request) {
         billNumber,
         issueDate: parsed.issueDate,
         dueDate: parsed.dueDate,
+        // 'hold' strategy parks a suspected duplicate for review rather than
+        // posting it straight to draft.
+        status: heldForDuplicate ? "pending_approval" : "draft",
         reference: parsed.reference || null,
         notes: parsed.notes || null,
         subtotal,
         taxTotal,
         total,
         amountPaid: 0,
-        amountDue: total,
+        amountDue,
         currencyCode,
         createdBy: ctx.userId,
       })
@@ -147,9 +243,17 @@ export async function POST(request: Request) {
       }))
     );
 
+    // Link any source purchase orders (join table supports multiple bills/PO).
+    if (parsed.purchaseOrderIds && parsed.purchaseOrderIds.length > 0) {
+      await linkBillToPurchaseOrders(created.id, parsed.purchaseOrderIds);
+    }
+
     logAudit({ ctx, action: "create", entityType: "bill", entityId: created.id, request });
 
-    return NextResponse.json({ bill: created }, { status: 201 });
+    return NextResponse.json(
+      { bill: created, held: heldForDuplicate || undefined },
+      { status: 201 }
+    );
   } catch (err) {
     return handleError(err);
   }

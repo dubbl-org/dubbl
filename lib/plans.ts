@@ -104,6 +104,9 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
   "manage:payments": "member",
   "manage:recurring": "admin",
   "manage:period-lock": "owner",
+  // Two-tier period lock: holders may post into the soft-locked window down to
+  // the stricter advisorLockDate (e.g. advisors closing the books).
+  "bypass:period-lock": "owner",
   "manage:bank-rules": "admin",
   "manage:cost-centers": "admin",
   "view:audit-log": "admin",
@@ -129,10 +132,94 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
 /** All available permissions derived from PERMISSION_REQUIREMENTS keys */
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_REQUIREMENTS);
 
+/**
+ * Permissions that only read/view data (no mutations). Used to build the
+ * Read-only preset role and to flag which permissions are non-mutating.
+ */
+export const READ_ONLY_PERMISSIONS = [
+  "view:data",
+  "view:payslips",
+  "view:payroll-reports",
+  "view:audit-log",
+];
+
+/**
+ * Built-in preset roles seeded as system roles (isSystem: true) for every
+ * organization. These give administrators sensible starting points without
+ * having to assemble permission sets by hand. Preset roles are immutable
+ * (cannot be edited or deleted) but can be assigned to members like any role.
+ *
+ * - Read-only: view-only access, no mutating permissions.
+ * - Advisor:   every available permission (accountant/advisor full access).
+ * - Invoice-only: limited to invoicing, contacts and payments.
+ * - Standard:  everyday operational access (no owner/admin-only powers).
+ */
+export interface PresetRole {
+  key: string;
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+const INVOICE_ONLY_PERMISSIONS = [
+  "view:data",
+  "manage:contacts",
+  "manage:invoices",
+  "manage:quotes",
+  "manage:credit-notes",
+  "manage:payments",
+].filter((p) => ALL_PERMISSIONS.includes(p));
+
+const STANDARD_PERMISSIONS = [
+  "view:data",
+  "create:entries",
+  "edit:entries",
+  "manage:contacts",
+  "manage:invoices",
+  "manage:bills",
+  "manage:expenses",
+  "manage:payments",
+  "manage:credit-notes",
+  "manage:debit-notes",
+  "manage:purchases",
+  "manage:projects",
+  "manage:timesheets",
+  "manage:leave",
+  "manage:time-tracking",
+  "manage:entries",
+].filter((p) => ALL_PERMISSIONS.includes(p));
+
+export const PRESET_ROLES: PresetRole[] = [
+  {
+    key: "read-only",
+    name: "Read-only",
+    description: "View-only access to financial data with no ability to make changes.",
+    permissions: READ_ONLY_PERMISSIONS.filter((p) => ALL_PERMISSIONS.includes(p)),
+  },
+  {
+    key: "advisor",
+    name: "Advisor",
+    description: "Full access to every feature — intended for accountants and advisors.",
+    permissions: [...ALL_PERMISSIONS],
+  },
+  {
+    key: "invoice-only",
+    name: "Invoice-only",
+    description: "Limited to creating invoices, quotes, credit notes and managing contacts and payments.",
+    permissions: INVOICE_ONLY_PERMISSIONS,
+  },
+  {
+    key: "standard",
+    name: "Standard",
+    description: "Everyday operational access without owner/admin-only powers (no posting, approvals or settings).",
+    permissions: STANDARD_PERMISSIONS,
+  },
+];
+
 /** Permission categories for UI grouping */
 export const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "General": ["view:data"],
-  "Accounting": ["create:entries", "edit:entries", "post:entries", "void:entries", "manage:accounts", "manage:recurring", "manage:period-lock"],
+  "Accounting": ["create:entries", "edit:entries", "post:entries", "void:entries", "manage:accounts", "manage:recurring", "manage:period-lock", "bypass:period-lock"],
   "Invoicing": ["manage:invoices", "approve:invoices", "manage:credit-notes", "manage:debit-notes"],
   "Bills": ["manage:bills", "approve:bills"],
   "Banking": ["manage:banking", "manage:bank-rules"],

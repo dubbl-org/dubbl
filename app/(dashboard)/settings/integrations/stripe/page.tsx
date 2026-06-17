@@ -259,11 +259,11 @@ export default function StripeIntegrationPage() {
           <div className="text-sm text-muted-foreground space-y-2">
             <p>When connected, dubbl will automatically:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Record each charge as revenue with proper journal entries</li>
-              <li>Track Stripe processing fees as expenses</li>
-              <li>Record refunds as revenue reversals</li>
-              <li>Reconcile payouts to your bank account</li>
-              <li>Sync Stripe customers as contacts</li>
+              <li>Record each payment you take as income</li>
+              <li>Track Stripe&apos;s processing fees as an expense</li>
+              <li>Record refunds you give back to customers</li>
+              <li>Match Stripe payouts to the money that lands in your bank account</li>
+              <li>Add your Stripe customers to your contacts</li>
             </ul>
           </div>
 

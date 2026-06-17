@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, DollarSign, Ban } from "lucide-react";
+import { ArrowLeft, Check, DollarSign, Ban, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ interface BillDetail {
   id: string; billNumber: string; issueDate: string; dueDate: string; status: string;
   subtotal: number; taxTotal: number; total: number; amountPaid: number; amountDue: number;
   currencyCode: string;
+  contactId: string;
   notes: string | null; contact: { name: string } | null;
   lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; account: { code: string; name: string } | null }[];
 }
@@ -50,8 +51,20 @@ const statusConfig: Record<string, { class: string }> = {
   void: { class: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300" },
 };
 
+// Plain-language status labels (end users aren't accountants).
+// "received" here means the bill has been approved and added to your books.
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  received: "in your books",
+  partial: "part paid",
+  paid: "paid",
+  overdue: "overdue",
+  void: "cancelled",
+};
+
 export default function BillDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [b, setB] = useState<BillDetail | null>(null);
   const [base, setBase] = useState<BaseAmounts | null>(null);
@@ -59,6 +72,7 @@ export default function BillDetailPage() {
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [payOpen, setPayOpen] = useState(false);
+  const [creditingSupplier, setCreditingSupplier] = useState(false);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useDocumentTitle("Purchases · Bill Details");
@@ -79,8 +93,8 @@ export default function BillDetailPage() {
   async function handleReceive() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/bills/${id}/receive`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill received"); }
-    else toast.error("Failed");
+    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill added to your books"); }
+    else toast.error("Couldn't add this bill to your books");
   }
 
   async function handlePay() {
@@ -98,14 +112,56 @@ export default function BillDetailPage() {
   async function handleVoid() {
     if (!orgId) return;
     const confirmed = await confirm({
-      title: "Void this bill?",
-      description: "This will mark the bill as void. This action cannot be undone.",
-      confirmLabel: "Void Bill",
+      title: "Cancel this bill?",
+      description: "This stops the bill from counting toward what you owe. You can't undo this.",
+      confirmLabel: "Cancel bill",
       destructive: true,
     });
     if (!confirmed) return;
     const res = await fetch(`/api/v1/bills/${id}/void`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill voided"); }
+    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill cancelled"); }
+  }
+
+  // Record a supplier credit (a "debit note") — money the supplier owes you back,
+  // e.g. for returned goods or an overcharge. Starts a credit pre-filled from
+  // this bill's lines so you don't have to retype them.
+  async function handleSupplierCredit() {
+    if (!orgId || !b) return;
+    const confirmed = await confirm({
+      title: "Record a supplier credit?",
+      description:
+        "Use this when a supplier owes you money back (for example, returned goods or an overcharge). We'll start a credit pre-filled from this bill's items, which you can adjust.",
+      confirmLabel: "Start supplier credit",
+    });
+    if (!confirmed) return;
+    setCreditingSupplier(true);
+    try {
+      const res = await fetch(`/api/v1/debit-notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId: b.contactId,
+          billId: b.id,
+          issueDate: new Date().toISOString().split("T")[0],
+          currencyCode: b.currencyCode,
+          reference: b.billNumber,
+          lines: b.lines.map((l) => ({
+            description: l.description,
+            quantity: l.quantity / 100,
+            unitPrice: l.unitPrice / 100,
+          })),
+        }),
+      });
+      if (res.ok) {
+        toast.success("Supplier credit recorded");
+        router.push("/purchases");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't record the supplier credit");
+      }
+    } finally {
+      setCreditingSupplier(false);
+    }
   }
 
   if (loading) return <BrandLoader />;
@@ -135,7 +191,7 @@ export default function BillDetailPage() {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-semibold tracking-tight">{b.billNumber}</h1>
-                <Badge variant="outline" className={sc.class}>{b.status}</Badge>
+                <Badge variant="outline" className={sc.class}>{statusLabels[b.status] || b.status}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {b.contact?.name || "Unknown supplier"} · Due {b.dueDate}
@@ -144,8 +200,8 @@ export default function BillDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {b.status === "draft" && (
-              <Button size="sm" onClick={handleReceive} className="bg-emerald-600 hover:bg-emerald-700">
-                <Check className="mr-2 size-3.5" />Mark Received
+              <Button size="sm" onClick={handleReceive} className="bg-emerald-600 hover:bg-emerald-700" title="Approve this bill and add it to your books so it counts toward what you owe">
+                <Check className="mr-2 size-3.5" />Add to my books
               </Button>
             )}
             {["received", "partial", "overdue"].includes(b.status) && (
@@ -171,9 +227,20 @@ export default function BillDetailPage() {
                 </DialogContent>
               </Dialog>
             )}
+            {["received", "partial", "paid", "overdue"].includes(b.status) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSupplierCredit}
+                loading={creditingSupplier}
+                title="Supplier owes you money back (returned goods or an overcharge)? Record a credit from them."
+              >
+                <Undo2 className="mr-2 size-3.5" />Record a supplier credit
+              </Button>
+            )}
             {b.status !== "void" && b.status !== "paid" && (
-              <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600 hover:text-red-700">
-                <Ban className="mr-2 size-3.5" />Void
+              <Button variant="outline" size="sm" onClick={handleVoid} className="text-red-600 hover:text-red-700" title="Stop this bill from counting toward what you owe">
+                <Ban className="mr-2 size-3.5" />Cancel bill
               </Button>
             )}
           </div>

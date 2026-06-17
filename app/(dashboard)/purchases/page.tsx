@@ -60,6 +60,17 @@ const statusColors: Record<string, string> = {
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
+// Plain-language status labels (end users aren't accountants).
+// "received" means the bill is approved and in your books.
+const statusLabels: Record<string, string> = {
+  draft: "draft",
+  received: "in your books",
+  partial: "part paid",
+  paid: "paid",
+  overdue: "overdue",
+  void: "cancelled",
+};
+
 function getDueInfo(dueDate: string, status: string) {
   if (status === "paid" || status === "void" || status === "draft") return null;
   const now = new Date();
@@ -129,7 +140,7 @@ function buildColumns(): Column<Bill>[] {
       className: "w-24",
       render: (r) => (
         <Badge variant="outline" className={statusColors[r.status] || ""}>
-          {r.status}
+          {statusLabels[r.status] || r.status}
         </Badge>
       ),
     },
@@ -418,11 +429,11 @@ export default function BillsPage() {
               <ShoppingCart className="size-7 text-amber-600 dark:text-amber-400" />
             </div>
             <h2 className="mt-5 text-xl font-semibold tracking-tight">
-              Track your payables
+              Track what you owe
             </h2>
             <p className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
               Add bills from your suppliers to keep track of what you owe, when
-              it&apos;s due, and how your payables age over time.
+              it&apos;s due, and how long bills have been waiting to be paid.
             </p>
             <Button
               onClick={() => openDrawer("bill")}
@@ -609,8 +620,8 @@ export default function BillsPage() {
                 <TabsList>
                   <TabsTrigger value="all" className="whitespace-nowrap">All ({countsData?.total || 0})</TabsTrigger>
                   <TabsTrigger value="draft" className="whitespace-nowrap">Draft ({statusCounts.draft || 0})</TabsTrigger>
-                  <TabsTrigger value="received" className="whitespace-nowrap">Received ({statusCounts.received || 0})</TabsTrigger>
-                  <TabsTrigger value="partial" className="whitespace-nowrap">Partial ({statusCounts.partial || 0})</TabsTrigger>
+                  <TabsTrigger value="received" className="whitespace-nowrap" title="Bills you've approved and added to your books">In your books ({statusCounts.received || 0})</TabsTrigger>
+                  <TabsTrigger value="partial" className="whitespace-nowrap">Part paid ({statusCounts.partial || 0})</TabsTrigger>
                   <TabsTrigger value="paid" className="whitespace-nowrap">Paid ({statusCounts.paid || 0})</TabsTrigger>
                   <TabsTrigger value="overdue" className="whitespace-nowrap">Overdue ({statusCounts.overdue || 0})</TabsTrigger>
                 </TabsList>

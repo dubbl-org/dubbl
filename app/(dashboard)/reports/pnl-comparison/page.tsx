@@ -83,8 +83,8 @@ export default function PnlComparisonPage() {
       </Link>
 
       <PageHeader
-        title="P&L Comparison"
-        description="Side-by-side period comparison with change amounts and percentages."
+        title="Compare two periods side by side"
+        description="Money in and money out for one period next to another, with the change shown."
       />
 
       <div className="flex items-center gap-3">

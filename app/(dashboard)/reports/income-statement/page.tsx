@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { formatMoney } from "@/lib/money";
-import { ArrowLeft } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { BackToReports, ReportHelp } from "../_components";
 import {
   Table,
   TableBody,
@@ -61,14 +60,17 @@ export default function IncomeStatementPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="size-3.5" /> Back to reports
-      </Link>
+      <BackToReports />
 
       <PageHeader
-        title="Income Statement"
-        description="Revenue - Expenses = Net Income"
+        title="Money in vs money out (summary)"
+        description="What you earned, minus what you spent, for the year so far."
       />
+
+      <ReportHelp>
+        A short version of the money-in-vs-money-out report: total earnings, total
+        costs, and what&apos;s left as profit. Also called an income statement.
+      </ReportHelp>
 
       {loading ? (
         <BrandLoader className="h-48" />
@@ -78,8 +80,8 @@ export default function IncomeStatementPage() {
         <ContentReveal>
           <div className="space-y-6">
             {[
-              { label: "Revenue", section: data.revenue },
-              { label: "Expenses", section: data.expenses },
+              { label: "Money in", section: data.revenue },
+              { label: "Money out", section: data.expenses },
             ].map((s) => (
               <div key={s.label} className="space-y-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -119,7 +121,7 @@ export default function IncomeStatementPage() {
             <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 sm:p-6">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                  Net Income
+                  Profit (money in minus money out)
                 </span>
                 <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
                   {formatMoney(parseFloat(data.netIncome) * 100)}

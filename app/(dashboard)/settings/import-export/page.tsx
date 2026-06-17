@@ -33,6 +33,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -354,6 +355,20 @@ export default function ImportExportPage() {
                 </button>
               );
             })}
+          </div>
+
+          {/* Bank statement signpost */}
+          <div className="flex items-start gap-2.5 rounded-lg border border-dashed bg-muted/40 p-3.5">
+            <Info className="size-4 shrink-0 text-muted-foreground mt-0.5" />
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Importing an actual <span className="font-medium text-foreground">bank statement</span>?
+              Use the per-account{" "}
+              <span className="font-medium text-foreground">Statement Importer</span> on the bank
+              account page (<span className="font-medium text-foreground">Banking → your account → &ldquo;Import statement&rdquo;</span>).
+              It auto-detects the format (CSV, OFX/QFX/QBO, CAMT, MT940, BAI2, &amp; more) and
+              de-duplicates against existing transactions, so you won&rsquo;t get stuck mapping a
+              custom CSV here. Use Bank Transactions below only for plain ledger-style rows.
+            </p>
           </div>
 
           {/* Import history */}

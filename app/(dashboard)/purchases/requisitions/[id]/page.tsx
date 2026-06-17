@@ -206,11 +206,11 @@ export default function RequisitionDetailPage() {
       );
       if (res.ok) {
         const data = await res.json();
-        toast.success("Converted to purchase order");
+        toast.success("Purchase order created from this request");
         router.push(`/purchases/orders/${data.purchaseOrder.id}`);
       } else {
         const err = await res.json();
-        toast.error(err.error || "Failed to convert");
+        toast.error(err.error || "Couldn't create a purchase order");
       }
     } catch {
       toast.error("Failed to convert");
@@ -286,7 +286,7 @@ export default function RequisitionDetailPage() {
             className="bg-emerald-600 hover:bg-emerald-700"
           >
             <FileText className="mr-2 size-4" />
-            Convert to PO
+            Create a purchase order
           </Button>
         )}
       </PageHeader>

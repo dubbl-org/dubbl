@@ -53,6 +53,13 @@ const statusColors: Record<string, string> = {
   void: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  posted: "in your books",
+  draft: "draft",
+  void: "cancelled",
+};
+
 const columns: Column<Entry>[] = [
   {
     key: "number",
@@ -88,7 +95,7 @@ const columns: Column<Entry>[] = [
     className: "w-24",
     render: (r) => (
       <Badge variant="outline" className={statusColors[r.status] || ""}>
-        {r.status}
+        {statusLabels[r.status] || r.status}
       </Badge>
     ),
   },
@@ -116,7 +123,7 @@ export default function TransactionsPage() {
   const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("date:desc");
 
-  useDocumentTitle("Accounting \u00B7 Journal Entries");
+  useDocumentTitle("Accounting \u00B7 Manual entries");
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -200,16 +207,22 @@ export default function TransactionsPage() {
     return (
       <ContentReveal className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Journal Entries
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Manual entries
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Direct adjustments to your books, used for things like accruals or
+              corrections.
+            </p>
+          </div>
           <Button
             onClick={() => openDrawer("entry")}
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700"
           >
             <Plus className="mr-2 size-4" />
-            New Entry
+            New manual entry
           </Button>
         </div>
 
@@ -222,7 +235,7 @@ export default function TransactionsPage() {
                   step: "1",
                   icon: BookOpen,
                   label: "Set up accounts",
-                  sub: "Define your chart of accounts and categories",
+                  sub: "Set up the categories you record transactions against",
                   color: "bg-blue-500",
                   ring: "ring-blue-200 dark:ring-blue-900",
                 },
@@ -230,7 +243,7 @@ export default function TransactionsPage() {
                   step: "2",
                   icon: ArrowLeftRight,
                   label: "Record entries",
-                  sub: "Create journal entries with balanced debits and credits",
+                  sub: "Add manual entries to adjust your books when needed",
                   color: "bg-amber-500",
                   ring: "ring-amber-200 dark:ring-amber-900",
                 },
@@ -273,7 +286,7 @@ export default function TransactionsPage() {
               Start tracking transactions
             </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Create your first journal entry to begin recording transactions.
+              Add your first manual entry to adjust your books.
             </p>
             <Button
               onClick={() => openDrawer("entry")}
@@ -281,15 +294,15 @@ export default function TransactionsPage() {
               className="mt-5 bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
-              New Entry
+              New manual entry
             </Button>
           </div>
 
           {/* Preview stat cards (empty) */}
           <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-40">
             {[
-              { label: "Total Posted", value: "$0.00" },
-              { label: "Posted Entries", value: "0" },
+              { label: "Total in your books", value: "$0.00" },
+              { label: "In your books", value: "0" },
               { label: "Drafts", value: "0" },
             ].map(({ label, value }) => (
               <div
@@ -315,21 +328,21 @@ export default function TransactionsPage() {
       {/* Inline stats row */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-          {/* Total Posted */}
+          {/* Total in your books */}
           <div>
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-              Total Posted
+              Total in your books
             </p>
             <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
               {formatMoney(totalPosted)}
             </p>
           </div>
 
-          {/* Posted count */}
+          {/* In your books count */}
           <div>
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
               <CheckCircle2 className="size-3 text-emerald-500" />
-              Posted
+              In your books
             </p>
             <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
               {posted.length}
@@ -347,11 +360,11 @@ export default function TransactionsPage() {
             </p>
           </div>
 
-          {/* Void count */}
+          {/* Cancelled count */}
           <div>
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
               <Ban className="size-3 text-red-500" />
-              Void
+              Cancelled
             </p>
             <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
               {voids.length}
@@ -365,7 +378,7 @@ export default function TransactionsPage() {
           className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
         >
           <Plus className="mr-2 size-4" />
-          New Entry
+          New manual entry
         </Button>
       </div>
 
@@ -385,7 +398,7 @@ export default function TransactionsPage() {
                   </span>
                 </TabsTrigger>
                 <TabsTrigger value="posted" className="whitespace-nowrap">
-                  Posted{" "}
+                  In your books{" "}
                   <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">
                     {posted.length}
                   </span>
@@ -397,7 +410,7 @@ export default function TransactionsPage() {
                   </span>
                 </TabsTrigger>
                 <TabsTrigger value="void" className="whitespace-nowrap">
-                  Void{" "}
+                  Cancelled{" "}
                   <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">
                     {voids.length}
                   </span>

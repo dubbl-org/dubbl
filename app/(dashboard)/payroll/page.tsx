@@ -95,8 +95,8 @@ export default function PayrollPage() {
           {[
             { icon: Users, label: "Active Employees" },
             { icon: DollarSign, label: "Monthly Cost" },
-            { icon: FileText, label: "Last Run Net" },
-            { icon: CalendarDays, label: "YTD Paid" },
+            { icon: FileText, label: "Last take-home" },
+            { icon: CalendarDays, label: "Paid this year" },
           ].map((card, i) => (
             <motion.div
               key={card.label}
@@ -156,7 +156,7 @@ export default function PayrollPage() {
               {...anim(0.45)}
               className="mt-2 max-w-md text-sm text-muted-foreground leading-relaxed"
             >
-              Add employees with their salary details, then create payroll runs to process payments. Track costs, deductions, and net payouts all in one place.
+              Add employees with their pay details, then run payroll to work out what each person takes home. Track costs, taxes, and take-home pay all in one place.
             </motion.p>
 
             {/* Steps */}
@@ -252,7 +252,7 @@ export default function PayrollPage() {
         <motion.div {...anim(0.1)} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <CalendarDays className="size-4" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">YTD Paid</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Paid this year</span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">
             {formatMoney(ytdPaid)}
@@ -262,7 +262,7 @@ export default function PayrollPage() {
         <motion.div {...anim(0.15)} className={`rounded-xl border bg-card p-4 ${draftRuns.length > 0 ? "border-amber-300/50 dark:border-amber-700/50" : ""}`}>
           <div className="flex items-center gap-2 text-muted-foreground">
             <FileText className="size-4" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Draft Runs</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Not finished yet</span>
           </div>
           <p className={`mt-2 text-2xl font-bold font-mono tabular-nums truncate ${draftRuns.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
             {draftRuns.length}
@@ -320,7 +320,7 @@ export default function PayrollPage() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs text-muted-foreground">Gross / Net</p>
+                    <p className="text-xs text-muted-foreground">Before deductions / Take-home</p>
                     <p className="text-sm font-mono tabular-nums">
                       {formatMoney(run.totalGross)} / {formatMoney(run.totalNet)}
                     </p>
@@ -360,7 +360,7 @@ export default function PayrollPage() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <div className="size-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                        <span className="text-muted-foreground">Net Pay</span>
+                        <span className="text-muted-foreground">Take-home pay</span>
                       </div>
                       <span className="font-mono tabular-nums font-medium">
                         {formatMoney(breakdownRun.totalNet)}
@@ -369,7 +369,7 @@ export default function PayrollPage() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <div className="size-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />
-                        <span className="text-muted-foreground">Deductions</span>
+                        <span className="text-muted-foreground">Taxes &amp; deductions</span>
                       </div>
                       <span className="font-mono tabular-nums font-medium">
                         {formatMoney(breakdownRun.totalDeductions)}
@@ -377,7 +377,7 @@ export default function PayrollPage() {
                     </div>
                     <div className="h-px bg-border" />
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground font-medium">Total Gross</span>
+                      <span className="text-muted-foreground font-medium">Total before deductions</span>
                       <span className="font-mono tabular-nums font-semibold">
                         {formatMoney(breakdownRun.totalGross)}
                       </span>

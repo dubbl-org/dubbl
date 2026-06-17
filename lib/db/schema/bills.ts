@@ -13,6 +13,7 @@ import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
 import { contact } from "./contacts";
 import { journalEntry, chartAccount, taxRate, costCenter } from "./bookkeeping";
+import { inventoryItem, warehouse } from "./inventory";
 
 export const billStatusEnum = pgEnum("bill_status", [
   "draft",
@@ -60,6 +61,13 @@ export const landedCostStatusEnum = pgEnum("landed_cost_status", [
   "allocated",
 ]);
 
+export const goodsReceiptStatusEnum = pgEnum("goods_receipt_status", [
+  "draft",
+  "received",
+  "billed",
+  "void",
+]);
+
 // Bill
 export const bill = pgTable("bill", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -103,6 +111,13 @@ export const billLine = pgTable("bill_line", {
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  // When set, this line is a stock purchase: posts to the item's Inventory
+  // account and increases on-hand qty/value instead of expensing.
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItem.id),
+  warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+  goodsReceiptLineId: uuid("goods_receipt_line_id"),
+  // Job-costing dimension (plain uuid; project lives in ./projects).
+  projectId: uuid("project_id"),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -140,6 +155,11 @@ export const purchaseOrderLine = pgTable("purchase_order_line", {
   taxAmount: integer("tax_amount").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItem.id),
+  warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+  // Running tallies for three-way match (qty x100 like quantity).
+  quantityReceived: integer("quantity_received").notNull().default(0),
+  quantityBilled: integer("quantity_billed").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -258,6 +278,62 @@ export const landedCostLineAllocation = pgTable("landed_cost_line_allocation", {
   allocationBasis: integer("allocation_basis"), // value used for calculation
 });
 
+// Goods Receipt (GRN) — records physical receipt of goods, optionally
+// against a purchase order. Posts to GRNI when stock lines are received.
+export const goodsReceipt = pgTable("goods_receipt", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrder.id),
+  contactId: uuid("contact_id").notNull().references(() => contact.id),
+  receiptNumber: text("receipt_number").notNull(),
+  date: date("date").notNull(),
+  status: goodsReceiptStatusEnum("status").notNull().default("draft"),
+  notes: text("notes"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+});
+
+export const goodsReceiptLine = pgTable("goods_receipt_line", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  goodsReceiptId: uuid("goods_receipt_id").notNull().references(() => goodsReceipt.id, { onDelete: "cascade" }),
+  purchaseOrderLineId: uuid("purchase_order_line_id").references(() => purchaseOrderLine.id),
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItem.id),
+  warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+  description: text("description").notNull(),
+  // Quantity received (x100 like other qty fields).
+  quantityReceived: integer("quantity_received").notNull().default(0),
+  // Unit cost in integer cents.
+  unitCost: integer("unit_cost").notNull().default(0),
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Bill <-> Purchase Order join — supports MULTIPLE bills per PO (and a bill
+// drawing from multiple POs). The legacy purchaseOrder.convertedBillId remains
+// for backward compatibility but new linkage should use this join table.
+export const billPurchaseOrder = pgTable("bill_purchase_order", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  billId: uuid("bill_id").notNull().references(() => bill.id, { onDelete: "cascade" }),
+  purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrder.id, { onDelete: "cascade" }),
+}, (t) => ({
+  uniqueBillPo: uniqueIndex("bill_purchase_order_bill_po_unique").on(t.billId, t.purchaseOrderId),
+}));
+
+// Procurement settings — per-org three-way-match tolerances and controls.
+export const procurementSettings = pgTable("procurement_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }),
+  // Tolerances in basis points (e.g. 500 = 5%).
+  priceTolerancePercent: integer("price_tolerance_percent").notNull().default(0),
+  qtyTolerancePercent: integer("qty_tolerance_percent").notNull().default(0),
+  requireGrnBeforeBill: boolean("require_grn_before_bill").notNull().default(false),
+  blockOverBill: boolean("block_over_bill").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Relations
 export const billRelations = relations(bill, ({ one, many }) => ({
   organization: one(organization, { fields: [bill.organizationId], references: [organization.id] }),
@@ -266,6 +342,7 @@ export const billRelations = relations(bill, ({ one, many }) => ({
   createdByUser: one(users, { fields: [bill.createdBy], references: [users.id] }),
   lines: many(billLine),
   debitNotes: many(debitNote),
+  purchaseOrders: many(billPurchaseOrder),
 }));
 
 export const billLineRelations = relations(billLine, ({ one }) => ({
@@ -280,6 +357,8 @@ export const purchaseOrderRelations = relations(purchaseOrder, ({ one, many }) =
   contact: one(contact, { fields: [purchaseOrder.contactId], references: [contact.id] }),
   createdByUser: one(users, { fields: [purchaseOrder.createdBy], references: [users.id] }),
   lines: many(purchaseOrderLine),
+  bills: many(billPurchaseOrder),
+  goodsReceipts: many(goodsReceipt),
 }));
 
 export const purchaseOrderLineRelations = relations(purchaseOrderLine, ({ one }) => ({
@@ -338,4 +417,29 @@ export const landedCostLineAllocationRelations = relations(landedCostLineAllocat
   allocation: one(landedCostAllocation, { fields: [landedCostLineAllocation.allocationId], references: [landedCostAllocation.id] }),
   component: one(landedCostComponent, { fields: [landedCostLineAllocation.componentId], references: [landedCostComponent.id] }),
   purchaseOrderLine: one(purchaseOrderLine, { fields: [landedCostLineAllocation.purchaseOrderLineId], references: [purchaseOrderLine.id] }),
+}));
+
+export const goodsReceiptRelations = relations(goodsReceipt, ({ one, many }) => ({
+  organization: one(organization, { fields: [goodsReceipt.organizationId], references: [organization.id] }),
+  purchaseOrder: one(purchaseOrder, { fields: [goodsReceipt.purchaseOrderId], references: [purchaseOrder.id] }),
+  contact: one(contact, { fields: [goodsReceipt.contactId], references: [contact.id] }),
+  createdByUser: one(users, { fields: [goodsReceipt.createdBy], references: [users.id] }),
+  lines: many(goodsReceiptLine),
+}));
+
+export const goodsReceiptLineRelations = relations(goodsReceiptLine, ({ one }) => ({
+  goodsReceipt: one(goodsReceipt, { fields: [goodsReceiptLine.goodsReceiptId], references: [goodsReceipt.id] }),
+  purchaseOrderLine: one(purchaseOrderLine, { fields: [goodsReceiptLine.purchaseOrderLineId], references: [purchaseOrderLine.id] }),
+  inventoryItem: one(inventoryItem, { fields: [goodsReceiptLine.inventoryItemId], references: [inventoryItem.id] }),
+  warehouse: one(warehouse, { fields: [goodsReceiptLine.warehouseId], references: [warehouse.id] }),
+  journalEntry: one(journalEntry, { fields: [goodsReceiptLine.journalEntryId], references: [journalEntry.id] }),
+}));
+
+export const billPurchaseOrderRelations = relations(billPurchaseOrder, ({ one }) => ({
+  bill: one(bill, { fields: [billPurchaseOrder.billId], references: [bill.id] }),
+  purchaseOrder: one(purchaseOrder, { fields: [billPurchaseOrder.purchaseOrderId], references: [purchaseOrder.id] }),
+}));
+
+export const procurementSettingsRelations = relations(procurementSettings, ({ one }) => ({
+  organization: one(organization, { fields: [procurementSettings.organizationId], references: [organization.id] }),
 }));

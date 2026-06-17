@@ -34,6 +34,8 @@ export default function ContactDetailsPage() {
     setFormType,
     formTaxExempt,
     setFormTaxExempt,
+    form1099Vendor,
+    setForm1099Vendor,
     formCreditLimit,
     setFormCreditLimit,
     formCurrencyCode,
@@ -107,6 +109,7 @@ export default function ContactDetailsPage() {
             ? decimalToCents(creditLimitValue)
             : null,
           isTaxExempt: formTaxExempt,
+          is1099Vendor: form1099Vendor,
           currencyCode: formCurrencyCode || null,
           defaultRevenueAccountId: formRevenueAccountId !== "none" ? formRevenueAccountId : null,
           defaultExpenseAccountId: formExpenseAccountId !== "none" ? formExpenseAccountId : null,
@@ -124,6 +127,7 @@ export default function ContactDetailsPage() {
       setFormExpenseAccountId(c.defaultExpenseAccountId || "none");
       setFormTaxRateId(c.defaultTaxRateId || "none");
       setFormTaxExempt(c.isTaxExempt);
+      setForm1099Vendor(c.is1099Vendor ?? false);
       setFormCreditLimit(c.creditLimit != null ? String(c.creditLimit / 100) : "");
       setFormCurrencyCode(c.currencyCode || "");
       toast.success("Contact updated");
@@ -244,9 +248,32 @@ export default function ContactDetailsPage() {
                     htmlFor="isTaxExempt"
                     className="cursor-pointer text-sm font-normal"
                   >
-                    Tax exempt
+                    Don&apos;t charge tax to this contact
                   </Label>
                 </div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">US tax reporting</Label>
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="is1099Vendor"
+                  className="mt-0.5"
+                  checked={form1099Vendor}
+                  onCheckedChange={(checked) =>
+                    setForm1099Vendor(checked === true)
+                  }
+                />
+                <Label
+                  htmlFor="is1099Vendor"
+                  className="cursor-pointer text-sm font-normal leading-snug"
+                >
+                  Track this supplier for a 1099
+                  <span className="block text-[12px] font-normal text-muted-foreground">
+                    Turn on for US contractors you pay $600 or more in a year, so
+                    they appear on your year-end 1099 list.
+                  </span>
+                </Label>
               </div>
             </div>
           </div>
@@ -254,10 +281,10 @@ export default function ContactDetailsPage() {
 
         <div className="h-px bg-border" />
 
-        <Section title="Default accounts" description="Default chart of accounts for this contact's transactions.">
+        <Section title="Default accounts" description="Where money from this contact lands in your books by default.">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Revenue account</Label>
+              <Label className="text-xs">Income account (money they pay you)</Label>
               <Select
                 value={formRevenueAccountId}
                 onValueChange={setFormRevenueAccountId}
@@ -276,7 +303,7 @@ export default function ContactDetailsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Expense account</Label>
+              <Label className="text-xs">Spending account (money you pay them)</Label>
               <Select
                 value={formExpenseAccountId}
                 onValueChange={setFormExpenseAccountId}

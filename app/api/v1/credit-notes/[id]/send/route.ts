@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { creditNote, organization } from "@/lib/db/schema";
+import { creditNote, invoice, organization } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { createCreditNoteJournalEntry, createCogsJournalEntry } from "@/lib/api/journal-automation";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
 import { z } from "zod";
@@ -47,6 +49,7 @@ export async function POST(
         eq(creditNote.organizationId, ctx.organizationId),
         notDeleted(creditNote.deletedAt)
       ),
+      with: { lines: true },
     });
 
     if (!found) return notFound("Credit note");
@@ -80,15 +83,95 @@ export async function POST(
       });
     }
 
-    const [updated] = await db
-      .update(creditNote)
-      .set({
-        status: "sent",
-        sentAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(creditNote.id, id))
-      .returning();
+    await assertNotLocked(ctx.organizationId, found.issueDate);
+
+    // Cost of goods sold reversal: a sales return restores inventory and reverses
+    // COGS for the stock that comes back. Credit-note lines don't carry inventory
+    // dimensions, so we read the stock lines from the original invoice (when the
+    // credit note is linked to one) and restock proportionally to the credited
+    // fraction (full credit → full restock; partial → pro-rata by value). This is
+    // a read — done before the transaction; the restock POSTING happens inside it.
+    let restockLines: {
+      inventoryItemId: string;
+      quantity: number;
+      warehouseId: string | null;
+    }[] = [];
+    if (found.invoiceId) {
+      const original = await db.query.invoice.findFirst({
+        where: and(
+          eq(invoice.id, found.invoiceId),
+          eq(invoice.organizationId, ctx.organizationId)
+        ),
+        with: { lines: true },
+      });
+      const invStockLines = original?.lines.filter((l) => l.inventoryItemId) ?? [];
+      if (original && invStockLines.length > 0) {
+        // Credited fraction of the original invoice, capped at 1 (a credit note
+        // can't return more stock than was sold). Falls back to full restock if
+        // the original total is zero/unknown.
+        const fraction =
+          original.total > 0 ? Math.min(found.total / original.total, 1) : 1;
+        restockLines = invStockLines
+          .map((l) => ({
+            inventoryItemId: l.inventoryItemId as string,
+            quantity: Math.round(l.quantity * fraction),
+            warehouseId: l.warehouseId,
+          }))
+          .filter((l) => l.quantity > 0);
+      }
+    }
+
+    // Post the reversal JE + COGS restock + the status/journalEntryId update in
+    // ONE transaction so a mid-post failure can't leave an orphaned journal
+    // entry, a sent credit note with no GL, or restocked inventory without a
+    // posted reversal.
+    const updated = await db.transaction(async (tx) => {
+      // Create journal entry: DR Revenue, DR Output VAT, CR Accounts Receivable —
+      // reversing the original sale's revenue + output VAT.
+      const entry = await createCreditNoteJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          creditNoteNumber: found.creditNoteNumber,
+          total: found.total,
+          taxTotal: found.taxTotal,
+          lines: found.lines.map((l) => ({
+            accountId: l.accountId,
+            amount: l.amount,
+            taxAmount: l.taxAmount,
+          })),
+          date: found.issueDate,
+          currencyCode: found.currencyCode,
+        },
+        tx
+      );
+
+      if (restockLines.length > 0) {
+        await createCogsJournalEntry(
+          { organizationId: ctx.organizationId, userId: ctx.userId },
+          {
+            reference: found.creditNoteNumber,
+            date: found.issueDate,
+            currencyCode: found.currencyCode,
+            lines: restockLines,
+          },
+          tx,
+          { reverse: true }
+        );
+      }
+
+      const [row] = await tx
+        .update(creditNote)
+        .set({
+          status: "sent",
+          sentAt: new Date(),
+          amountRemaining: found.total,
+          journalEntryId: entry?.id || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(creditNote.id, id))
+        .returning();
+      return row;
+    });
 
     logAudit({ ctx, action: "send", entityType: "credit_note", entityId: id, changes: { previousStatus: found.status }, request });
 

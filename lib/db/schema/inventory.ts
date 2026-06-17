@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization } from "./auth";
-import { chartAccount } from "./bookkeeping";
+import { chartAccount, journalEntry } from "./bookkeeping";
 import { contact } from "./contacts";
 
 export const trackingMethodEnum = pgEnum("tracking_method", [
@@ -27,6 +27,13 @@ export const serialStatusEnum = pgEnum("serial_status", [
   "sold",
   "reserved",
   "damaged",
+]);
+
+// Cost-flow method for perpetual inventory valuation.
+export const costMethodEnum = pgEnum("cost_method", [
+  "average", // moving weighted average (default)
+  "fifo", // first-in-first-out cost layers
+  "standard", // standard cost + purchase-price variance (deferred; gated)
 ]);
 
 // --- Inventory Category ---
@@ -74,6 +81,14 @@ export const inventoryItem = pgTable(
     sku: text("sku"),
     purchasePrice: integer("purchase_price").notNull().default(0), // cents
     salePrice: integer("sale_price").notNull().default(0), // cents
+    // Perpetual valuation: costMethod drives how unit cost is derived. averageCost
+    // is the moving weighted-average unit cost (cents); totalValue is the on-hand
+    // book value (cents) = averageCost*qty (average) or sum of FIFO layer values.
+    costMethod: costMethodEnum("cost_method").notNull().default("average"),
+    averageCost: integer("average_cost").notNull().default(0), // cents per unit
+    standardCost: integer("standard_cost").notNull().default(0), // cents per unit
+    totalValue: integer("total_value").notNull().default(0), // cents, on-hand book value
+    unitOfMeasure: text("unit_of_measure"),
     costAccountId: uuid("cost_account_id").references(() => chartAccount.id),
     revenueAccountId: uuid("revenue_account_id").references(() => chartAccount.id),
     inventoryAccountId: uuid("inventory_account_id").references(() => chartAccount.id),
@@ -149,6 +164,9 @@ export const inventoryMovement = pgTable("inventory_movement", {
   quantity: integer("quantity").notNull(), // can be negative
   previousQuantity: integer("previous_quantity").notNull(),
   newQuantity: integer("new_quantity").notNull(),
+  unitCost: integer("unit_cost").notNull().default(0), // cents per unit at the time of movement
+  value: integer("value").notNull().default(0), // cents, signed GL amount = unitCost*quantity
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   reason: text("reason"),
   referenceType: text("reference_type"),
   referenceId: uuid("reference_id"),
@@ -230,6 +248,8 @@ export const stockTakeLine = pgTable("stock_take_line", {
   countedQuantity: integer("counted_quantity"),
   discrepancy: integer("discrepancy"),
   adjusted: boolean("adjusted").default(false),
+  valueAdjustment: integer("value_adjustment"), // cents, GL value of the true-up
+  journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -403,7 +423,82 @@ export const movementLotAssignment = pgTable("movement_lot_assignment", {
   quantity: integer("quantity").notNull(),
 });
 
+// --- FIFO cost layers (financial cost flow, separate from physical lot/batch) ---
+
+export const inventoryCostLayer = pgTable(
+  "inventory_cost_layer",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItem.id, { onDelete: "cascade" }),
+    warehouseId: uuid("warehouse_id").references(() => warehouse.id),
+    receivedAt: timestamp("received_at", { mode: "date" }).defaultNow().notNull(),
+    originalQuantity: integer("original_quantity").notNull(),
+    remainingQuantity: integer("remaining_quantity").notNull(),
+    unitCost: integer("unit_cost").notNull(), // cents per unit for this layer
+    sourceMovementId: uuid("source_movement_id").references(() => inventoryMovement.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    // FIFO consumption order: oldest received first
+    uniqueIndex("inventory_cost_layer_fifo_idx").on(
+      table.organizationId,
+      table.inventoryItemId,
+      table.receivedAt,
+      table.id
+    ),
+  ]
+);
+
+// Which layers a given issue movement consumed (audit of FIFO cost-of-issue).
+export const inventoryLayerConsumption = pgTable("inventory_layer_consumption", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  issueMovementId: uuid("issue_movement_id")
+    .notNull()
+    .references(() => inventoryMovement.id, { onDelete: "cascade" }),
+  costLayerId: uuid("cost_layer_id")
+    .notNull()
+    .references(() => inventoryCostLayer.id),
+  quantity: integer("quantity").notNull(),
+  unitCost: integer("unit_cost").notNull(), // cents per unit consumed from this layer
+});
+
 // --- Relations ---
+
+export const inventoryCostLayerRelations = relations(inventoryCostLayer, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [inventoryCostLayer.organizationId],
+    references: [organization.id],
+  }),
+  inventoryItem: one(inventoryItem, {
+    fields: [inventoryCostLayer.inventoryItemId],
+    references: [inventoryItem.id],
+  }),
+  warehouse: one(warehouse, {
+    fields: [inventoryCostLayer.warehouseId],
+    references: [warehouse.id],
+  }),
+  sourceMovement: one(inventoryMovement, {
+    fields: [inventoryCostLayer.sourceMovementId],
+    references: [inventoryMovement.id],
+  }),
+  consumptions: many(inventoryLayerConsumption),
+}));
+
+export const inventoryLayerConsumptionRelations = relations(inventoryLayerConsumption, ({ one }) => ({
+  issueMovement: one(inventoryMovement, {
+    fields: [inventoryLayerConsumption.issueMovementId],
+    references: [inventoryMovement.id],
+  }),
+  costLayer: one(inventoryCostLayer, {
+    fields: [inventoryLayerConsumption.costLayerId],
+    references: [inventoryCostLayer.id],
+  }),
+}));
 
 export const inventoryCategoryRelations = relations(inventoryCategory, ({ one, many }) => ({
   organization: one(organization, {

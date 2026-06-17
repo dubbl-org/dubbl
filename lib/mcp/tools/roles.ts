@@ -6,15 +6,19 @@ import { eq, and, sql } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { ALL_PERMISSIONS } from "@/lib/plans";
+import { seedPresetRoles } from "@/lib/api/preset-roles";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerRoleTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "list_roles",
-    "List all custom roles for the organization, including each role's name, description, permissions array, and member count. System roles (isSystem: true) mirror the built-in owner/admin/member hierarchy.",
+    "List all custom roles for the organization, including each role's name, description, permissions array, and member count. System roles (isSystem: true) include the built-in presets (Read-only, Advisor, Invoice-only, Standard) which are seeded automatically and cannot be edited or deleted.",
     {},
     () =>
       wrapTool(ctx, async () => {
+        // Ensure the built-in preset system roles exist and are exposed.
+        await seedPresetRoles(ctx.organizationId);
+
         const roles = await db.query.customRole.findMany({
           where: eq(customRole.organizationId, ctx.organizationId),
         });

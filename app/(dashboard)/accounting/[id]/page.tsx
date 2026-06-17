@@ -65,17 +65,17 @@ interface Entry {
 const statusConfig: Record<string, { class: string; label: string; bg: string }> = {
   draft: {
     class: "",
-    label: "Draft",
+    label: "draft",
     bg: "bg-gray-500",
   },
   posted: {
     class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-    label: "Posted",
+    label: "in your books",
     bg: "bg-emerald-500",
   },
   void: {
     class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
-    label: "Void",
+    label: "cancelled",
     bg: "bg-red-500",
   },
 };
@@ -143,9 +143,9 @@ export default function EntryDetailPage() {
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
       setEntry(data.entry);
-      toast.success("Entry posted to the general ledger");
+      toast.success("Entry finalized and added to your books");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to post");
+      toast.error(err instanceof Error ? err.message : "Couldn't finalize this entry");
     } finally {
       setActionLoading(false);
     }
@@ -167,9 +167,9 @@ export default function EntryDetailPage() {
       const data = await res.json();
       setEntry(data.entry);
       setVoidReason("");
-      toast.success("Entry voided");
+      toast.success("Entry cancelled");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to void");
+      toast.error(err instanceof Error ? err.message : "Couldn't cancel this entry");
     } finally {
       setActionLoading(false);
     }
@@ -268,9 +268,10 @@ export default function EntryDetailPage() {
                   onClick={postEntry}
                   disabled={actionLoading}
                   className="bg-emerald-600 hover:bg-emerald-700"
+                  title="Locks this entry and adds it to your books"
                 >
                   <Check className="mr-2 size-4" />
-                  Post
+                  Finalize
                 </Button>
                 <Button
                   variant="outline"
@@ -286,22 +287,27 @@ export default function EntryDetailPage() {
             {entry.status === "posted" && (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-red-600">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600"
+                    title="Reverses this entry so it no longer affects your books"
+                  >
                     <X className="mr-2 size-4" />
-                    Void
+                    Cancel
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Void Entry #{entry.entryNumber}</DialogTitle>
+                    <DialogTitle>Cancel entry #{entry.entryNumber}?</DialogTitle>
                     <DialogDescription>
-                      This will reverse the entry in the general ledger. Please provide a reason.
+                      This reverses the entry so it no longer affects your books. Please add a reason.
                     </DialogDescription>
                   </DialogHeader>
                   <Textarea
                     value={voidReason}
                     onChange={(e) => setVoidReason(e.target.value)}
-                    placeholder="Reason for voiding this entry..."
+                    placeholder="Reason for cancelling this entry..."
                     rows={3}
                   />
                   <DialogFooter>
@@ -310,7 +316,7 @@ export default function EntryDetailPage() {
                       onClick={voidEntry}
                       disabled={!voidReason.trim() || actionLoading}
                     >
-                      {actionLoading ? "Voiding..." : "Void Entry"}
+                      {actionLoading ? "Cancelling..." : "Cancel entry"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -324,7 +330,7 @@ export default function EntryDetailPage() {
           <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-4">
             <AlertTriangle className="size-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-300">Entry voided</p>
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">Entry cancelled</p>
               <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">{entry.voidReason}</p>
             </div>
           </div>
@@ -370,14 +376,14 @@ export default function EntryDetailPage() {
                 {entry.postedAt && (
                   <div className="flex sm:justify-end items-center gap-2">
                     <Check className="size-3.5 text-emerald-500" />
-                    <span className="text-xs text-muted-foreground">Posted</span>
+                    <span className="text-xs text-muted-foreground">Finalized</span>
                     <span className="text-sm">{formatTimestamp(entry.postedAt)}</span>
                   </div>
                 )}
                 {entry.voidedAt && (
                   <div className="flex sm:justify-end items-center gap-2">
                     <X className="size-3.5 text-red-500" />
-                    <span className="text-xs text-muted-foreground">Voided</span>
+                    <span className="text-xs text-muted-foreground">Cancelled</span>
                     <span className="text-sm">{formatTimestamp(entry.voidedAt)}</span>
                   </div>
                 )}
@@ -533,13 +539,13 @@ export default function EntryDetailPage() {
               </div>
               {entry.postedAt && (
                 <div>
-                  <p className="text-[11px] text-muted-foreground">Posted</p>
+                  <p className="text-[11px] text-muted-foreground">Finalized</p>
                   <p className="text-sm mt-0.5">{formatTimestamp(entry.postedAt)}</p>
                 </div>
               )}
               {entry.voidedAt && (
                 <div>
-                  <p className="text-[11px] text-muted-foreground">Voided</p>
+                  <p className="text-[11px] text-muted-foreground">Cancelled</p>
                   <p className="text-sm mt-0.5">{formatTimestamp(entry.voidedAt)}</p>
                 </div>
               )}

@@ -25,6 +25,9 @@ const createSchema = z.object({
   description: z.string().min(1),
   reference: z.string().nullable().optional(),
   fiscalYearId: z.string().nullable().optional(),
+  // If set, a scheduled job posts a mirror reversing entry on this date
+  // (accruals / prepayments). Must be on or after the entry date.
+  autoReverseDate: z.string().nullable().optional(),
   lines: z.array(lineSchema).min(2),
 });
 
@@ -87,6 +90,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // An auto-reversal must fall on or after the original entry's date.
+    if (parsed.autoReverseDate && parsed.autoReverseDate < parsed.date) {
+      return NextResponse.json(
+        { error: "Auto-reverse date must be on or after the entry date" },
+        { status: 400 }
+      );
+    }
+
     // Get next entry number
     const [maxResult] = await db
       .select({ max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)` })
@@ -104,6 +115,7 @@ export async function POST(request: Request) {
         description: parsed.description,
         reference: parsed.reference || null,
         fiscalYearId: parsed.fiscalYearId || null,
+        autoReverseDate: parsed.autoReverseDate || null,
         createdBy: ctx.userId,
       })
       .returning();

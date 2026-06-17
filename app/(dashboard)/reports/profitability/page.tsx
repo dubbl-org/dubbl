@@ -71,8 +71,8 @@ export default function ProfitabilityPage() {
       </Link>
 
       <PageHeader
-        title="Contact Profitability"
-        description="Revenue minus costs per customer for the selected period."
+        title="Profit by customer"
+        description="What each customer brought in, minus what serving them cost, for the period."
       />
 
       <DateRangeFilter
@@ -83,7 +83,7 @@ export default function ProfitabilityPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Revenue"
+          title="Money in"
           value={formatMoney(totalRevenue)}
           icon={TrendingUp}
           changeType="positive"

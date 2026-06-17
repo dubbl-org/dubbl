@@ -40,6 +40,28 @@ export async function POST(
       );
     }
 
+    // periodIndex MUST be the count of depreciation entries already booked for
+    // this asset (never derived from accumulated/monthly — that breaks for
+    // declining-balance, SYD and any uneven schedule).
+    const [priorCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(depreciationEntry)
+      .where(eq(depreciationEntry.fixedAssetId, asset.id));
+    const periodIndex = Number(priorCount?.count ?? 0);
+
+    // Units-of-production assets need a usage reading for the period; optional
+    // for time-based methods.
+    let unitsThisPeriod: number | undefined;
+    try {
+      const body = await request.json();
+      if (typeof body?.unitsThisPeriod === "number")
+        unitsThisPeriod = body.unitsThisPeriod;
+    } catch {
+      // no JSON body — fine for time-based methods
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
     const amount = calculateMonthlyDepreciation({
       purchasePrice: asset.purchasePrice,
       residualValue: asset.residualValue,
@@ -47,6 +69,12 @@ export async function POST(
       depreciationMethod: asset.depreciationMethod,
       accumulatedDepreciation: asset.accumulatedDepreciation,
       purchaseDate: asset.purchaseDate,
+      periodIndex,
+      convention: asset.convention,
+      inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
+      totalExpectedUnits: asset.totalExpectedUnits,
+      unitsThisPeriod,
+      periodDate: today,
     });
 
     if (amount <= 0) {
@@ -55,8 +83,6 @@ export async function POST(
         { status: 400 }
       );
     }
-
-    const today = new Date().toISOString().split("T")[0];
 
     // Create journal entry if accounts are configured
     let journalEntryId: string | null = null;
@@ -115,6 +141,7 @@ export async function POST(
         fixedAssetId: asset.id,
         date: today,
         amount,
+        unitsThisPeriod: unitsThisPeriod ?? null,
         journalEntryId,
       })
       .returning();

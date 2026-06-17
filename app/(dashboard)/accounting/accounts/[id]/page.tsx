@@ -200,15 +200,25 @@ export default function AccountLedgerPage() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Ledger</h3>
+        <h3 className="text-sm font-semibold">Transactions</h3>
         <span className="text-xs text-muted-foreground tabular-nums">{total} entries</span>
       </div>
 
       <Tabs value={entryType} onValueChange={setEntryType}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="debits">Debits</TabsTrigger>
-          <TabsTrigger value="credits">Credits</TabsTrigger>
+          <TabsTrigger
+            value="debits"
+            title="The left column. For cash and what you're owed, this is money in; for income and what you owe, it's money out."
+          >
+            Debits
+          </TabsTrigger>
+          <TabsTrigger
+            value="credits"
+            title="The right column. For cash and what you're owed, this is money out; for income and what you owe, it's money in."
+          >
+            Credits
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 

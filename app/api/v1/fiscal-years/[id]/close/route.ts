@@ -12,6 +12,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, error, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
+import { getRetainedEarningsAccount } from "@/lib/api/period-close";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -87,16 +88,12 @@ export async function POST(
       )
       .groupBy(chartAccount.id, chartAccount.type);
 
-    // Find Retained Earnings account (code "3200")
-    const retainedEarnings = await db.query.chartAccount.findFirst({
-      where: and(
-        eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "3200")
-      ),
-    });
+    // Resolve Retained Earnings (configurable; defaults to subType 'retained' / code 3100).
+    // Previously hardcoded to 3200 which is "Owner's Drawings" — a posting bug.
+    const retainedEarnings = await getRetainedEarningsAccount(ctx.organizationId);
 
     if (!retainedEarnings) {
-      return error("Retained Earnings account (code 3200) not found", 400);
+      return error("Retained Earnings account not found. Set one in organization settings or add an equity account with subType 'retained'.", 400);
     }
 
     // Calculate balances and build closing lines

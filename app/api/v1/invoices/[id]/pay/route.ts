@@ -3,9 +3,11 @@ import { db } from "@/lib/db";
 import { invoice, payment, paymentAllocation } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
@@ -25,9 +27,14 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:payments");
 
     const body = await request.json();
     const parsed = paySchema.parse(body);
+
+    // Recording a payment posts DR Bank / CR AR — block it if the payment date
+    // falls in a locked/closed period.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
 
     const found = await db.query.invoice.findFirst({
       where: and(

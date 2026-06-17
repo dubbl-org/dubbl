@@ -1,11 +1,11 @@
 import { db } from "@/lib/db";
-import { contractorPayment, contractor, journalEntry, journalLine, chartAccount } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { contractorPayment, journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound, validationError } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { ensureAccountByCode, getNextEntryNumber } from "@/lib/api/journal-automation";
 
 export async function POST(
   request: Request,
@@ -23,13 +23,20 @@ export async function POST(
     if (!payment) return notFound("Payment");
     if (payment.status !== "pending") return validationError("Only pending payments can be processed");
 
-    // Create journal entry
-    const expenseAccount = await db.query.chartAccount.findFirst({
-      where: and(
-        eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "5100")
-      ),
+    // Resolve the org base currency so any auto-created accounts are stamped with it.
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+      columns: { defaultCurrency: true },
     });
+    const baseCurrency = org?.defaultCurrency ?? "USD";
+
+    // Contractor (1099) cost is Subcontractor Expense (5130), NOT employee
+    // Wages (5100) — keep contractor cost out of the employee payroll line.
+    const expenseAccount = await ensureAccountByCode(
+      ctx.organizationId,
+      { code: "5130", name: "Subcontractor Expense", type: "expense", subType: "operating" },
+      baseCurrency
+    );
 
     const bankAccount = await db.query.chartAccount.findFirst({
       where: and(
@@ -41,47 +48,45 @@ export async function POST(
     let journalEntryId: string | null = null;
 
     if (expenseAccount && bankAccount) {
-      const [maxResult] = await db
-        .select({ max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)` })
-        .from(journalEntry)
-        .where(eq(journalEntry.organizationId, ctx.organizationId));
+      // Post one balanced entry: DR Subcontractor Expense / CR Bank.
+      journalEntryId = await db.transaction(async (tx) => {
+        const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
 
-      const entryNumber = (Number(maxResult?.max) || 0) + 1;
+        const [entry] = await tx
+          .insert(journalEntry)
+          .values({
+            organizationId: ctx.organizationId,
+            entryNumber,
+            date: new Date().toISOString().split("T")[0],
+            description: `Contractor payment - ${payment.description || paymentId.slice(0, 8)}`,
+            reference: `CP-${paymentId.slice(0, 8)}`,
+            status: "posted",
+            sourceType: "contractor_payment",
+            sourceId: paymentId,
+            postedAt: new Date(),
+            createdBy: ctx.userId,
+          })
+          .returning();
 
-      const [entry] = await db
-        .insert(journalEntry)
-        .values({
-          organizationId: ctx.organizationId,
-          entryNumber,
-          date: new Date().toISOString().split("T")[0],
-          description: `Contractor payment - ${payment.description || paymentId.slice(0, 8)}`,
-          reference: `CP-${paymentId.slice(0, 8)}`,
-          status: "posted",
-          sourceType: "contractor_payment",
-          sourceId: paymentId,
-          postedAt: new Date(),
-          createdBy: ctx.userId,
-        })
-        .returning();
+        await tx.insert(journalLine).values([
+          {
+            journalEntryId: entry.id,
+            accountId: expenseAccount.id,
+            description: "Subcontractor expense",
+            debitAmount: payment.amount,
+            creditAmount: 0,
+          },
+          {
+            journalEntryId: entry.id,
+            accountId: bankAccount.id,
+            description: "Contractor payment",
+            debitAmount: 0,
+            creditAmount: payment.amount,
+          },
+        ]);
 
-      journalEntryId = entry.id;
-
-      await db.insert(journalLine).values([
-        {
-          journalEntryId: entry.id,
-          accountId: expenseAccount.id,
-          description: "Contractor expense",
-          debitAmount: payment.amount,
-          creditAmount: 0,
-        },
-        {
-          journalEntryId: entry.id,
-          accountId: bankAccount.id,
-          description: "Contractor payment",
-          debitAmount: 0,
-          creditAmount: payment.amount,
-        },
-      ]);
+        return entry.id;
+      });
     }
 
     const [updated] = await db

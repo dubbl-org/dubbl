@@ -25,6 +25,12 @@ const statusColors: Record<string, string> = {
   declined: "border-red-200 bg-red-50 text-red-700", expired: "border-gray-200 bg-gray-50 text-gray-700", converted: "border-purple-200 bg-purple-50 text-purple-700",
 };
 
+// Plain-language status labels (end users aren't accountants).
+const statusLabels: Record<string, string> = {
+  draft: "draft", sent: "sent", accepted: "accepted",
+  declined: "declined", expired: "expired", converted: "turned into an invoice",
+};
+
 export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -61,8 +67,8 @@ export default function QuoteDetailPage() {
   async function handleConvert() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/quotes/${id}/convert`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) { const data = await res.json(); toast.success("Converted to invoice"); router.push(`/sales/${data.invoice.id}`); }
-    else toast.error("Failed to convert");
+    if (res.ok) { const data = await res.json(); toast.success("Invoice created from this quote"); router.push(`/sales/${data.invoice.id}`); }
+    else toast.error("Couldn't create an invoice from this quote");
   }
 
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
@@ -77,11 +83,11 @@ export default function QuoteDetailPage() {
           <Button size="sm" onClick={() => action("accept")} className="bg-emerald-600 hover:bg-emerald-700"><Check className="mr-2 size-4" />Accept</Button>
           <Button size="sm" variant="outline" onClick={() => action("decline")} className="text-red-600"><X className="mr-2 size-4" />Decline</Button>
         </>}
-        {q.status === "accepted" && <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700"><FileText className="mr-2 size-4" />Convert to Invoice</Button>}
+        {q.status === "accepted" && <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700" title="Turn this accepted quote into an invoice you can send and get paid on"><FileText className="mr-2 size-4" />Create an invoice from this quote</Button>}
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <Badge variant="outline" className={statusColors[q.status] || ""}>{q.status}</Badge>
+        <Badge variant="outline" className={statusColors[q.status] || ""}>{statusLabels[q.status] || q.status}</Badge>
         <span className="text-xs sm:text-sm text-muted-foreground">Issued {q.issueDate} · Expires {q.expiryDate}</span>
       </div>
 

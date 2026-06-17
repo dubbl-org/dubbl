@@ -82,8 +82,8 @@ export default function CashFlowForecastPage() {
       </Link>
 
       <PageHeader
-        title="Cash Flow Forecast"
-        description="Forward-looking projection based on outstanding invoices, bills, and recurring templates."
+        title="Cash coming up"
+        description="A forward look at money expected in and out, from invoices, bills, and repeating items."
       />
 
       <div className="flex items-center gap-3">
@@ -103,19 +103,19 @@ export default function CashFlowForecastPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          title="Expected Inflows"
+          title="Money expected in"
           value={formatMoney(totalInflows)}
           icon={TrendingUp}
           changeType="positive"
         />
         <StatCard
-          title="Expected Outflows"
+          title="Money expected out"
           value={formatMoney(totalOutflows)}
           icon={TrendingDown}
           changeType="negative"
         />
         <StatCard
-          title="Net Forecast"
+          title="Expected change in cash"
           value={formatMoney(netForecast)}
           icon={DollarSign}
           changeType={netForecast >= 0 ? "positive" : "negative"}

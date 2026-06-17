@@ -409,7 +409,7 @@ export default function InventoryPage() {
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <DollarSign className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Stock Value</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Value of stock</span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(summary.totalValue)}</p>
         </div>
@@ -419,7 +419,7 @@ export default function InventoryPage() {
         >
           <div className="flex items-center gap-2 text-muted-foreground">
             <AlertTriangle className={cn("size-3.5", summary.lowStockCount > 0 && "text-amber-500")} />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Low Stock</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Running low</span>
           </div>
           <p className={cn(
             "mt-2 text-2xl font-bold font-mono tabular-nums truncate",
@@ -431,7 +431,7 @@ export default function InventoryPage() {
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <TrendingUp className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Avg. Margin</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Avg. profit margin</span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
             {summary.avgMargin > 0 ? `${summary.avgMargin.toFixed(1)}%` : "-"}
@@ -510,17 +510,17 @@ export default function InventoryPage() {
                     transition={{ duration: 0.2 }}
                     className="flex items-center gap-2 flex-wrap"
                   >
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_active")} disabled={bulkLoading}>
-                      <Power className="size-3 mr-1.5" />Active
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_active")} disabled={bulkLoading} title="Show these items in lists and pickers">
+                      <Power className="size-3 mr-1.5" />Show
                     </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_inactive")} disabled={bulkLoading}>
-                      <PowerOff className="size-3 mr-1.5" />Inactive
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_inactive")} disabled={bulkLoading} title="Hide these items from lists and pickers">
+                      <PowerOff className="size-3 mr-1.5" />Hide
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkCategoryOpen(true)} disabled={bulkLoading}>
                       <Tag className="size-3 mr-1.5" />Category
                     </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkAdjustOpen(true)} disabled={bulkLoading}>
-                      <ArrowUpDown className="size-3 mr-1.5" />Adjust
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkAdjustOpen(true)} disabled={bulkLoading} title="Add or remove units for the selected items">
+                      <ArrowUpDown className="size-3 mr-1.5" />Change count
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={handleBulkDelete} disabled={bulkLoading}>
                       <Trash2 className="size-3 mr-1.5" />Delete
@@ -551,9 +551,9 @@ export default function InventoryPage() {
               <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
                 <TabsList>
                   <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="low_stock">Low Stock</TabsTrigger>
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                  <TabsTrigger value="low_stock">Running low</TabsTrigger>
+                  <TabsTrigger value="active">Shown</TabsTrigger>
+                  <TabsTrigger value="inactive">Hidden</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -698,10 +698,10 @@ export default function InventoryPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium truncate">{item.name}</p>
                       {isLow && (
-                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-1.5 py-0">Low</Badge>
+                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-1.5 py-0" title="At or below your reorder level">Running low</Badge>
                       )}
                       {!item.isActive && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0" title="Hidden from lists and pickers">Hidden</Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
@@ -821,16 +821,16 @@ export default function InventoryPage() {
       {/* Bulk adjust stock sheet */}
       <Sheet open={bulkAdjustOpen} onOpenChange={setBulkAdjustOpen}>
         <SheetContent>
-          <SheetHeader><SheetTitle>Adjust Stock</SheetTitle></SheetHeader>
+          <SheetHeader><SheetTitle>Change the count</SheetTitle></SheetHeader>
           <div className="space-y-4 px-4">
-            <p className="text-sm text-muted-foreground">Adjust quantity for {selectionCount} selected item{selectionCount !== 1 ? "s" : ""}.</p>
+            <p className="text-sm text-muted-foreground">Add or remove the same number of units for {selectionCount} selected item{selectionCount !== 1 ? "s" : ""}.</p>
             <div className="space-y-2">
-              <Label>Adjustment (positive or negative)</Label>
+              <Label>Add or remove units</Label>
               <Input
                 type="number"
                 value={bulkAdjustment}
                 onChange={(e) => setBulkAdjustment(e.target.value)}
-                placeholder="e.g. 10 or -5"
+                placeholder="e.g. 10 to add, -5 to remove"
               />
             </div>
             <div className="space-y-2">
@@ -838,7 +838,7 @@ export default function InventoryPage() {
               <Input
                 value={bulkAdjustReason}
                 onChange={(e) => setBulkAdjustReason(e.target.value)}
-                placeholder="Reason for adjustment"
+                placeholder="e.g. Stock count, breakage, found extra"
               />
             </div>
           </div>
@@ -847,7 +847,7 @@ export default function InventoryPage() {
             <Button
               onClick={async () => {
                 const adj = parseInt(bulkAdjustment);
-                if (!adj) { toast.error("Enter a valid adjustment"); return; }
+                if (!adj) { toast.error("Enter how many units to add or remove"); return; }
                 await bulkAction("adjust_stock", { adjustment: adj, reason: bulkAdjustReason });
                 setBulkAdjustOpen(false);
                 setBulkAdjustment("");
@@ -856,7 +856,7 @@ export default function InventoryPage() {
               disabled={bulkLoading}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
-              {bulkLoading ? "Saving..." : "Apply"}
+              {bulkLoading ? "Saving..." : "Save new count"}
             </Button>
           </SheetFooter>
         </SheetContent>

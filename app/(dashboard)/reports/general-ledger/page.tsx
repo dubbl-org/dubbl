@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -12,6 +11,7 @@ import { ExportButton } from "@/components/dashboard/export-button";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { BackToReports, ReportHelp } from "../_components";
 
 interface LedgerEntry {
   date: string;
@@ -40,17 +40,41 @@ const entryColumns: Column<LedgerEntry>[] = [
   { key: "entry", header: "Entry #", className: "w-24", render: (r) => <span className="font-mono text-sm">{r.entryNumber}</span> },
   { key: "desc", header: "Description", render: (r) => <span className="text-sm">{r.description}</span> },
   { key: "ref", header: "Reference", className: "w-28", render: (r) => <span className="text-sm text-muted-foreground">{r.reference || "-"}</span> },
-  { key: "debit", header: "Debit", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{r.debit ? formatMoney(r.debit) : ""}</span> },
-  { key: "credit", header: "Credit", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{r.credit ? formatMoney(r.credit) : ""}</span> },
-  { key: "balance", header: "Balance", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.runningBalance)}</span> },
+  { key: "debit", header: "In (debit)", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{r.debit ? formatMoney(r.debit) : ""}</span> },
+  { key: "credit", header: "Out (credit)", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{r.credit ? formatMoney(r.credit) : ""}</span> },
+  { key: "balance", header: "Running balance", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.runningBalance)}</span> },
 ];
+
+/**
+ * Read drill-down hints from the URL the user arrived with. Other reports link
+ * here with ?startDate/&endDate, an optional ?costCenterId / ?projectId filter
+ * (passed straight through to the existing API), and a #accountId hash so we can
+ * open and scroll to the right account.
+ */
+function readDrilldown() {
+  if (typeof window === "undefined") return {};
+  const p = new URLSearchParams(window.location.search);
+  const costCenterId = p.get("costCenterId");
+  const projectId = p.get("projectId");
+  const dimension: Record<string, string> = {};
+  if (costCenterId !== null) dimension.costCenterId = costCenterId;
+  else if (projectId !== null) dimension.projectId = projectId;
+  return {
+    startDate: p.get("startDate") || undefined,
+    endDate: p.get("endDate") || undefined,
+    dimension,
+    focusAccountId: window.location.hash.slice(1) || undefined,
+  };
+}
 
 export default function GeneralLedgerPage() {
   const now = new Date();
+  const [drilldown] = useState(readDrilldown);
   const [initialLoad, setInitialLoad] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
-  const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(drilldown.startDate || `${now.getFullYear()}-01-01`);
+  const [endDate, setEndDate] = useState(drilldown.endDate || now.toISOString().slice(0, 10));
+  const [dimension] = useState<Record<string, string>>(() => drilldown.dimension || {});
   const [accounts, setAccounts] = useState<AccountLedger[]>([]);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [loadingMore, setLoadingMore] = useState<Set<string>>(new Set());
@@ -73,7 +97,7 @@ export default function GeneralLedgerPage() {
     setLoadingMore((prev) => new Set(prev).add(accountId));
     try {
       const offset = acct.entries.length;
-      const params = new URLSearchParams({ startDate, endDate, accountId, offset: String(offset), limit: "200" });
+      const params = new URLSearchParams({ startDate, endDate, accountId, offset: String(offset), limit: "200", ...dimension });
       const res = await fetch(`/api/v1/reports/general-ledger?${params}`, {
         headers: { "x-organization-id": orgId },
       });
@@ -92,7 +116,7 @@ export default function GeneralLedgerPage() {
         return next;
       });
     }
-  }, [accounts, startDate, endDate]);
+  }, [accounts, startDate, endDate, dimension]);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -100,7 +124,7 @@ export default function GeneralLedgerPage() {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate });
+    const params = new URLSearchParams({ startDate, endDate, ...dimension });
     fetch(`/api/v1/reports/general-ledger?${params}`, {
       headers: { "x-organization-id": orgId },
     })
@@ -110,6 +134,13 @@ export default function GeneralLedgerPage() {
           const accts = data.accounts || [];
           setAccounts(accts);
           setExpandedAccounts(new Set(accts.map((a: AccountLedger) => a.accountId)));
+          // When arriving from a drill-down link (#accountId), scroll to it.
+          const focus = drilldown.focusAccountId;
+          if (focus) {
+            requestAnimationFrame(() => {
+              document.getElementById(`gl-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+          }
         }
       })
       .finally(() => {
@@ -119,19 +150,17 @@ export default function GeneralLedgerPage() {
         }
       });
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, dimension, drilldown.focusAccountId]);
 
   if (initialLoad) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
-      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="size-3.5" /> Back to reports
-      </Link>
+      <BackToReports />
 
       <PageHeader
-        title="General Ledger"
-        description="All journal lines grouped by account with running balance."
+        title="Every transaction, by account"
+        description="All bookkeeping entries grouped by account, with a running balance."
       >
         {accounts.length > 0 && (
           <ExportButton
@@ -142,11 +171,28 @@ export default function GeneralLedgerPage() {
         )}
       </PageHeader>
 
+      <ReportHelp>
+        The full, line-by-line record of every transaction, grouped by account.
+        Open an account to see each entry and how the balance built up. This is
+        what other reports drill down into. Accountants call it the general ledger.
+      </ReportHelp>
+
       <DateRangeFilter
         startDate={startDate}
         endDate={endDate}
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
+
+      {(dimension.costCenterId !== undefined || dimension.projectId !== undefined) && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] dark:border-emerald-800 dark:bg-emerald-950/30">
+          <span>
+            Showing only transactions tagged to one {dimension.projectId !== undefined ? "project" : "department"}.
+          </span>
+          <a href="/reports/general-ledger" className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+            Show all
+          </a>
+        </div>
+      )}
 
       {loading ? (
         <BrandLoader className="h-48" />
@@ -184,7 +230,7 @@ export default function GeneralLedgerPage() {
               const isLoading = loadingMore.has(acct.accountId);
 
               return (
-                <div key={acct.accountId} className="rounded-lg border overflow-hidden">
+                <div id={`gl-${acct.accountId}`} key={acct.accountId} className="rounded-lg border overflow-hidden scroll-mt-4">
                   <button
                     onClick={() => toggleAccount(acct.accountId)}
                     className="flex w-full items-center justify-between px-3 py-2.5 sm:px-4 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
@@ -198,9 +244,9 @@ export default function GeneralLedgerPage() {
                       <span className="text-xs text-muted-foreground capitalize hidden sm:inline">{acct.accountType}</span>
                     </div>
                     <div className="flex items-center gap-3 sm:gap-6 font-mono tabular-nums text-xs sm:text-sm shrink-0">
-                      <span className="hidden sm:inline text-muted-foreground">Dr: {formatMoney(acct.totalDebit)}</span>
-                      <span className="hidden sm:inline text-muted-foreground">Cr: {formatMoney(acct.totalCredit)}</span>
-                      <span className="font-semibold">Bal: {formatMoney(acct.balance)}</span>
+                      <span className="hidden sm:inline text-muted-foreground">In: {formatMoney(acct.totalDebit)}</span>
+                      <span className="hidden sm:inline text-muted-foreground">Out: {formatMoney(acct.totalCredit)}</span>
+                      <span className="font-semibold">Balance: {formatMoney(acct.balance)}</span>
                       <span className={cn("text-xs px-1.5 py-0.5 rounded-full", acct.totalEntries > 0 ? "bg-muted text-muted-foreground" : "text-muted-foreground/50")}>
                         {acct.totalEntries}
                       </span>

@@ -136,8 +136,8 @@ export default function FinancialRatiosPage() {
       </Link>
 
       <PageHeader
-        title="Financial Ratios & KPIs"
-        description="Key financial metrics and performance indicators."
+        title="Business health signals"
+        description="Quick measures of how easily you can cover bills and how strong your margins are."
       />
 
       <DateRangeFilter

@@ -1,8 +1,33 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { chartAccount, journalLine, journalEntry } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import {
+  chartAccount,
+  journalLine,
+  journalEntry,
+  taxRate,
+  taxComponent,
+  inventoryItem,
+  assetCategory,
+  fixedAsset,
+  contact,
+  bankAccount,
+  bankTransaction,
+  bankRule,
+  expenseItem,
+  budgetLine,
+  accrualSchedule,
+  revenueSchedule,
+  recurringTemplateLine,
+  loan,
+  invoiceLine,
+  quoteLine,
+  creditNoteLine,
+  billLine,
+  purchaseOrderLine,
+  debitNoteLine,
+} from "@/lib/db/schema";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
@@ -26,6 +51,7 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         const conditions = [
           eq(chartAccount.organizationId, ctx.organizationId),
+          isNull(chartAccount.deletedAt),
         ];
 
         const accounts = await db.query.chartAccount.findMany({
@@ -93,7 +119,7 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "create_account",
-    "Create a new chart of accounts entry. Account code must be unique within the organization. Type determines the account's normal balance (asset/expense = debit, liability/equity/revenue = credit).",
+    "Create a new chart of accounts entry. Account code must be unique within the organization. Type determines the account's normal balance (asset/expense = debit, liability/equity/revenue = credit). Optionally sets a default tax rate (applied to lines coded to this account), a reporting code, and a tax-disallowed percentage.",
     {
       code: z.string().describe("Unique account code (e.g. '1000')"),
       name: z.string().describe("Account name (e.g. 'Cash')"),
@@ -107,6 +133,25 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
         .default("USD")
         .describe("Currency code (default: USD)"),
       description: z.string().optional().describe("Account description"),
+      defaultTaxRateId: z
+        .string()
+        .optional()
+        .describe(
+          "UUID of the tax rate to default onto lines coded to this account. Must belong to the organization."
+        ),
+      reportingCode: z
+        .string()
+        .optional()
+        .describe("Optional reporting/report-code mapping for report packs"),
+      taxDisallowedPercent: z
+        .number()
+        .int()
+        .min(0)
+        .max(10000)
+        .optional()
+        .describe(
+          "Portion of activity that is tax-disallowable for income tax, in basis points (10000 = 100%). Defaults to 0."
+        ),
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -120,6 +165,17 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
         });
         if (existing) throw new Error("Account code already exists");
 
+        // Validate the default tax rate belongs to this org (if supplied).
+        if (params.defaultTaxRateId) {
+          const rate = await db.query.taxRate.findFirst({
+            where: and(
+              eq(taxRate.id, params.defaultTaxRateId),
+              eq(taxRate.organizationId, ctx.organizationId)
+            ),
+          });
+          if (!rate) throw new Error("Tax rate not found");
+        }
+
         const [account] = await db
           .insert(chartAccount)
           .values({
@@ -130,6 +186,11 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
             subType: params.subType ?? null,
             currencyCode: params.currencyCode,
             description: params.description ?? null,
+            defaultTaxRateId: params.defaultTaxRateId ?? null,
+            reportingCode: params.reportingCode ?? null,
+            ...(params.taxDisallowedPercent !== undefined
+              ? { taxDisallowedPercent: params.taxDisallowedPercent }
+              : {}),
           })
           .returning();
 
@@ -139,7 +200,7 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_account",
-    "Update an existing account. Only code, name, sub-type, active status, and description can be changed. Type cannot be changed after creation.",
+    "Update an existing account. Code, name, sub-type, active status, description, default tax rate, reporting code, and tax-disallowed percentage can be changed. Account type cannot be changed after creation. System control accounts (AR/AP/bank/tax/retained earnings) cannot be retyped or deleted.",
     {
       accountId: z.string().describe("The UUID of the account to update"),
       code: z.string().optional().describe("New account code"),
@@ -147,12 +208,53 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
       subType: z.string().optional().describe("New sub-type"),
       isActive: z.boolean().optional().describe("Set active/inactive"),
       description: z.string().optional().describe("New description"),
+      defaultTaxRateId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          "UUID of the tax rate to default onto lines coded to this account (must belong to the org), or null to clear."
+        ),
+      reportingCode: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Reporting/report-code mapping, or null to clear"),
+      taxDisallowedPercent: z
+        .number()
+        .int()
+        .min(0)
+        .max(10000)
+        .optional()
+        .describe(
+          "Portion of activity tax-disallowable for income tax, in basis points (10000 = 100%)."
+        ),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:accounts");
 
         const { accountId, ...updates } = params;
+
+        const existing = await db.query.chartAccount.findFirst({
+          where: and(
+            eq(chartAccount.id, accountId),
+            eq(chartAccount.organizationId, ctx.organizationId)
+          ),
+        });
+        if (!existing) throw new Error("Account not found");
+
+        // Validate the default tax rate belongs to this org (if supplied).
+        if (updates.defaultTaxRateId) {
+          const rate = await db.query.taxRate.findFirst({
+            where: and(
+              eq(taxRate.id, updates.defaultTaxRateId),
+              eq(taxRate.organizationId, ctx.organizationId)
+            ),
+          });
+          if (!rate) throw new Error("Tax rate not found");
+        }
+
         const cleanUpdates = Object.fromEntries(
           Object.entries(updates).filter(([, v]) => v !== undefined)
         );
@@ -175,13 +277,26 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "delete_account",
-    "Delete an account. Fails if the account has any journal line entries. This is a permanent deletion, not a soft delete.",
+    "Delete an account. Fails if the account has any journal line entries, or if it is a system control account (AR/AP/bank/tax/retained earnings). This is a permanent deletion, not a soft delete.",
     {
       accountId: z.string().describe("The UUID of the account to delete"),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:accounts");
+
+        const account = await db.query.chartAccount.findFirst({
+          where: and(
+            eq(chartAccount.id, params.accountId),
+            eq(chartAccount.organizationId, ctx.organizationId)
+          ),
+        });
+        if (!account) throw new Error("Account not found");
+
+        // System control accounts cannot be deleted (E8a).
+        if (account.isSystem) {
+          throw new Error("Cannot delete a system account");
+        }
 
         const lines = await db.query.journalLine.findFirst({
           where: eq(journalLine.accountId, params.accountId),
@@ -202,6 +317,226 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
 
         if (!deleted) throw new Error("Account not found");
         return { success: true };
+      })
+  );
+
+  server.tool(
+    "merge_accounts",
+    "Merge one chart-of-accounts entry into another. Repoints all financial and configuration references (journal lines, tax components, document lines, contact/bank/inventory/fixed-asset/budget/accrual/revenue/recurring/loan account mappings) from the source account to the target, then soft-deletes (archives) the source. Both accounts must belong to the organization and share the same account type. This is irreversible: balances and history move to the target account.",
+    {
+      sourceAccountId: z
+        .string()
+        .describe("UUID of the account to merge from (will be archived)"),
+      targetAccountId: z
+        .string()
+        .describe("UUID of the account to merge into (keeps all activity)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:accounts");
+
+        const { sourceAccountId, targetAccountId } = params;
+        if (sourceAccountId === targetAccountId) {
+          throw new Error("Cannot merge an account into itself");
+        }
+
+        const source = await db.query.chartAccount.findFirst({
+          where: and(
+            eq(chartAccount.id, sourceAccountId),
+            eq(chartAccount.organizationId, ctx.organizationId)
+          ),
+        });
+        if (!source) throw new Error("Source account not found");
+        if (source.deletedAt) {
+          throw new Error("Source account has already been merged or deleted");
+        }
+
+        const target = await db.query.chartAccount.findFirst({
+          where: and(
+            eq(chartAccount.id, targetAccountId),
+            eq(chartAccount.organizationId, ctx.organizationId)
+          ),
+        });
+        if (!target) throw new Error("Target account not found");
+        if (target.deletedAt) throw new Error("Target account has been deleted");
+
+        // Same-type guard: merging across types would corrupt the trial balance.
+        if (source.type !== target.type) {
+          throw new Error("Accounts must be the same type to merge");
+        }
+
+        await db.transaction(async (tx) => {
+          const src = sourceAccountId;
+          const tgt = targetAccountId;
+
+          // Core ledger + tax mappings (the required minimum).
+          await tx
+            .update(journalLine)
+            .set({ accountId: tgt })
+            .where(eq(journalLine.accountId, src));
+          await tx
+            .update(taxComponent)
+            .set({ accountId: tgt })
+            .where(eq(taxComponent.accountId, src));
+
+          // Document lines.
+          await tx
+            .update(invoiceLine)
+            .set({ accountId: tgt })
+            .where(eq(invoiceLine.accountId, src));
+          await tx
+            .update(quoteLine)
+            .set({ accountId: tgt })
+            .where(eq(quoteLine.accountId, src));
+          await tx
+            .update(creditNoteLine)
+            .set({ accountId: tgt })
+            .where(eq(creditNoteLine.accountId, src));
+          await tx
+            .update(billLine)
+            .set({ accountId: tgt })
+            .where(eq(billLine.accountId, src));
+          await tx
+            .update(purchaseOrderLine)
+            .set({ accountId: tgt })
+            .where(eq(purchaseOrderLine.accountId, src));
+          await tx
+            .update(debitNoteLine)
+            .set({ accountId: tgt })
+            .where(eq(debitNoteLine.accountId, src));
+          await tx
+            .update(expenseItem)
+            .set({ accountId: tgt })
+            .where(eq(expenseItem.accountId, src));
+
+          // Bank feed + rules + transactions.
+          await tx
+            .update(bankAccount)
+            .set({ chartAccountId: tgt })
+            .where(eq(bankAccount.chartAccountId, src));
+          await tx
+            .update(bankTransaction)
+            .set({ accountId: tgt })
+            .where(eq(bankTransaction.accountId, src));
+          await tx
+            .update(bankRule)
+            .set({ accountId: tgt })
+            .where(eq(bankRule.accountId, src));
+
+          // Contact default mappings.
+          await tx
+            .update(contact)
+            .set({ defaultRevenueAccountId: tgt })
+            .where(eq(contact.defaultRevenueAccountId, src));
+          await tx
+            .update(contact)
+            .set({ defaultExpenseAccountId: tgt })
+            .where(eq(contact.defaultExpenseAccountId, src));
+
+          // Inventory item account mappings.
+          await tx
+            .update(inventoryItem)
+            .set({ costAccountId: tgt })
+            .where(eq(inventoryItem.costAccountId, src));
+          await tx
+            .update(inventoryItem)
+            .set({ revenueAccountId: tgt })
+            .where(eq(inventoryItem.revenueAccountId, src));
+          await tx
+            .update(inventoryItem)
+            .set({ inventoryAccountId: tgt })
+            .where(eq(inventoryItem.inventoryAccountId, src));
+
+          // Fixed asset category + asset account mappings.
+          await tx
+            .update(assetCategory)
+            .set({ assetAccountId: tgt })
+            .where(eq(assetCategory.assetAccountId, src));
+          await tx
+            .update(assetCategory)
+            .set({ depreciationAccountId: tgt })
+            .where(eq(assetCategory.depreciationAccountId, src));
+          await tx
+            .update(assetCategory)
+            .set({ accumulatedDepAccountId: tgt })
+            .where(eq(assetCategory.accumulatedDepAccountId, src));
+          await tx
+            .update(assetCategory)
+            .set({ cwipAccountId: tgt })
+            .where(eq(assetCategory.cwipAccountId, src));
+
+          await tx
+            .update(fixedAsset)
+            .set({ assetAccountId: tgt })
+            .where(eq(fixedAsset.assetAccountId, src));
+          await tx
+            .update(fixedAsset)
+            .set({ depreciationAccountId: tgt })
+            .where(eq(fixedAsset.depreciationAccountId, src));
+          await tx
+            .update(fixedAsset)
+            .set({ accumulatedDepAccountId: tgt })
+            .where(eq(fixedAsset.accumulatedDepAccountId, src));
+          await tx
+            .update(fixedAsset)
+            .set({ cwipAccountId: tgt })
+            .where(eq(fixedAsset.cwipAccountId, src));
+          await tx
+            .update(fixedAsset)
+            .set({ revaluationReserveAccountId: tgt })
+            .where(eq(fixedAsset.revaluationReserveAccountId, src));
+          await tx
+            .update(fixedAsset)
+            .set({ impairmentExpenseAccountId: tgt })
+            .where(eq(fixedAsset.impairmentExpenseAccountId, src));
+
+          // Planning / scheduling tables.
+          await tx
+            .update(budgetLine)
+            .set({ accountId: tgt })
+            .where(eq(budgetLine.accountId, src));
+          await tx
+            .update(accrualSchedule)
+            .set({ accountId: tgt })
+            .where(eq(accrualSchedule.accountId, src));
+          await tx
+            .update(accrualSchedule)
+            .set({ reverseAccountId: tgt })
+            .where(eq(accrualSchedule.reverseAccountId, src));
+          await tx
+            .update(revenueSchedule)
+            .set({ deferredRevenueAccountId: tgt })
+            .where(eq(revenueSchedule.deferredRevenueAccountId, src));
+          await tx
+            .update(revenueSchedule)
+            .set({ revenueAccountId: tgt })
+            .where(eq(revenueSchedule.revenueAccountId, src));
+          await tx
+            .update(recurringTemplateLine)
+            .set({ accountId: tgt })
+            .where(eq(recurringTemplateLine.accountId, src));
+          await tx
+            .update(loan)
+            .set({ principalAccountId: tgt })
+            .where(eq(loan.principalAccountId, src));
+          await tx
+            .update(loan)
+            .set({ interestAccountId: tgt })
+            .where(eq(loan.interestAccountId, src));
+
+          // Soft-delete / archive the source.
+          await tx
+            .update(chartAccount)
+            .set({ deletedAt: new Date(), isActive: false })
+            .where(
+              and(
+                eq(chartAccount.id, src),
+                eq(chartAccount.organizationId, ctx.organizationId)
+              )
+            );
+        });
+
+        return { success: true, sourceAccountId, targetAccountId };
       })
   );
 }

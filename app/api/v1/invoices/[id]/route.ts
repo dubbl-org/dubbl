@@ -8,6 +8,32 @@ import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { toBaseAmounts } from "@/lib/currency/base-amount";
+import { decimalToCents } from "@/lib/money";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
+import { z } from "zod";
+
+const lineSchema = z.object({
+  description: z.string().min(1),
+  quantity: z.number().default(1),
+  unitPrice: z.number().default(0),
+  accountId: z.string().nullable().optional(),
+  taxRateId: z.string().nullable().optional(),
+  discountPercent: z.number().int().min(0).max(10000).default(0),
+  costCenterId: z.string().nullable().optional(),
+  projectId: z.string().nullable().optional(),
+  // When set, sending this invoice relieves inventory and posts COGS for the item.
+  inventoryItemId: z.string().nullable().optional(),
+  warehouseId: z.string().nullable().optional(),
+});
+
+const updateSchema = z.object({
+  issueDate: z.string().optional(),
+  dueDate: z.string().optional(),
+  reference: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  // When provided, fully replaces the invoice's line set and recomputes totals.
+  lines: z.array(lineSchema).min(1).optional(),
+});
 
 export async function GET(
   request: Request,
@@ -98,9 +124,69 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    const parsed = updateSchema.parse(body);
+
+    // Build the invoice-field patch (only set keys the caller actually sent so we
+    // don't clobber existing values with undefined).
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.issueDate !== undefined) patch.issueDate = parsed.issueDate;
+    if (parsed.dueDate !== undefined) patch.dueDate = parsed.dueDate;
+    if (parsed.reference !== undefined) patch.reference = parsed.reference || null;
+    if (parsed.notes !== undefined) patch.notes = parsed.notes || null;
+
+    // When lines are supplied, replace the whole line set, persisting the
+    // inventory/job-costing dimensions, and recompute the invoice totals.
+    if (parsed.lines) {
+      const taxRateIds = parsed.lines
+        .map((l) => l.taxRateId)
+        .filter(Boolean) as string[];
+      const ratesMap = await preloadTaxRates(taxRateIds);
+
+      let subtotal = 0;
+      const processedLines = parsed.lines.map((l, i) => {
+        const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+        const discountAmount = l.discountPercent
+          ? Math.round((grossAmount * l.discountPercent) / 10000)
+          : 0;
+        const amount = grossAmount - discountAmount;
+        subtotal += amount;
+        const taxRateId = l.taxRateId || null;
+        const taxAmount = taxRateId
+          ? calcTax(amount, ratesMap.get(taxRateId) ?? 0)
+          : 0;
+        return {
+          invoiceId: id,
+          description: l.description,
+          quantity: Math.round(l.quantity * 100),
+          unitPrice: decimalToCents(l.unitPrice),
+          accountId: l.accountId || null,
+          taxRateId,
+          discountPercent: l.discountPercent,
+          taxAmount,
+          amount,
+          costCenterId: l.costCenterId || null,
+          projectId: l.projectId || null,
+          inventoryItemId: l.inventoryItemId || null,
+          warehouseId: l.warehouseId || null,
+          sortOrder: i,
+        };
+      });
+
+      const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+      const total = subtotal + taxTotal;
+      patch.subtotal = subtotal;
+      patch.taxTotal = taxTotal;
+      patch.total = total;
+      // Draft invoices are unpaid, so amountDue tracks the new total.
+      patch.amountDue = total - existing.amountPaid;
+
+      await db.delete(invoiceLine).where(eq(invoiceLine.invoiceId, id));
+      await db.insert(invoiceLine).values(processedLines);
+    }
+
     const [updated] = await db
       .update(invoice)
-      .set({ ...body, updatedAt: new Date() })
+      .set(patch)
       .where(eq(invoice.id, id))
       .returning();
 

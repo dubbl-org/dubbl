@@ -257,7 +257,7 @@ export default function BankRulesPage() {
       const data = await res.json();
       const count = data.suggestions?.length ?? 0;
       if (count === 0) {
-        toast.info("No suggestions found. Categorize more transactions first.");
+        toast.info("No suggestions found. Assign more transactions to categories first.");
       } else {
         toast.success(`Found ${count} rule suggestion${count === 1 ? "" : "s"}`);
       }
@@ -270,7 +270,7 @@ export default function BankRulesPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    toast.info("Applying rules to uncategorized transactions...");
+    toast.info("Applying rules to transactions that don't have a category yet...");
 
     try {
       const res = await fetch("/api/v1/bank-rules/apply", {
@@ -300,7 +300,7 @@ export default function BankRulesPage() {
           <div>
             <h2 className="text-lg font-semibold">Bank Rules</h2>
             <p className="text-sm text-muted-foreground">
-              Auto-categorize imported bank transactions with matching rules.
+              Automatically sort imported bank transactions into the right category.
               {rules.length > 0 && (
                 <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
                   {rules.length} rule{rules.length === 1 ? "" : "s"}
@@ -340,7 +340,7 @@ export default function BankRulesPage() {
           <EmptyState
             icon={ListFilter}
             title="No bank rules yet"
-            description="Create rules to automatically categorize imported bank transactions based on description or reference patterns."
+            description="Create rules to automatically assign imported bank transactions to a category, based on words in their description or reference."
           >
             <Button
               size="sm"
@@ -526,9 +526,13 @@ export default function BankRulesPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Auto-reconcile</Label>
+                <Label
+                  title="Marking as cleared moves no money — it just confirms the transaction matches your bank."
+                >
+                  Mark matching transactions as cleared
+                </Label>
                 <p className="text-xs text-muted-foreground">
-                  Automatically reconcile matching transactions
+                  Tick off matching transactions automatically. This moves no money.
                 </p>
               </div>
               <Switch

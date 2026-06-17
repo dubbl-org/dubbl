@@ -22,6 +22,7 @@ const updateSchema = z.object({
   currencyCode: currencyCodeSchema.optional(),
   creditLimit: z.number().int().min(0).nullable().optional(),
   isTaxExempt: z.boolean().optional(),
+  is1099Vendor: z.boolean().optional(),
   defaultRevenueAccountId: z.string().uuid().nullable().optional(),
   defaultExpenseAccountId: z.string().uuid().nullable().optional(),
   defaultTaxRateId: z.string().uuid().nullable().optional(),

@@ -92,8 +92,8 @@ export default function FinancialCalendarPage() {
       </Link>
 
       <PageHeader
-        title="Financial Calendar"
-        description="Upcoming due dates, recurring generations, and budget periods."
+        title="What's due soon"
+        description="Upcoming invoice and bill due dates, repeating items, and budget periods on a calendar."
       />
 
       {loading ? (

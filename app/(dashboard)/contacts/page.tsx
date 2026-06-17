@@ -44,9 +44,16 @@ interface Contact {
   paymentTermsDays: number;
   creditLimit: number | null;
   isTaxExempt: boolean;
+  is1099Vendor: boolean;
   currencyCode: string | null;
   createdAt: string;
 }
+
+const typeLabel: Record<Contact["type"], string> = {
+  customer: "Customer",
+  supplier: "Supplier",
+  both: "Customer & supplier",
+};
 
 const typeBadgeClass: Record<Contact["type"], string> = {
   customer: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
@@ -75,7 +82,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
       className: "w-28",
       render: (r) => (
         <Badge variant="outline" className={typeBadgeClass[r.type]}>
-          {r.type}
+          {typeLabel[r.type]}
         </Badge>
       ),
     },
@@ -113,19 +120,33 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
     },
     {
       key: "taxExempt",
-      header: "Tax Exempt",
-      className: "w-28 text-center",
-      render: (r) =>
-        r.isTaxExempt ? (
-          <Badge
-            variant="outline"
-            className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-          >
-            Exempt
-          </Badge>
-        ) : (
-          <span className="text-sm text-muted-foreground">-</span>
-        ),
+      header: "Tax",
+      className: "w-32 text-center",
+      render: (r) => (
+        <div className="flex flex-wrap items-center justify-center gap-1">
+          {r.isTaxExempt && (
+            <Badge
+              variant="outline"
+              className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+              title="You don't charge tax to this contact"
+            >
+              No tax
+            </Badge>
+          )}
+          {r.is1099Vendor && (
+            <Badge
+              variant="outline"
+              className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+              title="Tracked for a year-end 1099 (US contractor)"
+            >
+              1099
+            </Badge>
+          )}
+          {!r.isTaxExempt && !r.is1099Vendor && (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
     },
     {
       key: "currency",
@@ -173,9 +194,9 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
               <ExternalLink className="size-4" />
               Open
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateLead(r); }}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateLead(r); }} title="Start tracking a potential sale with this contact">
               <Target className="size-4" />
-              Create Lead
+              Add a sales opportunity
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
@@ -427,14 +448,14 @@ export default function ContactsPage() {
               {
                 icon: Truck,
                 title: "Suppliers",
-                description: "Manage your vendors, purchase history, and payable accounts.",
+                description: "Manage who you buy from, your purchase history, and what you owe them.",
                 color: "text-orange-600 dark:text-orange-400",
                 bg: "bg-orange-50 dark:bg-orange-950/40",
               },
               {
                 icon: ArrowRight,
                 title: "Linked data",
-                description: "Contacts connect to invoices, bills, and journal entries automatically.",
+                description: "Contacts connect to their invoices, bills, and bookkeeping entries automatically.",
                 color: "text-purple-600 dark:text-purple-400",
                 bg: "bg-purple-50 dark:bg-purple-950/40",
               },
@@ -494,7 +515,7 @@ export default function ContactsPage() {
                 <span className="text-border">·</span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-violet-500" />
-                  <span className="tabular-nums">{taxExemptCount}</span> tax exempt
+                  <span className="tabular-nums">{taxExemptCount}</span> no tax
                 </span>
               </>
             )}

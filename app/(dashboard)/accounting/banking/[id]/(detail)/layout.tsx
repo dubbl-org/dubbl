@@ -29,9 +29,21 @@ import type {
   ImportPreview,
   StatementFormat,
   OpenBill,
+  OpenInvoice,
   SuggestedMatch,
+  ExistingMatch,
+  BankAccountSummary,
 } from "../_components";
-import { ImportSheet, MatchToBillSheet, CreateExpenseSheet } from "../_components";
+import {
+  ImportSheet,
+  MatchToBillSheet,
+  CreateExpenseSheet,
+  CategorizeSheet,
+  MatchToInvoiceSheet,
+  MatchSheet,
+  TransferSheet,
+  SplitAccountSheet,
+} from "../_components";
 import { ACCOUNT_TYPE_LABELS } from "../_components";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +61,13 @@ interface BankAccountContextValue {
   handleExclude: (txId: string) => Promise<void>;
   handleOpenMatch: (tx: Transaction) => void;
   handleOpenExpense: (tx: Transaction) => void;
+  handleOpenCategorize: (tx: Transaction) => void;
+  handleOpenMatchInvoice: (tx: Transaction) => void;
+  // New actions (unified find-&-match, transfer, split)
+  handleOpenMatchUnified: (tx: Transaction) => void;
+  handleOpenTransfer: (tx: Transaction) => void;
+  handleOpenSplit: (tx: Transaction) => void;
+  bankAccounts: BankAccountSummary[];
   // Import
   openImport: () => void;
   // Summary
@@ -116,6 +135,27 @@ export default function BankAccountDetailLayout({ children }: { children: React.
   const [matchSuggestions, setMatchSuggestions] = useState<SuggestedMatch[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
   const [expenseTx, setExpenseTx] = useState<Transaction | null>(null);
+  const [categorizeTx, setCategorizeTx] = useState<Transaction | null>(null);
+  // Match-to-invoice (incoming) sheet state
+  const [matchInvoiceTx, setMatchInvoiceTx] = useState<Transaction | null>(null);
+  const [matchInvoices, setMatchInvoices] = useState<OpenInvoice[]>([]);
+  const [matchInvoiceSuggestions, setMatchInvoiceSuggestions] = useState<SuggestedMatch[]>([]);
+  const [matchInvoiceLoading, setMatchInvoiceLoading] = useState(false);
+
+  // Unified find-&-match sheet state (invoices + bills + existing records)
+  const [unifiedMatchTx, setUnifiedMatchTx] = useState<Transaction | null>(null);
+  const [unifiedInvoices, setUnifiedInvoices] = useState<OpenInvoice[]>([]);
+  const [unifiedBills, setUnifiedBills] = useState<OpenBill[]>([]);
+  const [unifiedDocSuggestions, setUnifiedDocSuggestions] = useState<SuggestedMatch[]>([]);
+  const [unifiedExistingMatches, setUnifiedExistingMatches] = useState<ExistingMatch[]>([]);
+  const [unifiedMatchLoading, setUnifiedMatchLoading] = useState(false);
+
+  // Transfer + split sheet state
+  const [transferTx, setTransferTx] = useState<Transaction | null>(null);
+  const [splitTx, setSplitTx] = useState<Transaction | null>(null);
+
+  // Other own bank accounts (transfer targets)
+  const [bankAccounts, setBankAccounts] = useState<BankAccountSummary[]>([]);
 
   useEntityTitle(account?.accountName ?? undefined);
 
@@ -143,6 +183,34 @@ export default function BankAccountDetailLayout({ children }: { children: React.
     fetchData();
   }, [fetchData]);
 
+  // Load the org's other bank accounts once — used as transfer targets.
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/v1/bank-accounts`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        const list = (data.bankAccounts ?? []).map((b: {
+          id: string;
+          accountName: string;
+          bankName: string | null;
+          currencyCode: string;
+          accountType: BankAccountSummary["accountType"];
+          balance: number;
+          chartAccountId: string | null;
+        }) => ({
+          id: b.id,
+          accountName: b.accountName,
+          bankName: b.bankName,
+          currencyCode: b.currencyCode,
+          accountType: b.accountType,
+          balance: b.balance,
+          hasLedgerAccount: Boolean(b.chartAccountId),
+        }));
+        setBankAccounts(list);
+      })
+      .catch(() => {});
+  }, [orgId]);
+
   const summary = useMemo(() => {
     const unreconciled = transactions.filter((tx) => tx.status === "unreconciled").length;
     const reconciled = transactions.filter((tx) => tx.status === "reconciled").length;
@@ -166,10 +234,10 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         body: JSON.stringify({}),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      toast.success("Transaction reconciled");
+      toast.success("Marked as cleared");
       fetchData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reconcile");
+      toast.error(err instanceof Error ? err.message : "Couldn't mark as cleared");
     }
   }
 
@@ -211,6 +279,64 @@ export default function BankAccountDetailLayout({ children }: { children: React.
 
   function handleOpenExpense(tx: Transaction) {
     setExpenseTx(tx);
+  }
+
+  function handleOpenCategorize(tx: Transaction) {
+    setCategorizeTx(tx);
+  }
+
+  async function handleOpenMatchInvoice(tx: Transaction) {
+    if (!orgId) return;
+    setMatchInvoiceTx(tx);
+    setMatchInvoiceLoading(true);
+    setMatchInvoices([]);
+    setMatchInvoiceSuggestions([]);
+    try {
+      const res = await fetch(`/api/v1/bank-transactions/${tx.id}/match-invoice`, {
+        headers: { "x-organization-id": orgId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMatchInvoices(data.openInvoices || []);
+        setMatchInvoiceSuggestions(data.suggestedMatches || []);
+      }
+    } finally {
+      setMatchInvoiceLoading(false);
+    }
+  }
+
+  // Unified find-&-match: pulls invoices + bills + existing records from the
+  // single GET …/match endpoint so the user can match against any record.
+  async function handleOpenMatchUnified(tx: Transaction) {
+    if (!orgId) return;
+    setUnifiedMatchTx(tx);
+    setUnifiedMatchLoading(true);
+    setUnifiedInvoices([]);
+    setUnifiedBills([]);
+    setUnifiedDocSuggestions([]);
+    setUnifiedExistingMatches([]);
+    try {
+      const res = await fetch(`/api/v1/bank-transactions/${tx.id}/match`, {
+        headers: { "x-organization-id": orgId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnifiedInvoices(data.openInvoices || []);
+        setUnifiedBills(data.openBills || []);
+        setUnifiedDocSuggestions(data.suggestedMatches || []);
+        setUnifiedExistingMatches(data.existingMatches || []);
+      }
+    } finally {
+      setUnifiedMatchLoading(false);
+    }
+  }
+
+  function handleOpenTransfer(tx: Transaction) {
+    setTransferTx(tx);
+  }
+
+  function handleOpenSplit(tx: Transaction) {
+    setSplitTx(tx);
   }
 
   // Import handlers
@@ -291,6 +417,12 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       handleExclude,
       handleOpenMatch,
       handleOpenExpense,
+      handleOpenCategorize,
+      handleOpenMatchInvoice,
+      handleOpenMatchUnified,
+      handleOpenTransfer,
+      handleOpenSplit,
+      bankAccounts,
       openImport: () => setImportOpen(true),
       summary,
     }}>
@@ -327,9 +459,9 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)}>
+            <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)} title="Tick off transactions against your bank statement">
               <RefreshCcw className="mr-2 size-3.5" />
-              Reconcile
+              Match statement to your books
             </Button>
             <Button size="sm" onClick={() => setImportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
               <Upload className="mr-2 size-3.5" />
@@ -353,7 +485,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-red-600">{formatMoney(summary.debits, cur)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-muted-foreground">Reconciled</p>
+            <p className="text-[11px] text-muted-foreground">Done</p>
             <div className="flex items-center gap-2 mt-1">
               <div className="h-2 flex-1 rounded-full bg-gray-200 dark:bg-muted overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${reconciledPct}%` }} />
@@ -436,6 +568,61 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         currencyCode={cur}
         orgId={orgId}
         onCreated={() => { setExpenseTx(null); fetchData(); }}
+      />
+
+      {/* Match to Invoice Sheet (incoming) */}
+      <MatchToInvoiceSheet
+        transaction={matchInvoiceTx}
+        onClose={() => setMatchInvoiceTx(null)}
+        invoices={matchInvoices}
+        suggestions={matchInvoiceSuggestions}
+        loading={matchInvoiceLoading}
+        currencyCode={cur}
+        orgId={orgId}
+        onMatched={() => { setMatchInvoiceTx(null); fetchData(); }}
+      />
+
+      {/* Categorize Sheet (any account: income, expense, loan, owner, transfer) */}
+      <CategorizeSheet
+        transaction={categorizeTx}
+        onClose={() => setCategorizeTx(null)}
+        currencyCode={cur}
+        orgId={orgId}
+        onCategorized={() => { setCategorizeTx(null); fetchData(); }}
+      />
+
+      {/* Find & Match Sheet (invoices, bills, existing payments/journals, transfers) */}
+      <MatchSheet
+        transaction={unifiedMatchTx}
+        onClose={() => setUnifiedMatchTx(null)}
+        invoices={unifiedInvoices}
+        bills={unifiedBills}
+        documentSuggestions={unifiedDocSuggestions}
+        existingMatches={unifiedExistingMatches}
+        loading={unifiedMatchLoading}
+        currencyCode={cur}
+        orgId={orgId}
+        onMatched={() => { setUnifiedMatchTx(null); fetchData(); }}
+      />
+
+      {/* Transfer Sheet (move money between own bank accounts) */}
+      <TransferSheet
+        transaction={transferTx}
+        onClose={() => setTransferTx(null)}
+        bankAccounts={bankAccounts}
+        currentBankAccountId={account.id}
+        currencyCode={cur}
+        orgId={orgId}
+        onTransferred={() => { setTransferTx(null); fetchData(); }}
+      />
+
+      {/* Split Sheet (code one line across multiple accounts) */}
+      <SplitAccountSheet
+        transaction={splitTx}
+        onClose={() => setSplitTx(null)}
+        currencyCode={cur}
+        orgId={orgId}
+        onSplit={() => { setSplitTx(null); fetchData(); }}
       />
     </BankAccountContext.Provider>
   );

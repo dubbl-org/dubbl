@@ -739,6 +739,42 @@ export default function MembersPage() {
         </div>
       </div>
 
+      {/* Ready-made access levels you can assign on top of the base role */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Ready-made access levels</h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Assign one of these to a person (from the &quot;...&quot; menu next to their name) to give them just the right amount of access.
+          </p>
+        </div>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-[13px] font-medium">Read-only</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              Can look at everything but can&apos;t change anything. Good for people who just need to check the numbers.
+            </p>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-[13px] font-medium">Advisor</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              Full access to every feature. Best for your accountant or bookkeeper.
+            </p>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-[13px] font-medium">Invoice-only</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              Can create invoices and quotes, take payments and manage customers — nothing else.
+            </p>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-[13px] font-medium">Standard</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              Day-to-day access to invoices, bills, expenses and contacts. Can&apos;t approve, lock dates or change settings.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Invite Member Sheet */}
       <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
         <SheetContent>

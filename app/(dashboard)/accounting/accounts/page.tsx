@@ -142,14 +142,20 @@ export default function AccountsPage() {
     return (
       <ContentReveal className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Your list of accounts — the categories every transaction is
+              recorded against.
+            </p>
+          </div>
           <Button
             onClick={() => openDrawer("account")}
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700"
           >
             <Plus className="mr-2 size-4" />
-            New Account
+            New account
           </Button>
         </div>
 
@@ -184,7 +190,8 @@ export default function AccountsPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Chart of Accounts</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {accounts.length} accounts · {activeCount} active
+            Your list of accounts — the categories every transaction is recorded
+            against. {accounts.length} accounts · {activeCount} active
           </p>
         </div>
         <Button
@@ -193,7 +200,7 @@ export default function AccountsPage() {
           className="bg-emerald-600 hover:bg-emerald-700"
         >
           <Plus className="mr-2 size-4" />
-          New Account
+          New account
         </Button>
       </div>
 

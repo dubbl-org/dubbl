@@ -10,6 +10,10 @@ import { z } from "zod";
 
 const upsertSchema = z.object({
   lockDate: z.string().min(1),
+  // Stricter advisor/hard lock. Staff are blocked at lockDate; callers holding
+  // bypass:period-lock are only blocked at advisorLockDate. Null/omitted means
+  // advisors are governed by lockDate too.
+  advisorLockDate: z.string().min(1).nullable().optional(),
   reason: z.string().nullable().optional(),
 });
 
@@ -45,12 +49,13 @@ export async function PUT(request: Request) {
       .values({
         organizationId: ctx.organizationId,
         lockDate: parsed.lockDate,
+        advisorLockDate: parsed.advisorLockDate ?? null,
         lockedBy: ctx.userId,
         reason: parsed.reason || null,
       })
       .returning();
 
-    logAudit({ ctx, action: "update", entityType: "period_lock", entityId: ctx.organizationId, changes: { lockDate: parsed.lockDate }, request });
+    logAudit({ ctx, action: "update", entityType: "period_lock", entityId: ctx.organizationId, changes: { lockDate: parsed.lockDate, advisorLockDate: parsed.advisorLockDate ?? null }, request });
 
     return NextResponse.json({ periodLock: created });
   } catch (err) {
