@@ -232,7 +232,7 @@ export default function SettingsPage() {
       <Section title="Legal" description="Legal entity information, tax IDs, and registration details.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Country</Label>
+            <Label className="text-xs">Country (sets your tax rules)</Label>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -279,9 +279,12 @@ export default function SettingsPage() {
                 </Command>
               </PopoverContent>
             </Popover>
+            <p className="text-[11px] text-muted-foreground">
+              Picks the right tax rules and forms for where your business is based (for example VAT, GST or sales tax).
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Entity type</Label>
+            <Label className="text-xs">Business structure</Label>
             {form.countryCode ? (
               <Select
                 value={form.businessType}
@@ -523,7 +526,7 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* E-Invoicing / PEPPOL */}
-      <Section title="E-Invoicing" description="PEPPOL identifiers for electronic invoicing (EU/UK/SG compliance).">
+      <Section title="Send invoices electronically" description="Your business ID on the PEPPOL network, which lets you send invoices straight into another company's system (required in parts of the EU, UK and Singapore). Leave blank if you don't use it.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">PEPPOL Participant ID</Label>
@@ -562,10 +565,10 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Period Lock */}
-      <Section title="Period Lock" description="Lock transactions on or before a specific date to prevent backdating.">
+      <Section title="Lock past dates" description="Lock past dates so they can't be changed. Once set, nothing dated on or before this day can be added or edited — useful after you've filed taxes or closed your books for a period.">
         <div className="flex items-end gap-3">
           <div className="space-y-1.5 flex-1 max-w-xs">
-            <Label className="text-xs">Lock date</Label>
+            <Label className="text-xs">Lock everything up to and including</Label>
             <Input
               type="date"
               value={lockDate}
@@ -599,12 +602,12 @@ export default function SettingsPage() {
             }}
           >
             <Lock className="size-3.5" />
-            {lockSaving ? "Saving..." : "Set Lock"}
+            {lockSaving ? "Saving..." : "Lock dates"}
           </Button>
         </div>
         {lockDate && (
           <p className="text-xs text-amber-600 mt-2">
-            No transactions can be created or modified on or before {lockDate}.
+            Nothing dated on or before {lockDate} can be added or changed.
           </p>
         )}
       </Section>

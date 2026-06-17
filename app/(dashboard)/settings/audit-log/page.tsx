@@ -86,12 +86,12 @@ const ACTION_CONFIG: Record<string, { icon: LucideIcon; label: string; color: st
     badgeClass: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
   },
   post: {
-    icon: Check, label: "Posted",
+    icon: Check, label: "Finalized",
     color: "text-violet-600 dark:text-violet-400",
     badgeClass: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300",
   },
   void: {
-    icon: XCircle, label: "Voided",
+    icon: XCircle, label: "Cancelled",
     color: "text-orange-600 dark:text-orange-400",
     badgeClass: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300",
   },
@@ -140,7 +140,7 @@ const ENTITY_TYPES = [
   { value: "invoice", label: "Invoice" },
   { value: "bill", label: "Bill" },
   { value: "contact", label: "Contact" },
-  { value: "journal_entry", label: "Journal Entry" },
+  { value: "journal_entry", label: "Manual transaction" },
   { value: "account", label: "Account" },
   { value: "quote", label: "Quote" },
   { value: "purchase_order", label: "Purchase Order" },
@@ -152,6 +152,8 @@ const ENTITY_TYPES = [
 
 
 function formatEntityType(type: string): string {
+  const known = ENTITY_TYPES.find((e) => e.value === type);
+  if (known) return known.label.toLowerCase();
   return type.replace(/_/g, " ");
 }
 

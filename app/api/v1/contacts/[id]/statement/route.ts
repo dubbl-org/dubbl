@@ -9,7 +9,7 @@ import {
   payment,
   paymentAllocation,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, lt, notInArray, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, lt, notInArray, inArray, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 
@@ -49,6 +49,27 @@ export async function GET(
     }
 
     const c = contactRow[0];
+
+    // Credit/debit-note APPLICATIONS are recorded as zero-cash "carrier" payments
+    // (so a paymentAllocation can link note -> document). They must NOT be counted
+    // as cash in the statement — the credit/debit note document itself is already
+    // included — otherwise the application reduces the balance twice.
+    const carrierPaymentRows = await db
+      .selectDistinct({ paymentId: paymentAllocation.paymentId })
+      .from(paymentAllocation)
+      .innerJoin(payment, eq(paymentAllocation.paymentId, payment.id))
+      .where(
+        and(
+          eq(payment.organizationId, ctx.organizationId),
+          eq(payment.contactId, id),
+          inArray(paymentAllocation.documentType, ["credit_note", "debit_note"])
+        )
+      );
+    const carrierPaymentIds = carrierPaymentRows.map((r) => r.paymentId);
+    const excludeCarriers = carrierPaymentIds.length
+      ? notInArray(payment.id, carrierPaymentIds)
+      : undefined;
+
     const url = new URL(request.url);
     const now = new Date();
     const defaultStart = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -104,7 +125,8 @@ export async function GET(
             eq(payment.contactId, id),
             eq(payment.type, "received"),
             lt(payment.date, startDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
       openingBalance -= priorPaymentsReceived.reduce(
@@ -154,7 +176,8 @@ export async function GET(
             eq(payment.contactId, id),
             eq(payment.type, "made"),
             lt(payment.date, startDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
       openingBalance += priorPaymentsMade.reduce((s, r) => s + r.amount, 0);
@@ -229,7 +252,8 @@ export async function GET(
             eq(payment.type, "received"),
             gte(payment.date, startDate),
             lte(payment.date, endDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
 
@@ -312,7 +336,8 @@ export async function GET(
             eq(payment.type, "made"),
             gte(payment.date, startDate),
             lte(payment.date, endDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
 

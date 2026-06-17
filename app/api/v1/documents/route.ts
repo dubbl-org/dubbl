@@ -15,6 +15,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const { page, limit, offset } = parsePagination(url);
     const folderId = url.searchParams.get("folderId");
+    const entityType = url.searchParams.get("entityType");
+    const entityId = url.searchParams.get("entityId");
 
     const conditions = [
       eq(document.organizationId, ctx.organizationId),
@@ -27,6 +29,16 @@ export async function GET(request: Request) {
 
     if (folderId) {
       conditions.push(eq(document.folderId, folderId));
+    }
+
+    // Generic per-entity attachments: list files for any invoice/bill/payment/
+    // journal/bank-transaction/contact by passing entityType (+ optionally entityId).
+    if (entityType) {
+      conditions.push(eq(document.entityType, entityType));
+    }
+
+    if (entityId) {
+      conditions.push(eq(document.entityId, entityId));
     }
 
     const all = await db.query.document.findMany({

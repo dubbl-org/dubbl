@@ -55,8 +55,59 @@ const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "Owner": ["manage:billing", "delete:organization"],
 };
 
+// Plain-language label for each permission. The end user is not an accountant,
+// so these describe what the permission lets someone DO rather than echoing the
+// internal permission code (e.g. "post:entries" -> "Finalize transactions").
+const PERMISSION_LABELS: Record<string, string> = {
+  "view:data": "See data (read-only)",
+  "create:entries": "Add transactions",
+  "edit:entries": "Edit transactions",
+  "post:entries": "Finalize transactions (lock them in)",
+  "void:entries": "Cancel transactions",
+  "manage:accounts": "Manage the chart of accounts",
+  "manage:recurring": "Manage repeating transactions",
+  "manage:period-lock": "Lock past dates",
+  "manage:invoices": "Manage invoices",
+  "approve:invoices": "Approve invoices",
+  "manage:credit-notes": "Manage refunds to customers",
+  "manage:debit-notes": "Manage charge-backs to suppliers",
+  "manage:bills": "Manage bills you owe",
+  "approve:bills": "Approve bills you owe",
+  "manage:banking": "Manage bank accounts & feeds",
+  "manage:bank-rules": "Manage auto-sorting rules for bank activity",
+  "manage:contacts": "Manage customers & suppliers",
+  "manage:payments": "Manage payments",
+  "manage:expenses": "Manage expenses",
+  "approve:expenses": "Approve expenses",
+  "manage:inventory": "Manage stock & products",
+  "manage:payroll": "Manage payroll",
+  "approve:payroll": "Approve payroll",
+  "manage:timesheets": "Manage timesheets",
+  "manage:leave": "Manage time off",
+  "manage:contractors": "Manage contractors",
+  "view:payslips": "See pay slips",
+  "manage:compensation": "Manage pay & salaries",
+  "manage:tax-config": "Manage payroll tax setup",
+  "manage:shifts": "Manage shifts",
+  "self-service:payroll": "See their own pay info",
+  "view:payroll-reports": "See payroll reports",
+  "manage:projects": "Manage projects",
+  "manage:assets": "Manage equipment & assets",
+  "manage:budgets": "Manage budgets",
+  "manage:tax-rates": "Manage tax rates",
+  "manage:cost-centers": "Manage cost centers",
+  "manage:teams": "Manage teams",
+  "invite:members": "Invite people",
+  "change:roles": "Change people's access level",
+  "remove:members": "Remove people",
+  "manage:api-keys": "Manage developer API keys",
+  "view:audit-log": "See the activity history",
+  "manage:billing": "Manage billing & subscription",
+  "delete:organization": "Delete the whole organization",
+};
+
 function formatPermission(p: string) {
-  return p.replace(":", " ").replace(/-/g, " ");
+  return PERMISSION_LABELS[p] ?? p.replace(":", " ").replace(/-/g, " ");
 }
 
 export default function RolesPage() {
@@ -167,7 +218,7 @@ export default function RolesPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Custom Roles</h2>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Create roles with specific permissions for fine-grained access control.
+            Build your own access levels by choosing exactly what each person can see and do.
           </p>
         </div>
         <Button size="sm" onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
@@ -281,7 +332,7 @@ export default function RolesPage() {
                             checked={selectedPermissions.includes(perm)}
                             onCheckedChange={() => togglePermission(perm)}
                           />
-                          <span className="capitalize">{formatPermission(perm)}</span>
+                          <span>{formatPermission(perm)}</span>
                         </label>
                       ))}
                     </div>

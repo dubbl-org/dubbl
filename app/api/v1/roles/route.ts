@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { ALL_PERMISSIONS } from "@/lib/plans";
+import { seedPresetRoles } from "@/lib/api/preset-roles";
 import { z } from "zod";
 import { logAudit } from "@/lib/api/audit";
 
@@ -20,6 +21,9 @@ const createSchema = z.object({
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+
+    // Ensure the built-in preset system roles exist and are exposed.
+    await seedPresetRoles(ctx.organizationId);
 
     const roles = await db.query.customRole.findMany({
       where: eq(customRole.organizationId, ctx.organizationId),

@@ -122,10 +122,10 @@ export default function ContactBookkeepingPage() {
   return (
     <ContentReveal key="bookkeeping">
       <form onSubmit={handleSubmit} className="space-y-10">
-        <Section title="Default accounts" description="Default chart of accounts for this contact's transactions.">
+        <Section title="Default accounts" description="Where money from this contact lands in your books by default.">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Revenue account</Label>
+              <Label className="text-xs">Income account (money they pay you)</Label>
               <Select
                 value={formRevenueAccountId}
                 onValueChange={setFormRevenueAccountId}
@@ -144,7 +144,7 @@ export default function ContactBookkeepingPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Expense account</Label>
+              <Label className="text-xs">Spending account (money you pay them)</Label>
               <Select
                 value={formExpenseAccountId}
                 onValueChange={setFormExpenseAccountId}

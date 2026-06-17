@@ -37,10 +37,10 @@ export default function ContactStatementPage() {
 
   const statementTypeLabels: Record<string, string> = {
     invoice: "Invoice",
-    credit_note: "Credit Note",
+    credit_note: "Credit note (refund/reduction)",
     payment: "Payment",
     bill: "Bill",
-    debit_note: "Debit Note",
+    debit_note: "Debit note (extra charge)",
   };
 
   const fetchStatement = useCallback(async () => {
@@ -236,25 +236,25 @@ export default function ContactStatementPage() {
               {/* Summary cards */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-lg border p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Opening Balance</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground" title="What was owed at the start of this period">Starting balance</p>
                   <p className="mt-1 text-sm font-semibold tabular-nums font-mono">
                     {formatMoney(statementData.openingBalance)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total Debited</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground" title="New invoices and charges added this period">Total charged</p>
                   <p className="mt-1 text-sm font-semibold tabular-nums font-mono">
                     {formatMoney(statementData.transactions.reduce((s, t) => s + t.debit, 0))}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total Credited</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground" title="Payments and credits applied this period">Total paid</p>
                   <p className="mt-1 text-sm font-semibold tabular-nums font-mono">
                     {formatMoney(statementData.transactions.reduce((s, t) => s + t.credit, 0))}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Closing Balance</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground" title="What's owed at the end of this period">Ending balance</p>
                   <p className="mt-1 text-sm font-semibold tabular-nums font-mono">
                     {formatMoney(statementData.closingBalance)}
                   </p>
@@ -270,16 +270,16 @@ export default function ContactStatementPage() {
                       <th className="px-3 py-2 font-medium">Type</th>
                       <th className="px-3 py-2 font-medium">Reference</th>
                       <th className="px-3 py-2 font-medium">Description</th>
-                      <th className="px-3 py-2 text-right font-medium">Debit</th>
-                      <th className="px-3 py-2 text-right font-medium">Credit</th>
-                      <th className="px-3 py-2 text-right font-medium">Balance</th>
+                      <th className="px-3 py-2 text-right font-medium" title="Invoices and charges that add to what's owed">Charges</th>
+                      <th className="px-3 py-2 text-right font-medium" title="Payments and credits that reduce what's owed">Payments</th>
+                      <th className="px-3 py-2 text-right font-medium" title="Running total owed">Balance</th>
                     </tr>
                   </thead>
                   <tbody>
                     {/* Opening balance row */}
                     <tr className="border-b bg-muted/30">
                       <td colSpan={6} className="px-3 py-2 text-sm font-medium">
-                        Opening Balance
+                        Starting balance
                       </td>
                       <td className="px-3 py-2 text-right font-mono text-sm font-medium tabular-nums">
                         {formatMoney(statementData.openingBalance)}
@@ -325,7 +325,7 @@ export default function ContactStatementPage() {
                     {/* Closing balance row */}
                     <tr className="bg-muted/30">
                       <td colSpan={6} className="px-3 py-2 text-sm font-medium">
-                        Closing Balance
+                        Ending balance
                       </td>
                       <td className="px-3 py-2 text-right font-mono text-sm font-medium tabular-nums">
                         {formatMoney(statementData.closingBalance)}
