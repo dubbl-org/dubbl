@@ -14,6 +14,7 @@ import { registerWebhookTools } from "./webhooks";
 import { registerReportScheduleTools } from "./report-schedule-tools";
 import { registerApprovalTools } from "./approvals";
 import { registerBankRuleTools } from "./bank-rules";
+import { registerBankTransactionTools } from "./bank-transactions";
 import { registerDocumentTools } from "./documents";
 import { registerIntegrationTools } from "./integrations";
 import { registerEmailTools } from "./email";
@@ -22,6 +23,18 @@ import { registerImportExportTools } from "./import-export";
 import { registerTrashTools } from "./trash";
 import { registerBackupTools } from "./backups";
 import { registerCurrencyTools } from "./currencies";
+import { registerTaxTools } from "./tax";
+import { registerConsolidationTools } from "./consolidation";
+import { registerPayrollTools } from "./payroll";
+import { registerFixedAssetTools } from "./fixed-assets";
+import { registerInventoryTools } from "./inventory";
+import { registerPricingTools } from "./pricing";
+import { registerPurchasingTools } from "./purchasing";
+import { registerSalesReceiptTools } from "./sales-receipts";
+import { registerQuoteTools } from "./quotes";
+import { registerTaxProfileTools } from "./tax-profiles";
+import { registerRecurringJournalTools } from "./recurring-journals";
+import { registerProjectTools } from "./projects";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -38,6 +51,7 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerReportScheduleTools(server, ctx);
   registerApprovalTools(server, ctx);
   registerBankRuleTools(server, ctx);
+  registerBankTransactionTools(server, ctx);
   registerDocumentTools(server, ctx);
   registerIntegrationTools(server, ctx);
   registerEmailTools(server, ctx);
@@ -46,4 +60,16 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerTrashTools(server, ctx);
   registerBackupTools(server, ctx);
   registerCurrencyTools(server, ctx);
+  registerTaxTools(server, ctx);
+  registerConsolidationTools(server, ctx);
+  registerPayrollTools(server, ctx);
+  registerFixedAssetTools(server, ctx);
+  registerInventoryTools(server, ctx);
+  registerPricingTools(server, ctx);
+  registerPurchasingTools(server, ctx);
+  registerSalesReceiptTools(server, ctx);
+  registerQuoteTools(server, ctx);
+  registerTaxProfileTools(server, ctx);
+  registerRecurringJournalTools(server, ctx);
+  registerProjectTools(server, ctx);
 }

@@ -174,6 +174,22 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
               .optional()
               .default(0)
               .describe("Discount in basis points (1000 = 10%)"),
+            inventoryItemId: z
+              .string()
+              .optional()
+              .describe(
+                "Inventory item UUID. When set, selling this line will relieve stock and post COGS for the item when the invoice is posted/sent."
+              ),
+            warehouseId: z
+              .string()
+              .optional()
+              .describe(
+                "Warehouse UUID to draw the inventory from (only meaningful with inventoryItemId)."
+              ),
+            projectId: z
+              .string()
+              .optional()
+              .describe("Project UUID for job-costing this line."),
           })
         )
         .min(1)
@@ -234,6 +250,9 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
             discountPercent: l.discountPercent,
             taxAmount,
             amount,
+            inventoryItemId: l.inventoryItemId ?? null,
+            warehouseId: l.warehouseId ?? null,
+            projectId: l.projectId ?? null,
             sortOrder: i,
           };
         });

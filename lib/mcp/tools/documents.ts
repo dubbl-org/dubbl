@@ -141,4 +141,131 @@ export function registerDocumentTools(server: McpServer, ctx: AuthContext) {
         return { document: doc, uploadUrl };
       })
   );
+
+  server.tool(
+    "list_entity_files",
+    "List files/attachments linked to any business entity (invoice, bill, payment, journal entry, bank transaction, contact, etc.). Returns shared files and your own private files. File sizes are in bytes.",
+    {
+      entityType: z
+        .string()
+        .min(1)
+        .describe(
+          "Type of entity the files are attached to, e.g. 'invoice', 'bill', 'payment', 'journal_entry', 'bank_transaction', 'contact'"
+        ),
+      entityId: z
+        .string()
+        .uuid()
+        .describe("UUID of the entity to list attachments for"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(50)
+        .describe("Number of files to return (max 100)"),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .default(1)
+        .describe("Page number"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const conditions = [
+          eq(document.organizationId, ctx.organizationId),
+          eq(document.entityType, params.entityType),
+          eq(document.entityId, params.entityId),
+          notDeleted(document.deletedAt),
+          or(
+            eq(document.visibility, "organization"),
+            and(eq(document.visibility, "private"), eq(document.uploadedBy, ctx.userId))
+          ),
+        ];
+
+        const offset = (params.page - 1) * params.limit;
+
+        const files = await db.query.document.findMany({
+          where: and(...conditions),
+          orderBy: desc(document.createdAt),
+          limit: params.limit,
+          offset,
+        });
+
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)`.mapWith(Number) })
+          .from(document)
+          .where(and(...conditions));
+
+        return {
+          files,
+          total: Number(countResult?.count ?? 0),
+          page: params.page,
+          limit: params.limit,
+        };
+      })
+  );
+
+  server.tool(
+    "attach_file_to_entity",
+    "Attach a file to any business entity (invoice, bill, payment, journal entry, bank transaction, contact, etc.). Returns the document record plus a presigned S3 upload URL the file bytes must be PUT to. File size in bytes.",
+    {
+      entityType: z
+        .string()
+        .min(1)
+        .describe(
+          "Type of entity to attach the file to, e.g. 'invoice', 'bill', 'payment', 'journal_entry', 'bank_transaction', 'contact'"
+        ),
+      entityId: z
+        .string()
+        .uuid()
+        .describe("UUID of the entity to attach the file to"),
+      fileName: z
+        .string()
+        .min(1)
+        .describe("Name of the file"),
+      fileSize: z
+        .number()
+        .int()
+        .min(1)
+        .describe("File size in bytes"),
+      mimeType: z
+        .string()
+        .min(1)
+        .describe("MIME type of the file (e.g. application/pdf)"),
+      visibility: z
+        .enum(["organization", "private"])
+        .optional()
+        .default("organization")
+        .describe("Visibility: 'organization' (shared) or 'private' (only you)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+
+        await checkStorageLimit(ctx.organizationId, params.fileSize);
+
+        const fileKey = `documents/${ctx.organizationId}/${Date.now()}-${params.fileName}`;
+        const uploadUrl = await getUploadUrl(fileKey, params.mimeType);
+
+        const [doc] = await db
+          .insert(document)
+          .values({
+            organizationId: ctx.organizationId,
+            fileName: params.fileName,
+            fileKey,
+            fileSize: params.fileSize,
+            mimeType: params.mimeType,
+            entityType: params.entityType,
+            entityId: params.entityId,
+            visibility: params.visibility,
+            uploadedBy: ctx.userId,
+          })
+          .returning();
+
+        return { document: doc, uploadUrl };
+      })
+  );
 }

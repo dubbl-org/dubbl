@@ -6,13 +6,14 @@ import {
   invoice, invoiceLine, bill, billLine,
   journalEntry, journalLine, bankTransaction, bankAccount,
 } from "@/lib/db/schema";
-import { eq, and, desc, ilike } from "drizzle-orm";
+import { eq, and, desc, ilike, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { wrapTool } from "@/lib/mcp/errors";
 import { getMapping } from "@/lib/import-export/mappings";
 import { generateCSV, centsToDecimal } from "@/lib/import-export/csv-utils";
 import { parseMoney } from "@/lib/import-export/transformers";
 import { resolveContactByName, resolveAccountByCode } from "@/lib/import-export/reference-resolver";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import type { AuthContext } from "@/lib/api/auth-context";
 import type { SourceSystem, ImportEntity } from "@/lib/import-export/types";
 
@@ -155,6 +156,190 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
           processedRows,
           errorRows,
           status: errorRows === rows.length ? "failed" : "completed",
+          errors: errorDetails.slice(0, 10),
+        };
+      })
+  );
+
+  server.tool(
+    "import_journal_entries",
+    "Bulk-import balanced double-entry journal entries. Rows are grouped into entries by entryNumber (falling back to date+description when entryNumber is omitted). Each resulting entry MUST balance: the sum of its line debits must equal the sum of its line credits, the entry must move a non-zero amount, it must have at least 2 lines, and no single line may carry both a debit and a credit. Account codes are resolved within the organization and must reference an existing, active (non-deleted) account. Unbalanced or invalid entries are skipped and reported in errors; only valid entries are inserted. All amounts are integer cents (e.g. $12.50 = 1250). By default entries are created as drafts; set post=true to post them, which also enforces that each entry date is not in a locked period or closed fiscal year. Returns a job summary with processed/error counts.",
+    {
+      rows: z
+        .array(
+          z.object({
+            entryNumber: z
+              .string()
+              .optional()
+              .describe("Groups lines into one entry. Lines sharing an entryNumber form a single entry. If omitted, lines are grouped by date+description."),
+            date: z
+              .string()
+              .describe("Entry date in YYYY-MM-DD format."),
+            description: z
+              .string()
+              .describe("Entry description."),
+            reference: z
+              .string()
+              .optional()
+              .describe("Optional external reference for the entry."),
+            lineAccountCode: z
+              .string()
+              .describe("Chart-of-accounts code for this line. Must reference an existing, active account in the organization."),
+            debit: z
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .default(0)
+              .describe("Debit amount in integer cents (e.g. $12.50 = 1250). A line may have a debit or a credit, but not both."),
+            credit: z
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .default(0)
+              .describe("Credit amount in integer cents (e.g. $12.50 = 1250). A line may have a debit or a credit, but not both."),
+          })
+        )
+        .min(1)
+        .describe("Flat list of journal lines. Lines are grouped into balanced entries by entryNumber (or date+description)."),
+      post: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("When true, created entries are posted (status 'posted' with postedAt) and each entry date is checked against locked periods / closed fiscal years. When false (default), entries are created as drafts."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const rows = params.rows;
+        const post = params.post;
+
+        const [job] = await db.insert(bulkImportJob).values({
+          organizationId: ctx.organizationId,
+          type: "entries",
+          fileName: "mcp-import-entries",
+          totalRows: rows.length,
+          status: "processing",
+          createdBy: ctx.userId,
+        }).returning();
+
+        // Group rows into entries, preserving first-seen order.
+        type Row = (typeof rows)[number];
+        const groupOrder: string[] = [];
+        const entryGroups = new Map<string, Row[]>();
+        for (const row of rows) {
+          const key = row.entryNumber || `${row.date}|${row.description}`;
+          let existing = entryGroups.get(key);
+          if (!existing) {
+            existing = [];
+            entryGroups.set(key, existing);
+            groupOrder.push(key);
+          }
+          existing.push(row);
+        }
+
+        // Allocate entry numbers sequentially within this pass so groups never
+        // collide on the same number.
+        const [maxResult] = await db
+          .select({ max: sql<number>`COALESCE(MAX(entry_number), 0)`.mapWith(Number) })
+          .from(journalEntry)
+          .where(eq(journalEntry.organizationId, ctx.organizationId));
+        let nextEntryNumber = (maxResult?.max ?? 0) + 1;
+
+        let processedRows = 0;
+        let errorRows = 0;
+        const errorDetails: Array<{ row: number; error: string }> = [];
+        let groupIndex = 0;
+
+        for (const key of groupOrder) {
+          const groupRows = entryGroups.get(key)!;
+          const firstRow = groupRows[0];
+          groupIndex++;
+          try {
+            if (groupRows.length < 2) {
+              throw new Error("Entry must have at least 2 lines");
+            }
+
+            const lines = [];
+            let totalDebit = 0;
+            let totalCredit = 0;
+            for (const row of groupRows) {
+              const account = await db.query.chartAccount.findFirst({
+                where: and(
+                  eq(chartAccount.organizationId, ctx.organizationId),
+                  ilike(chartAccount.code, row.lineAccountCode.trim()),
+                  notDeleted(chartAccount.deletedAt),
+                ),
+                columns: { id: true, isActive: true },
+              });
+              if (!account) throw new Error(`Account not found: "${row.lineAccountCode}"`);
+              if (!account.isActive) throw new Error(`Account is inactive: "${row.lineAccountCode}"`);
+
+              const debitAmount = row.debit ?? 0;
+              const creditAmount = row.credit ?? 0;
+              if (debitAmount !== 0 && creditAmount !== 0) {
+                throw new Error(`Line for account "${row.lineAccountCode}" cannot have both a debit and a credit`);
+              }
+
+              totalDebit += debitAmount;
+              totalCredit += creditAmount;
+              lines.push({ accountId: account.id, debitAmount, creditAmount });
+            }
+
+            if (totalDebit !== totalCredit) {
+              const imbalance = totalDebit - totalCredit;
+              throw new Error(
+                `Entry does not balance: debits ${totalDebit} != credits ${totalCredit} (imbalance ${imbalance} cents)`
+              );
+            }
+            if (totalDebit === 0) {
+              throw new Error("Entry must have non-zero amounts");
+            }
+
+            if (post) {
+              await assertNotLocked(ctx.organizationId, firstRow.date);
+            }
+
+            const entryNumber = nextEntryNumber;
+            const [created] = await db.insert(journalEntry).values({
+              organizationId: ctx.organizationId,
+              entryNumber,
+              date: firstRow.date,
+              description: firstRow.description,
+              reference: firstRow.reference || null,
+              status: post ? "posted" : "draft",
+              postedAt: post ? new Date() : null,
+              sourceType: "manual",
+              createdBy: ctx.userId,
+            }).returning();
+            nextEntryNumber++;
+
+            await db.insert(journalLine).values(
+              lines.map(l => ({ journalEntryId: created.id, ...l }))
+            );
+            processedRows++;
+          } catch (err) {
+            errorRows++;
+            errorDetails.push({ row: groupIndex, error: err instanceof Error ? err.message : "Unknown error" });
+          }
+        }
+
+        const status = errorRows === entryGroups.size ? "failed" : "completed";
+        await db.update(bulkImportJob).set({
+          processedRows,
+          errorRows,
+          errorDetails: errorDetails.length > 0 ? errorDetails : null,
+          status,
+          completedAt: new Date(),
+        }).where(eq(bulkImportJob.id, job.id));
+
+        return {
+          jobId: job.id,
+          totalEntries: entryGroups.size,
+          processedEntries: processedRows,
+          errorEntries: errorRows,
+          posted: post,
+          status,
           errors: errorDetails.slice(0, 10),
         };
       })
