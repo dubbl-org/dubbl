@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, timeEntry, invoice, invoiceLine } from "@/lib/db/schema";
+import {
+  project,
+  projectBillableItem,
+  timeEntry,
+  invoice,
+  invoiceLine,
+} from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -13,7 +19,18 @@ const invoiceSchema = z.object({
   issueDate: z.string().min(1).optional(),
   dueDate: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
+  // Include registered (not-yet-billed) billable expenses on this invoice.
+  includeBillableExpenses: z.boolean().optional().default(true),
+  // Markup (basis points, 1000 = 10%) applied to billable expenses whose own
+  // markup is 0 (i.e. a default markup at invoice time). Each item's stored
+  // markup takes precedence when non-zero.
+  defaultExpenseMarkupBasisPoints: z.number().int().min(0).optional().default(0),
 });
+
+/** Billed amount for a cost line = cost grossed up by the markup (basis points). */
+function withMarkup(cost: number, markupBasisPoints: number): number {
+  return Math.round(cost * (1 + markupBasisPoints / 10000));
+}
 
 export async function POST(
   request: Request,
@@ -50,8 +67,22 @@ export async function POST(
       ),
     });
 
-    if (unbilledEntries.length === 0) {
-      return validationError("No unbilled time entries found");
+    // Get registered (not-yet-billed) billable expenses for this project.
+    const billableItems = parsed.includeBillableExpenses
+      ? await db
+          .select()
+          .from(projectBillableItem)
+          .where(
+            and(
+              eq(projectBillableItem.organizationId, ctx.organizationId),
+              eq(projectBillableItem.projectId, id),
+              isNull(projectBillableItem.billedInvoiceId)
+            )
+          )
+      : [];
+
+    if (unbilledEntries.length === 0 && billableItems.length === 0) {
+      return validationError("No unbilled time entries or billable expenses found");
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -62,9 +93,17 @@ export async function POST(
 
     const invoiceNumber = await getNextNumber(ctx.organizationId, "invoice", "invoice_number", "INV");
 
-    // Calculate totals from time entries
+    // Calculate totals from time entries (tagged with this projectId for job costing).
     let subtotal = 0;
-    const lines = unbilledEntries.map((entry, i) => {
+    const lines: {
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      taxAmount: number;
+      amount: number;
+      projectId: string;
+      sortOrder: number;
+    }[] = unbilledEntries.map((entry, i) => {
       const hours = entry.minutes / 60;
       const amount = Math.round(hours * entry.hourlyRate);
       subtotal += amount;
@@ -75,53 +114,100 @@ export async function POST(
         unitPrice: entry.hourlyRate,
         taxAmount: 0,
         amount,
+        projectId: id,
         sortOrder: i,
       };
     });
 
-    // Create invoice
-    const [created] = await db
-      .insert(invoice)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: proj.contactId,
-        invoiceNumber,
-        issueDate,
-        dueDate,
-        notes: parsed.notes || `Invoice for project: ${proj.name}`,
-        subtotal,
-        taxTotal: 0,
-        total: subtotal,
-        amountPaid: 0,
-        amountDue: subtotal,
-        createdBy: ctx.userId,
-      })
-      .returning();
+    // Append billable-expense lines (cost grossed up by markup). The item's own
+    // markup takes precedence; fall back to the request default when it's 0.
+    const billedUpdates: { id: string; billedAmount: number }[] = [];
+    billableItems.forEach((item, idx) => {
+      const markup =
+        item.markupBasisPoints > 0
+          ? item.markupBasisPoints
+          : parsed.defaultExpenseMarkupBasisPoints;
+      const amount = withMarkup(item.costAmount, markup);
+      subtotal += amount;
+      lines.push({
+        description: item.description,
+        quantity: 100, // 1.00
+        unitPrice: amount,
+        taxAmount: 0,
+        amount,
+        projectId: id,
+        sortOrder: unbilledEntries.length + idx,
+      });
+      billedUpdates.push({ id: item.id, billedAmount: amount });
+    });
 
-    // Create invoice lines
-    await db.insert(invoiceLine).values(
-      lines.map((l) => ({
-        invoiceId: created.id,
-        ...l,
-      }))
-    );
+    // Create the invoice + lines, mark time entries + billable items billed, and
+    // bump the project total atomically.
+    const created = await db.transaction(async (tx) => {
+      const [inv] = await tx
+        .insert(invoice)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId: proj.contactId!,
+          invoiceNumber,
+          issueDate,
+          dueDate,
+          notes: parsed.notes || `Invoice for project: ${proj.name}`,
+          subtotal,
+          taxTotal: 0,
+          total: subtotal,
+          amountPaid: 0,
+          amountDue: subtotal,
+          currencyCode: proj.currency,
+          createdBy: ctx.userId,
+        })
+        .returning();
 
-    // Mark time entries as invoiced
-    for (const entry of unbilledEntries) {
-      await db
-        .update(timeEntry)
-        .set({ invoiceId: created.id })
-        .where(eq(timeEntry.id, entry.id));
-    }
+      if (lines.length > 0) {
+        await tx.insert(invoiceLine).values(
+          lines.map((l) => ({
+            invoiceId: inv.id,
+            ...l,
+          }))
+        );
+      }
 
-    // Update project totalBilled
-    await db
-      .update(project)
-      .set({
-        totalBilled: proj.totalBilled + subtotal,
-        updatedAt: new Date(),
-      })
-      .where(eq(project.id, id));
+      // Mark time entries as invoiced.
+      for (const entry of unbilledEntries) {
+        await tx
+          .update(timeEntry)
+          .set({ invoiceId: inv.id })
+          .where(eq(timeEntry.id, entry.id));
+      }
+
+      // Mark billable expenses as billed on this invoice.
+      const now = new Date();
+      for (const upd of billedUpdates) {
+        await tx
+          .update(projectBillableItem)
+          .set({
+            billedInvoiceId: inv.id,
+            billedAmount: upd.billedAmount,
+            billedAt: now,
+          })
+          .where(
+            and(
+              eq(projectBillableItem.id, upd.id),
+              isNull(projectBillableItem.billedInvoiceId)
+            )
+          );
+      }
+
+      await tx
+        .update(project)
+        .set({
+          totalBilled: proj.totalBilled + subtotal,
+          updatedAt: new Date(),
+        })
+        .where(eq(project.id, id));
+
+      return inv;
+    });
 
     return NextResponse.json({ invoice: created }, { status: 201 });
   } catch (err) {

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   project,
   projectMilestone,
+  projectBillableItem,
   timeEntry,
   invoice,
   invoiceLine,
@@ -23,7 +24,19 @@ const progressInvoiceSchema = z.object({
   issueDate: z.string().optional(),
   dueDate: z.string().optional(),
   notes: z.string().nullable().optional(),
+  // Billable-expense on-billing controls.
+  includeBillableExpenses: z.boolean().optional().default(false),
+  // Specific billable item ids to include; when omitted (and
+  // includeBillableExpenses is true), ALL registered unbilled items are added.
+  billableItemIds: z.array(z.string()).optional(),
+  // Default markup (basis points) for items whose own markup is 0.
+  defaultExpenseMarkupBasisPoints: z.number().int().min(0).optional().default(0),
 });
+
+/** Billed amount for a cost line = cost grossed up by the markup (basis points). */
+function withMarkup(cost: number, markupBasisPoints: number): number {
+  return Math.round(cost * (1 + markupBasisPoints / 10000));
+}
 
 export async function POST(
   request: Request,
@@ -72,6 +85,8 @@ export async function POST(
 
     // Track milestones to update after invoice creation
     const milestoneUpdates: { id: string; newInvoicedAmount: number }[] = [];
+    // Track billable expenses to mark billed after invoice creation.
+    const billedUpdates: { id: string; billedAmount: number }[] = [];
 
     if (proj.billingType === "milestone" && parsed.milestoneIds?.length) {
       const selectedMilestones = proj.milestones.filter((m) =>
@@ -131,6 +146,39 @@ export async function POST(
       });
     }
 
+    // Billable expenses: on-bill registered, not-yet-billed cost lines (any
+    // billing type). Cost is grossed up by the item's markup, falling back to
+    // the request default when the item's own markup is 0.
+    if (parsed.includeBillableExpenses) {
+      const conditions = [
+        eq(projectBillableItem.organizationId, ctx.organizationId),
+        eq(projectBillableItem.projectId, id),
+        isNull(projectBillableItem.billedInvoiceId),
+      ];
+      if (parsed.billableItemIds?.length) {
+        conditions.push(inArray(projectBillableItem.id, parsed.billableItemIds));
+      }
+      const billableItems = await db
+        .select()
+        .from(projectBillableItem)
+        .where(and(...conditions));
+
+      for (const item of billableItems) {
+        const markup =
+          item.markupBasisPoints > 0
+            ? item.markupBasisPoints
+            : parsed.defaultExpenseMarkupBasisPoints;
+        const amount = withMarkup(item.costAmount, markup);
+        lines.push({
+          description: item.description,
+          quantity: 100, // 1.00
+          unitPrice: amount,
+          amount,
+        });
+        billedUpdates.push({ id: item.id, billedAmount: amount });
+      }
+    }
+
     if (lines.length === 0) {
       return validationError("No billable items to invoice");
     }
@@ -145,73 +193,97 @@ export async function POST(
       "INV"
     );
 
-    // Create invoice
-    const [newInvoice] = await db
-      .insert(invoice)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId,
-        invoiceNumber,
-        issueDate,
-        dueDate,
-        status: "draft",
-        reference: `Project: ${proj.name}`,
-        notes: parsed.notes || null,
-        subtotal,
-        taxTotal: 0,
-        total: subtotal,
-        amountPaid: 0,
-        amountDue: subtotal,
-        currencyCode: proj.currency,
-        createdBy: ctx.userId,
-      })
-      .returning();
+    // Create the invoice + lines, update milestones/time entries/billable items,
+    // and bump the project total atomically so a failure rolls everything back.
+    const newInvoice = await db.transaction(async (tx) => {
+      const [inv] = await tx
+        .insert(invoice)
+        .values({
+          organizationId: ctx.organizationId,
+          contactId,
+          invoiceNumber,
+          issueDate,
+          dueDate,
+          status: "draft",
+          reference: `Project: ${proj.name}`,
+          notes: parsed.notes || null,
+          subtotal,
+          taxTotal: 0,
+          total: subtotal,
+          amountPaid: 0,
+          amountDue: subtotal,
+          currencyCode: proj.currency,
+          createdBy: ctx.userId,
+        })
+        .returning();
 
-    // Create invoice lines
-    await db.insert(invoiceLine).values(
-      lines.map((l, i) => ({
-        invoiceId: newInvoice.id,
-        description: l.description,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        taxAmount: 0,
-        amount: l.amount,
-        sortOrder: i,
-      }))
-    );
+      // Create invoice lines (tagged with this projectId for job costing).
+      await tx.insert(invoiceLine).values(
+        lines.map((l, i) => ({
+          invoiceId: inv.id,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          taxAmount: 0,
+          amount: l.amount,
+          projectId: id,
+          sortOrder: i,
+        }))
+      );
 
-    // Update milestone invoiced amounts
-    if (proj.billingType === "milestone" && milestoneUpdates.length > 0) {
-      for (const mu of milestoneUpdates) {
-        await db
-          .update(projectMilestone)
-          .set({ invoicedAmountCents: mu.newInvoicedAmount })
-          .where(eq(projectMilestone.id, mu.id));
+      // Update milestone invoiced amounts
+      if (proj.billingType === "milestone" && milestoneUpdates.length > 0) {
+        for (const mu of milestoneUpdates) {
+          await tx
+            .update(projectMilestone)
+            .set({ invoicedAmountCents: mu.newInvoicedAmount })
+            .where(eq(projectMilestone.id, mu.id));
+        }
       }
-    }
 
-    // Update time entries with invoice ID
-    if (proj.billingType === "hourly" && parsed.timeEntryIds?.length) {
-      await db
-        .update(timeEntry)
-        .set({ invoiceId: newInvoice.id })
-        .where(
-          and(
-            inArray(timeEntry.id, parsed.timeEntryIds),
-            eq(timeEntry.projectId, id),
-            isNull(timeEntry.invoiceId)
-          )
-        );
-    }
+      // Update time entries with invoice ID
+      if (proj.billingType === "hourly" && parsed.timeEntryIds?.length) {
+        await tx
+          .update(timeEntry)
+          .set({ invoiceId: inv.id })
+          .where(
+            and(
+              inArray(timeEntry.id, parsed.timeEntryIds),
+              eq(timeEntry.projectId, id),
+              isNull(timeEntry.invoiceId)
+            )
+          );
+      }
 
-    // Update project totalBilled
-    await db
-      .update(project)
-      .set({
-        totalBilled: proj.totalBilled + subtotal,
-        updatedAt: new Date(),
-      })
-      .where(eq(project.id, id));
+      // Mark billable expenses as billed on this invoice.
+      const now = new Date();
+      for (const upd of billedUpdates) {
+        await tx
+          .update(projectBillableItem)
+          .set({
+            billedInvoiceId: inv.id,
+            billedAmount: upd.billedAmount,
+            billedAt: now,
+          })
+          .where(
+            and(
+              eq(projectBillableItem.id, upd.id),
+              isNull(projectBillableItem.billedInvoiceId)
+            )
+          );
+      }
+
+      // Update project totalBilled
+      await tx
+        .update(project)
+        .set({
+          totalBilled: proj.totalBilled + subtotal,
+          updatedAt: new Date(),
+        })
+        .where(eq(project.id, id));
+
+      return inv;
+    });
 
     return NextResponse.json({ invoice: newInvoice }, { status: 201 });
   } catch (err) {
@@ -238,6 +310,30 @@ export async function GET(
 
     if (!proj) return notFound("Project");
 
+    // Registered, not-yet-billed billable expenses — available to on-bill on any
+    // billing type. Included alongside every branch's response.
+    const billableRows = await db
+      .select()
+      .from(projectBillableItem)
+      .where(
+        and(
+          eq(projectBillableItem.organizationId, ctx.organizationId),
+          eq(projectBillableItem.projectId, id),
+          isNull(projectBillableItem.billedInvoiceId)
+        )
+      );
+    const billableExpenses = billableRows.map((i) => ({
+      id: i.id,
+      description: i.description,
+      costAmount: i.costAmount,
+      markupBasisPoints: i.markupBasisPoints,
+      billableAmount: withMarkup(i.costAmount, i.markupBasisPoints),
+    }));
+    const billableExpensesTotal = billableExpenses.reduce(
+      (s, i) => s + i.billableAmount,
+      0
+    );
+
     if (proj.billingType === "milestone") {
       const milestones = proj.milestones.map((m) => ({
         id: m.id,
@@ -249,7 +345,13 @@ export async function GET(
         progressPercent: m.progressPercent,
       }));
       const totalRemaining = milestones.reduce((s, m) => s + m.remaining, 0);
-      return NextResponse.json({ billingType: "milestone", milestones, totalRemaining });
+      return NextResponse.json({
+        billingType: "milestone",
+        milestones,
+        totalRemaining,
+        billableExpenses,
+        billableExpensesTotal,
+      });
     }
 
     if (proj.billingType === "hourly") {
@@ -281,6 +383,8 @@ export async function GET(
           task: e.task,
         })),
         totalAmount,
+        billableExpenses,
+        billableExpensesTotal,
       });
     }
 
@@ -308,10 +412,17 @@ export async function GET(
         totalInvoiced,
         remaining,
         invoicedPercent,
+        billableExpenses,
+        billableExpensesTotal,
       });
     }
 
-    return NextResponse.json({ billingType: proj.billingType, message: "Non-billable project" });
+    return NextResponse.json({
+      billingType: proj.billingType,
+      message: "Non-billable project",
+      billableExpenses,
+      billableExpensesTotal,
+    });
   } catch (err) {
     return handleError(err);
   }
