@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { expenseClaim, journalEntry, journalLine, chartAccount } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { expenseClaim, chartAccount } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { createExpenseClaimPaymentJournalEntry } from "@/lib/api/expense-claims";
 import { z } from "zod";
 
 const paySchema = z.object({
@@ -47,13 +48,6 @@ export async function POST(
       );
     }
 
-    // Get next entry number
-    const [maxResult] = await db
-      .select({ max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)` })
-      .from(journalEntry)
-      .where(eq(journalEntry.organizationId, ctx.organizationId));
-    const entryNumber = (maxResult?.max || 0) + 1;
-
     // Find bank account
     const bankAccount = await db.query.chartAccount.findFirst({
       where: and(
@@ -69,85 +63,31 @@ export async function POST(
       );
     }
 
-    // Create journal entry
-    // DR Expense accounts (per item)
-    // CR Bank/Cash
-    const [entry] = await db
-      .insert(journalEntry)
-      .values({
-        organizationId: ctx.organizationId,
-        entryNumber,
-        date: parsed.date,
-        description: `Expense claim: ${found.title}`,
-        reference: `EXP-${id.slice(0, 8)}`,
-        status: "posted",
-        sourceType: "expense",
-        sourceId: id,
-        postedAt: new Date(),
-        createdBy: ctx.userId,
-      })
-      .returning();
+    // Post the payment (DR Employee Reimbursements Payable / CR Bank) — clearing
+    // the obligation recognized at approval — and flip status to paid atomically.
+    // The expense accounts were already debited at approval, so we must NOT
+    // re-debit them here.
+    const paidAt = new Date();
+    const updated = await db.transaction(async (tx) => {
+      await createExpenseClaimPaymentJournalEntry(
+        ctx,
+        found,
+        { id: bankAccount.id },
+        tx,
+        parsed.date
+      );
 
-    const lines: (typeof journalLine.$inferInsert)[] = [];
-
-    // DR Expense accounts per item
-    for (const item of found.items) {
-      if (item.accountId && item.amount > 0) {
-        lines.push({
-          journalEntryId: entry.id,
-          accountId: item.accountId,
-          description: item.description,
-          debitAmount: item.amount,
-          creditAmount: 0,
-        });
-      }
-    }
-
-    // If no specific accounts, use a single debit line for the total
-    if (lines.length === 0) {
-      // Find default expense account (code 5000)
-      const defaultExpenseAccount = await db.query.chartAccount.findFirst({
-        where: and(
-          eq(chartAccount.organizationId, ctx.organizationId),
-          eq(chartAccount.code, "5000")
-        ),
-      });
-
-      if (defaultExpenseAccount) {
-        lines.push({
-          journalEntryId: entry.id,
-          accountId: defaultExpenseAccount.id,
-          description: `Expense claim: ${found.title}`,
-          debitAmount: found.totalAmount,
-          creditAmount: 0,
-        });
-      }
-    }
-
-    // CR Bank for total amount
-    lines.push({
-      journalEntryId: entry.id,
-      accountId: bankAccount.id,
-      description: `Expense claim: ${found.title}`,
-      debitAmount: 0,
-      creditAmount: found.totalAmount,
+      const [row] = await tx
+        .update(expenseClaim)
+        .set({
+          status: "paid",
+          paidAt,
+          updatedAt: paidAt,
+        })
+        .where(eq(expenseClaim.id, id))
+        .returning();
+      return row;
     });
-
-    if (lines.length > 0) {
-      await db.insert(journalLine).values(lines);
-    }
-
-    // Update expense claim
-    const [updated] = await db
-      .update(expenseClaim)
-      .set({
-        status: "paid",
-        journalEntryId: entry.id,
-        paidAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(expenseClaim.id, id))
-      .returning();
 
     logAudit({ ctx, action: "pay", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
 
