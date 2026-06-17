@@ -111,7 +111,7 @@ export default function ComparativeBalanceSheetPage() {
         <ArrowLeft className="size-3.5" /> Back to reports
       </Link>
 
-      <PageHeader title="Comparative Balance Sheet" description="Period-over-period balance sheet comparison.">
+      <PageHeader title="What you own and owe — compared" description="What the business owns and owes at several dates, side by side, to show what changed.">
         <ExportButton data={exportData} columns={["section", "code", "name", ...periods.map((p) => p.label)]} filename="comparative-balance-sheet" />
       </PageHeader>
 

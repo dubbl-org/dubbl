@@ -70,7 +70,7 @@ export default function VendorSpendPage() {
         <ArrowLeft className="size-3.5" /> Back to reports
       </Link>
 
-      <PageHeader title="Vendor Spend Analysis" description="Top suppliers by total spend for the period.">
+      <PageHeader title="Who you spend the most with" description="Your biggest suppliers, ranked by total spend for the period.">
         <ExportButton
           data={vendors}
           columns={["contactName", "totalSpend", "billCount", "avgBillAmount", "lastBillDate", "percentage"]}
@@ -85,8 +85,8 @@ export default function VendorSpendPage() {
       ) : (
         <ContentReveal>
           <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard title="Total Vendor Spend" value={formatMoney(totalSpend)} icon={TrendingDown} changeType="negative" />
-            <StatCard title="Vendors" value={String(vendors.length)} icon={TrendingDown} changeType="neutral" change={`${vendors.length} active`} />
+            <StatCard title="Total spent with suppliers" value={formatMoney(totalSpend)} icon={TrendingDown} changeType="negative" />
+            <StatCard title="Suppliers" value={String(vendors.length)} icon={TrendingDown} changeType="neutral" change={`${vendors.length} active`} />
           </div>
 
           {vendors.length === 0 ? (

@@ -62,8 +62,8 @@ export default function DuplicateDetectionPage() {
       </Link>
 
       <PageHeader
-        title="Duplicate Detection"
-        description="Potential duplicate invoices and bills (same contact, same amount, within 7 days)."
+        title="Possible double-ups"
+        description="Invoices or bills that may have been entered twice (same contact, same amount, within 7 days)."
       />
 
       {loading ? (

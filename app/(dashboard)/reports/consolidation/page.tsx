@@ -302,8 +302,8 @@ export default function ConsolidationPage() {
       </Link>
 
       <PageHeader
-        title="Consolidation"
-        description="Combined financial statements across multiple entities."
+        title="Combined company reports"
+        description="One set of reports that adds up several of your businesses together. Sales and bills between those businesses are removed so you don't count them twice, and amounts in other currencies are converted into one currency."
       >
         {report && exportData.length > 0 && (
           <ExportButton
@@ -316,7 +316,12 @@ export default function ConsolidationPage() {
 
       {/* Group Management */}
       <div className="rounded-xl border border-border/50 bg-card/80 p-4 sm:p-6 space-y-4">
-        <h2 className="text-sm font-semibold">Consolidation Groups</h2>
+        <div>
+          <h2 className="text-sm font-semibold">Company groups</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            A group is the set of businesses you want to report on together. Create one, then add each business below.
+          </p>
+        </div>
 
         {/* Create group */}
         <div className="flex gap-2">
@@ -368,7 +373,7 @@ export default function ConsolidationPage() {
 
         {groups.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            Create your first consolidation group to combine financial statements across entities.
+            Create your first group to report on several of your businesses together.
           </p>
         )}
       </div>
@@ -377,7 +382,7 @@ export default function ConsolidationPage() {
       {selectedGroup && (
         <div className="rounded-xl border border-border/50 bg-card/80 p-4 sm:p-6 space-y-4">
           <h2 className="text-sm font-semibold">
-            Members of &quot;{selectedGroup.name}&quot;
+            Businesses in &quot;{selectedGroup.name}&quot;
           </h2>
 
           {/* Add member - org picker */}
@@ -386,7 +391,7 @@ export default function ConsolidationPage() {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
                   <Plus className="size-4" />
-                  Add Entity
+                  Add a business
                   <ChevronsUpDown className="size-3 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -454,7 +459,7 @@ export default function ConsolidationPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No member entities yet. Select an organization to add.
+              No businesses added yet. Add one above to include it in the combined reports.
             </p>
           )}
         </div>
@@ -520,12 +525,12 @@ export default function ConsolidationPage() {
                   {/* Per Entity Summary */}
                   <div className="rounded-xl border border-border/50 overflow-hidden">
                     <div className="bg-muted/30 px-4 py-3">
-                      <h3 className="text-sm font-semibold">Per Entity Summary</h3>
+                      <h3 className="text-sm font-semibold">Each business</h3>
                     </div>
                     <Table>
                       <TableHeader>
                         <TableRow className="border-border/50">
-                          <TableHead className="px-4">Entity</TableHead>
+                          <TableHead className="px-4">Business</TableHead>
                           <TableHead className="px-4 text-right">Revenue</TableHead>
                           <TableHead className="px-4 text-right">Expenses</TableHead>
                           <TableHead className="px-4 text-right">Net Income</TableHead>
@@ -556,7 +561,7 @@ export default function ConsolidationPage() {
 
                   {/* Account Detail */}
                   <AccountDetailTable
-                    title="Account Detail"
+                    title="Account breakdown"
                     accounts={pnl.accounts}
                     members={report!.members}
                   />
@@ -576,12 +581,12 @@ export default function ConsolidationPage() {
                   {/* Per Entity Summary */}
                   <div className="rounded-xl border border-border/50 overflow-hidden">
                     <div className="bg-muted/30 px-4 py-3">
-                      <h3 className="text-sm font-semibold">Per Entity Summary</h3>
+                      <h3 className="text-sm font-semibold">Each business</h3>
                     </div>
                     <Table>
                       <TableHeader>
                         <TableRow className="border-border/50">
-                          <TableHead className="px-4">Entity</TableHead>
+                          <TableHead className="px-4">Business</TableHead>
                           <TableHead className="px-4 text-right">Assets</TableHead>
                           <TableHead className="px-4 text-right">Liabilities</TableHead>
                           <TableHead className="px-4 text-right">Equity</TableHead>
@@ -608,7 +613,7 @@ export default function ConsolidationPage() {
 
                   {/* Account Detail */}
                   <AccountDetailTable
-                    title="Account Detail"
+                    title="Account breakdown"
                     accounts={bs.accounts}
                     members={report!.members}
                   />

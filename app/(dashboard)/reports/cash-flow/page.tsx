@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowDownUp, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ArrowDownUp, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -10,6 +9,7 @@ import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
+import { BackToReports, ReportHelp } from "../_components";
 
 interface CashFlowRow {
   accountName: string;
@@ -68,23 +68,46 @@ export default function CashFlowPage() {
   }, [startDate, endDate]);
 
   const sections = [
-    { title: "Operating Activities", data: operating, total: totalOperating, icon: ArrowDownUp },
-    { title: "Investing Activities", data: investing, total: totalInvesting, icon: TrendingDown },
-    { title: "Financing Activities", data: financing, total: totalFinancing, icon: TrendingUp },
+    {
+      title: "From day-to-day trading",
+      help: "Cash from running the business — sales you collected, minus costs you paid.",
+      data: operating,
+      total: totalOperating,
+      icon: ArrowDownUp,
+    },
+    {
+      title: "From buying & selling things",
+      help: "Cash spent on or received from equipment, property, and other longer-term items.",
+      data: investing,
+      total: totalInvesting,
+      icon: TrendingDown,
+    },
+    {
+      title: "From funding",
+      help: "Cash from loans and owners putting money in, minus repayments and money taken out.",
+      data: financing,
+      total: totalFinancing,
+      icon: TrendingUp,
+    },
   ];
 
   if (initialLoad) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
-      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="size-3.5" /> Back to reports
-      </Link>
+      <BackToReports />
 
       <PageHeader
-        title="Cash Flow Statement"
-        description="Cash inflows and outflows by activity type."
+        title="Where your cash went"
+        description="How actual cash moved in and out over the period."
       />
+
+      <ReportHelp>
+        Profit isn&apos;t the same as cash in the bank. This report follows the actual
+        money: how much came in and went out, split into day-to-day trading,
+        buying or selling things, and funding. The bottom line is how much your
+        cash changed over the period.
+      </ReportHelp>
 
       <DateRangeFilter
         startDate={startDate}
@@ -101,14 +124,14 @@ export default function CashFlowPage() {
               {sections.map((s) => (
                 <StatCard
                   key={s.title}
-                  title={s.title.replace(" Activities", "")}
+                  title={s.title}
                   value={formatMoney(s.total)}
                   icon={s.icon}
                   changeType={s.total >= 0 ? "positive" : "negative"}
                 />
               ))}
               <StatCard
-                title="Net Cash Flow"
+                title="Change in cash"
                 value={formatMoney(netCashFlow)}
                 icon={DollarSign}
                 changeType={netCashFlow >= 0 ? "positive" : "negative"}
@@ -117,17 +140,20 @@ export default function CashFlowPage() {
 
             {sections.map((s) => (
               <div key={s.title} className="space-y-2">
-                <h2 className="text-lg font-semibold">{s.title}</h2>
-                <DataTable columns={columns} data={s.data} loading={false} emptyMessage={`No ${s.title.toLowerCase()}.`} />
+                <div>
+                  <h2 className="text-lg font-semibold">{s.title}</h2>
+                  <p className="text-[13px] text-muted-foreground">{s.help}</p>
+                </div>
+                <DataTable columns={columns} data={s.data} loading={false} emptyMessage={`No cash movement ${s.title.toLowerCase()}.`} />
                 <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
-                  <span>Total {s.title}</span>
+                  <span>Total {s.title.toLowerCase()}</span>
                   <span className="font-mono tabular-nums">{formatMoney(s.total)}</span>
                 </div>
               </div>
             ))}
 
             <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg font-semibold text-sm sm:text-base">
-              <span>Net Cash Flow</span>
+              <span>Total change in cash this period</span>
               <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
             </div>
           </div>

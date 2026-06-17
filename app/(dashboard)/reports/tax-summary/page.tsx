@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Receipt, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Receipt, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
+import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { BackToReports, ReportHelp } from "../_components";
 
 interface TaxRateSummary {
   taxRateId: string;
@@ -25,12 +26,24 @@ interface TaxRateSummary {
   netTax: number;
 }
 
-export default function TaxSummaryPage() {
+/** Honor ?startDate/&endDate when arriving from a tax-return drill-down link. */
+function initialDates() {
   const now = new Date();
+  const fallback = { start: `${now.getFullYear()}-01-01`, end: now.toISOString().slice(0, 10) };
+  if (typeof window === "undefined") return fallback;
+  const p = new URLSearchParams(window.location.search);
+  return {
+    start: p.get("startDate") || fallback.start,
+    end: p.get("endDate") || fallback.end,
+  };
+}
+
+export default function TaxSummaryPage() {
+  const [dates] = useState(initialDates);
   const [initialLoad, setInitialLoad] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
-  const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(dates.start);
+  const [endDate, setEndDate] = useState(dates.end);
   const [rates, setRates] = useState<TaxRateSummary[]>([]);
   const [totalOutputTax, setTotalOutputTax] = useState(0);
   const [totalInputTax, setTotalInputTax] = useState(0);
@@ -67,14 +80,22 @@ export default function TaxSummaryPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="size-3.5" /> Back to reports
-      </Link>
+      <BackToReports />
 
       <PageHeader
-        title="Tax Summary"
-        description="Output tax (sales) vs input tax (purchases) by tax rate."
-      />
+        title="Tax collected vs tax paid"
+        description="Tax you charged on sales vs tax you paid on purchases, by tax rate."
+      >
+        <Button asChild variant="outline" size="sm">
+          <a href="/reports/vat-return">Open the full tax return</a>
+        </Button>
+      </PageHeader>
+
+      <ReportHelp>
+        A breakdown by tax rate of the tax you added to customer invoices and the
+        tax you paid on supplier bills. The difference is roughly what you&apos;ll pay
+        to (or get back from) the tax office.
+      </ReportHelp>
 
       <DateRangeFilter
         startDate={startDate}
@@ -89,20 +110,20 @@ export default function TaxSummaryPage() {
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-3">
               <StatCard
-                title="Output Tax (Sales)"
+                title="Tax you charged on sales"
                 value={formatMoney(totalOutputTax)}
                 icon={ArrowUpRight}
                 changeType="neutral"
               />
               <StatCard
-                title="Input Tax (Purchases)"
+                title="Tax you paid on purchases"
                 value={formatMoney(totalInputTax)}
                 icon={ArrowDownLeft}
                 changeType="neutral"
               />
               <StatCard
-                title="Net Tax Payable"
-                value={formatMoney(netTaxPayable)}
+                title={netTaxPayable >= 0 ? "You'll owe the tax office" : "You'll get a refund"}
+                value={formatMoney(Math.abs(netTaxPayable))}
                 icon={Receipt}
                 changeType={netTaxPayable > 0 ? "negative" : "positive"}
               />
@@ -117,13 +138,13 @@ export default function TaxSummaryPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Tax Rate</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Tax rate</th>
                       <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Rate</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Output Net</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Output Tax</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Input Net</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Input Tax</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Net Tax</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Sales (before tax)</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Tax charged</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Purchases (before tax)</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Tax paid</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Owe / refund</th>
                     </tr>
                   </thead>
                   <tbody>

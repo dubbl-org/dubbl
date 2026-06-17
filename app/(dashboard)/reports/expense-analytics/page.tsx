@@ -99,8 +99,8 @@ export default function ExpenseAnalyticsPage() {
       </Link>
 
       <PageHeader
-        title="Expense Analytics"
-        description="Spending breakdown by category with trends over time."
+        title="Where the money is spent"
+        description="Your spending grouped by category, with trends over time."
       />
 
       <DateRangeFilter
@@ -115,13 +115,13 @@ export default function ExpenseAnalyticsPage() {
         <ContentReveal>
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
-              title="Total Expenses"
+              title="Total spent"
               value={formatMoney(totalExpenses)}
               icon={TrendingDown}
               changeType="negative"
             />
             <StatCard
-              title="Monthly Average"
+              title="Average per month"
               value={formatMoney(monthlyAverage)}
               icon={PieChart}
               changeType="neutral"

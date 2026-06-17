@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { journalEntry, journalLine, chartAccount } from "@/lib/db/schema";
-import { eq, and, isNull, gte, lte, asc, sql, count, sum } from "drizzle-orm";
+import { journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
+import { eq, and, isNull, gte, lte, asc, sql, type SQL } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import type { Statement } from "@/lib/reports/statement-export";
+import { aggregateByDateRange, type Dimension } from "@/lib/reports/gl-query";
 
 const DEFAULT_ENTRIES_PER_ACCOUNT = 50;
 
@@ -11,6 +13,7 @@ export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
     const url = new URL(request.url);
+    const format = (url.searchParams.get("format") || "json").toLowerCase();
     const startDate = url.searchParams.get("startDate") || `${new Date().getFullYear()}-01-01`;
     const endDate = url.searchParams.get("endDate") || new Date().toISOString().slice(0, 10);
     // Optional: fetch entries for a single account with pagination
@@ -18,12 +21,48 @@ export async function GET(request: Request) {
     const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10) || 0);
     const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit") || String(DEFAULT_ENTRIES_PER_ACCOUNT), 10) || DEFAULT_ENTRIES_PER_ACCOUNT));
 
+    // Optional tracking-dimension filter. Restrict the ledger to journal lines
+    // tagged with a given cost center or project. costCenterId takes precedence
+    // if both are supplied. Pass the literal value "none"/"null" to match lines
+    // where the dimension is unset.
+    const costCenterId = url.searchParams.get("costCenterId");
+    const projectId = url.searchParams.get("projectId");
+    let dimension: Dimension | undefined;
+    let dimensionValue: string | null | undefined;
+    let dimensionRaw: string | null = null;
+    if (costCenterId !== null) {
+      dimension = "costCenterId";
+      dimensionRaw = costCenterId;
+    } else if (projectId !== null) {
+      dimension = "projectId";
+      dimensionRaw = projectId;
+    }
+    if (dimension) {
+      dimensionValue =
+        dimensionRaw === "none" || dimensionRaw === "null" || dimensionRaw === ""
+          ? null
+          : dimensionRaw;
+    }
+
+    // Line-level predicate for the detail queries that mirror the gl-query
+    // dimension filter (gl-query handles the aggregated totals).
+    const dimensionClause: SQL | undefined = dimension
+      ? (() => {
+          const col =
+            dimension === "costCenterId"
+              ? journalLine.costCenterId
+              : journalLine.projectId;
+          return dimensionValue === null ? isNull(col) : eq(col, dimensionValue!);
+        })()
+      : undefined;
+
     const baseWhere = and(
       eq(journalEntry.organizationId, ctx.organizationId),
       eq(journalEntry.status, "posted"),
       isNull(journalEntry.deletedAt),
       gte(journalEntry.date, startDate),
-      lte(journalEntry.date, endDate)
+      lte(journalEntry.date, endDate),
+      dimensionClause
     );
 
     // Single-account mode: return paginated entries for one account
@@ -87,23 +126,22 @@ export async function GET(request: Request) {
     }
 
     // Summary mode: return all accounts with totals + capped entries per account
-    // First get per-account summaries
-    const summaries = await db
-      .select({
-        accountId: journalLine.accountId,
-        accountName: chartAccount.name,
-        accountCode: chartAccount.code,
-        accountType: chartAccount.type,
-        totalDebit: sum(journalLine.debitAmount).mapWith(Number),
-        totalCredit: sum(journalLine.creditAmount).mapWith(Number),
-        entryCount: count(),
-      })
-      .from(journalLine)
-      .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
-      .innerJoin(chartAccount, eq(journalLine.accountId, chartAccount.id))
-      .where(baseWhere)
-      .groupBy(journalLine.accountId, chartAccount.name, chartAccount.code, chartAccount.type)
-      .orderBy(asc(chartAccount.code));
+    // Per-account totals come from the shared GL aggregation (so basis/dimension
+    // handling stays consistent across reports). Entry counts are still pulled
+    // from the detail query below.
+    const aggregates = await aggregateByDateRange(
+      ctx.organizationId,
+      { startDate, endDate },
+      dimension ? { dimension, dimensionValue } : {}
+    );
+    const summaries = aggregates.map((a) => ({
+      accountId: a.accountId,
+      accountName: a.name,
+      accountCode: a.code,
+      accountType: a.type,
+      totalDebit: a.debit,
+      totalCredit: a.credit,
+    }));
 
     // Then fetch first N entries per account using a single query with row numbers
     const entriesRows = await db
@@ -124,9 +162,16 @@ export async function GET(request: Request) {
       .where(baseWhere)
       .orderBy(asc(chartAccount.code), asc(journalEntry.date), asc(journalEntry.entryNumber));
 
-    // Group entries by account, capped at limit
+    // Group entries by account, capped at limit. The window's ROW_NUMBER gives
+    // us the true total line count per account as the max rn, so we can keep
+    // reporting `totalEntries` without a separate COUNT query.
     const entriesByAccount = new Map<string, typeof entriesRows>();
+    const countByAccount = new Map<string, number>();
     for (const row of entriesRows) {
+      countByAccount.set(
+        row.accountId,
+        Math.max(countByAccount.get(row.accountId) || 0, Number(row.rn))
+      );
       if (row.rn > limit) continue;
       const existing = entriesByAccount.get(row.accountId) || [];
       existing.push(row);
@@ -160,16 +205,63 @@ export async function GET(request: Request) {
         accountCode: s.accountCode,
         accountType: s.accountType,
         entries,
-        totalEntries: s.entryCount,
+        totalEntries: countByAccount.get(s.accountId) || 0,
         totalDebit: s.totalDebit || 0,
         totalCredit: s.totalCredit || 0,
         balance,
       };
     });
 
+    if (format === "pdf" || format === "xlsx") {
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, ctx.organizationId),
+        columns: { defaultCurrency: true },
+      });
+      const currency = org?.defaultCurrency || "USD";
+
+      // One section per account: its entries (debit positive, credit negative)
+      // plus a running closing balance as the subtotal.
+      const statement: Statement = {
+        title: "General Ledger",
+        periodLabel: `${startDate} to ${endDate}`,
+        currency,
+        sections: accounts.map((acct) => ({
+          label: `${acct.accountCode} ${acct.accountName}`,
+          rows: acct.entries.map((e) => ({
+            name: `${e.date} ${e.entryNumber}${e.description ? ` - ${e.description}` : ""}`,
+            amount: e.debit - e.credit,
+            depth: 1,
+          })),
+          subtotal: acct.balance,
+        })),
+      };
+
+      const { toPdf, toXlsx } = await import("@/lib/reports/statement-export");
+      if (format === "pdf") {
+        const buffer = await toPdf(statement);
+        return new NextResponse(new Uint8Array(buffer), {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="general-ledger-${startDate}-${endDate}.pdf"`,
+          },
+        });
+      }
+      const buffer = await toXlsx(statement);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="general-ledger-${startDate}-${endDate}.xlsx"`,
+        },
+      });
+    }
+
     return NextResponse.json({
       startDate,
       endDate,
+      ...(dimension
+        ? { dimension, dimensionValue: dimensionValue ?? null }
+        : {}),
       accounts,
     });
   } catch (err) {

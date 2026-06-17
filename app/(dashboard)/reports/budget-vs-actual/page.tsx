@@ -115,11 +115,11 @@ export default function BudgetVsActualPage() {
         <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-3.5" /> Back to reports
         </Link>
-        <PageHeader title="Budget vs Actual" description="Compare budgeted amounts to actual GL balances." />
+        <PageHeader title="Budget vs what actually happened" description="See where you came in over or under your plan." />
         <EmptyState
           icon={Target}
           title="No budgets yet"
-          description="Create a budget first to see budget vs actual comparisons."
+          description="Set up a budget first to compare it against what actually happened."
         />
       </ContentReveal>
     );
@@ -132,8 +132,8 @@ export default function BudgetVsActualPage() {
       </Link>
 
       <PageHeader
-        title="Budget vs Actual"
-        description="Compare budgeted amounts to actual GL balances."
+        title="Budget vs what actually happened"
+        description="See where you came in over or under your plan."
       />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
