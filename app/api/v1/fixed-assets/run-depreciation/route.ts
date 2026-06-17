@@ -39,6 +39,14 @@ export async function POST(request: Request) {
       [];
 
     for (const asset of assets) {
+      // periodIndex = number of depreciation entries already booked for the
+      // asset (safe for declining-balance / SYD / uneven schedules).
+      const [priorCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(depreciationEntry)
+        .where(eq(depreciationEntry.fixedAssetId, asset.id));
+      const periodIndex = Number(priorCount?.count ?? 0);
+
       const amount = calculateMonthlyDepreciation({
         purchasePrice: asset.purchasePrice,
         residualValue: asset.residualValue,
@@ -46,6 +54,14 @@ export async function POST(request: Request) {
         depreciationMethod: asset.depreciationMethod,
         accumulatedDepreciation: asset.accumulatedDepreciation,
         purchaseDate: asset.purchaseDate,
+        periodIndex,
+        convention: asset.convention,
+        inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
+        totalExpectedUnits: asset.totalExpectedUnits,
+        // Bulk run can't supply per-asset usage readings, so units-of-production
+        // assets are skipped here (amount resolves to 0) and depreciated via the
+        // per-asset endpoint with a units reading.
+        periodDate: today,
       });
 
       if (amount <= 0) continue;
