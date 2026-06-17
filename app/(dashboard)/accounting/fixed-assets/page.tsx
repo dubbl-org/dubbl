@@ -40,9 +40,10 @@ const statusColors: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = {
-  active: "Active",
-  fully_depreciated: "Fully Depreciated",
-  disposed: "Disposed",
+  active: "In use",
+  fully_depreciated: "Fully written down",
+  disposed: "Sold or written off",
+  in_progress: "Not in use yet",
 };
 
 const methodLabels: Record<string, string> = {
@@ -120,7 +121,7 @@ function buildColumns(): Column<FixedAsset>[] {
     },
     {
       key: "depreciationMethod",
-      header: "Method",
+      header: "How value is spread",
       className: "w-32",
       render: (r) => (
         <span className="text-xs text-muted-foreground">
@@ -130,7 +131,7 @@ function buildColumns(): Column<FixedAsset>[] {
     },
     {
       key: "purchasePrice",
-      header: "Cost",
+      header: "What you paid",
       className: "w-28 text-right",
       render: (r) => (
         <span className="font-mono text-sm tabular-nums">
@@ -140,7 +141,7 @@ function buildColumns(): Column<FixedAsset>[] {
     },
     {
       key: "depreciation",
-      header: "Depreciation",
+      header: "Value used up",
       className: "w-36",
       render: (r) => {
         const pct =
@@ -166,7 +167,7 @@ function buildColumns(): Column<FixedAsset>[] {
     },
     {
       key: "netBookValue",
-      header: "Book Value",
+      header: "Current value",
       className: "w-28 text-right",
       render: (r) => (
         <span className="font-mono text-sm tabular-nums">
@@ -266,14 +267,14 @@ export default function FixedAssetsPage() {
       const data = await res.json();
       if (res.ok) {
         toast.success(
-          `Depreciation run complete: ${data.processed} assets processed`
+          `Value drops recorded for ${data.processed} item${data.processed === 1 ? "" : "s"}`
         );
         window.location.reload();
       } else {
-        toast.error(typeof data.error === "string" ? data.error : "Failed to run depreciation");
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't record this period's value drops");
       }
     } catch {
-      toast.error("Failed to run depreciation");
+      toast.error("Couldn't record this period's value drops");
     } finally {
       setRunningDepreciation(false);
     }
@@ -346,15 +347,15 @@ export default function FixedAssetsPage() {
                 },
                 {
                   step: "2",
-                  label: "Set depreciation",
-                  sub: "Choose method and useful life for each asset",
+                  label: "Spread the cost",
+                  sub: "Choose how each item's cost spreads over its useful life",
                   color: "bg-amber-500",
                   ring: "ring-amber-200 dark:ring-amber-900",
                 },
                 {
                   step: "3",
                   label: "Track value",
-                  sub: "Monitor book values and run depreciation monthly",
+                  sub: "Watch current values and record the drop each month",
                   color: "bg-emerald-500",
                   ring: "ring-emerald-200 dark:ring-emerald-900",
                 },
@@ -386,8 +387,8 @@ export default function FixedAssetsPage() {
               Track your fixed assets
             </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Add your first asset to start tracking depreciation and book
-              values.
+              Add your first item to start tracking how its value drops over
+              time.
             </p>
             <Button
               onClick={() => openDrawer("fixedAsset")}
@@ -395,16 +396,16 @@ export default function FixedAssetsPage() {
               className="mt-5 bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
-              Add Asset
+              Add item
             </Button>
           </div>
 
           {/* Preview stat cards (empty) */}
           <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-40">
             {[
-              { label: "Total Cost", value: "$0.00" },
-              { label: "Net Book Value", value: "$0.00" },
-              { label: "Depreciation", value: "$0.00" },
+              { label: "Total cost", value: "$0.00" },
+              { label: "Current value", value: "$0.00" },
+              { label: "Value used up", value: "$0.00" },
             ].map(({ label, value }) => (
               <div
                 key={label}
@@ -432,7 +433,7 @@ export default function FixedAssetsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-3">
             <div>
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Total Cost
+                Total cost
               </p>
               <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
                 {formatMoney(totalCost)}
@@ -440,7 +441,7 @@ export default function FixedAssetsPage() {
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Net Book Value
+                Current value
               </p>
               <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
                 {formatMoney(totalNBV)}
@@ -451,7 +452,7 @@ export default function FixedAssetsPage() {
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Accumulated Depr.
+                Value used up
               </p>
               <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-red-500">
                 -{formatMoney(totalAccDep)}
@@ -459,7 +460,7 @@ export default function FixedAssetsPage() {
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Assets
+                Items
               </p>
               <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
                 {allAssets.length}
@@ -473,9 +474,10 @@ export default function FixedAssetsPage() {
               variant="outline"
               onClick={handleRunDepreciation}
               disabled={runningDepreciation}
+              title="Record this period's drop in value across all your items at once"
             >
               <Play className="mr-2 size-4" />
-              {runningDepreciation ? "Running..." : "Run Depreciation"}
+              {runningDepreciation ? "Recording..." : "Record value drops"}
             </Button>
             <Button
               size="sm"
@@ -483,7 +485,7 @@ export default function FixedAssetsPage() {
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-2 size-4" />
-              Add Asset
+              Add item
             </Button>
           </div>
         </div>
@@ -493,10 +495,10 @@ export default function FixedAssetsPage() {
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Depreciation Progress
+                Value used up so far
               </p>
               <span className="text-xs font-mono tabular-nums text-muted-foreground">
-                {depPct}% depreciated
+                {depPct}% used up
               </span>
             </div>
             <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-muted">
@@ -516,7 +518,7 @@ export default function FixedAssetsPage() {
               <div className="flex items-center gap-1.5">
                 <span className="inline-block size-2 rounded-full bg-emerald-500" />
                 <span className="text-muted-foreground">
-                  Net Book Value · {formatMoney(totalNBV)}
+                  Current value · {formatMoney(totalNBV)}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -527,7 +529,7 @@ export default function FixedAssetsPage() {
                   )}
                 />
                 <span className="text-muted-foreground">
-                  Depreciated · {formatMoney(totalAccDep)}
+                  Value used up · {formatMoney(totalAccDep)}
                 </span>
               </div>
             </div>
@@ -549,7 +551,7 @@ export default function FixedAssetsPage() {
                 </span>
               </TabsTrigger>
               <TabsTrigger value="active" className="whitespace-nowrap">
-                Active{" "}
+                In use{" "}
                 <span className="ml-1 text-muted-foreground">
                   {countByStatus.active}
                 </span>
@@ -558,13 +560,13 @@ export default function FixedAssetsPage() {
                 value="fully_depreciated"
                 className="whitespace-nowrap"
               >
-                Fully Depreciated{" "}
+                Fully written down{" "}
                 <span className="ml-1 text-muted-foreground">
                   {countByStatus.fully_depreciated}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="disposed" className="whitespace-nowrap">
-                Disposed{" "}
+                Sold or written off{" "}
                 <span className="ml-1 text-muted-foreground">
                   {countByStatus.disposed}
                 </span>

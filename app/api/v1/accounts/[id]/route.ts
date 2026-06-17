@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { chartAccount, journalLine, journalEntry } from "@/lib/db/schema";
+import { chartAccount, journalLine, journalEntry, taxRate } from "@/lib/db/schema";
 import { eq, and, ilike, gte, lte, asc, desc } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -14,6 +14,10 @@ const updateSchema = z.object({
   subType: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   description: z.string().nullable().optional(),
+  // Account-driven tax defaulting + reporting metadata (E7).
+  defaultTaxRateId: z.string().uuid().nullable().optional(),
+  taxDisallowedPercent: z.number().int().min(0).max(10000).optional(),
+  reportingCode: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -152,6 +156,37 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // System control accounts (AR/AP/bank/tax/retained earnings) cannot be
+    // retyped. `type` is not part of updateSchema so it can never be changed
+    // here, but guard explicitly in case a `type` field is sent (E8a).
+    if (
+      existing.isSystem &&
+      "type" in body &&
+      body.type !== undefined &&
+      body.type !== existing.type
+    ) {
+      return NextResponse.json(
+        { error: "Cannot change the type of a system account" },
+        { status: 422 }
+      );
+    }
+
+    // Validate the default tax rate belongs to this org (if supplied) (E7).
+    if (parsed.defaultTaxRateId) {
+      const rate = await db.query.taxRate.findFirst({
+        where: and(
+          eq(taxRate.id, parsed.defaultTaxRateId),
+          eq(taxRate.organizationId, ctx.organizationId)
+        ),
+      });
+      if (!rate) {
+        return NextResponse.json(
+          { error: "Tax rate not found" },
+          { status: 400 }
+        );
+      }
+    }
+
     const [updated] = await db
       .update(chartAccount)
       .set(parsed)
@@ -183,6 +218,25 @@ export async function DELETE(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:accounts");
 
+    const existing = await db.query.chartAccount.findFirst({
+      where: and(
+        eq(chartAccount.id, id),
+        eq(chartAccount.organizationId, ctx.organizationId)
+      ),
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // System control accounts (AR/AP/bank/tax/retained earnings) cannot be
+    // deleted (E8a).
+    if (existing.isSystem) {
+      return NextResponse.json(
+        { error: "Cannot delete a system account" },
+        { status: 422 }
+      );
+    }
+
     // Check if account has journal lines
     const lines = await db.query.journalLine.findFirst({
       where: eq(journalLine.accountId, id),
@@ -207,6 +261,8 @@ export async function DELETE(
     if (!deleted) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    logAudit({ ctx, action: "delete", entityType: "chart_account", entityId: id, request });
 
     return NextResponse.json({ success: true });
   } catch (err) {
