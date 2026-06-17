@@ -134,13 +134,23 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
       </div>
 
       <div className="space-y-3">
-        <Label>Journal Lines</Label>
+        <div className="space-y-1">
+          <Label>Entry lines</Label>
+          <p className="text-xs text-muted-foreground">
+            Each line is money in (debit) or money out (credit). The Debit and
+            Credit columns must add up to the same total.
+          </p>
+        </div>
         <div className="overflow-x-auto rounded-lg border">
           <div className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
             <span>Account</span>
             <span>Description</span>
-            <span className="text-right">Debit</span>
-            <span className="text-right">Credit</span>
+            <span className="text-right" title="The left side of an entry">
+              Debit
+            </span>
+            <span className="text-right" title="The right side of an entry">
+              Credit
+            </span>
             <span />
           </div>
           {lines.map((line, i) => (

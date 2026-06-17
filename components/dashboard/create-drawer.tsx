@@ -819,7 +819,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
         throw new Error(err.error || "Failed to create entry");
       }
       const { entry } = await res.json();
-      toast.success("Journal entry created");
+      toast.success("Manual entry created");
       onClose();
       router.push(`/accounting/${entry.id}`);
     } catch (err) {
@@ -836,8 +836,8 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
           <div className="flex items-center gap-3">
             <DrawerIcon><BookOpen className="size-5" /></DrawerIcon>
             <div>
-              <SheetTitle className="text-lg">New Journal Entry</SheetTitle>
-              <SheetDescription>Create a balanced double-entry journal entry.</SheetDescription>
+              <SheetTitle className="text-lg">New manual entry</SheetTitle>
+              <SheetDescription>Make a direct adjustment to your books, for things like accruals or corrections.</SheetDescription>
             </div>
           </div>
         </SheetHeader>
@@ -847,7 +847,7 @@ function EntryDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
             onSubmit={handleSubmit}
             loading={loading}
             onCancel={onClose}
-            submitLabel="Create Entry"
+            submitLabel="Create entry"
           />
         </div>
       </SheetContent>
@@ -1227,7 +1227,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." rows={3} />
             </div>
           </div>
-          <DrawerFooter onClose={onClose} saving={saving} label="Create PO" />
+          <DrawerFooter onClose={onClose} saving={saving} label="Create purchase order" />
         </form>
       </SheetContent>
     </Sheet>

@@ -12,6 +12,7 @@ interface Tab {
   icon?: LucideIcon;
   exact?: boolean;
   badge?: string | number;
+  title?: string;
 }
 
 export function TabLayout({
@@ -54,6 +55,7 @@ export function TabLayout({
               <Link
                 key={tab.href}
                 href={tab.href}
+                title={tab.title}
                 className={cn(
                   "flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors whitespace-nowrap",
                   isActive
