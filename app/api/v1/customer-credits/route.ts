@@ -25,6 +25,7 @@ import {
   assertBaseRateAvailable,
   ensureControlAccount,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 
 // A customer credit holds money received in advance of (or in excess of) an
@@ -134,15 +135,18 @@ export async function POST(request: Request) {
           eq(bankAccount.organizationId, ctx.organizationId),
           notDeleted(bankAccount.deletedAt)
         ),
-        columns: { chartAccountId: true },
+        columns: {
+          id: true,
+          accountName: true,
+          accountType: true,
+          currencyCode: true,
+          chartAccountId: true,
+        },
       });
       if (!acct) return notFound("Bank account");
-      if (!acct.chartAccountId) {
-        return validationError(
-          "This bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before recording a customer credit."
-        );
-      }
-      cashAccountId = acct.chartAccountId;
+      // Connect the bank account to its ledger account automatically (older
+      // accounts self-heal on first use) so recording a credit never dead-ends.
+      cashAccountId = await ensureBankLedgerAccount(ctx.organizationId, acct);
     } else if (parsed.depositAccountId) {
       const acct = await db.query.chartAccount.findFirst({
         where: and(
