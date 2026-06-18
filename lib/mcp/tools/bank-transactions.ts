@@ -45,6 +45,7 @@ import {
   splitGrossTax,
   assertBaseRateAvailable,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 // ---------------------------------------------------------------------------
@@ -267,11 +268,9 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
 
         const { transaction, account } = await loadTransactionAndAccount(params.transactionId, ctx);
         if (transaction.status === "reconciled") throw new Error("Transaction already reconciled");
-        if (!account.chartAccountId) {
-          throw new Error(
-            "This bank account isn't linked to a ledger account. Set its ledger account before categorizing."
-          );
-        }
+        // Connect the bank account to its ledger account automatically (older
+        // accounts self-heal on first use) so categorizing never dead-ends.
+        const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
         const target = await db.query.chartAccount.findFirst({
           where: and(
@@ -288,7 +287,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           const entry = await createCategorizationJournalEntry(
             { organizationId: ctx.organizationId, userId: ctx.userId },
             {
-              bankGlAccountId: account.chartAccountId!,
+              bankGlAccountId,
               otherAccountId: params.accountId,
               amount: transaction.amount,
               date: transaction.date,
@@ -937,16 +936,10 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
 
         const targetAccount = await loadBankAccount(params.targetBankAccountId, ctx);
 
-        if (!sourceAccount.chartAccountId) {
-          throw new Error(
-            "This bank account isn't linked to a ledger account. Set its ledger account before matching transfers."
-          );
-        }
-        if (!targetAccount.chartAccountId) {
-          throw new Error(
-            "The target bank account isn't linked to a ledger account. Set its ledger account before matching transfers."
-          );
-        }
+        // Both banks must post to a ledger account; connect them automatically
+        // (older accounts self-heal on first use) so transfers never dead-end.
+        const sourceGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, sourceAccount);
+        const targetGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, targetAccount);
 
         const abs = Math.abs(transaction.amount);
         if (abs === 0) throw new Error("Cannot transfer a zero-amount transaction.");
@@ -980,11 +973,11 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
 
         const moneyInToSource = transaction.amount > 0;
         const debitBankAccountId = moneyInToSource
-          ? sourceAccount.chartAccountId
-          : targetAccount.chartAccountId;
+          ? sourceGlAccountId
+          : targetGlAccountId;
         const creditBankAccountId = moneyInToSource
-          ? targetAccount.chartAccountId
-          : sourceAccount.chartAccountId;
+          ? targetGlAccountId
+          : sourceGlAccountId;
 
         const currencyCode = transaction.currencyCode || sourceAccount.currencyCode;
         await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
@@ -1143,11 +1136,9 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
 
         const { transaction, account } = await loadTransactionAndAccount(params.transactionId, ctx);
         if (transaction.status === "reconciled") throw new Error("Transaction already reconciled");
-        if (!account.chartAccountId) {
-          throw new Error(
-            "This bank account isn't linked to a ledger account. Set its ledger account before categorizing."
-          );
-        }
+        // Connect the bank account to its ledger account automatically (older
+        // accounts self-heal on first use) so splitting never dead-ends.
+        const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
         const abs = Math.abs(transaction.amount);
         if (abs === 0) throw new Error("Cannot split a zero-amount transaction.");
@@ -1203,7 +1194,6 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
         const moneyIn = transaction.amount > 0;
-        const bankGlAccountId = account.chartAccountId;
         const reference = transaction.reference || transaction.description;
 
         const { entry } = await db.transaction(async (tx) => {
@@ -1419,14 +1409,9 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               results.push({ transactionId, ok: false, error: "Transaction already reconciled" });
               continue;
             }
-            if (!account.chartAccountId) {
-              results.push({
-                transactionId,
-                ok: false,
-                error: "Bank account isn't linked to a ledger account",
-              });
-              continue;
-            }
+            // Connect the bank account to its ledger account automatically (older
+            // accounts self-heal on first use) so coding never dead-ends.
+            const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
             const currencyCode = transaction.currencyCode || account.currencyCode;
             await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
@@ -1435,7 +1420,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               const entry = await createCategorizationJournalEntry(
                 { organizationId: ctx.organizationId, userId: ctx.userId },
                 {
-                  bankGlAccountId: account.chartAccountId!,
+                  bankGlAccountId,
                   otherAccountId: params.accountId,
                   amount: transaction.amount,
                   date: transaction.date,
