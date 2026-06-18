@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createCategorizationJournalEntry, resolveBaseRate } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { logAudit } from "@/lib/api/audit";
 import { MissingExchangeRateError } from "@/lib/currency/converter";
 import { z } from "zod";
@@ -60,7 +61,13 @@ export async function POST(request: Request) {
     // stay outside the per-item db.transaction.
     const bankAccountCache = new Map<
       string,
-      { chartAccountId: string | null; currencyCode: string | null } | null
+      {
+        id: string;
+        accountName: string;
+        accountType: string;
+        currencyCode: string;
+        chartAccountId: string | null;
+      } | null
     >();
     const targetAccountCache = new Map<string, boolean>();
 
@@ -86,7 +93,13 @@ export async function POST(request: Request) {
               eq(bankAccount.organizationId, ctx.organizationId),
               notDeleted(bankAccount.deletedAt)
             ),
-            columns: { chartAccountId: true, currencyCode: true },
+            columns: {
+              id: true,
+              accountName: true,
+              accountType: true,
+              currencyCode: true,
+              chartAccountId: true,
+            },
           });
           bankAcct = found ?? null;
           bankAccountCache.set(transaction.bankAccountId, bankAcct);
@@ -101,13 +114,14 @@ export async function POST(request: Request) {
           continue;
         }
 
+        // Connect the bank account to its ledger account automatically (older
+        // accounts self-heal on first use). Mutating the cached object links the
+        // account once per batch so later items for the same account reuse it.
         if (!bankAcct.chartAccountId) {
-          results.push({
-            transactionId: item.transactionId,
-            success: false,
-            error: "This bank account isn't linked to a ledger account yet. Set its ledger account before categorizing.",
-          });
-          continue;
+          bankAcct.chartAccountId = await ensureBankLedgerAccount(
+            ctx.organizationId,
+            bankAcct
+          );
         }
 
         // Verify the chosen account belongs to this org (cached).
@@ -138,9 +152,9 @@ export async function POST(request: Request) {
 
         // Post + mark this single item inside its OWN db.transaction so a
         // DB-level error rolls back ONLY this item, leaving the rest of the
-        // batch committed (the chartAccountId non-null check above is safe to
-        // assert here — TS narrows it inside the closure).
-        const bankGlAccountId = bankAcct.chartAccountId;
+        // batch committed. chartAccountId is guaranteed set by the auto-connect
+        // above, so the assertion is safe here.
+        const bankGlAccountId = bankAcct.chartAccountId!;
         const entry = await db.transaction(async (tx) => {
           const posted = await createCategorizationJournalEntry(
             { organizationId: ctx.organizationId, userId: ctx.userId },
