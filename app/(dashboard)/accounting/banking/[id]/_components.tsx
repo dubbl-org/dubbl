@@ -102,6 +102,10 @@ export interface BankAccountDetail {
   color: string;
   balance: number;
   isActive: boolean;
+  // The ledger account this bank account is recorded under in the books. Set up
+  // automatically; surfaced read-only so users can see the connection exists.
+  chartAccountId?: string | null;
+  chartAccount?: { id: string; name: string; code: string } | null;
 }
 
 export interface ImportPreviewRow {
