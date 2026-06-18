@@ -20,6 +20,7 @@ import {
   assertBaseRateAvailable,
   ensureAccountByCode,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
@@ -70,13 +71,11 @@ export async function POST(
     }
 
     // The reconcile UI keys off journalEntryId, so we can only flip the line to
-    // "reconciled" once we have actually posted the matching GL entry. That
-    // requires the bank account to be linked to a ledger account.
-    if (!account.chartAccountId) {
-      return validationError(
-        "This bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before creating an expense from a transaction."
-      );
-    }
+    // "reconciled" once we have actually posted the matching GL entry — which
+    // requires the bank account to be connected to a ledger account. We connect
+    // it automatically here rather than erroring, so the user never hits a dead
+    // end (older accounts created before auto-linking self-heal on first use).
+    const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
@@ -178,7 +177,7 @@ export async function POST(
       const entry = await createCategorizationJournalEntry(
         { organizationId: ctx.organizationId, userId: ctx.userId },
         {
-          bankGlAccountId: account.chartAccountId!,
+          bankGlAccountId,
           otherAccountId: expenseAccountId!,
           amount: transaction.amount,
           date: transaction.date,

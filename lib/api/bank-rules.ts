@@ -6,6 +6,7 @@ import {
   createCategorizationJournalEntry,
   assertBaseRateAvailable,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 
 interface MatchResult {
   accountId: string | null;
@@ -346,7 +347,13 @@ export async function applyBankRulesToAccount(
       eq(bankAccount.organizationId, organizationId),
       notDeleted(bankAccount.deletedAt),
     ),
-    columns: { id: true, chartAccountId: true, currencyCode: true },
+    columns: {
+      id: true,
+      accountName: true,
+      accountType: true,
+      chartAccountId: true,
+      currencyCode: true,
+    },
   });
   if (!account) return { applied: 0, reconciled: 0, split: 0 };
 
@@ -381,9 +388,15 @@ export async function applyBankRulesToAccount(
     if (!assignment) continue;
 
     // Split actions post journal entries and reconcile the transaction.
-    if (assignment.splitAllocations && account.chartAccountId && userId) {
+    if (assignment.splitAllocations && userId) {
       const currencyCode = txn.currencyCode || account.currencyCode;
       try {
+        // Connect the bank account to its ledger account automatically (older
+        // accounts self-heal on first use); cache on `account` so we link once
+        // per pass rather than per transaction.
+        if (!account.chartAccountId) {
+          account.chartAccountId = await ensureBankLedgerAccount(organizationId, account);
+        }
         // Fail cleanly before any write if the FX rate is missing.
         await assertBaseRateAvailable(organizationId, currencyCode, txn.date);
 

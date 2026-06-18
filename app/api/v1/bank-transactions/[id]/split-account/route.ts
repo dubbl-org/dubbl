@@ -23,6 +23,7 @@ import {
   ensureControlAccount,
   splitGrossTax,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 
 // Split ONE bank transaction across MULTIPLE ledger accounts in a single posting
@@ -83,11 +84,9 @@ export async function POST(
       return NextResponse.json({ error: "Transaction already reconciled" }, { status: 400 });
     }
 
-    if (!account.chartAccountId) {
-      return validationError(
-        "This bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before categorizing transactions."
-      );
-    }
+    // Connect the bank account to its ledger account automatically (older
+    // accounts self-heal on first use) so splitting never hits a dead end.
+    const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
     const body = await request.json();
     const parsed = splitAccountSchema.parse(body);
@@ -152,7 +151,6 @@ export async function POST(
     await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
     const moneyIn = transaction.amount > 0;
-    const bankGlAccountId = account.chartAccountId;
     const reference = transaction.reference || transaction.description;
 
     const { entry } = await db.transaction(async (tx) => {

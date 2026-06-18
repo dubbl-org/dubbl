@@ -22,6 +22,7 @@ import {
   ensureControlAccount,
   createCogsJournalEntry,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 
 /**
  * Post a draft sales receipt (cash sale) to the GL.
@@ -73,15 +74,18 @@ export async function POST(
           eq(bankAccount.organizationId, ctx.organizationId),
           notDeleted(bankAccount.deletedAt)
         ),
-        columns: { chartAccountId: true },
+        columns: {
+          id: true,
+          accountName: true,
+          accountType: true,
+          currencyCode: true,
+          chartAccountId: true,
+        },
       });
       if (!acct) return notFound("Bank account");
-      if (!acct.chartAccountId) {
-        return validationError(
-          "This bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before posting a sales receipt."
-        );
-      }
-      cashAccountId = acct.chartAccountId;
+      // Connect the bank account to its ledger account automatically (older
+      // accounts self-heal on first use) so posting never hits a dead end.
+      cashAccountId = await ensureBankLedgerAccount(ctx.organizationId, acct);
     } else if (found.depositAccountId) {
       const acct = await db.query.chartAccount.findFirst({
         where: and(

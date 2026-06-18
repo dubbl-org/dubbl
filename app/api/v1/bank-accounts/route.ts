@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
@@ -55,21 +56,34 @@ export async function POST(request: Request) {
     await checkResourceLimit(ctx.organizationId, bankAccount, bankAccount.organizationId, "bankAccounts", bankAccount.deletedAt);
     await checkMultiCurrency(ctx.organizationId, parsed.currencyCode);
 
-    const [created] = await db
-      .insert(bankAccount)
-      .values({
-        organizationId: ctx.organizationId,
-        accountName: parsed.accountName,
-        accountNumber: parsed.accountNumber || null,
-        bankName: parsed.bankName || null,
-        currencyCode: parsed.currencyCode,
-        countryCode: parsed.countryCode || null,
-        accountType: parsed.accountType,
-        color: parsed.color,
-        chartAccountId: parsed.chartAccountId || null,
-        balance: parsed.balance,
-      })
-      .returning();
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(bankAccount)
+        .values({
+          organizationId: ctx.organizationId,
+          accountName: parsed.accountName,
+          accountNumber: parsed.accountNumber || null,
+          bankName: parsed.bankName || null,
+          currencyCode: parsed.currencyCode,
+          countryCode: parsed.countryCode || null,
+          accountType: parsed.accountType,
+          color: parsed.color,
+          chartAccountId: parsed.chartAccountId || null,
+          balance: parsed.balance,
+        })
+        .returning();
+
+      // Connect the account to its own ledger account up-front so bank movements
+      // (categorize, create-expense, transfers, reconciliation) can post to the
+      // GL without the user ever having to set this up. A no-op when the caller
+      // already supplied a specific ledger account.
+      await ensureBankLedgerAccount(ctx.organizationId, row, tx);
+
+      const linked = await tx.query.bankAccount.findFirst({
+        where: eq(bankAccount.id, row.id),
+      });
+      return linked ?? row;
+    });
 
     logAudit({ ctx, action: "create", entityType: "bank_account", entityId: created.id, request });
 

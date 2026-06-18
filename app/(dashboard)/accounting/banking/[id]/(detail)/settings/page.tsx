@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencySelect } from "@/components/ui/currency-select";
@@ -27,6 +28,9 @@ export default function BankSettingsPage() {
   const { account, setAccount, refetch } = useBankAccountContext();
   const [saving, setSaving] = useState(false);
   const [bankCurrency, setBankCurrency] = useState(account?.currencyCode || "USD");
+  // Which ledger account this bank account is recorded under. Defaults to the
+  // one connected automatically; the picker lets the user point it elsewhere.
+  const [chartAccountId, setChartAccountId] = useState(account?.chartAccountId ?? "");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -49,6 +53,9 @@ export default function BankSettingsPage() {
           countryCode: fd.get("countryCode") || null,
           accountType: fd.get("accountType") || undefined,
           color: fd.get("color") || undefined,
+          // Only send a connection when one is chosen — never actively unlink
+          // (an empty value just falls back to the automatic connection).
+          ...(chartAccountId ? { chartAccountId } : {}),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -138,6 +145,29 @@ export default function BankSettingsPage() {
               <Label className="text-xs">Country</Label>
               <Input name="countryCode" defaultValue={account.countryCode || ""} placeholder="US" maxLength={2} />
             </div>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+          <div className="shrink-0">
+            <p className="text-sm font-medium">Books connection</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              The account in your books where this bank account&apos;s money is recorded. We set one up automatically &mdash; change it only if you want to use a specific account you already have.
+            </p>
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <AccountPicker
+              value={chartAccountId}
+              onChange={setChartAccountId}
+              typeFilter={["asset", "liability"]}
+              placeholder="Connect to an account in your books…"
+              allowCreate
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Changing this only affects transactions recorded from now on.
+            </p>
           </div>
         </div>
 

@@ -33,6 +33,7 @@ import {
   ensureAccountByCode,
   createCogsJournalEntry,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 /**
@@ -298,14 +299,18 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
               eq(bankAccount.organizationId, ctx.organizationId),
               notDeleted(bankAccount.deletedAt)
             ),
-            columns: { chartAccountId: true },
+            columns: {
+              id: true,
+              accountName: true,
+              accountType: true,
+              currencyCode: true,
+              chartAccountId: true,
+            },
           });
           if (!acct) throw new Error("Bank account not found");
-          if (!acct.chartAccountId)
-            throw new Error(
-              "This bank account isn't linked to a ledger account yet. Set its ledger account before posting."
-            );
-          cashAccountId = acct.chartAccountId;
+          // Connect the bank account to its ledger account automatically (older
+          // accounts self-heal on first use) so posting never dead-ends.
+          cashAccountId = await ensureBankLedgerAccount(ctx.organizationId, acct);
         } else if (depositAccountId) {
           const acct = await db.query.chartAccount.findFirst({
             where: and(
@@ -643,14 +648,18 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
               eq(bankAccount.organizationId, ctx.organizationId),
               notDeleted(bankAccount.deletedAt)
             ),
-            columns: { chartAccountId: true },
+            columns: {
+              id: true,
+              accountName: true,
+              accountType: true,
+              currencyCode: true,
+              chartAccountId: true,
+            },
           });
           if (!acct) throw new Error("Bank account not found");
-          if (!acct.chartAccountId)
-            throw new Error(
-              "This bank account isn't linked to a ledger account yet. Set its ledger account before recording a credit."
-            );
-          cashAccountId = acct.chartAccountId;
+          // Connect the bank account to its ledger account automatically (older
+          // accounts self-heal on first use) so recording a credit never dead-ends.
+          cashAccountId = await ensureBankLedgerAccount(ctx.organizationId, acct);
         } else if (params.depositAccountId) {
           const acct = await db.query.chartAccount.findFirst({
             where: and(

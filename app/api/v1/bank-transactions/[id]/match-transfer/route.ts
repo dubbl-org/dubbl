@@ -19,6 +19,7 @@ import {
   toBaseLines,
   assertBaseRateAvailable,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 
 // Match a statement line to a transfer between the org's OWN bank accounts.
@@ -106,17 +107,10 @@ export async function POST(
     });
     if (!targetAccount) return notFound("Bank account");
 
-    // Both banks must be linked to a ledger account to post the transfer.
-    if (!sourceAccount.chartAccountId) {
-      return validationError(
-        "This bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before matching transfers."
-      );
-    }
-    if (!targetAccount.chartAccountId) {
-      return validationError(
-        "The target bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before matching transfers."
-      );
-    }
+    // Both banks must post to a ledger account. Connect them automatically
+    // (older accounts self-heal on first use) so transfers never hit a dead end.
+    const sourceGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, sourceAccount);
+    const targetGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, targetAccount);
 
     const abs = Math.abs(transaction.amount);
     if (abs === 0) {
@@ -167,11 +161,11 @@ export async function POST(
     // The "in" leg is debited, the "out" leg is credited (both are assets).
     const moneyInToSource = transaction.amount > 0;
     const debitBankAccountId = moneyInToSource
-      ? sourceAccount.chartAccountId
-      : targetAccount.chartAccountId;
+      ? sourceGlAccountId
+      : targetGlAccountId;
     const creditBankAccountId = moneyInToSource
-      ? targetAccount.chartAccountId
-      : sourceAccount.chartAccountId;
+      ? targetGlAccountId
+      : sourceGlAccountId;
 
     // Transfers are booked at the source line's currency/date. Pre-flight the FX
     // rate so a missing rate fails cleanly (422) before any writes.
