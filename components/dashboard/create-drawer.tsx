@@ -2499,12 +2499,15 @@ function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [countryCode, setCountryCode] = useState("");
   const [color, setColor] = useState(BANK_ACCOUNT_COLORS[0]);
+  // Optional: connect to a specific ledger account. Left blank, the account is
+  // connected to its own one automatically.
+  const [chartAccountId, setChartAccountId] = useState("");
 
   useEffect(() => {
     if (!open) {
       setAccountName(""); setBankName(""); setAccountNumber("");
       setAccountType("checking"); setCurrencyCode("USD"); setCountryCode("");
-      setColor(BANK_ACCOUNT_COLORS[0]);
+      setColor(BANK_ACCOUNT_COLORS[0]); setChartAccountId("");
     }
   }, [open]);
 
@@ -2527,6 +2530,7 @@ function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           countryCode: countryCode || null,
           accountType,
           color,
+          ...(chartAccountId ? { chartAccountId } : {}),
         }),
       });
       if (!res.ok) {
@@ -2605,6 +2609,24 @@ function BankAccountDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                   <Label>Country</Label>
                   <Input value={countryCode} onChange={(e) => setCountryCode(e.target.value.toUpperCase())} placeholder="US" maxLength={2} />
                 </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Books connection (optional)</SectionLabel>
+              <div className="space-y-1.5">
+                <AccountPicker
+                  value={chartAccountId}
+                  onChange={setChartAccountId}
+                  typeFilter={["asset", "liability"]}
+                  placeholder="Set up automatically"
+                  allowCreate
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Leave blank and we&apos;ll connect this account to your books automatically. Pick one only if you want to use a specific account you already have.
+                </p>
               </div>
             </div>
 
