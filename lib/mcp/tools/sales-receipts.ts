@@ -1096,12 +1096,20 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
           found.issueDate
         );
 
-        const bankAccount = await findAccountByCode(
-          ctx.organizationId,
-          params.bankAccountCode || "1100"
-        );
-        if (!bankAccount)
-          throw new Error(`Bank account (${params.bankAccountCode || "1100"}) not found`);
+        // With no code given, fall back to the standard checking account,
+        // creating it on demand so recovery never dead-ends. An explicitly
+        // supplied code must already exist (don't fabricate a typo'd account).
+        const bankCode = params.bankAccountCode || "1100";
+        const bankAccount =
+          (await findAccountByCode(ctx.organizationId, bankCode)) ??
+          (!params.bankAccountCode
+            ? await ensureAccountByCode(
+                ctx.organizationId,
+                { code: "1100", name: "Checking Account", type: "asset", subType: "bank" },
+                base
+              )
+            : null);
+        if (!bankAccount) throw new Error(`Bank account (${bankCode}) not found`);
 
         const recoveredAccount = await ensureAccountByCode(
           ctx.organizationId,

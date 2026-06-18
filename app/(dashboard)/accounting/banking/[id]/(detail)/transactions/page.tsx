@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { Clock3, LayoutList, Search, Table2, X } from "lucide-react";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -51,6 +54,11 @@ export default function BankTransactionsPage() {
   const [txDateTo, setTxDateTo] = useState("");
   const [txSort, setTxSort] = useState("date:desc");
 
+  // Batch selection (list view): pick several to-do lines and categorize them at once.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchAccountId, setBatchAccountId] = useState("");
+  const [batchSaving, setBatchSaving] = useState(false);
+
   const txSearchPending = txSearch !== debouncedTxSearch;
 
   const filteredTx = useMemo(() => {
@@ -76,6 +84,89 @@ export default function BankTransactionsPage() {
     });
     return result;
   }, [transactions, statusFilter, debouncedTxSearch, txDateFrom, txDateTo, txSort]);
+
+  // Only unreconciled ("To do") lines can be batch-categorized.
+  const selectableTx = useMemo(
+    () => filteredTx.filter((tx) => tx.status === "unreconciled"),
+    [filteredTx]
+  );
+  const allVisibleSelected =
+    selectableTx.length > 0 && selectableTx.every((tx) => selectedIds.has(tx.id));
+
+  // Drop any selection when the visible set changes, so we never act on hidden lines.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBatchAccountId("");
+  }, [statusFilter, debouncedTxSearch, txDateFrom, txDateTo, viewMode]);
+
+  function toggleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+  function toggleSelectAll(checked: boolean) {
+    setSelectedIds(checked ? new Set(selectableTx.map((tx) => tx.id)) : new Set());
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setBatchAccountId("");
+  }
+
+  async function applyBatchCategorize() {
+    if (!orgId || !batchAccountId || selectedIds.size === 0) return;
+    setBatchSaving(true);
+    try {
+      const items = [...selectedIds].map((transactionId) => ({
+        transactionId,
+        accountId: batchAccountId,
+      }));
+      const res = await fetch("/api/v1/bulk/bank-transactions/categorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ items }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Couldn't categorize");
+      const data = await res.json();
+      const ok = data.summary?.succeeded ?? 0;
+      const failed = data.summary?.failed ?? 0;
+      toast.success(
+        `Categorized ${ok} transaction${ok === 1 ? "" : "s"}${failed ? ` · ${failed} skipped` : ""}`
+      );
+      clearSelection();
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't categorize");
+    } finally {
+      setBatchSaving(false);
+    }
+  }
+
+  async function batchIgnore() {
+    if (!orgId || selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    setBatchSaving(true);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/v1/bank-transactions/${id}/exclude`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+            body: JSON.stringify({}),
+          })
+        )
+      );
+      toast.success(`Ignored ${ids.length} transaction${ids.length === 1 ? "" : "s"}`);
+      clearSelection();
+      refetch();
+    } catch {
+      toast.error("Couldn't ignore some transactions");
+    } finally {
+      setBatchSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -183,6 +274,13 @@ export default function BankTransactionsPage() {
 
       {/* Results summary */}
       <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+        {selectableTx.length > 0 && (
+          <Checkbox
+            checked={allVisibleSelected}
+            onCheckedChange={(c) => toggleSelectAll(c === true)}
+            aria-label="Select all to-do transactions"
+          />
+        )}
         <span className="font-medium text-foreground tabular-nums">{filteredTx.length}</span> transactions
         {statusFilter !== "all" && (
           <>
@@ -193,6 +291,33 @@ export default function BankTransactionsPage() {
           </>
         )}
       </div>
+
+      {/* Batch bar — categorize several to-do lines at once (great for repeat payees) */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <span className="text-border">·</span>
+          <span className="shrink-0 text-xs text-muted-foreground">Categorize all as</span>
+          <div className="w-56">
+            <AccountPicker value={batchAccountId} onChange={setBatchAccountId} allowCreate />
+          </div>
+          <Button
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={!batchAccountId || batchSaving}
+            loading={batchSaving}
+            onClick={applyBatchCategorize}
+          >
+            Apply to {selectedIds.size}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={batchSaving} onClick={batchIgnore}>
+            Ignore
+          </Button>
+          <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={clearSelection}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {txSearchPending ? (
         <BrandLoader className="h-auto py-16" />
@@ -226,6 +351,8 @@ export default function BankTransactionsPage() {
               onMatch={handleOpenMatchUnified}
               onTransfer={handleOpenTransfer}
               onSplit={handleOpenSplit}
+              selected={selectedIds.has(tx.id)}
+              onSelectChange={toggleSelect}
             />
           ))}
         </motion.div>

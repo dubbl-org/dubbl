@@ -8,20 +8,21 @@ import {
   organization,
 } from "@/lib/db/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
+import { ensureAccountByCode } from "@/lib/api/journal-automation";
 
 /**
  * Resolve the org's Retained Earnings account for year-end close. Precedence:
  *  1. organization.retainedEarningsAccountId (explicit setting, must be equity)
  *  2. the first equity account with subType 'retained'
- *  3. account code '3100' (Retained Earnings in the standard chart)
- * Returns null if none found. NOTE: the old code hardcoded '3200', which is
- * "Owner's Drawings" in the chart — a real bug that posted net income to the
- * wrong account.
+ *  3. the standard Retained Earnings account (code '3100'), created on demand so
+ *     year-end close never dead-ends on a chart that's missing it.
+ * NOTE: the old code hardcoded '3200', which is "Owner's Drawings" in the chart
+ * — a real bug that posted net income to the wrong account.
  */
 export async function getRetainedEarningsAccount(organizationId: string) {
   const org = await db.query.organization.findFirst({
     where: eq(organization.id, organizationId),
-    columns: { retainedEarningsAccountId: true },
+    columns: { retainedEarningsAccountId: true, defaultCurrency: true },
   });
   if (org?.retainedEarningsAccountId) {
     const chosen = await db.query.chartAccount.findFirst({
@@ -41,9 +42,13 @@ export async function getRetainedEarningsAccount(organizationId: string) {
     ),
   });
   if (bySubType) return bySubType;
-  return db.query.chartAccount.findFirst({
-    where: and(eq(chartAccount.organizationId, organizationId), eq(chartAccount.code, "3100")),
-  });
+  // Standard Retained Earnings (3100) — find-or-create so the close always has a
+  // correct equity account to post net income to.
+  return ensureAccountByCode(
+    organizationId,
+    { code: "3100", name: "Retained Earnings", type: "equity", subType: "retained" },
+    org?.defaultCurrency ?? "USD"
+  );
 }
 
 async function getNextEntryNumber(organizationId: string) {

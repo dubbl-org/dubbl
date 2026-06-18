@@ -14,6 +14,7 @@ import {
   handleChargeSucceeded,
   handlePayoutPaid,
 } from "@/lib/integrations/stripe/sync";
+import { ensureIntegrationAccountsMapped } from "@/lib/integrations/stripe/accounts";
 import type Stripe from "stripe";
 
 export async function POST(request: Request) {
@@ -39,6 +40,9 @@ export async function POST(request: Request) {
     });
 
     if (!integration) return notFound("Stripe integration");
+
+    // Connect default account mappings if missing so the import never dead-ends.
+    await ensureIntegrationAccountsMapped(integration);
 
     if (!file) {
       return NextResponse.json({ error: "Missing file" }, { status: 400 });

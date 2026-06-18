@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { stripeIntegration } from "@/lib/db/schema";
 import { stripe } from "@/lib/stripe";
-import { suggestStripeAccounts } from "@/lib/integrations/stripe/accounts";
+import { ensureStripeAccounts } from "@/lib/integrations/stripe/accounts";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 
@@ -71,8 +71,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // Suggest default account mappings (user can change in settings)
-    const suggestions = await suggestStripeAccounts(stateData.orgId);
+    // Connect default account mappings automatically (user can change in
+    // settings) so the integration is ready to sync without manual setup.
+    const accounts = await ensureStripeAccounts(stateData.orgId);
 
     // No per-account webhook needed. We use a single platform-level Connect
     // webhook (STRIPE_CONNECT_WEBHOOK_SECRET) that receives events from all
@@ -91,9 +92,9 @@ export async function GET(request: Request) {
         livemode: response.livemode ?? false,
         scope: response.scope ?? null,
         status: "active",
-        clearingAccountId: suggestions.clearingAccountId,
-        revenueAccountId: suggestions.revenueAccountId,
-        feesAccountId: suggestions.feesAccountId,
+        clearingAccountId: accounts.clearingAccountId,
+        revenueAccountId: accounts.revenueAccountId,
+        feesAccountId: accounts.feesAccountId,
         connectedBy: stateData.userId,
       })
       .returning();

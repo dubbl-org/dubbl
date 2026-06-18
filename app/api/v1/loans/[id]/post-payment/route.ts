@@ -12,6 +12,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -64,17 +65,23 @@ export async function POST(
       return validationError("No unposted schedule entries remaining");
     }
 
-    // Determine bank account for credit side
+    // Determine the bank account for the credit side. When one is selected,
+    // connect it to its ledger account automatically (older accounts self-heal)
+    // so posting never dead-ends; only error when no bank account was chosen.
     let creditAccountId: string | null = null;
     if (found.bankAccountId) {
       const bank = await db.query.bankAccount.findFirst({
         where: eq(bankAccount.id, found.bankAccountId),
       });
-      creditAccountId = bank?.chartAccountId || null;
+      if (bank) {
+        creditAccountId = await ensureBankLedgerAccount(ctx.organizationId, bank);
+      }
     }
 
     if (!creditAccountId) {
-      return validationError("Loan has no bank account or bank account has no linked chart account");
+      return validationError(
+        "Select the bank account this loan is repaid from before posting a payment"
+      );
     }
 
     // Create journal entry

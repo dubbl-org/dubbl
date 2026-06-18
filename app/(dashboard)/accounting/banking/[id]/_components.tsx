@@ -12,7 +12,6 @@ import {
   Loader2,
   MoreHorizontal,
   Plus,
-  Receipt,
   Scale,
   Search,
   Split,
@@ -25,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
@@ -320,30 +320,34 @@ export function TransactionRow({
   isLast,
   onReconcile,
   onExclude,
-  onMatchBill,
-  onCreateExpense,
   onCategorize,
-  onMatchInvoice,
   onMatch,
   onTransfer,
   onSplit,
+  selected,
+  onSelectChange,
 }: {
   tx: Transaction;
   cur: string;
   isLast: boolean;
   onReconcile: (id: string) => void;
   onExclude: (id: string) => void;
-  onMatchBill: (tx: Transaction) => void;
-  onCreateExpense: (tx: Transaction) => void;
   onCategorize: (tx: Transaction) => void;
-  onMatchInvoice: (tx: Transaction) => void;
+  // Legacy per-document match/expense entry points — kept optional for callers
+  // that still pass them; the row now routes matching through the unified onMatch.
+  onMatchBill?: (tx: Transaction) => void;
+  onCreateExpense?: (tx: Transaction) => void;
+  onMatchInvoice?: (tx: Transaction) => void;
   // New actions — optional so existing callers keep compiling.
   onMatch?: (tx: Transaction) => void;
   onTransfer?: (tx: Transaction) => void;
   onSplit?: (tx: Transaction) => void;
+  // Batch selection (optional). When provided, an unreconciled row shows a checkbox.
+  selected?: boolean;
+  onSelectChange?: (id: string, checked: boolean) => void;
 }) {
   const isCredit = tx.amount > 0;
-  const isOutgoing = tx.amount < 0;
+  const selectable = !!onSelectChange && tx.status === "unreconciled";
   const [confirmClear, setConfirmClear] = useState(false);
   const derived = deriveTxState(tx);
   const stateMeta = DERIVED_STATE_META[derived];
@@ -354,6 +358,14 @@ export function TransactionRow({
         !isLast && "border-b"
       )}
     >
+      {selectable && (
+        <Checkbox
+          checked={!!selected}
+          onCheckedChange={(c) => onSelectChange?.(tx.id, c === true)}
+          aria-label="Select transaction"
+          className="shrink-0"
+        />
+      )}
       <div className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-lg",
         isCredit ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"
@@ -388,56 +400,57 @@ export function TransactionRow({
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1.5">
           {tx.status === "unreconciled" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                  <MoreHorizontal className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {onMatch && (
-                  <DropdownMenuItem onClick={() => onMatch(tx)} title="Find a matching invoice, bill, or recorded payment and link this line to it">
-                    <Link2 className="mr-2 size-3.5" />Find a match…
-                  </DropdownMenuItem>
-                )}
-                {isOutgoing ? (
-                  <>
-                    <DropdownMenuItem onClick={() => onMatchBill(tx)} title="Link this payment to a bill you owe">
-                      <Receipt className="mr-2 size-3.5" />Match to a bill you owe
+            <>
+              {/* Surfaced primary action — the most common thing to do with a line */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => onCategorize(tx)}
+                title="Choose what this money was for (the category or account it belongs to)"
+              >
+                <Tags className="mr-1.5 size-3.5" />Categorize
+              </Button>
+              {/* Everything else, one level down */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+                    title="More actions"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {onMatch && (
+                    <DropdownMenuItem onClick={() => onMatch(tx)} title="Find a matching invoice, bill, or recorded payment and link this line to it">
+                      <Link2 className="mr-2 size-3.5" />Find a match…
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onCreateExpense(tx)} title="Record this as a business expense">
-                      <FileText className="mr-2 size-3.5" />Record as an expense
+                  )}
+                  {onSplit && (
+                    <DropdownMenuItem onClick={() => onSplit(tx)} title="Divide this one transaction across more than one category">
+                      <Split className="mr-2 size-3.5" />Split across categories
                     </DropdownMenuItem>
-                  </>
-                ) : (
-                  <DropdownMenuItem onClick={() => onMatchInvoice(tx)} title="Link this payment received to an invoice you sent">
-                    <Receipt className="mr-2 size-3.5" />Match to an invoice you sent
+                  )}
+                  {onTransfer && (
+                    <DropdownMenuItem onClick={() => onTransfer(tx)} title="Record this as money moved between your own accounts (not income or expense)">
+                      <ArrowLeftRight className="mr-2 size-3.5" />Record a transfer between accounts
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setConfirmClear(true)} title="Confirms this matches your bank — moves no money and records no bookkeeping">
+                    <CheckCircle className="mr-2 size-3.5" />Mark as cleared
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => onCategorize(tx)} title="Choose what this money was for (the category or account it belongs to)">
-                  <Tags className="mr-2 size-3.5" />Assign to a category{isCredit ? " (loan, owner funds, income…)" : ""}
-                </DropdownMenuItem>
-                {onSplit && (
-                  <DropdownMenuItem onClick={() => onSplit(tx)} title="Divide this one transaction across more than one category">
-                    <Split className="mr-2 size-3.5" />Split across categories
+                  <DropdownMenuItem onClick={() => onExclude(tx.id)} className="text-muted-foreground" title="Hide this line and leave it out of your books">
+                    <XCircle className="mr-2 size-3.5" />Ignore this transaction
                   </DropdownMenuItem>
-                )}
-                {onTransfer && (
-                  <DropdownMenuItem onClick={() => onTransfer(tx)} title="Record this as money moved between your own accounts (not income or expense)">
-                    <ArrowLeftRight className="mr-2 size-3.5" />Record a transfer between accounts
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setConfirmClear(true)} title="Confirms this matches your bank — moves no money and records no bookkeeping">
-                  <CheckCircle className="mr-2 size-3.5" />Mark as cleared
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onExclude(tx.id)} className="text-muted-foreground" title="Hide this line and leave it out of your books">
-                  <XCircle className="mr-2 size-3.5" />Ignore this transaction
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           )}
           {tx.status === "excluded" && (
             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onExclude(tx.id)} title="Bring this transaction back into your books">Stop ignoring</Button>
@@ -473,7 +486,7 @@ export function TransactionRow({
               <p className="font-medium">It does not record what the money was for.</p>
               <p className="mt-1">
                 No money is moved and nothing is added to your books. To record <em>what this was for</em>,
-                use <span className="font-medium">{isOutgoing ? "Match to a bill you owe or Record as an expense" : "Find a match or Assign to a category"}</span> instead.
+                use <span className="font-medium">Categorize or Find a match</span> instead.
                 You can undo this at any time.
               </p>
             </div>
