@@ -90,14 +90,22 @@ export async function POST(
       const amount = body.amount ?? found.total;
       if (amount <= 0) return validationError("Recovery amount must be positive");
 
-      const bankAccount = await findAccountByCode(
-        ctx.organizationId,
-        body.bankAccountCode || "1100"
-      );
+      // Resolve the bank/cash account the recovery lands in. With no code given,
+      // fall back to the standard checking account, creating it on demand so the
+      // recovery never dead-ends. An explicitly-supplied code must already exist
+      // (don't fabricate a wrong account from a typo).
+      const bankCode = body.bankAccountCode || "1100";
+      const bankAccount =
+        (await findAccountByCode(ctx.organizationId, bankCode)) ??
+        (!body.bankAccountCode
+          ? await ensureAccountByCode(
+              ctx.organizationId,
+              { code: "1100", name: "Checking Account", type: "asset", subType: "bank" },
+              base
+            )
+          : null);
       if (!bankAccount) {
-        return validationError(
-          `Bank account (${body.bankAccountCode || "1100"}) not found`
-        );
+        return validationError(`Bank account (${bankCode}) not found`);
       }
       const recoveredAccount = await ensureAccountByCode(
         ctx.organizationId,
