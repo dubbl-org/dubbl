@@ -37,6 +37,7 @@ import {
 import {
   getNextEntryNumber,
   findAccountByCode,
+  ensureAccountByCode,
 } from "@/lib/api/journal-automation";
 import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
 import type { AuthContext } from "@/lib/api/auth-context";
@@ -1002,11 +1003,32 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
           kind.includes("unemployment");
         const liabilityCode = isPayrollTax ? "2235" : "2220";
 
-        const liabilityAccount = await findAccountByCode(ctx.organizationId, liabilityCode);
+        // Connect the payroll liability account on demand — an org that hasn't
+        // run a payroll yet won't have it — so a remittance never dead-ends. The
+        // REST sibling (payroll/tax-payments) does the same; names match the chart.
+        const PAYROLL_LIABILITY_NAMES: Record<string, string> = {
+          "2220": "Income Tax Payable",
+          "2235": "Payroll Taxes Payable",
+          "2245": "Pension & Benefits Payable",
+        };
+        const remittanceSettings = await db.query.payrollSettings.findFirst({
+          where: eq(payrollSettings.organizationId, ctx.organizationId),
+        });
+        const baseCurrency = remittanceSettings?.defaultCurrency ?? "USD";
+        const liabilityAccount =
+          (await findAccountByCode(ctx.organizationId, liabilityCode)) ??
+          (await ensureAccountByCode(
+            ctx.organizationId,
+            {
+              code: liabilityCode,
+              name: PAYROLL_LIABILITY_NAMES[liabilityCode] ?? `Account ${liabilityCode}`,
+              type: "liability",
+              subType: "current",
+            },
+            baseCurrency
+          ));
         if (!liabilityAccount) {
-          throw new Error(
-            `Payroll liability account ${liabilityCode} not found. Run a payroll first to create it.`
-          );
+          throw new Error(`Could not resolve payroll liability account ${liabilityCode}`);
         }
 
         const postingDate = params.date || params.periodEnd;
