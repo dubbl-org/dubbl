@@ -4,9 +4,10 @@ import { bankTransaction, bankAccount, chartAccount, auditLog } from "@/lib/db/s
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound, validationError } from "@/lib/api/response";
+import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createCategorizationJournalEntry, assertBaseRateAvailable } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 
 // Code a bank transaction directly to a ledger account ("Categorize"). This is
@@ -48,11 +49,9 @@ export async function POST(
       return NextResponse.json({ error: "Transaction already reconciled" }, { status: 400 });
     }
 
-    if (!account.chartAccountId) {
-      return validationError(
-        "This bank account isn't linked to a ledger account yet. Set its ledger account in the bank account settings before categorizing transactions."
-      );
-    }
+    // Connect the bank account to its ledger account automatically (older
+    // accounts self-heal on first use) so categorizing never hits a dead end.
+    const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
     const body = await request.json();
     const parsed = categorizeSchema.parse(body);
@@ -75,7 +74,7 @@ export async function POST(
       const entry = await createCategorizationJournalEntry(
         { organizationId: ctx.organizationId, userId: ctx.userId },
         {
-          bankGlAccountId: account.chartAccountId!,
+          bankGlAccountId,
           otherAccountId: parsed.accountId,
           amount: transaction.amount,
           date: transaction.date,
