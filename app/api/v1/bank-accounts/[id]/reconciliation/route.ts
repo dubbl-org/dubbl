@@ -19,6 +19,7 @@ import {
   ensureAccountByCode,
   resolveBaseRate,
 } from "@/lib/api/journal-automation";
+import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
 
 // Reconciliation proof + completion surface for a single bank account.
@@ -322,11 +323,9 @@ async function postAdjustment(
   account: typeof bankAccount.$inferSelect,
   parsed: z.infer<typeof adjustmentSchema>
 ) {
-  if (!account.chartAccountId) {
-    return validationError(
-      "This bank account isn't linked to a ledger account yet. Set its ledger account before posting an adjustment."
-    );
-  }
+  // Connect the bank account to its ledger account automatically (older accounts
+  // self-heal on first use) so posting an adjustment never hits a dead end.
+  const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
   if (parsed.amount === 0) {
     return validationError("Adjustment amount must be non-zero.");
   }
@@ -388,7 +387,7 @@ async function postAdjustment(
     const lines: (typeof journalLine.$inferInsert)[] = [
       {
         journalEntryId: entry.id,
-        accountId: account.chartAccountId!,
+        accountId: bankGlAccountId,
         description,
         debitAmount: moneyIn ? abs : 0,
         creditAmount: moneyIn ? 0 : abs,
