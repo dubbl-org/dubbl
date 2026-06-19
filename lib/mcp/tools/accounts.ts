@@ -30,12 +30,18 @@ import {
 import { eq, and, sql, isNull } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
+import { syncSystemAccounts } from "@/lib/db/system-accounts";
+import {
+  resolveSpecialAccount,
+  SPECIAL_CATEGORY_ROLES,
+  SPECIAL_CATEGORY_RESOLUTION,
+} from "@/lib/banking/special-categories";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerAccountTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "list_accounts",
-    "List all chart of accounts for the organization. Returns account code, name, type (asset/liability/equity/revenue/expense), and active status.",
+    "List all chart of accounts (categories) for the organization. Returns account code, name, type (asset/liability/equity/revenue/expense), active status, and isSystem (true = a built-in default category that can't be renamed or deleted). Built-in defaults come from the code-owned template and are kept continuously in sync, so newly added defaults appear here automatically.",
     {
       type: z
         .enum(["asset", "liability", "equity", "revenue", "expense"])
@@ -49,6 +55,14 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        // Bring the org's built-in default categories up to date with the
+        // code-owned template before listing (best-effort).
+        try {
+          await syncSystemAccounts(ctx.organizationId);
+        } catch {
+          // non-fatal
+        }
+
         const conditions = [
           eq(chartAccount.organizationId, ctx.organizationId),
           isNull(chartAccount.deletedAt),
@@ -200,7 +214,7 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_account",
-    "Update an existing account. Code, name, sub-type, active status, description, default tax rate, reporting code, and tax-disallowed percentage can be changed. Account type cannot be changed after creation. System control accounts (AR/AP/bank/tax/retained earnings) cannot be retyped or deleted.",
+    "Update an existing account (category). Sub-type, active status, description, default tax rate, reporting code, and tax-disallowed percentage can be changed; code and name can be changed only for custom accounts. Account type cannot be changed after creation. Built-in/system categories (isSystem = true) cannot be renamed, recoded, retyped, or deleted — create a custom account instead.",
     {
       accountId: z.string().describe("The UUID of the account to update"),
       code: z.string().optional().describe("New account code"),
@@ -243,6 +257,17 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
           ),
         });
         if (!existing) throw new Error("Account not found");
+
+        // Built-in/system categories are locked: their identity (name/code)
+        // can't be changed. Usage settings stay editable.
+        if (existing.isSystem) {
+          if (updates.name !== undefined && updates.name !== existing.name) {
+            throw new Error("Cannot rename a built-in category — create a custom account instead");
+          }
+          if (updates.code !== undefined && updates.code !== existing.code) {
+            throw new Error("Cannot recode a built-in category — create a custom account instead");
+          }
+        }
 
         // Validate the default tax rate belongs to this org (if supplied).
         if (updates.defaultTaxRateId) {
@@ -537,6 +562,51 @@ export function registerAccountTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { success: true, sourceAccountId, targetAccountId };
+      })
+  );
+
+  server.tool(
+    "get_special_category_account",
+    "Resolve a plain-language money-movement behavior to the org's correct chart account, so you can then categorize a bank transaction to it. Built-in categories are ensured first (added if missing), so this works for any org/country even when the localized account code differs. Roles: owner_director_loan (money the owner/director lends the business, in or repaid — a liability; interest is always separate, so a 0% loan needs no interest line), capital_introduced (money the owner puts in — equity), owner_drawings (money the owner takes out — equity, never an expense), dividends_paid (company profit distribution — equity), reimbursements_payable (repay someone for a business cost they paid — clears the liability), tax_payable (pay the tax office; clears the VAT/sales-tax liability), suspense (park a line to sort later). Returns the account { id, code, name, type }. This only records money on the right account; it does not enforce country tax rules.",
+    {
+      role: z
+        .enum(SPECIAL_CATEGORY_ROLES as [string, ...string[]])
+        .describe("The money-movement behavior to resolve to an account"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        // Ensure the built-in categories exist for this org first.
+        try {
+          await syncSystemAccounts(ctx.organizationId);
+        } catch {
+          // non-fatal: resolve against whatever exists
+        }
+
+        const accounts = await db.query.chartAccount.findMany({
+          where: and(
+            eq(chartAccount.organizationId, ctx.organizationId),
+            isNull(chartAccount.deletedAt)
+          ),
+          orderBy: chartAccount.code,
+        });
+
+        const role = params.role as keyof typeof SPECIAL_CATEGORY_RESOLUTION;
+        const match = resolveSpecialAccount(role, accounts);
+        if (!match) {
+          throw new Error(
+            `No '${SPECIAL_CATEGORY_RESOLUTION[role].label}' account exists for this organization`
+          );
+        }
+
+        return {
+          role,
+          account: {
+            id: match.id,
+            code: match.code,
+            name: match.name,
+            type: match.type,
+          },
+        };
       })
   );
 }

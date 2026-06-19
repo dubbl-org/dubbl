@@ -19,6 +19,7 @@ interface AccountDetail {
   description?: string | null;
   currencyCode?: string;
   isActive?: boolean;
+  isSystem?: boolean;
   totalDebits?: number;
   totalCredits?: number;
   entryCount?: number;

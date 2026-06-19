@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Plus, Search, X } from "lucide-react";
+import { ChevronRight, Lock, Plus, Search, X } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ interface Account {
   isActive: boolean;
   description: string | null;
   currencyCode: string;
+  isSystem: boolean;
 }
 
 const TYPE_META: Record<string, { dot: string; bg: string; text: string; border: string }> = {
@@ -326,7 +327,15 @@ export default function AccountsPage() {
                     >
                       <span className="font-mono text-xs text-muted-foreground w-14 shrink-0">{account.code}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{account.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{account.name}</p>
+                          {account.isSystem && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                              <Lock className="size-2.5" />
+                              Built-in
+                            </span>
+                          )}
+                        </div>
                         {account.description && (
                           <p className="text-xs text-muted-foreground truncate">{account.description}</p>
                         )}

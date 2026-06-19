@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { chartAccount, journalLine, journalEntry, taxRate } from "@/lib/db/schema";
-import { eq, and, ilike, gte, lte, asc, desc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { logAudit, diffChanges } from "@/lib/api/audit";
@@ -156,19 +156,30 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // System control accounts (AR/AP/bank/tax/retained earnings) cannot be
-    // retyped. `type` is not part of updateSchema so it can never be changed
-    // here, but guard explicitly in case a `type` field is sent (E8a).
-    if (
-      existing.isSystem &&
-      "type" in body &&
-      body.type !== undefined &&
-      body.type !== existing.type
-    ) {
-      return NextResponse.json(
-        { error: "Cannot change the type of a system account" },
-        { status: 422 }
-      );
+    // System categories come from the code-owned default template and are
+    // locked: their identity (name / code / type) can't be changed. Usage
+    // settings (active/inactive, default tax rate, disallowed %, description,
+    // reporting code) stay editable. `type` isn't in updateSchema, but guard it
+    // explicitly in case a `type` field is sent (E8a).
+    if (existing.isSystem) {
+      const changingType =
+        "type" in body && body.type !== undefined && body.type !== existing.type;
+      const changingName =
+        parsed.name !== undefined && parsed.name !== existing.name;
+      const changingCode =
+        parsed.code !== undefined && parsed.code !== existing.code;
+      if (changingType) {
+        return NextResponse.json(
+          { error: "Cannot change the type of a system account" },
+          { status: 422 }
+        );
+      }
+      if (changingName || changingCode) {
+        return NextResponse.json(
+          { error: "This is a built-in category, so its name and code can't be changed. Create your own category instead." },
+          { status: 422 }
+        );
+      }
     }
 
     // Validate the default tax rate belongs to this org (if supplied) (E7).
@@ -228,11 +239,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // System control accounts (AR/AP/bank/tax/retained earnings) cannot be
-    // deleted (E8a).
+    // Built-in categories from the default template can't be deleted (E8a).
+    // Users can hide one they don't use by marking it inactive instead.
     if (existing.isSystem) {
       return NextResponse.json(
-        { error: "Cannot delete a system account" },
+        { error: "This is a built-in category, so it can't be deleted. Mark it inactive to hide it instead." },
         { status: 422 }
       );
     }

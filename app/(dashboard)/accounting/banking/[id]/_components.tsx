@@ -62,6 +62,11 @@ import { formatMoney, centsToDecimal } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
+import {
+  resolveSpecialAccount,
+  type ResolvableAccount as SpecialResolvableAccount,
+  type SpecialCategoryRole,
+} from "@/lib/banking/special-categories";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1135,12 +1140,18 @@ export function CategorizeSheet({
   currencyCode,
   orgId,
   onCategorized,
+  onSwitchToTransfer,
+  onSwitchToSplit,
 }: {
   transaction: Transaction | null;
   onClose: () => void;
   currencyCode: string;
   orgId: string | null;
   onCategorized: () => void;
+  /** Hand off to the "move money between my accounts" flow. */
+  onSwitchToTransfer?: (transaction: Transaction) => void;
+  /** Hand off to the "split one line across accounts" flow (e.g. loan repayment). */
+  onSwitchToSplit?: (transaction: Transaction) => void;
 }) {
   const [accountId, setAccountId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -1148,6 +1159,12 @@ export function CategorizeSheet({
   const [taxRateId, setTaxRateId] = useState("none");
   const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
   const [saving, setSaving] = useState(false);
+  // Quick-choice ("what was this?") state.
+  const [accounts, setAccounts] = useState<SpecialResolvableAccount[]>([]);
+  const [isCompany, setIsCompany] = useState(false);
+  const [choice, setChoice] = useState<string>("");
+  const [pickerType, setPickerType] = useState<string[] | undefined>(undefined);
+  const [choiceHint, setChoiceHint] = useState<string>("");
 
   const isCredit = (transaction?.amount ?? 0) > 0;
 
@@ -1157,8 +1174,30 @@ export function CategorizeSheet({
       setContactId("");
       setMemo("");
       setTaxRateId("none");
+      setChoice("");
+      setPickerType(undefined);
+      setChoiceHint("");
     }
   }, [transaction]);
+
+  // Load the org's accounts (also triggers the built-in category sync) and
+  // whether it's an incorporated company, so the quick choices can resolve to
+  // the right account behind the scenes.
+  useEffect(() => {
+    if (!transaction || !orgId) return;
+    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.accounts) setAccounts(data.accounts); })
+      .catch(() => {});
+    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        const o = data?.organization ?? data ?? {};
+        const t = `${o.legalEntityType ?? ""} ${o.businessType ?? ""}`.toLowerCase();
+        setIsCompany(/ltd|limited|corp|\binc\b|company|gmbh|\bab\b|plc|llc|\boy\b|\bbv\b|sarl|srl|\bsa\b|\bag\b/.test(t));
+      })
+      .catch(() => {});
+  }, [transaction, orgId]);
 
   useEffect(() => {
     if (!transaction || !orgId || taxRates.length > 0) return;
@@ -1173,6 +1212,86 @@ export function CategorizeSheet({
     () => (selectedTax && transaction ? splitTaxPreview(Math.abs(transaction.amount), selectedTax, isCredit) : null),
     [selectedTax, transaction, isCredit]
   );
+
+  // Plain-language "what was this?" quick choices. Each one either pre-picks the
+  // right account (resolved per org so it works in every country), filters the
+  // category list to the relevant type, or hands off to the transfer / split
+  // flow. The double entry still follows from the sign of the amount, so the
+  // same generic categorize endpoint posts all of them correctly.
+  const quickChoices = useMemo(() => {
+    const resolve = (role: SpecialCategoryRole) => resolveSpecialAccount(role, accounts);
+    const ownerLoan = resolve("owner_director_loan");
+    const capital = resolve("capital_introduced");
+    const drawings = resolve("owner_drawings");
+    const reimburse = resolve("reimbursements_payable");
+    const taxPayable = resolve("tax_payable");
+
+    const canonical = (
+      key: string,
+      label: string,
+      account: SpecialResolvableAccount | null,
+      opts?: { memo?: string; hint?: string },
+    ) =>
+      account
+        ? [{
+            key,
+            label,
+            onSelect: () => {
+              setAccountId(account.id);
+              setChoice(key);
+              setPickerType(undefined);
+              setChoiceHint(opts?.hint ?? `Goes to "${account.code} — ${account.name}".`);
+              if (opts?.memo) setMemo((m) => m || opts.memo!);
+            },
+          }]
+        : [];
+
+    const guided = (key: string, label: string, types: string[], hint: string) => [{
+      key,
+      label,
+      onSelect: () => {
+        setChoice(key);
+        setPickerType(types);
+        setAccountId("");
+        setChoiceHint(hint);
+      },
+    }];
+
+    const handoff = (
+      key: string,
+      label: string,
+      cb: ((t: Transaction) => void) | undefined,
+    ) =>
+      cb && transaction
+        ? [{ key, label, onSelect: () => cb(transaction) }]
+        : [];
+
+    if (isCredit) {
+      return [
+        ...guided("sale", "A sale / income", ["revenue"], "Pick the income account this sale belongs to."),
+        ...canonical("capital_in", "Money you put in", capital, { hint: "Recorded as money the owner put in (equity) — kept off your profit." }),
+        ...canonical("loan_in", "Director's / owner's loan in", ownerLoan, { memo: "Director's loan", hint: "Recorded as a loan the business owes you (a liability). 0% is fine — no interest needed." }),
+        ...guided("refund_in", "Refund of a business cost", ["expense"], "Pick the cost it refunds — this reduces that expense, not income."),
+        ...handoff("transfer", "Moved between my accounts", onSwitchToTransfer),
+      ];
+    }
+
+    return [
+      ...guided("cost", "A business cost", ["expense"], "Pick the expense category this cost belongs to."),
+      ...canonical("drawings", "Money you took out", drawings, { hint: "Recorded as drawings (equity) — never an expense." }),
+      ...canonical("loan_repaid", "Director's / owner's loan repaid", ownerLoan, { memo: "Director's loan", hint: "Reduces the loan the business owes you (a liability)." }),
+      ...canonical(
+        "personal",
+        "Personal — not business",
+        isCompany ? ownerLoan : drawings,
+        { hint: isCompany ? "Recorded against the director's loan — it's your money, not a company cost." : "Recorded as drawings — it's your money, not a business cost." },
+      ),
+      ...canonical("tax", "Paid the tax office", taxPayable, { hint: "Clears the VAT / sales-tax you owe — not an expense." }),
+      ...canonical("reimburse", "Repaid someone for a business cost", reimburse, { hint: "Clears what you owed them — the original cost is the expense, not this." }),
+      ...handoff("loan_split", "Loan repayment (split interest)", onSwitchToSplit),
+      ...handoff("transfer", "Moved between my accounts", onSwitchToTransfer),
+    ];
+  }, [accounts, isCredit, isCompany, transaction, onSwitchToTransfer, onSwitchToSplit]);
 
   async function handleSave() {
     if (!orgId || !transaction) return;
@@ -1223,26 +1342,42 @@ export function CategorizeSheet({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Category</Label>
-            <AccountPicker value={accountId} onChange={setAccountId} placeholder="Search every category…" allowCreate />
-            <div className="rounded-lg border bg-muted/20 p-3 text-[11px] text-muted-foreground space-y-1">
-              {isCredit ? (
-                <>
-                  <p className="font-medium text-foreground">Money in — common choices:</p>
-                  <p>• A sale / normal trade → an <span className="font-medium">Income</span> account</p>
-                  <p>• A loan you received (incl. your own personal / director&apos;s loan) → a <span className="font-medium">Liability</span> account (e.g. Short-Term Loans)</p>
-                  <p>• Your own money put into the business → an <span className="font-medium">Equity</span> account (e.g. Owner&apos;s Equity)</p>
-                  <p>• Moving money in from another of your accounts → that account&apos;s <span className="font-medium">bank / asset</span> account</p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium text-foreground">Money out — common choices:</p>
-                  <p>• A running cost → an <span className="font-medium">Expense</span> account (e.g. Bank Fees &amp; Charges)</p>
-                  <p>• Repaying a loan → the <span className="font-medium">Liability</span> account for that loan</p>
-                  <p>• Taking money out for yourself → an <span className="font-medium">Equity</span> account (Owner&apos;s Drawings)</p>
-                  <p>• Moving money to another of your accounts → that account&apos;s <span className="font-medium">bank / asset</span> account</p>
-                </>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">What was this?</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {quickChoices.map((c) => (
+                  <Button
+                    key={c.key}
+                    type="button"
+                    size="sm"
+                    variant={choice === c.key ? "default" : "outline"}
+                    className={cn(
+                      "h-7 rounded-full px-3 text-xs font-normal",
+                      choice === c.key && "bg-emerald-600 hover:bg-emerald-700"
+                    )}
+                    onClick={c.onSelect}
+                  >
+                    {c.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Pick the closest match — or search the full list below. We post it to the right account for you.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Category</Label>
+              <AccountPicker
+                value={accountId}
+                onChange={(v) => { setAccountId(v); setChoice(""); }}
+                typeFilter={pickerType}
+                placeholder="Search every category…"
+                allowCreate
+              />
+              {choiceHint && (
+                <p className="text-[11px] text-muted-foreground">{choiceHint}</p>
               )}
             </div>
           </div>

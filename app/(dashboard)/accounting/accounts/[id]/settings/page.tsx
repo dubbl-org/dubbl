@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,23 +33,33 @@ export default function AccountSettingsPage() {
   if (!account) return null;
 
   const cur = account.currencyCode || "USD";
+  const isSystem = account.isSystem === true;
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!orgId) return;
     setSaving(true);
     const fd = new FormData(e.currentTarget);
-    try {
-      const res = await fetch(`/api/v1/accounts/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
+    // Built-in categories have their name/code locked (the inputs are disabled,
+    // so they aren't in the form data) — only send the editable usage fields.
+    const payload = isSystem
+      ? {
+          subType: fd.get("subType") || null,
+          description: fd.get("description") || null,
+          isActive: fd.get("isActive") === "true",
+        }
+      : {
           code: fd.get("code"),
           name: fd.get("name"),
           subType: fd.get("subType") || null,
           description: fd.get("description") || null,
           isActive: fd.get("isActive") === "true",
-        }),
+        };
+    try {
+      const res = await fetch(`/api/v1/accounts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
@@ -117,22 +128,37 @@ export default function AccountSettingsPage() {
   return (
     <>
       <form onSubmit={handleSave} className="space-y-10">
+        {isSystem && (
+          <div className="flex items-start gap-2.5 rounded-md border border-border bg-muted/40 px-4 py-3">
+            <Lock className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              This is a <span className="font-medium text-foreground">built-in category</span>. It&apos;s kept up to date for you,
+              so its name and code can&apos;t be changed and it can&apos;t be deleted. You can still hide it (mark it inactive) or
+              set its tax defaults. Need something different? <span className="font-medium text-foreground">Create your own category</span> instead.
+            </p>
+          </div>
+        )}
+
         {/* General */}
         <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
           <div className="shrink-0">
             <p className="text-sm font-medium">General</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">Account name, code, and description.</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              {isSystem ? "Description for this built-in category. Name and code are fixed." : "Account name, code, and description."}
+            </p>
           </div>
           <div className="min-w-0 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Account Code</Label>
-                <Input name="code" required defaultValue={account.code} className="font-mono" />
-                <p className="text-[11px] text-muted-foreground">Changing the code won&apos;t affect existing journal entries.</p>
+                <Input name="code" required defaultValue={account.code} className="font-mono" readOnly={isSystem} disabled={isSystem} />
+                <p className="text-[11px] text-muted-foreground">
+                  {isSystem ? "Built-in category codes are fixed." : "Changing the code won’t affect existing journal entries."}
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Account Name</Label>
-                <Input name="name" required defaultValue={account.name} />
+                <Input name="name" required defaultValue={account.name} readOnly={isSystem} disabled={isSystem} />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -224,13 +250,23 @@ export default function AccountSettingsPage() {
               </Button>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
-              <div>
-                <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete account</p>
-                <p className="text-[12px] text-muted-foreground">Accounts with existing transactions cannot be deleted.</p>
+            {isSystem ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">Delete account</p>
+                  <p className="text-[12px] text-muted-foreground">Built-in categories can&apos;t be deleted. Mark it inactive above to hide it.</p>
+                </div>
+                <Button variant="outline" size="sm" type="button" disabled>Delete</Button>
               </div>
-              <Button variant="destructive" size="sm" type="button" onClick={handleDelete}>Delete</Button>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
+                <div>
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete account</p>
+                  <p className="text-[12px] text-muted-foreground">Accounts with existing transactions cannot be deleted.</p>
+                </div>
+                <Button variant="destructive" size="sm" type="button" onClick={handleDelete}>Delete</Button>
+              </div>
+            )}
           </div>
         </div>
       </form>

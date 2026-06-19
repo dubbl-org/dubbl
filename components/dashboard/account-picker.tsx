@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { Check, ChevronsUpDown, Loader2, Plus, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -165,13 +166,13 @@ export function AccountPicker({
             <>
               <CommandSeparator />
               <div className="p-1">
-                <a
-                  href="/settings/chart-of-accounts"
+                <Link
+                  href="/accounting/accounts"
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
                   <Plus className="size-4 text-muted-foreground" />
                   Manage chart of accounts
-                </a>
+                </Link>
               </div>
             </>
           )}
