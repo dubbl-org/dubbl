@@ -1,36 +1,22 @@
-import { db } from "./index";
-import { chartAccount } from "./schema";
-import { eq, sql } from "drizzle-orm";
-import { getAccountsForCountry, GENERIC_ACCOUNTS } from "./chart-templates";
+import { GENERIC_ACCOUNTS } from "./chart-templates";
+import { syncSystemAccounts } from "./system-accounts";
 
 /** @deprecated Use getAccountsForCountry() for country-specific templates */
 export const DEFAULT_ACCOUNTS = GENERIC_ACCOUNTS;
 
+/**
+ * Seeds an org's default categories from the code-owned template.
+ *
+ * Delegates to {@link syncSystemAccounts}, which is idempotent: it adds any
+ * template categories the org is missing (as locked system categories) and
+ * never duplicates existing ones. Safe to call repeatedly — the same sync also
+ * runs continuously on the accounts list endpoint, so later additions to the
+ * template propagate to every existing org automatically.
+ */
 export async function seedDefaultAccounts(
   orgId: string,
   currencyCode: string,
   countryCode?: string,
 ) {
-  const existing = await db
-    .select({ count: sql<number>`count(*)`.mapWith(Number) })
-    .from(chartAccount)
-    .where(eq(chartAccount.organizationId, orgId));
-
-  if ((existing[0]?.count || 0) > 0) return;
-
-  const accounts = getAccountsForCountry(countryCode || "");
-
-  await db
-    .insert(chartAccount)
-    .values(
-      accounts.map((a) => ({
-        organizationId: orgId,
-        code: a.code,
-        name: a.name,
-        type: a.type,
-        subType: a.subType,
-        currencyCode: currencyCode,
-      }))
-    )
-    .onConflictDoNothing();
+  await syncSystemAccounts(orgId, { currencyCode, countryCode });
 }

@@ -5,6 +5,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
+import { syncSystemAccounts } from "@/lib/db/system-accounts";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
@@ -46,6 +47,15 @@ async function isTaxRateInOrg(
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+
+    // Keep the org's default categories continuously in sync with the
+    // code-owned template: any default added in code shows up here for every
+    // org automatically. Best-effort — never let a sync hiccup break the list.
+    try {
+      await syncSystemAccounts(ctx.organizationId);
+    } catch {
+      // non-fatal: fall through and return whatever the org already has
+    }
 
     const accounts = await db.query.chartAccount.findMany({
       where: and(

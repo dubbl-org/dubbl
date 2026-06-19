@@ -589,6 +589,8 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         currencyCode={cur}
         orgId={orgId}
         onCategorized={() => { setCategorizeTx(null); fetchData(); }}
+        onSwitchToTransfer={(t) => { setCategorizeTx(null); setTransferTx(t); }}
+        onSwitchToSplit={(t) => { setCategorizeTx(null); setSplitTx(t); }}
       />
 
       {/* Find & Match Sheet (invoices, bills, existing payments/journals, transfers) */}
