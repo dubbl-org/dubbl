@@ -176,6 +176,22 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         });
         const primary = perDate[0];
 
+        // Current-year (un-closed) earnings as at each date, so the sheet
+        // balances (Assets = Liabilities + Equity) inside the open year.
+        const plPerDate = await Promise.all(
+          allDates.map((date) =>
+            aggregateAsAt(ctx.organizationId, date, {
+              accountTypes: ["revenue", "expense"],
+            })
+          )
+        );
+        const earningsByDate = plPerDate.map((accts) =>
+          accts.reduce(
+            (s, a) => s + (a.type === "revenue" ? a.balance : -a.balance),
+            0
+          )
+        );
+
         function buildSection(type: AccountAggregate["type"]) {
           const accountsOfType = primary.filter((a) => a.type === type);
           const accts = accountsOfType.map((a) => {
@@ -208,12 +224,39 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
           };
         }
 
+        const equity = buildSection("equity");
+        // Add Current Year Earnings to equity (accounts + totals).
+        if (earningsByDate.some((v) => v !== 0)) {
+          equity.accounts.push({
+            accountId: "current-year-earnings",
+            code: "",
+            name: "Current Year Earnings",
+            balance: centsToDecimal(earningsByDate[0]),
+            ...(hasComparatives
+              ? { balances: earningsByDate.map((b) => centsToDecimal(b)) }
+              : {}),
+          });
+          const newTotals = allDates.map(
+            (_, i) =>
+              earningsByDate[i] +
+              (byDate[i]
+                ? primary
+                    .filter((a) => a.type === "equity")
+                    .reduce((s, a) => s + (byDate[i].get(a.accountId)?.balance ?? 0), 0)
+                : 0)
+          );
+          equity.total = centsToDecimal(newTotals[0]);
+          if (hasComparatives) {
+            equity.totals = newTotals.map((t) => centsToDecimal(t));
+          }
+        }
+
         return {
           asAt,
           ...(hasComparatives ? { dates: allDates, compareDates } : {}),
           assets: buildSection("asset"),
           liabilities: buildSection("liability"),
-          equity: buildSection("equity"),
+          equity,
         };
       })
   );
