@@ -6,7 +6,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { reverseJournalEntry } from "@/lib/api/journal-automation";
 import { recordInventoryIssue, type ValuedItem } from "@/lib/api/inventory-valuation";
@@ -168,7 +168,7 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
           const discountPercent = l.discountPercent ?? 0;
-          const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+          const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, params.currencyCode);
           const discountAmount = discountPercent ? Math.round(grossAmount * discountPercent / 10000) : 0;
           const amount = grossAmount - discountAmount;
           subtotal += amount;
@@ -177,7 +177,7 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
           return {
             description: l.description,
             quantity: Math.round(l.quantity * 100),
-            unitPrice: decimalToCents(l.unitPrice),
+            unitPrice: decimalToMinorUnits(l.unitPrice, params.currencyCode),
             accountId: l.accountId ?? null,
             taxRateId,
             discountPercent,

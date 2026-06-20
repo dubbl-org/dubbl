@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     // Calculate total from items
     let totalAmount = 0;
     const processedItems = parsed.items.map((item, i) => {
-      const amount = decimalToCents(item.amount);
+      const amount = decimalToMinorUnits(item.amount, parsed.currencyCode);
       totalAmount += amount;
       return {
         date: item.date,

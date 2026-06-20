@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { z } from "zod";
 
 const itemSchema = z.object({
@@ -94,7 +94,7 @@ export async function PATCH(
     if (parsed.items) {
       let totalAmount = 0;
       const processedItems = parsed.items.map((item, i) => {
-        const amount = decimalToCents(item.amount);
+        const amount = decimalToMinorUnits(item.amount, existing.currencyCode);
         totalAmount += amount;
         return {
           expenseClaimId: id,

@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -88,13 +88,13 @@ export async function PATCH(
     if (parsed.lines) {
       let subtotal = 0;
       const processedLines = parsed.lines.map((l, i) => {
-        const amount = decimalToCents(l.quantity * l.unitPrice);
+        const amount = decimalToMinorUnits(l.quantity * l.unitPrice, existing.currencyCode);
         subtotal += amount;
         return {
           purchaseOrderId: id,
           description: l.description,
           quantity: Math.round(l.quantity * 100),
-          unitPrice: decimalToCents(l.unitPrice),
+          unitPrice: decimalToMinorUnits(l.unitPrice, existing.currencyCode),
           accountId: l.accountId || null,
           taxRateId: l.taxRateId || null,
           taxAmount: 0,

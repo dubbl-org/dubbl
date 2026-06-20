@@ -8,7 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     const unitPricesCents = await Promise.all(
       parsed.lines.map(async (l) => {
         // Explicit price always wins (caller override).
-        if (l.unitPrice !== undefined) return decimalToCents(l.unitPrice);
+        if (l.unitPrice !== undefined) return decimalToMinorUnits(l.unitPrice, parsed.currencyCode);
         if (l.inventoryItemId) {
           const listId = l.priceListId || parsed.priceListId || null;
           if (listId) {

@@ -20,7 +20,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents, formatMoney } from "@/lib/money";
+import { decimalToMinorUnits, formatMoney } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { wrapTool } from "@/lib/mcp/errors";
@@ -223,7 +223,7 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
 
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
-          const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+          const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, params.currencyCode);
           const discountAmount = l.discountPercent
             ? Math.round((grossAmount * l.discountPercent) / 10000)
             : 0;
@@ -236,7 +236,7 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
           return {
             description: l.description,
             quantity: Math.round(l.quantity * 100),
-            unitPrice: decimalToCents(l.unitPrice),
+            unitPrice: decimalToMinorUnits(l.unitPrice, params.currencyCode),
             accountId: l.accountId ?? null,
             taxRateId,
             taxAmount,
