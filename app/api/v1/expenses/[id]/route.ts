@@ -76,9 +76,13 @@ export async function PATCH(
     });
 
     if (!existing) return notFound("Expense claim");
-    if (existing.status !== "draft") {
+    // Editable while nothing has hit the ledger: a draft, or a rejected claim
+    // being fixed before resubmission. A claim awaiting approval is recalled to
+    // draft first (see the recall route); approved/paid claims are in the books
+    // and must be unwound before they can change.
+    if (!["draft", "rejected"].includes(existing.status)) {
       return NextResponse.json(
-        { error: "Only draft expense claims can be edited" },
+        { error: "This claim can't be edited right now. Recall it to a draft first (or, if it's approved/paid, undo that)." },
         { status: 400 }
       );
     }
@@ -162,9 +166,11 @@ export async function DELETE(
     });
 
     if (!existing) return notFound("Expense claim");
-    if (existing.status !== "draft") {
+    // A claim that never reached the ledger can be deleted; approved/paid
+    // claims are in the books and must be unwound first.
+    if (!["draft", "rejected"].includes(existing.status)) {
       return NextResponse.json(
-        { error: "Only draft expense claims can be deleted" },
+        { error: "Only draft or rejected expense claims can be deleted" },
         { status: 400 }
       );
     }

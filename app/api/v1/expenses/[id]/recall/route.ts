@@ -8,6 +8,9 @@ import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 
+// Recall a claim that's awaiting approval back to draft so it can be edited.
+// Only "submitted" claims qualify — they haven't been approved, so nothing has
+// been posted to the ledger and pulling it back is a no-op accounting-wise.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -26,12 +29,9 @@ export async function POST(
     });
 
     if (!found) return notFound("Expense claim");
-    // A fresh draft is submitted; a rejected claim that's been corrected is
-    // re-submitted (clearing the previous rejection so it returns to the
-    // approval queue clean).
-    if (found.status !== "draft" && found.status !== "rejected") {
+    if (found.status !== "submitted") {
       return NextResponse.json(
-        { error: "Only draft or rejected expense claims can be submitted" },
+        { error: "Only a claim that's awaiting approval can be recalled" },
         { status: 400 }
       );
     }
@@ -39,16 +39,14 @@ export async function POST(
     const [updated] = await db
       .update(expenseClaim)
       .set({
-        status: "submitted",
-        submittedAt: new Date(),
-        rejectedAt: null,
-        rejectionReason: null,
+        status: "draft",
+        submittedAt: null,
         updatedAt: new Date(),
       })
       .where(eq(expenseClaim.id, id))
       .returning();
 
-    logAudit({ ctx, action: "submit", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
+    logAudit({ ctx, action: "recall", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
 
     return NextResponse.json({ expenseClaim: updated });
   } catch (err) {

@@ -17,6 +17,7 @@ import {
   Download,
   Loader2,
   Receipt,
+  Undo2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -488,6 +489,22 @@ export default function ExpenseDetailPage() {
     }
   }
 
+  async function handleRecall() {
+    if (!orgId) return;
+    const res = await fetch(`/api/v1/expenses/${id}/recall`, {
+      method: "POST",
+      headers: { "x-organization-id": orgId },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      toast.success("Pulled back to draft — you can edit it now");
+    } else {
+      const data = await res.json();
+      toast.error(typeof data.error === "string" ? data.error : "Failed to recall");
+    }
+  }
+
   async function handleApprove() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/expenses/${id}/approve`, {
@@ -617,6 +634,9 @@ export default function ExpenseDetailPage() {
             )}
             {claim.status === "submitted" && (
               <>
+                <Button variant="outline" size="sm" onClick={handleRecall} title="Pull this back to a draft so you can change it">
+                  <Undo2 className="mr-2 size-3.5" />Recall to edit
+                </Button>
                 <Button size="sm" onClick={handleApprove} className="bg-emerald-600 hover:bg-emerald-700">
                   <Check className="mr-2 size-3.5" />Approve
                 </Button>
@@ -661,6 +681,19 @@ export default function ExpenseDetailPage() {
                   </div>
                 </DialogContent>
               </Dialog>
+            )}
+            {claim.status === "rejected" && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="mr-2 size-3.5" />Edit
+                </Button>
+                <Button size="sm" onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700" title="Send it back for approval after fixing it">
+                  <Send className="mr-2 size-3.5" />Resubmit
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600 hover:text-red-700">
+                  <Trash2 className="mr-2 size-3.5" />Delete
+                </Button>
+              </>
             )}
           </div>
         </div>
