@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import {
   getNextEntryNumber,
   ensureAccountByCode,
@@ -71,6 +72,9 @@ export async function POST(
 
     const body = await request.json();
     const parsed = impairSchema.parse(body);
+
+    // Impairment posts GL entries dated parsed.date — block locked/closed periods.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
 
     // Current carrying amount = latest revalued amount if present, else NBV.
     const previousCarryingAmount = asset.revaluedAmount ?? asset.netBookValue;

@@ -88,6 +88,16 @@ export async function DELETE(
     });
 
     if (!existing) return notFound("Tax period");
+    // A filed (or amended) return is a statutory record — and the journal entry
+    // that cleared the VAT control accounts on filing references it. Deleting it
+    // would erase the filed figures and reference and orphan that entry, so only
+    // an open (not-yet-filed) period can be deleted.
+    if (existing.status !== "open") {
+      return NextResponse.json(
+        { error: "This return has already been filed and can't be deleted. Amend it instead." },
+        { status: 400 }
+      );
+    }
 
     await db.delete(taxPeriod).where(eq(taxPeriod.id, id));
 

@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import {
   getNextEntryNumber,
   findAccountByCode,
@@ -60,6 +61,10 @@ export async function POST(
 
     const body = await request.json();
     const parsed = disposeSchema.parse(body);
+
+    // Disposal posts GL entries dated parsed.date — don't let it write into a
+    // locked period or closed fiscal year and silently change finalized books.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
 
     // Resolve the org base currency once — used when find-or-creating the
     // gain/loss/proceeds/equity accounts so existing charts get them on demand.

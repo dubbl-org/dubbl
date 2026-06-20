@@ -27,10 +27,14 @@ interface IncomeData {
   netIncome: string;
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [0, 1, 2, 3, 4].map((n) => CURRENT_YEAR - n);
+
 export default function IncomeStatementPage() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<IncomeData | null>(null);
+  const [year, setYear] = useState(CURRENT_YEAR);
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -39,7 +43,15 @@ export default function IncomeStatementPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
 
-    fetch("/api/v1/reports/income-statement", {
+    // Always request a concrete year range so the figures are "for the year",
+    // not a lifetime running total.
+    const from = `${year}-01-01`;
+    const to =
+      year === CURRENT_YEAR
+        ? new Date().toISOString().slice(0, 10)
+        : `${year}-12-31`;
+
+    fetch(`/api/v1/reports/income-statement?from=${from}&to=${to}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
@@ -54,7 +66,7 @@ export default function IncomeStatementPage() {
         }
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [year]);
 
   if (initialLoad) return <BrandLoader />;
 
@@ -64,8 +76,19 @@ export default function IncomeStatementPage() {
 
       <PageHeader
         title="Money in vs money out (summary)"
-        description="What you earned, minus what you spent, for the year so far."
-      />
+        description="What you earned, minus what you spent, for the year you pick."
+      >
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          aria-label="Year"
+        >
+          {YEAR_OPTIONS.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </PageHeader>
 
       <ReportHelp>
         A short version of the money-in-vs-money-out report: total earnings, total
@@ -124,7 +147,7 @@ export default function IncomeStatementPage() {
                   Profit (money in minus money out)
                 </span>
                 <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
-                  {formatMoney(parseFloat(data.netIncome) * 100)}
+                  {formatMoney(Math.round(parseFloat(data.netIncome) * 100))}
                 </span>
               </div>
             </div>

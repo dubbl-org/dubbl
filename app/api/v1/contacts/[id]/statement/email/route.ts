@@ -7,10 +7,11 @@ import {
   bill,
   debitNote,
   payment,
+  paymentAllocation,
   organization,
   emailConfig,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, lt, notInArray, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, lt, inArray, notInArray, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound, error } from "@/lib/api/response";
 import { formatMoney } from "@/lib/money";
@@ -66,6 +67,25 @@ export async function POST(
     if (!c.email) {
       return error("Contact does not have an email address", 400);
     }
+
+    // Exclude zero-cash "carrier" payments that merely record a credit/debit
+    // note application — the note document is already in the statement, so
+    // counting the carrier as cash would reduce the balance twice.
+    const carrierPaymentRows = await db
+      .selectDistinct({ paymentId: paymentAllocation.paymentId })
+      .from(paymentAllocation)
+      .innerJoin(payment, eq(paymentAllocation.paymentId, payment.id))
+      .where(
+        and(
+          eq(payment.organizationId, ctx.organizationId),
+          eq(payment.contactId, id),
+          inArray(paymentAllocation.documentType, ["credit_note", "debit_note"])
+        )
+      );
+    const carrierPaymentIds = carrierPaymentRows.map((r) => r.paymentId);
+    const excludeCarriers = carrierPaymentIds.length
+      ? notInArray(payment.id, carrierPaymentIds)
+      : undefined;
 
     // Fetch email config
     const emailCfg = await db.query.emailConfig.findFirst({
@@ -136,7 +156,8 @@ export async function POST(
             eq(payment.contactId, id),
             eq(payment.type, "received"),
             lt(payment.date, startDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
       openingBalance -= priorPaymentsReceived.reduce((s, r) => s + r.amount, 0);
@@ -180,7 +201,8 @@ export async function POST(
             eq(payment.contactId, id),
             eq(payment.type, "made"),
             lt(payment.date, startDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
       openingBalance += priorPaymentsMade.reduce((s, r) => s + r.amount, 0);
@@ -250,7 +272,8 @@ export async function POST(
             eq(payment.type, "received"),
             gte(payment.date, startDate),
             lte(payment.date, endDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
       for (const p of paymentsReceived) {
@@ -327,7 +350,8 @@ export async function POST(
             eq(payment.type, "made"),
             gte(payment.date, startDate),
             lte(payment.date, endDate),
-            isNull(payment.deletedAt)
+            isNull(payment.deletedAt),
+            excludeCarriers
           )
         );
       for (const p of paymentsMade) {

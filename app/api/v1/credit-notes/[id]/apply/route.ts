@@ -66,6 +66,23 @@ export async function POST(
         { status: 400 }
       );
     }
+    // The credit note belongs to one customer — applying it to another
+    // customer's invoice would corrupt both customers' balances and statements.
+    if (foundInvoice.contactId !== found.contactId) {
+      return NextResponse.json(
+        { error: "This credit note belongs to a different customer than the invoice." },
+        { status: 400 }
+      );
+    }
+    // The amounts are offset 1:1, so a currency mismatch (e.g. a €100 credit
+    // note against a $100 invoice) would reduce the invoice by the wrong figure
+    // and break the tie between AR and the GL. Require matching currencies.
+    if (foundInvoice.currencyCode !== found.currencyCode) {
+      return NextResponse.json(
+        { error: "The credit note and invoice are in different currencies. Apply a credit note in the same currency." },
+        { status: 400 }
+      );
+    }
     if (parsed.amount > foundInvoice.amountDue) {
       return NextResponse.json(
         { error: "Amount exceeds invoice amount due" },

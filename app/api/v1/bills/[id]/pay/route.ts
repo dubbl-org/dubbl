@@ -44,8 +44,13 @@ export async function POST(
       );
     }
 
+    // Settle against the bill's OUTSTANDING balance (amountDue), not a fresh
+    // total - paid. For reverse-charge bills the payable is the net only (the
+    // self-accounted VAT never leaves the bank), so amountDue < total; deriving
+    // the remainder from total left a phantom balance = the RC VAT and the bill
+    // could never reach "paid".
     const newAmountPaid = found.amountPaid + parsed.amount;
-    const newAmountDue = found.total - newAmountPaid;
+    const newAmountDue = found.amountDue - parsed.amount;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
     // Generate payment number
