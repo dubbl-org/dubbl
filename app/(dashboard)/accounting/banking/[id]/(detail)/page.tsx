@@ -15,6 +15,7 @@ export default function BankAccountOverviewPage() {
     summary,
     handleReconcile,
     handleExclude,
+    handleUndo,
     handleOpenMatch,
     handleOpenExpense,
     handleOpenCategorize,
@@ -94,6 +95,7 @@ export default function BankAccountOverviewPage() {
                 onMatch={handleOpenMatchUnified}
                 onTransfer={handleOpenTransfer}
                 onSplit={handleOpenSplit}
+                onUndo={handleUndo}
               />
             ))}
           </div>

@@ -32,6 +32,7 @@ export default function BankTransactionsPage() {
     refetch,
     handleReconcile,
     handleExclude,
+    handleUndo,
     handleOpenMatch,
     handleOpenExpense,
     handleOpenCategorize,
@@ -351,6 +352,7 @@ export default function BankTransactionsPage() {
               onMatch={handleOpenMatchUnified}
               onTransfer={handleOpenTransfer}
               onSplit={handleOpenSplit}
+              onUndo={handleUndo}
               selected={selectedIds.has(tx.id)}
               onSelectChange={toggleSelect}
             />
