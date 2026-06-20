@@ -53,5 +53,13 @@ export function logAudit({
       userAgent,
     })
     .then(() => {})
-    .catch(() => {});
+    // Don't fail the underlying operation if the audit row can't be written,
+    // but never swallow it silently — a lost "who changed what" trail must at
+    // least surface in the logs so it can be investigated.
+    .catch((err) => {
+      console.error(
+        `[audit] failed to record ${action} on ${entityType} ${entityId}:`,
+        err
+      );
+    });
 }

@@ -291,6 +291,80 @@ export async function getNextEntryNumber(
 }
 
 /**
+ * Post a true REVERSING entry for an already-posted journal entry: a new posted
+ * entry whose lines mirror the original with debit/credit swapped. Both entries
+ * stay `posted` so reports (which count posted only) net the pair to zero, and
+ * the audit trail is preserved — unlike flipping the original to `void`, which
+ * makes the amount silently vanish from every report (even closed periods) with
+ * no offsetting record.
+ *
+ * Links the pair via reversesEntryId / reversedByEntryId. Returns the reversal
+ * entry, or null when the original has no lines (nothing to reverse).
+ *
+ * The caller is responsible for the period-lock check (assertNotLocked on the
+ * reversal date) and for running this inside a db.transaction so the reversal
+ * commits/rolls back with the document status change.
+ */
+export async function reverseJournalEntry(
+  ctx: JournalAutomationContext,
+  data: {
+    entryId: string;
+    date: string;
+    description: string;
+    reference?: string | null;
+    sourceType: string;
+    sourceId?: string | null;
+  },
+  tx: Tx
+): Promise<typeof journalEntry.$inferSelect | null> {
+  const originalLines = await tx.query.journalLine.findMany({
+    where: eq(journalLine.journalEntryId, data.entryId),
+  });
+  if (originalLines.length === 0) return null;
+
+  const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
+  const [reversal] = await tx
+    .insert(journalEntry)
+    .values({
+      organizationId: ctx.organizationId,
+      entryNumber,
+      date: data.date,
+      description: data.description,
+      reference: data.reference ?? null,
+      status: "posted",
+      sourceType: data.sourceType,
+      sourceId: data.sourceId ?? null,
+      reversesEntryId: data.entryId,
+      postedAt: new Date(),
+      createdBy: ctx.userId,
+    })
+    .returning();
+
+  await tx.insert(journalLine).values(
+    originalLines.map((l) => ({
+      journalEntryId: reversal.id,
+      accountId: l.accountId,
+      description: data.description,
+      debitAmount: l.creditAmount,
+      creditAmount: l.debitAmount,
+      currencyCode: l.currencyCode,
+      exchangeRate: l.exchangeRate,
+      costCenterId: l.costCenterId,
+      projectId: l.projectId,
+    }))
+  );
+
+  // Link the original back to its reversal so the UI can show "Reversed" and
+  // never offers to reverse it twice.
+  await tx
+    .update(journalEntry)
+    .set({ reversedByEntryId: reversal.id, updatedAt: new Date() })
+    .where(eq(journalEntry.id, data.entryId));
+
+  return reversal;
+}
+
+/**
  * Create journal entry when an invoice is sent/approved.
  * DR Accounts Receivable (asset)
  * CR Revenue (per line account)
