@@ -139,6 +139,15 @@ export async function POST(request: Request) {
       if (!poLine) {
         return validationError(`PO line ${r.purchaseOrderLineId} not found on this purchase order`);
       }
+      // Perpetual inventory tracks whole units, so a fractional receipt for a
+      // stock line would book rounded units (e.g. 2.5 → 3) while the PO tracks
+      // the exact 2.5 — leaving inventory and the PO permanently out of step and
+      // mis-valuing the stock. Require whole units for stock lines.
+      if (poLine.inventoryItemId && !Number.isInteger(r.quantity)) {
+        return validationError(
+          `"${poLine.description}" is a stock item — receive it in whole units.`
+        );
+      }
       const qtyScaled = Math.round(r.quantity * 100);
       if (qtyScaled <= 0) continue;
       const remaining = poLine.quantity - poLine.quantityReceived;
