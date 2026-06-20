@@ -489,6 +489,30 @@ export default function ExpenseDetailPage() {
     }
   }
 
+  async function handleReverse() {
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Reverse this expense claim?",
+      description:
+        "We reverse the bookkeeping it posted (the approval, and the payment if it was paid) and move it back to a draft so you can fix and resubmit it. Nothing is deleted — the reversal stays in your books.",
+      confirmLabel: "Reverse",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const res = await fetch(`/api/v1/expenses/${id}/reverse`, {
+      method: "POST",
+      headers: { "x-organization-id": orgId },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      toast.success("Reversed and moved back to draft");
+    } else {
+      const data = await res.json();
+      toast.error(typeof data.error === "string" ? data.error : "Failed to reverse");
+    }
+  }
+
   async function handleRecall() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/expenses/${id}/recall`, {
@@ -658,6 +682,16 @@ export default function ExpenseDetailPage() {
                   </DialogContent>
                 </Dialog>
               </>
+            )}
+            {claim.status === "approved" && (
+              <Button variant="outline" size="sm" onClick={handleReverse} className="text-red-600 hover:text-red-700" title="Undo the approval and move it back to a draft">
+                <Undo2 className="mr-2 size-3.5" />Reverse
+              </Button>
+            )}
+            {claim.status === "paid" && (
+              <Button variant="outline" size="sm" onClick={handleReverse} className="text-red-600 hover:text-red-700" title="Reverse the payment and approval, back to a draft">
+                <Undo2 className="mr-2 size-3.5" />Reverse
+              </Button>
             )}
             {claim.status === "approved" && (
               <Dialog open={payOpen} onOpenChange={setPayOpen}>
