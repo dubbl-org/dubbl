@@ -46,7 +46,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
-import { formatMoney, centsToDecimal, decimalToCents } from "@/lib/money";
+import { formatMoney, minorUnitsToDecimal, decimalToCents } from "@/lib/money";
 import Link from "next/link";
 
 interface ExpenseDetail {
@@ -259,7 +259,7 @@ function EditExpenseDrawer({
         claim.items.map((item) => ({
           date: item.date,
           description: item.description,
-          amount: centsToDecimal(item.amount),
+          amount: minorUnitsToDecimal(item.amount, claim.currencyCode),
           category: item.category || "",
           accountId: "",
           receiptFileKey: item.receiptFileKey || "",

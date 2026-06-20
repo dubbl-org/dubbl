@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
-import { formatMoney, centsToDecimal } from "@/lib/money";
+import { formatMoney, minorUnitsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
 import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import { useConfirm } from "@/lib/hooks/use-confirm";
@@ -494,7 +494,7 @@ export default function InvoiceDetailPage() {
                         prefix="$"
                         value={payAmount}
                         onChange={setPayAmount}
-                        placeholder={centsToDecimal(inv.amountDue)}
+                        placeholder={minorUnitsToDecimal(inv.amountDue, inv.currencyCode)}
                       />
                     </div>
                     <div className="space-y-2">

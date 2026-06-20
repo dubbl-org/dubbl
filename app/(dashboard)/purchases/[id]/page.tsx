@@ -15,7 +15,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
-import { formatMoney, centsToDecimal } from "@/lib/money";
+import { formatMoney, minorUnitsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
 import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import Link from "next/link";
@@ -216,7 +216,7 @@ export default function BillDetailPage() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Amount</Label>
-                      <CurrencyInput prefix="$" value={payAmount} onChange={setPayAmount} placeholder={centsToDecimal(b.amountDue)} />
+                      <CurrencyInput prefix="$" value={payAmount} onChange={setPayAmount} placeholder={minorUnitsToDecimal(b.amountDue, b.currencyCode)} />
                     </div>
                     <div className="space-y-2">
                       <Label>Date</Label>
