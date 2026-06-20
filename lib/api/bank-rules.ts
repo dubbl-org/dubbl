@@ -439,18 +439,72 @@ export async function applyBankRulesToAccount(
       }
     }
 
+    // A rule that auto-reconciles to a single account must POST the
+    // categorization entry, exactly like the manual Categorize action — not
+    // just flip the status. Otherwise the line shows as done with a category
+    // but nothing hits the ledger, so income/expense silently never gets
+    // recorded and the statement-vs-books difference is wrong.
+    const canPost =
+      assignment.reconcile && assignment.accountId && userId;
+
+    if (canPost) {
+      const currencyCode = txn.currencyCode || account.currencyCode;
+      try {
+        if (!account.chartAccountId) {
+          account.chartAccountId = await ensureBankLedgerAccount(organizationId, account);
+        }
+        await assertBaseRateAvailable(organizationId, currencyCode, txn.date);
+
+        await db.transaction(async (dbTx) => {
+          const entry = await createCategorizationJournalEntry(
+            { organizationId, userId: userId! },
+            {
+              bankGlAccountId: account.chartAccountId!,
+              otherAccountId: assignment.accountId!,
+              amount: txn.amount,
+              date: txn.date,
+              reference: txn.reference || txn.description,
+              description: txn.description,
+              currencyCode,
+              taxRateId: assignment.taxRateId ?? null,
+            },
+            dbTx
+          );
+
+          await dbTx
+            .update(bankTransaction)
+            .set({
+              status: "reconciled" as const,
+              accountId: assignment.accountId,
+              contactId: assignment.contactId,
+              taxRateId: assignment.taxRateId,
+              journalEntryId: entry?.id ?? null,
+            })
+            .where(eq(bankTransaction.id, txn.id));
+        });
+
+        applied += 1;
+        reconciled += 1;
+        continue;
+      } catch {
+        // Missing FX rate or similar — skip; the user can categorize manually.
+        continue;
+      }
+    }
+
+    // No reconcile (or no account to post to): just apply the rule's category /
+    // contact / tax without changing the line's status, so we never mark a line
+    // "done" without a matching ledger entry.
     await db
       .update(bankTransaction)
       .set({
         accountId: assignment.accountId,
         contactId: assignment.contactId,
         taxRateId: assignment.taxRateId,
-        ...(assignment.reconcile ? { status: "reconciled" as const } : {}),
       })
       .where(eq(bankTransaction.id, txn.id));
 
     applied += 1;
-    if (assignment.reconcile) reconciled += 1;
   }
 
   return { applied, reconciled, split };
