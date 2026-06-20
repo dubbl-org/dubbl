@@ -6,7 +6,7 @@ import {
   journalEntry,
   journalLine,
 } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, gte, lte } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -35,10 +35,35 @@ export async function POST(request: Request) {
     }
 
     const today = new Date().toISOString().split("T")[0];
+    // Current calendar month — the period this run depreciates. Used to make the
+    // run idempotent: an asset already depreciated this month is skipped, so
+    // running it twice (or double-clicking) never double-books the charge.
+    const [y, m] = today.split("-");
+    const monthStart = `${y}-${m}-01`;
+    const lastDay = new Date(Number(y), Number(m), 0).getDate();
+    const monthEnd = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
+
     const results: { assetId: string; assetNumber: string; amount: number }[] =
       [];
+    let skipped = 0;
 
     for (const asset of assets) {
+      // Already depreciated this month? Skip (idempotency).
+      const [thisPeriod] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(depreciationEntry)
+        .where(
+          and(
+            eq(depreciationEntry.fixedAssetId, asset.id),
+            gte(depreciationEntry.date, monthStart),
+            lte(depreciationEntry.date, monthEnd)
+          )
+        );
+      if (Number(thisPeriod?.count ?? 0) > 0) {
+        skipped++;
+        continue;
+      }
+
       // periodIndex = number of depreciation entries already booked for the
       // asset (safe for declining-balance / SYD / uneven schedules).
       const [priorCount] = await db
@@ -115,12 +140,15 @@ export async function POST(request: Request) {
         ]);
       }
 
-      // Create depreciation entry
+      // Create depreciation entry, stamped with the period so the idempotency
+      // guard above can recognise it on a re-run.
       await db.insert(depreciationEntry).values({
         fixedAssetId: asset.id,
         date: today,
         amount,
         journalEntryId,
+        periodStart: monthStart,
+        periodEnd: monthEnd,
       });
 
       // Update asset
@@ -147,8 +175,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      message: `Depreciation run complete`,
+      message: skipped > 0
+        ? `Depreciation run complete (${skipped} already done this month)`
+        : `Depreciation run complete`,
       processed: results.length,
+      skipped,
       results,
     });
   } catch (err) {

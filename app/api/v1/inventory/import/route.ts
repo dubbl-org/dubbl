@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inventoryItem } from "@/lib/db/schema";
+import { inventoryItem, journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import {
+  getNextEntryNumber,
+  ensureControlAccount,
+  ensureAccountByCode,
+  resolveBaseRate,
+} from "@/lib/api/journal-automation";
 
 interface CsvRow {
   code?: string;
@@ -102,6 +108,10 @@ export async function POST(request: Request) {
 
     let created = 0;
     let updated = 0;
+    // Total cost of opening stock loaded for NEW items, posted as one combined
+    // opening-balance journal entry after the loop so imported stock has a real
+    // ledger value (not $0, which made later sales post $0 COGS).
+    let openingValueTotal = 0;
     const errors: { row: number; message: string }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -143,6 +153,7 @@ export async function POST(request: Request) {
             .where(eq(inventoryItem.id, existing.id));
           updated++;
         } else {
+          const opening = quantityOnHand > 0 && purchasePrice > 0;
           await db.insert(inventoryItem).values({
             organizationId: ctx.organizationId,
             code: row.code,
@@ -154,7 +165,14 @@ export async function POST(request: Request) {
             salePrice,
             quantityOnHand,
             reorderPoint,
+            // Value the opening stock (moving-average items): unit cost =
+            // purchase price, book value = qty * cost. Without this, stock sat
+            // at $0 and every later sale posted $0 cost of goods.
+            ...(opening
+              ? { averageCost: purchasePrice, totalValue: quantityOnHand * purchasePrice }
+              : {}),
           });
+          if (opening) openingValueTotal += quantityOnHand * purchasePrice;
           created++;
         }
       } catch (err) {
@@ -162,6 +180,48 @@ export async function POST(request: Request) {
           row: i + 2,
           message: err instanceof Error ? err.message : "Unknown error",
         });
+      }
+    }
+
+    // One combined opening-balance entry for all the imported stock:
+    // DR Inventory control / CR Opening Balance Equity.
+    if (openingValueTotal > 0) {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const { base } = await resolveBaseRate(ctx.organizationId, undefined, today);
+        await db.transaction(async (tx) => {
+          const inv = await ensureControlAccount(ctx.organizationId, "inventory", base, tx);
+          const openingEquity = await ensureAccountByCode(
+            ctx.organizationId,
+            { code: "3000", name: "Opening Balance Equity", type: "equity", subType: "other_equity" },
+            base,
+            tx
+          );
+          if (!inv?.id || !openingEquity?.id) return;
+          const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
+          const [entry] = await tx
+            .insert(journalEntry)
+            .values({
+              organizationId: ctx.organizationId,
+              entryNumber,
+              date: today,
+              description: `Opening stock — imported (${created} item${created === 1 ? "" : "s"})`,
+              reference: "INV-IMPORT",
+              status: "posted",
+              sourceType: "inventory_opening",
+              postedAt: new Date(),
+              createdBy: ctx.userId,
+            })
+            .returning();
+          await tx.insert(journalLine).values([
+            { journalEntryId: entry.id, accountId: inv.id, description: "Opening stock (import)", debitAmount: openingValueTotal, creditAmount: 0, currencyCode: base },
+            { journalEntryId: entry.id, accountId: openingEquity.id, description: "Opening stock (import)", debitAmount: 0, creditAmount: openingValueTotal, currencyCode: base },
+          ]);
+        });
+      } catch (err) {
+        // The items imported fine; surface a posting problem without failing the
+        // whole import.
+        errors.push({ row: 0, message: `Items imported, but the opening-balance entry failed: ${err instanceof Error ? err.message : "unknown error"}` });
       }
     }
 

@@ -1,9 +1,11 @@
 import { db } from "@/lib/db";
-import { inventoryItem, inventoryMovement } from "@/lib/db/schema";
+import { inventoryItem } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { ok, handleError } from "@/lib/api/response";
+import { createInventoryAdjustmentJournalEntry } from "@/lib/api/journal-automation";
+import { type ValuedItem } from "@/lib/api/inventory-valuation";
 import { z } from "zod";
 
 const schema = z.object({
@@ -34,31 +36,29 @@ export async function POST(request: Request) {
 
     const itemMap = new Map(items.map((i) => [i.id, i]));
     let adjusted = 0;
+    const today = new Date().toISOString().slice(0, 10);
 
-    for (const adj of adjustments) {
-      const item = itemMap.get(adj.itemId);
-      if (!item) continue;
-
-      const newQty = item.quantityOnHand + adj.quantity;
-
-      await db
-        .update(inventoryItem)
-        .set({ quantityOnHand: newQty, updatedAt: new Date() })
-        .where(eq(inventoryItem.id, item.id));
-
-      await db.insert(inventoryMovement).values({
-        organizationId: ctx.organizationId,
-        inventoryItemId: item.id,
-        type: "adjustment",
-        quantity: adj.quantity,
-        previousQuantity: item.quantityOnHand,
-        newQuantity: newQty,
-        reason: adj.reason || "Bulk adjustment",
-        createdBy: ctx.userId,
-      });
-
-      adjusted++;
-    }
+    // Each adjustment moves the quantity, revalues the stock at cost, records
+    // the movement, and posts the GL (shrinkage/found vs Inventory) — instead of
+    // changing only the count, which left book value and the GL untouched and
+    // the balance sheet out of step with units.
+    await db.transaction(async (tx) => {
+      for (const adj of adjustments) {
+        const item = itemMap.get(adj.itemId);
+        if (!item || adj.quantity === 0) continue;
+        await createInventoryAdjustmentJournalEntry(
+          { organizationId: ctx.organizationId, userId: ctx.userId },
+          {
+            item: item as ValuedItem & { inventoryAccountId?: string | null },
+            qtyDelta: adj.quantity,
+            reason: adj.reason || "Bulk adjustment",
+            date: today,
+          },
+          tx
+        );
+        adjusted++;
+      }
+    });
 
     return ok({ adjusted });
   } catch (err) {
