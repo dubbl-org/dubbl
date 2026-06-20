@@ -509,7 +509,7 @@ export function TransactionRow({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 px-2.5 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                  className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => setConfirmUndo(true)}
                   title="Reverse this and move the line back to your to-do list"
                 >
