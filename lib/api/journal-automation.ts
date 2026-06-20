@@ -986,6 +986,9 @@ export async function createCategorizationJournalEntry(
     currencyCode?: string;
     /** Optional tax rate to split the (tax-inclusive) amount into net + tax. */
     taxRateId?: string | null;
+    /** Optional tracking applied to the categorized (non-bank, non-tax) line. */
+    costCenterId?: string | null;
+    projectId?: string | null;
   },
   tx: Tx
 ) {
@@ -1048,6 +1051,11 @@ export async function createCategorizationJournalEntry(
     description: data.description,
     debitAmount: debit,
     creditAmount: credit,
+    // Tracking (cost centre / project) belongs only on the categorized line —
+    // not the bank leg or the tax control legs.
+    ...(accountId === data.otherAccountId
+      ? { costCenterId: data.costCenterId ?? null, projectId: data.projectId ?? null }
+      : {}),
   });
 
   const lines: (typeof journalLine.$inferInsert)[] = [];

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { ensureTaxRatesSeeded } from "@/lib/api/tax-profiles";
 import { z } from "zod";
 
 // A single component of a compound tax (e.g. GST + PST). rate is in basis
@@ -46,13 +47,30 @@ export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
 
-    const rates = await db.query.taxRate.findMany({
-      where: and(
-        eq(taxRate.organizationId, ctx.organizationId),
-        notDeleted(taxRate.deletedAt)
-      ),
-      with: { components: true },
-    });
+    const query = () =>
+      db.query.taxRate.findMany({
+        where: and(
+          eq(taxRate.organizationId, ctx.organizationId),
+          notDeleted(taxRate.deletedAt)
+        ),
+        with: { components: true },
+      });
+
+    let rates = await query();
+
+    // Self-heal: an org with no tax rates (never applied a country profile) can
+    // only ever pick "No tax". Seed the standard rates for its country the first
+    // time the list is read — mirroring how the chart of accounts self-syncs —
+    // so a real VAT/GST rate becomes selectable with no extra setup. Best-effort
+    // and a no-op for genuinely tax-free orgs (no resolvable profile).
+    if (rates.length === 0) {
+      try {
+        const result = await ensureTaxRatesSeeded(ctx.organizationId);
+        if (result && result.created.length > 0) rates = await query();
+      } catch {
+        // non-fatal: return the empty list (the "No tax" option still works)
+      }
+    }
 
     return NextResponse.json({ taxRates: rates });
   } catch (err) {

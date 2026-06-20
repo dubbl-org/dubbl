@@ -20,6 +20,8 @@ const categorizeSchema = z.object({
   contactId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
+  costCenterId: z.string().uuid().nullable().optional(),
+  projectId: z.string().uuid().nullable().optional(),
 });
 
 export async function POST(
@@ -82,6 +84,8 @@ export async function POST(
           description: parsed.memo?.trim() || transaction.description,
           currencyCode,
           taxRateId: parsed.taxRateId || null,
+          costCenterId: parsed.costCenterId || null,
+          projectId: parsed.projectId || null,
         },
         tx
       );

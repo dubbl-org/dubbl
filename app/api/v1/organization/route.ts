@@ -17,6 +17,7 @@ import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { seedDefaultAccounts } from "@/lib/db/default-accounts";
+import { ensureTaxRatesSeeded } from "@/lib/api/tax-profiles";
 import { toAppUrl } from "@/lib/public-url";
 
 const updateSchema = z
@@ -258,9 +259,17 @@ export async function PATCH(request: Request) {
       .where(eq(organization.id, ctx.organizationId))
       .returning();
 
-    // Seed default chart of accounts on first-time country set (onboarding completion)
+    // Seed the default chart of accounts AND the country's standard tax rates on
+    // first-time country set (onboarding completion), so a new org can pick a
+    // real VAT/GST rate immediately instead of only "No tax". Both are
+    // idempotent; tax seeding is best-effort so it never blocks onboarding.
     if (existing?.country === null && updated.country !== null) {
       await seedDefaultAccounts(ctx.organizationId, updated.defaultCurrency || "USD", updated.countryCode || undefined);
+      try {
+        await ensureTaxRatesSeeded(ctx.organizationId, updated.countryCode || updated.country || undefined);
+      } catch {
+        // non-fatal: rates also self-heal lazily on the tax-rates endpoint
+      }
     }
 
     logAudit({ ctx, action: "update", entityType: "organization", entityId: ctx.organizationId, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });

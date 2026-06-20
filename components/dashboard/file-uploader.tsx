@@ -9,12 +9,25 @@ interface FileUploaderProps {
   onUpload: (fileKey: string, fileName: string) => void;
   accept?: string;
   className?: string;
+  /**
+   * When both are set, the upload is linked to that entity via the shared
+   * document system (entityType e.g. "bank_transaction" / "expense"), so the
+   * file shows up wherever that entity's attachments are listed. When omitted,
+   * the legacy un-linked attachment endpoint is used.
+   */
+  entityType?: string;
+  entityId?: string;
+  /** Fires with the created document id once an entity-linked upload finishes. */
+  onAttached?: (documentId: string, fileName: string) => void;
 }
 
 export function FileUploader({
   onUpload,
   accept = "image/*,.pdf",
   className,
+  entityType,
+  entityId,
+  onAttached,
 }: FileUploaderProps) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -33,25 +46,44 @@ export function FileUploader({
       }
 
       try {
-        // Get presigned URL
-        const presignRes = await fetch("/api/v1/attachments/presign", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-organization-id": orgId,
-          },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-          }),
-        });
+        // Entity-linked uploads go through the shared document system so the
+        // file is attached to (and listed against) the given entity; everything
+        // else uses the legacy un-linked attachment endpoint.
+        const linked = !!(entityType && entityId);
+        const presignRes = await fetch(
+          linked ? "/api/v1/documents" : "/api/v1/attachments/presign",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-organization-id": orgId,
+            },
+            body: JSON.stringify(
+              linked
+                ? {
+                    fileName: file.name,
+                    mimeType: file.type || "application/octet-stream",
+                    fileSize: file.size,
+                    entityType,
+                    entityId,
+                  }
+                : {
+                    fileName: file.name,
+                    contentType: file.type,
+                    fileSize: file.size,
+                  }
+            ),
+          }
+        );
 
         if (!presignRes.ok) {
           throw new Error("Failed to get upload URL");
         }
 
-        const { uploadUrl, attachment } = await presignRes.json();
+        const json = await presignRes.json();
+        const uploadUrl = json.uploadUrl;
+        const fileKey = linked ? json.document?.fileKey : json.attachment?.fileKey;
+        const documentId = linked ? json.document?.id : null;
 
         // Upload to S3
         const uploadRes = await fetch(uploadUrl, {
@@ -64,7 +96,8 @@ export function FileUploader({
           throw new Error("Failed to upload file");
         }
 
-        onUpload(attachment.fileKey, file.name);
+        onUpload(fileKey, file.name);
+        if (linked && documentId) onAttached?.(documentId, file.name);
         toast.success("File uploaded");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -73,7 +106,7 @@ export function FileUploader({
         setUploading(false);
       }
     },
-    [onUpload]
+    [onUpload, entityType, entityId, onAttached]
   );
 
   function handleDragOver(e: React.DragEvent) {

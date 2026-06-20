@@ -260,6 +260,8 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
       accountId: z.string().describe("UUID of the chart-of-accounts account to post the other side to"),
       contactId: z.string().optional().describe("Optional UUID of the contact (customer/supplier) involved"),
       taxRateId: z.string().optional().describe("Optional UUID of the tax rate to record on the line"),
+      costCenterId: z.string().optional().describe("Optional UUID of a cost centre to tag the categorized line"),
+      projectId: z.string().optional().describe("Optional UUID of a project to tag the categorized line"),
       memo: z.string().optional().describe("Optional memo; defaults to the transaction description"),
     },
     (params) =>
@@ -295,6 +297,8 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               description: params.memo?.trim() || transaction.description,
               currencyCode,
               taxRateId: params.taxRateId || null,
+              costCenterId: params.costCenterId || null,
+              projectId: params.projectId || null,
             },
             tx
           );
