@@ -46,6 +46,7 @@ import {
   assertBaseRateAvailable,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 // ---------------------------------------------------------------------------
@@ -254,7 +255,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
 
   server.tool(
     "categorize_bank_transaction",
-    "Categorize a bank transaction by posting it to a chart-of-accounts account. This is the generic money-in / money-out coding action: the chosen account determines the meaning (expense, income, loan received → a liability account, owner contribution → an equity account, owner drawings, a tax payment, a refund, etc.) and the double entry follows the sign of the amount (money in: DR bank / CR chosen account; money out: DR chosen account / CR bank). Posts a balanced journal entry and marks the transaction reconciled. Amounts are in integer cents.",
+    "Categorize a bank transaction by posting it to a chart-of-accounts account. This is the generic money-in / money-out coding action: the chosen account determines the meaning (expense, income, loan received → a liability account, owner contribution → an equity account, owner drawings, a tax payment, a refund, etc.) and the double entry follows the sign of the amount (money in: DR bank / CR chosen account; money out: DR chosen account / CR bank). Posts a balanced journal entry and marks the transaction reconciled. Can also CORRECT an already-categorized line: call it again on a reconciled line that was a plain categorization and it voids the previous entry and posts the corrected one. Lines matched to an invoice/bill, transfers, and statement-reconciled lines must be reversed with unreconcile_bank_transaction first. Amounts are in integer cents.",
     {
       transactionId: z.string().describe("UUID of the bank transaction to categorize"),
       accountId: z.string().describe("UUID of the chart-of-accounts account to post the other side to"),
@@ -269,7 +270,26 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         requireRole(ctx, "manage:banking");
 
         const { transaction, account } = await loadTransactionAndAccount(params.transactionId, ctx);
-        if (transaction.status === "reconciled") throw new Error("Transaction already reconciled");
+
+        // Re-categorizing an already-coded line corrects it in place (void the
+        // old entry, post the new one). Only a plain categorization is safe to
+        // re-code here; lines that own a payment, a transfer leg, or a
+        // statement reconciliation must be reversed with unreconcile first.
+        const isEdit = transaction.status === "reconciled";
+        if (isEdit) {
+          if (transaction.transferTransactionId)
+            throw new Error("This line is a transfer between accounts. Reverse it with unreconcile_bank_transaction first.");
+          if (transaction.reconciliationId)
+            throw new Error("This line is part of a completed statement match. Reverse it with unreconcile_bank_transaction first.");
+          const linkedPayment = await db.query.payment.findFirst({
+            where: and(eq(payment.bankTransactionId, params.transactionId), notDeleted(payment.deletedAt)),
+            columns: { id: true },
+          });
+          if (linkedPayment)
+            throw new Error("This line is matched to an invoice or bill. Reverse it with unreconcile_bank_transaction first.");
+          await assertNotLocked(ctx.organizationId, transaction.date, ctx);
+        }
+
         // Connect the bank account to its ledger account automatically (older
         // accounts self-heal on first use) so categorizing never dead-ends.
         const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
@@ -286,6 +306,26 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
         const { entry } = await db.transaction(async (tx) => {
+          // Void the previous categorization entry first so the GL never
+          // double-counts when correcting a line.
+          if (isEdit && transaction.journalEntryId) {
+            await tx
+              .update(journalEntry)
+              .set({
+                status: "void",
+                voidedAt: new Date(),
+                voidReason: "Re-categorized",
+                deletedAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(journalEntry.id, transaction.journalEntryId),
+                  eq(journalEntry.organizationId, ctx.organizationId)
+                )
+              );
+          }
+
           const entry = await createCategorizationJournalEntry(
             { organizationId: ctx.organizationId, userId: ctx.userId },
             {
@@ -320,7 +360,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
           userId: ctx.userId,
-          action: "categorized",
+          action: isEdit ? "recategorized" : "categorized",
           entityType: "bank_transaction",
           entityId: params.transactionId,
           changes: { accountId: params.accountId, journalEntryId: entry?.id || null, amount: transaction.amount },
