@@ -1,0 +1,2 @@
+ALTER TABLE "expense_item" ADD COLUMN "tax_rate_id" uuid;--> statement-breakpoint
+ALTER TABLE "expense_item" ADD CONSTRAINT "expense_item_tax_rate_id_tax_rate_id_fk" FOREIGN KEY ("tax_rate_id") REFERENCES "public"."tax_rate"("id") ON DELETE no action ON UPDATE no action;

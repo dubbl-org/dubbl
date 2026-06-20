@@ -63,6 +63,7 @@ import { cn } from "@/lib/utils";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
+import { TrackingPicker } from "@/components/dashboard/tracking-picker";
 import {
   resolveSpecialAccount,
   type ResolvableAccount as SpecialResolvableAccount,
@@ -974,6 +975,11 @@ export function CreateExpenseSheet({
   const [itemDesc, setItemDesc] = useState("");
   const [itemAmount, setItemAmount] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [taxRateId, setTaxRateId] = useState("none");
+  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
+  const [contactId, setContactId] = useState("");
+  const [costCenterId, setCostCenterId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -983,8 +989,20 @@ export function CreateExpenseSheet({
       setItemDesc(transaction.description || "");
       setItemAmount(centsToDecimal(Math.abs(transaction.amount)));
       setAccountId("");
+      setTaxRateId("none");
+      setContactId("");
+      setCostCenterId("");
+      setProjectId("");
     }
   }, [transaction]);
+
+  useEffect(() => {
+    if (!transaction || !orgId || taxRates.length > 0) return;
+    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
+      .catch(() => {});
+  }, [transaction, orgId, taxRates.length]);
 
   async function handleCreate() {
     if (!orgId || !transaction) return;
@@ -1001,6 +1019,10 @@ export function CreateExpenseSheet({
           title: title.trim(),
           description: description.trim() || null,
           currencyCode,
+          contactId: contactId || null,
+          taxRateId: taxRateId === "none" ? null : taxRateId,
+          costCenterId: costCenterId || null,
+          projectId: projectId || null,
           items: [{
             date: transaction.date,
             description: itemDesc.trim() || title.trim(),
@@ -1085,6 +1107,33 @@ export function CreateExpenseSheet({
               </p>
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tax <span className="text-muted-foreground font-normal">(the amount is treated as tax-inclusive)</span></Label>
+              <Select value={taxRateId} onValueChange={setTaxRateId}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No tax</SelectItem>
+                  {taxRates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Who you paid (optional)</Label>
+              <ContactPicker value={contactId} onChange={setContactId} placeholder="Pick a supplier or contact" />
+            </div>
+
+            <TrackingPicker
+              orgId={orgId}
+              costCenterId={costCenterId}
+              projectId={projectId}
+              onChange={(v) => { setCostCenterId(v.costCenterId); setProjectId(v.projectId); }}
+            />
+
             <div className="h-px bg-border" />
 
             <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
@@ -1163,6 +1212,8 @@ export function CategorizeSheet({
   const [memo, setMemo] = useState("");
   const [taxRateId, setTaxRateId] = useState("none");
   const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
+  const [costCenterId, setCostCenterId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
   // Quick-choice ("what was this?") state.
   const [accounts, setAccounts] = useState<SpecialResolvableAccount[]>([]);
@@ -1179,6 +1230,8 @@ export function CategorizeSheet({
       setContactId("");
       setMemo("");
       setTaxRateId("none");
+      setCostCenterId("");
+      setProjectId("");
       setChoice("");
       setPickerType(undefined);
       setChoiceHint("");
@@ -1311,6 +1364,8 @@ export function CategorizeSheet({
           contactId: contactId || null,
           memo: memo.trim() || null,
           taxRateId: taxRateId === "none" ? null : taxRateId,
+          costCenterId: costCenterId || null,
+          projectId: projectId || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -1423,6 +1478,13 @@ export function CategorizeSheet({
             <Label className="text-xs">Contact (optional)</Label>
             <ContactPicker value={contactId} onChange={setContactId} placeholder="Who was this with?" />
           </div>
+
+          <TrackingPicker
+            orgId={orgId}
+            costCenterId={costCenterId}
+            projectId={projectId}
+            onChange={(v) => { setCostCenterId(v.costCenterId); setProjectId(v.projectId); }}
+          />
 
           <div className="space-y-1.5">
             <Label className="text-xs">Memo (optional)</Label>
@@ -2309,6 +2371,10 @@ export function SplitAccountSheet({
               </p>
             </div>
           </div>
+
+          <div className="h-px bg-border" />
+
+          <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">

@@ -15,6 +15,13 @@
       "when": 1781669782966,
       "tag": "0001_parity_build",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781925643876,
+      "tag": "0002_old_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

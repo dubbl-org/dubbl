@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
-import { journalEntry, chartAccount, costCenter } from "./bookkeeping";
+import { journalEntry, chartAccount, costCenter, taxRate } from "./bookkeeping";
 
 export const expenseStatusEnum = pgEnum("expense_status", [
   "draft",
@@ -52,6 +52,9 @@ export const expenseItem = pgTable("expense_item", {
   category: text("category"),
   accountId: uuid("account_id").references(() => chartAccount.id),
   costCenterId: uuid("cost_center_id").references(() => costCenter.id),
+  // Tax applied to this line (the amount is treated as tax-inclusive), so an
+  // expense captures tax the same way a categorized bank line does.
+  taxRateId: uuid("tax_rate_id").references(() => taxRate.id),
   receiptFileKey: text("receipt_file_key"),
   receiptFileName: text("receipt_file_name"),
   isMileage: boolean("is_mileage").notNull().default(false),

@@ -36,6 +36,10 @@ const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   currencyCode: currencyCodeSchema.default("USD"),
+  contactId: z.string().uuid().nullable().optional(),
+  taxRateId: z.string().uuid().nullable().optional(),
+  costCenterId: z.string().uuid().nullable().optional(),
+  projectId: z.string().uuid().nullable().optional(),
   items: z.array(itemSchema).min(1),
 });
 
@@ -91,6 +95,8 @@ export async function POST(
         amount,
         category: item.category || null,
         accountId: item.accountId || null,
+        taxRateId: parsed.taxRateId || null,
+        costCenterId: parsed.costCenterId || null,
         receiptFileKey: null,
         receiptFileName: null,
         sortOrder: i,
@@ -184,6 +190,9 @@ export async function POST(
           reference: transaction.reference || transaction.description,
           description: parsed.title || transaction.description,
           currencyCode,
+          taxRateId: parsed.taxRateId || null,
+          costCenterId: parsed.costCenterId || null,
+          projectId: parsed.projectId || null,
         },
         tx
       );
@@ -198,13 +207,19 @@ export async function POST(
           .set({
             status: "reconciled",
             accountId: expenseAccountId,
+            contactId: parsed.contactId || null,
+            taxRateId: parsed.taxRateId || null,
             journalEntryId: entry.id,
           })
           .where(eq(bankTransaction.id, id));
       } else {
         await tx
           .update(bankTransaction)
-          .set({ accountId: expenseAccountId })
+          .set({
+            accountId: expenseAccountId,
+            contactId: parsed.contactId || null,
+            taxRateId: parsed.taxRateId || null,
+          })
           .where(eq(bankTransaction.id, id));
       }
 
