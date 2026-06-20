@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { createExpenseClaimPaymentJournalEntry } from "@/lib/api/expense-claims";
 import { z } from "zod";
 
@@ -62,6 +63,9 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    // The payment posts a GL entry on parsed.date — block locked/closed periods.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
 
     // Post the payment (DR Employee Reimbursements Payable / CR Bank) — clearing
     // the obligation recognized at approval — and flip status to paid atomically.
