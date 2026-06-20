@@ -241,6 +241,52 @@ export default function ReconcilePage() {
     }
   }
 
+  // Finish the active statement check: stamp the chosen lines (or every
+  // categorized line in the period) with the reconciliation and close it. This
+  // is the completion step that was missing — without it a statement check
+  // stayed "In Progress" forever and ticked lines were never attached.
+  async function finishStatementCheck(includeIds?: string[]) {
+    if (!orgId) return;
+    const active = reconciliations.find((r) => r.status === "in_progress");
+    if (!active) {
+      toast.error("Start a statement check first.");
+      setSheetOpen(true);
+      return;
+    }
+    setActing(true);
+    try {
+      const res = await fetch(`/api/v1/bank-accounts/${id}/reconciliation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": orgId,
+        },
+        body: JSON.stringify({
+          action: "complete",
+          reconciliationId: active.id,
+          ...(includeIds && includeIds.length > 0
+            ? { transactionIds: includeIds }
+            : {}),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json();
+      toast.success(
+        `Statement check finished — ${data.reconciledCount} line${data.reconciledCount === 1 ? "" : "s"} matched`
+      );
+      setSelectedIds(new Set());
+      fetchData();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Couldn't finish the statement check"
+      );
+    } finally {
+      setActing(false);
+    }
+  }
+
+  const activeRec = reconciliations.find((r) => r.status === "in_progress");
+
   const selectedTotal = filteredTransactions
     .filter((t) => selectedIds.has(t.id))
     .reduce((sum, t) => sum + t.amount, 0);
@@ -268,9 +314,22 @@ export default function ReconcilePage() {
             Tick off transactions that appear on your bank statement
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setSheetOpen(true)}>
-          Check a statement
-        </Button>
+        {activeRec ? (
+          <Button
+            size="sm"
+            onClick={() => finishStatementCheck()}
+            disabled={acting}
+            className="bg-emerald-600 hover:bg-emerald-700"
+            title="Mark every in-your-books line in this period as on the statement and close the check"
+          >
+            <CheckCircle className="mr-1.5 size-3.5" />
+            Finish statement check
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setSheetOpen(true)}>
+            Check a statement
+          </Button>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -312,13 +371,13 @@ export default function ReconcilePage() {
           <div className="flex items-center gap-2 px-4 py-2.5 border-t bg-muted/30">
             <Button
               size="sm"
-              onClick={() => bulkAction("reconcile")}
-              disabled={acting}
+              onClick={() => finishStatementCheck([...selectedIds])}
+              disabled={acting || !activeRec}
               className="bg-emerald-600 hover:bg-emerald-700"
-              title="Tick off these lines as appearing on your bank statement"
+              title={activeRec ? "Mark these lines as on your statement and finish the check" : "Start a statement check first"}
             >
               <CheckCircle className="mr-1.5 size-3.5" />
-              Mark {selectedIds.size} as on statement
+              Mark {selectedIds.size} on statement &amp; finish
             </Button>
             <Button
               variant="outline"
