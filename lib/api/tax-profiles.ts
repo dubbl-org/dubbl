@@ -400,6 +400,23 @@ export async function applyTaxProfile(
 }
 
 /**
+ * Ensure an org has its standard tax rates seeded from the best-fitting country
+ * profile. Resolves the profile (by explicit country, else the org's
+ * regime/country) and applies it. Both steps are idempotent, so this is safe to
+ * call at onboarding AND lazily on read (e.g. when the tax-rates list comes back
+ * empty) — mirroring how the chart-of-accounts catalog self-heals. Returns null
+ * when no profile resolves (a genuinely tax-free org), so callers can no-op.
+ */
+export async function ensureTaxRatesSeeded(
+  organizationId: string,
+  country?: string | null
+): Promise<ApplyProfileResult | null> {
+  const profile = await resolveProfileForOrg(organizationId, country);
+  if (!profile) return null;
+  return applyTaxProfile(organizationId, profile);
+}
+
+/**
  * US 1099 reporting
  * =================
  * Aggregates reportable payments made to each 1099 vendor for a tax (calendar)

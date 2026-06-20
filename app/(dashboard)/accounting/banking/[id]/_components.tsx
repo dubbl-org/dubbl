@@ -62,6 +62,7 @@ import { formatMoney, centsToDecimal } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
+import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
 import {
   resolveSpecialAccount,
   type ResolvableAccount as SpecialResolvableAccount,
@@ -1083,6 +1084,10 @@ export function CreateExpenseSheet({
                 a generic “Miscellaneous” category.
               </p>
             </div>
+
+            <div className="h-px bg-border" />
+
+            <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
           </div>
         </div>
 
@@ -1423,6 +1428,8 @@ export function CategorizeSheet({
             <Label className="text-xs">Memo (optional)</Label>
             <Input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Note for your records" />
           </div>
+
+          <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
