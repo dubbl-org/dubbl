@@ -1,13 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { bill, billLine } from "@/lib/db/schema";
+import { bill, billLine, inventoryItem } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToCents } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { reverseJournalEntry } from "@/lib/api/journal-automation";
+import { recordInventoryIssue, type ValuedItem } from "@/lib/api/inventory-valuation";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
@@ -321,7 +323,7 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "void_bill",
-    "Void a bill. Only non-paid bills can be voided.",
+    "Void a bill and reverse its bookkeeping. Reverses the posted GL entry (expense/inventory, input VAT, accounts payable) and the perpetual stock receipt for any stock lines. Blocked if the bill has recorded payments (unapply/refund first) or its period is locked. Amounts in integer cents.",
     {
       billId: z.string().describe("The UUID of the bill to void"),
     },
@@ -338,22 +340,75 @@ export function registerBillTools(server: McpServer, ctx: AuthContext) {
         });
 
         if (!existing) throw new Error("Bill not found");
-        if (existing.status === "paid") {
-          throw new Error("Cannot void a fully paid bill");
-        }
         if (existing.status === "void") {
           throw new Error("Bill is already voided");
         }
+        if (existing.amountPaid > 0) {
+          throw new Error(
+            "Cannot void a bill with recorded payments. Unapply or refund the payment first, then void."
+          );
+        }
 
-        const [updated] = await db
-          .update(bill)
-          .set({
-            status: "void",
-            voidedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(bill.id, params.billId))
-          .returning();
+        const wasPosted = !!existing.journalEntryId;
+        if (wasPosted) {
+          await assertNotLocked(ctx.organizationId, existing.issueDate, ctx);
+        }
+
+        const lines = wasPosted
+          ? await db.query.billLine.findMany({
+              where: eq(billLine.billId, params.billId),
+            })
+          : [];
+        const stockLines = lines.filter((l) => l.inventoryItemId);
+
+        const [updated] = await db.transaction(async (tx) => {
+          if (wasPosted && existing.journalEntryId) {
+            await reverseJournalEntry(
+              { organizationId: ctx.organizationId, userId: ctx.userId },
+              {
+                entryId: existing.journalEntryId,
+                date: existing.issueDate,
+                description: `Void bill ${existing.billNumber}`,
+                reference: existing.billNumber,
+                sourceType: "bill_void",
+                sourceId: existing.id,
+              },
+              tx
+            );
+          }
+
+          for (const line of stockLines) {
+            const units = Math.round(line.quantity / 100);
+            if (units <= 0 || !line.inventoryItemId) continue;
+            const item = await tx.query.inventoryItem.findFirst({
+              where: and(
+                eq(inventoryItem.id, line.inventoryItemId),
+                eq(inventoryItem.organizationId, ctx.organizationId)
+              ),
+            });
+            if (!item) continue;
+            await recordInventoryIssue(tx, {
+              item: item as ValuedItem,
+              quantity: units,
+              warehouseId: line.warehouseId,
+              type: "adjustment",
+              referenceType: "bill_void",
+              referenceId: existing.id,
+              createdBy: ctx.userId,
+            });
+          }
+
+          return tx
+            .update(bill)
+            .set({
+              status: "void",
+              voidedAt: new Date(),
+              amountDue: 0,
+              updatedAt: new Date(),
+            })
+            .where(eq(bill.id, params.billId))
+            .returning();
+        });
 
         return { bill: updated };
       })

@@ -254,6 +254,11 @@ export default function EntryDetailPage() {
                   Entry #{entry.entryNumber}
                 </h1>
                 <Badge variant="outline" className={sc.class}>{sc.label}</Badge>
+                {entry.voidedAt && (
+                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    Reversed
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {entry.description}
@@ -284,7 +289,7 @@ export default function EntryDetailPage() {
                 </Button>
               </>
             )}
-            {entry.status === "posted" && (
+            {entry.status === "posted" && !entry.voidedAt && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button

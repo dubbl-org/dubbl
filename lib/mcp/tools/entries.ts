@@ -5,6 +5,7 @@ import { journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { reverseJournalEntry } from "@/lib/api/journal-automation";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkMonthlyLimit } from "@/lib/api/check-limit";
 import { logAudit } from "@/lib/api/audit";
@@ -299,7 +300,7 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "void_entry",
-    "Void a posted journal entry by creating a reversing entry. The original entry is marked as void and a new entry with reversed debits/credits is created.",
+    "Reverse a posted journal entry. Posts a mirror entry (debits/credits swapped) dated the original entry's date and marks the original as reversed; both stay posted so the pair nets to zero in reports and the audit trail is preserved. Blocked if the period is locked or the entry was already reversed.",
     {
       entryId: z
         .string()
@@ -322,55 +323,38 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
         if (entry.status !== "posted") {
           throw new Error("Only posted entries can be voided");
         }
+        if (entry.reversedByEntryId) {
+          throw new Error("This entry has already been reversed");
+        }
+        // The reversal posts on the original entry's date — block locked/closed
+        // periods.
+        await assertNotLocked(ctx.organizationId, entry.date, ctx);
 
-        // Mark original as void
-        await db
-          .update(journalEntry)
-          .set({
-            status: "void",
-            voidedAt: new Date(),
-            voidReason: params.reason,
-            updatedAt: new Date(),
-          })
-          .where(eq(journalEntry.id, params.entryId));
+        // Post a reversing entry and mark the original "reversed", keeping BOTH
+        // posted so the pair nets to zero in reports. (Previously this voided the
+        // original AND added a reversal — double-counting, since reports drop
+        // the void but keep the reversal, leaving a net -original.)
+        const reversal = await db.transaction(async (tx) => {
+          const rev = await reverseJournalEntry(
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+              entryId: params.entryId,
+              date: entry.date,
+              description: `Reversal of entry #${entry.entryNumber}: ${params.reason}`,
+              reference: `VOID-${entry.entryNumber}`,
+              sourceType: "manual_reversal",
+              sourceId: entry.id,
+            },
+            tx
+          );
+          await tx
+            .update(journalEntry)
+            .set({ voidedAt: new Date(), voidReason: params.reason, updatedAt: new Date() })
+            .where(eq(journalEntry.id, params.entryId));
+          return rev;
+        });
 
-        // Create reversing entry
-        const [maxResult] = await db
-          .select({
-            max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
-          })
-          .from(journalEntry)
-          .where(eq(journalEntry.organizationId, ctx.organizationId));
-
-        const entryNumber = (maxResult?.max || 0) + 1;
-
-        const [reversal] = await db
-          .insert(journalEntry)
-          .values({
-            organizationId: ctx.organizationId,
-            entryNumber,
-            date: new Date().toISOString().slice(0, 10),
-            description: `Reversal of entry #${entry.entryNumber}: ${params.reason}`,
-            reference: `VOID-${entry.entryNumber}`,
-            status: "posted",
-            postedAt: new Date(),
-            createdBy: ctx.userId,
-          })
-          .returning();
-
-        await db.insert(journalLine).values(
-          entry.lines.map((l) => ({
-            journalEntryId: reversal.id,
-            accountId: l.accountId,
-            description: l.description,
-            debitAmount: l.creditAmount,
-            creditAmount: l.debitAmount,
-            currencyCode: l.currencyCode,
-            exchangeRate: l.exchangeRate,
-          }))
-        );
-
-        return { voidedEntry: params.entryId, reversalEntry: reversal };
+        return { reversedEntry: params.entryId, reversalEntry: reversal };
       })
   );
 
@@ -642,8 +626,8 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
       draftOnly: z
         .boolean()
         .optional()
-        .default(false)
-        .describe("Limit the recode to draft entries only"),
+        .default(true)
+        .describe("Defaults true (draft entries only) so posted, already-reported lines aren't silently rewritten. Pass false to deliberately include posted entries."),
     },
     (params) =>
       wrapTool(ctx, async () => {
