@@ -52,17 +52,18 @@ export async function POST(request: Request) {
     }
 
     // Pull the actual file bytes from storage via a short-lived presigned URL
-    // (the same download route the rest of the app uses), then hand a File-like
-    // object to the extractor. Tesseract accepts a Blob/File at runtime.
+    // (the same download route the rest of the app uses) and hand the raw bytes
+    // to the extractor. We pass a Buffer (not a File) because tesseract.js's
+    // Node image loader only reads a Buffer/Uint8Array/path/URL — a web File/Blob
+    // would be read as zero bytes server-side.
     const downloadUrl = await getDownloadUrl(doc.fileKey);
     const fileRes = await fetch(downloadUrl);
     if (!fileRes.ok) {
       return validationError("Couldn't load the receipt image to read it.");
     }
-    const blob = await fileRes.blob();
-    const file = new File([blob], doc.fileName, { type: doc.mimeType });
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
 
-    const extracted = await extractReceiptData(file);
+    const extracted = await extractReceiptData(buffer);
 
     return ok({
       documentId: doc.id,

@@ -155,6 +155,13 @@ export interface PdfDocumentLabels {
   numberLabel?: string;
   partyLabel?: string;
   amountLabel?: string;
+  // Label for the second-date metadata row. Defaults to "Date due" (invoice).
+  // Pass null to hide the row entirely (e.g. credit/debit notes have no due date).
+  dateLabel?: string | null;
+  // The connecting word in the headline/footer summary "{amount} {noun} {date}".
+  // Defaults to "due" (invoice). Pass null to show just the amount with no date
+  // (e.g. a credit note or purchase order isn't "due" on a date).
+  summaryNoun?: string | null;
 }
 
 interface InvoiceDocProps {
@@ -172,6 +179,17 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
   const amountDue = inv.amountDue ?? inv.total;
   const amountPaid = inv.amountPaid ?? 0;
   const hasDiscount = inv.lines.some((l) => l.discountPercent && l.discountPercent > 0);
+
+  // The second-date row and the headline/footer summary are invoice-shaped by
+  // default ("Date due" / "{amount} due {date}"). Other document types override
+  // the wording or suppress them: dateLabel === null hides the date row, and
+  // summaryNoun === null shows just the amount with no "due {date}".
+  const showDateRow = labels?.dateLabel !== null;
+  const dateRowLabel = labels?.dateLabel ?? "Date due";
+  const summaryNoun = labels?.summaryNoun === undefined ? "due" : labels.summaryNoun;
+  const summaryText = summaryNoun
+    ? `${fmtMoney(amountDue, inv.currencyCode)} ${summaryNoun} ${inv.dueDate}`
+    : fmtMoney(amountDue, inv.currencyCode);
 
   const vars: Record<string, string> = {
     orgName: org.name, orgAddress: org.address || "", orgTaxId: org.taxId || "",
@@ -209,10 +227,12 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
             <Text style={s.metaLabel}>Date of issue</Text>
             <Text style={{ fontSize: 9 }}>{inv.issueDate}</Text>
           </View>
-          <View style={s.metaRow}>
-            <Text style={s.metaLabel}>Date due</Text>
-            <Text style={{ fontSize: 9 }}>{inv.dueDate}</Text>
-          </View>
+          {showDateRow && (
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>{dateRowLabel}</Text>
+              <Text style={{ fontSize: 9 }}>{inv.dueDate}</Text>
+            </View>
+          )}
           {inv.reference && (
             <View style={s.metaRow}>
               <Text style={s.metaLabel}>Reference</Text>
@@ -240,10 +260,8 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
           </View>
         </View>
 
-        {/* Due amount summary */}
-        <Text style={s.dueSummary}>
-          {fmtMoney(amountDue, inv.currencyCode)} due {inv.dueDate}
-        </Text>
+        {/* Headline amount summary */}
+        <Text style={s.dueSummary}>{summaryText}</Text>
 
         {/* Line Items */}
         <View style={s.table}>
@@ -326,7 +344,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
         <View style={s.footer} fixed>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={s.footerText}>{inv.invoiceNumber}</Text>
-            <Text style={s.footerText}>{fmtMoney(amountDue, inv.currencyCode)} due {inv.dueDate}</Text>
+            <Text style={s.footerText}>{summaryText}</Text>
             {footerText && <Text style={s.footerText}>{footerText}</Text>}
           </View>
           <Link src="https://dubbl.dev" style={{ textDecoration: "none" }}>

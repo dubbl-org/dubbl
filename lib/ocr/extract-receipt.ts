@@ -9,16 +9,35 @@ export interface ReceiptData {
 }
 
 export async function extractReceiptData(
-  imageFile: File,
+  image: File | Blob | Buffer,
   onProgress?: (progress: number) => void
 ): Promise<ReceiptData> {
-  const result = await Tesseract.recognize(imageFile, "eng", {
-    logger: (m: { status: string; progress: number }) => {
-      if (m.status === "recognizing text" && onProgress) {
-        onProgress(Math.round(m.progress * 100));
-      }
-    },
-  });
+  // tesseract.js ships two image loaders. The browser loader reads a File/Blob
+  // via FileReader, but the Node loader only understands a Buffer/Uint8Array/path/
+  // URL — handed a File/Blob it reads zero bytes and throws "Error attempting to
+  // read image". So on the server (where API routes call this) we normalise a
+  // File/Blob to a Uint8Array first; in the browser we pass it through untouched
+  // because the browser loader needs the original Blob.
+  let input: File | Blob | Buffer | Uint8Array = image;
+  if (
+    typeof window === "undefined" &&
+    typeof Blob !== "undefined" &&
+    image instanceof Blob
+  ) {
+    input = new Uint8Array(await image.arrayBuffer());
+  }
+
+  const result = await Tesseract.recognize(
+    input as Parameters<typeof Tesseract.recognize>[0],
+    "eng",
+    {
+      logger: (m: { status: string; progress: number }) => {
+        if (m.status === "recognizing text" && onProgress) {
+          onProgress(Math.round(m.progress * 100));
+        }
+      },
+    }
+  );
 
   const text = result.data.text;
   return {

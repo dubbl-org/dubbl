@@ -116,6 +116,9 @@ export async function GET(
           numberLabel: "Credit note number",
           partyLabel: "Credit to",
           amountLabel: "Credit total",
+          // A credit note has no due date — show the credit amount, no "due {date}".
+          dateLabel: null,
+          summaryNoun: null,
         }
       );
 

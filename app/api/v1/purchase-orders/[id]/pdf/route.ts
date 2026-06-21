@@ -114,6 +114,9 @@ export async function GET(
           numberLabel: "PO number",
           partyLabel: "Supplier",
           amountLabel: "Order total",
+          // A PO isn't "due" — show the delivery date (when set) and the order total.
+          dateLabel: docData.secondDate ? "Delivery date" : null,
+          summaryNoun: null,
         }
       );
 

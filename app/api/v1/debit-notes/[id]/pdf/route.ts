@@ -116,6 +116,9 @@ export async function GET(
           numberLabel: "Debit note number",
           partyLabel: "Supplier",
           amountLabel: "Debit total",
+          // A debit note has no due date — show the debit amount, no "due {date}".
+          dateLabel: null,
+          summaryNoun: null,
         }
       );
 

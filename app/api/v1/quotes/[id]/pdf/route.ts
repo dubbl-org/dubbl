@@ -114,6 +114,9 @@ export async function GET(
           numberLabel: "Quote number",
           partyLabel: "Quote for",
           amountLabel: "Total",
+          // A quote isn't "due" — it's valid until its expiry date.
+          dateLabel: docData.secondDate ? "Valid until" : null,
+          summaryNoun: docData.secondDate ? "valid until" : null,
         }
       );
 
