@@ -41,6 +41,7 @@ import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
+import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
 import Link from "next/link";
 
 interface InvoiceDetail {
@@ -874,6 +875,20 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Attachments */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Attachments</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Attach the customer&apos;s purchase order, a signed copy, or any other file for this invoice.
+          </p>
+          <ReceiptAttachments
+            orgId={orgId}
+            entityType="invoice"
+            entityId={id}
+            label="Add a file (purchase order, signed copy, etc.)"
+          />
         </div>
 
         {/* Payment summary + Notes row */}
