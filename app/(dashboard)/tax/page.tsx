@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Scale, Percent, Pencil, Trash2 } from "lucide-react";
+import { Plus, Scale, Percent, Pencil, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -221,6 +220,107 @@ function buildPayload(opts: {
   };
 }
 
+interface CountryProfile {
+  country: string;
+  countryName: string;
+}
+
+// Shown when the org has no tax rates yet: one click seeds the country's
+// standard tax rates so the user doesn't have to type them all out by hand.
+function QuickSetup({ orgId, onSeeded }: { orgId: string | null; onSeeded: () => void }) {
+  const [profiles, setProfiles] = useState<CountryProfile[]>([]);
+  const [recommended, setRecommended] = useState<string | null>(null);
+  const [country, setCountry] = useState<string>("");
+  const [seeding, setSeeding] = useState(false);
+
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/tax-profiles", { headers: { "x-organization-id": orgId } });
+        const data = await res.json();
+        if (cancelled) return;
+        if (Array.isArray(data.profiles)) {
+          setProfiles(data.profiles.map((p: CountryProfile) => ({ country: p.country, countryName: p.countryName })));
+        }
+        if (data.recommendedCountry) {
+          setRecommended(data.recommendedCountry);
+          setCountry(data.recommendedCountry);
+        }
+      } catch {
+        /* leave the picker empty; the seed button is still usable */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [orgId]);
+
+  async function handleSeed() {
+    if (!orgId) return;
+    setSeeding(true);
+    try {
+      const res = await fetch("/api/v1/tax-profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        // Empty country lets the server resolve it from the org; otherwise use the picked one.
+        body: JSON.stringify(country ? { country } : {}),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const result = await res.json();
+      const created = Array.isArray(result.created) ? result.created.length : 0;
+      const skipped = Array.isArray(result.skipped) ? result.skipped.length : 0;
+      if (created > 0) {
+        toast.success(`Added ${created} tax rate${created === 1 ? "" : "s"}${skipped ? ` (${skipped} already existed)` : ""}`);
+      } else {
+        toast.info("Those tax rates were already set up");
+      }
+      onSeeded();
+    } catch {
+      toast.error("Couldn't add tax rates — try again");
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  const recommendedName = profiles.find((p) => p.country === recommended)?.countryName;
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center dark:border-emerald-800/40 dark:bg-emerald-950/20">
+      <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">
+        <Sparkles className="size-5" />
+      </div>
+      <h3 className="mt-3 text-base font-semibold">Add your country&apos;s tax rates</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {recommendedName
+          ? `We can set up the standard tax rates for ${recommendedName} so you don't have to enter them one by one.`
+          : "Pick your country and we'll set up its standard tax rates so you don't have to enter them one by one."}
+      </p>
+      <div className="mx-auto mt-4 flex max-w-sm flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
+        {profiles.length > 0 && (
+          <Select value={country} onValueChange={setCountry}>
+            <SelectTrigger className="sm:w-56 bg-background">
+              <SelectValue placeholder="Choose a country" />
+            </SelectTrigger>
+            <SelectContent>
+              {profiles.map((p) => (
+                <SelectItem key={p.country} value={p.country}>{p.countryName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Button
+          onClick={handleSeed}
+          disabled={seeding || (profiles.length > 0 && !country)}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Sparkles className="mr-1.5 size-3.5" />
+          {seeding ? "Setting up..." : "Quick setup: add my country's tax rates"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolean; setOpen: (v: boolean) => void; onCreated: () => void; orgId: string | null }) {
   const [name, setName] = useState("");
   const [rate, setRate] = useState("");
@@ -387,7 +487,7 @@ export default function TaxRatesPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : rates.length === 0 ? (
-        <EmptyState icon={Scale} title="No tax rates" description="Add tax rates to apply taxes on invoices and bills." />
+        <QuickSetup orgId={orgId} onSeeded={fetchRates} />
       ) : (
         <div className="space-y-2.5">
           {rates.map((rate) => {

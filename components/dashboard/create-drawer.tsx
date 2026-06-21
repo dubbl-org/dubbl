@@ -646,6 +646,10 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [reference, setReference] = useState("");
   const [billNumber, setBillNumber] = useState("");
   const [notes, setNotes] = useState("");
+  // When on, the bill is routed into the approval queue instead of being
+  // posted straight away (created as a draft awaiting approval; the bill's own
+  // page carries the approve / reject lifecycle actions).
+  const [forApproval, setForApproval] = useState(false);
   // When the server flags a possible duplicate (409 + warning), stash the
   // duplicate's bill number so we can show a "Create anyway" confirm.
   const [duplicateBillNumber, setDuplicateBillNumber] = useState<string | null>(null);
@@ -655,7 +659,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   useEffect(() => {
     if (!open) {
-      setContactId(""); setReference(""); setBillNumber(""); setNotes(""); setDuplicateBillNumber(null);
+      setContactId(""); setReference(""); setBillNumber(""); setNotes(""); setForApproval(false); setDuplicateBillNumber(null);
       setIssueDate(new Date().toISOString().split("T")[0]);
       const d = new Date(); d.setDate(d.getDate() + 30);
       setDueDate(d.toISOString().split("T")[0]);
@@ -695,6 +699,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
           reference: reference || null,
           notes: notes || null,
           ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
+          ...(forApproval ? { submitForApproval: true } : {}),
           lines: lines.map((l) => ({
             description: l.description,
             quantity: parseFloat(l.quantity) || 1,
@@ -714,7 +719,11 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         throw new Error(data.error || "Failed to create bill");
       }
       const data = await res.json();
-      toast.success("Bill created");
+      toast.success(
+        forApproval
+          ? "Bill saved for approval — approve it from the bill's page to post it"
+          : "Bill created"
+      );
       onClose();
       router.push(`/purchases/${data.bill.id}`);
     } catch (err) {
@@ -776,6 +785,20 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
                 </div>
               </div>
+              <label className="flex items-start gap-3 rounded-lg border bg-muted/30 px-3 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={forApproval}
+                  onChange={(e) => setForApproval(e.target.checked)}
+                  className="mt-0.5 size-4 accent-emerald-600"
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium">Submit for approval instead of posting</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Save the bill for someone to approve. It stays a draft and isn&apos;t added to your books until it&apos;s approved.
+                  </span>
+                </span>
+              </label>
               {duplicateBillNumber && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
                   <p className="font-medium text-amber-800 dark:text-amber-300">
@@ -2476,6 +2499,9 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const [endDate, setEndDate] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  // When on, each generated invoice is approved AND emailed to the customer
+  // automatically (carried as `autoSend` on /api/v1/recurring-invoices).
+  const [autoSend, setAutoSend] = useState(false);
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
@@ -2483,6 +2509,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
   useEffect(() => {
     if (!open) {
       setName(""); setContactId(""); setFrequency("monthly"); setReference(""); setNotes(""); setEndDate("");
+      setAutoSend(false);
       setStartDate(new Date().toISOString().split("T")[0]);
       setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
     }
@@ -2497,14 +2524,15 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
     if (!orgId) return;
 
     try {
-      const res = await fetch("/api/v1/recurring", {
+      const res = await fetch("/api/v1/recurring-invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
-          name, type: "invoice", contactId, frequency, startDate,
+          name, contactId, frequency, startDate,
           endDate: endDate || null,
           reference: reference || null,
           notes: notes || null,
+          autoSend,
           lines: lines.map((l) => ({
             description: l.description,
             quantity: parseFloat(l.quantity) || 1,
@@ -2584,6 +2612,20 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
                   <DatePicker value={endDate} onChange={setEndDate} placeholder="No end date" />
                 </div>
               </div>
+              <label className="flex items-start gap-3 rounded-lg border bg-muted/30 px-3 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoSend}
+                  onChange={(e) => setAutoSend(e.target.checked)}
+                  className="mt-0.5 size-4 accent-emerald-600"
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium">Email it automatically each time</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Each new invoice is finalised and emailed to the customer on its own. Leave off to create drafts you send yourself.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="h-px bg-border" />

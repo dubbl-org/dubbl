@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 interface StatementLine {
   date: string;
@@ -53,9 +55,21 @@ export default function PortalStatementsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Statement of Account</h2>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Total Outstanding</p>
-          <p className="text-xl font-bold">{formatMoney(totalOutstanding)}</p>
+        <div className="flex items-center gap-4">
+          <a
+            href={`/api/portal/${token}/statements/pdf?format=pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="outline" size="sm" className="gap-1">
+              <Download className="size-4" />
+              Download statement (PDF)
+            </Button>
+          </a>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Total Outstanding</p>
+            <p className="text-xl font-bold">{formatMoney(totalOutstanding)}</p>
+          </div>
         </div>
       </div>
 

@@ -265,10 +265,10 @@ export default function StockTakeDetailPage() {
   async function handleApplyAdjustments() {
     if (!orgId) return;
     const confirmed = await confirm({
-      title: "Apply adjustments?",
+      title: "Finalize & post adjustment?",
       description:
-        "This will update inventory quantities based on the counted values. This action cannot be undone.",
-      confirmLabel: "Apply",
+        "This corrects on-hand inventory to your counted quantities and posts the value of any difference to the ledger. The stock take will be marked completed and this cannot be undone.",
+      confirmLabel: "Finalize & post",
       destructive: false,
     });
     if (!confirmed) return;
@@ -279,13 +279,32 @@ export default function StockTakeDetailPage() {
         method: "POST",
         headers: { "x-organization-id": orgId },
       });
-      if (!res.ok) throw new Error("Failed to apply adjustments");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Failed to post adjustment");
+      }
       const data = await res.json();
-      setStockTake(data.stockTake);
-      toast.success("Adjustments applied");
+
+      // Refetch the full detail so lines, badges and totals reflect the post.
+      const refetch = await fetch(`/api/v1/stock-takes/${id}`, {
+        headers: { "x-organization-id": orgId },
+      });
+      if (refetch.ok) {
+        const fresh = await refetch.json();
+        if (fresh.stockTake) setStockTake(fresh.stockTake);
+      } else if (data.stockTake) {
+        setStockTake(data.stockTake);
+      }
+
+      const count = typeof data.adjustedCount === "number" ? data.adjustedCount : 0;
+      toast.success(
+        count > 0
+          ? `Adjustment posted · ${count} item${count === 1 ? "" : "s"} corrected`
+          : "Stock take finalized · no differences to post"
+      );
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to apply adjustments"
+        err instanceof Error ? err.message : "Failed to post adjustment"
       );
     } finally {
       setActionLoading(false);
@@ -660,7 +679,7 @@ export default function StockTakeDetailPage() {
                   ) : (
                     <CheckCircle className="mr-1.5 size-3.5" />
                   )}
-                  Apply Adjustments
+                  Finalize &amp; post adjustment
                 </Button>
                 <Button
                   size="sm"
