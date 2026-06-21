@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX } from "lucide-react";
+import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX, Percent, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,9 +65,28 @@ interface InvoiceDetail {
     quantity: number;
     unitPrice: number;
     amount: number;
+    taxAmount: number;
     account: { code: string; name: string; id: string } | null;
+    taxRate: { id: string; name: string; rate: number } | null;
   }[];
 }
+
+interface AvailableCredit {
+  id: string;
+  date: string;
+  currencyCode: string;
+  originalAmount: number;
+  amountRemaining: number;
+  sourceType: string;
+  notes: string | null;
+}
+
+// Plain-language label for where the credit came from.
+const creditSourceLabels: Record<string, string> = {
+  prepayment: "Prepayment",
+  overpayment: "Overpayment",
+  credit_note: "Credit note",
+};
 
 interface BaseAmounts {
   baseCurrency: string;
@@ -181,6 +200,13 @@ export default function InvoiceDetailPage() {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
   const [orgName, setOrgName] = useState("");
+  // Late fee / interest
+  const [interestOpen, setInterestOpen] = useState(false);
+  const [interestAmount, setInterestAmount] = useState("");
+  const [interestLoading, setInterestLoading] = useState(false);
+  // Available customer credits
+  const [credits, setCredits] = useState<AvailableCredit[]>([]);
+  const [applyingCreditId, setApplyingCreditId] = useState<string | null>(null);
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -223,7 +249,99 @@ export default function InvoiceDetailPage() {
         if (data.organization?.name) setOrgName(data.organization.name);
       })
       .catch(() => {});
+
+    fetch(`/api/v1/invoices/${id}/available-credits`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.credits)) setCredits(data.credits);
+      })
+      .catch(() => {});
   }, [id, orgId]);
+
+  // Re-pull the invoice (+ payments + base) and available credits after an
+  // action that changes balances (late fee, applying a credit).
+  function refetchInvoice() {
+    if (!orgId) return;
+    fetch(`/api/v1/invoices/${id}`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.invoice) setInv(data.invoice);
+        if (data.payments) setPayments(data.payments);
+        if (data.base) setBase(data.base);
+      })
+      .catch(() => {});
+    fetch(`/api/v1/invoices/${id}/available-credits`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.credits)) setCredits(data.credits);
+      })
+      .catch(() => {});
+  }
+
+  async function handleChargeInterest() {
+    if (!orgId) return;
+    setInterestLoading(true);
+    try {
+      const body: { amount?: number } = {};
+      const trimmed = interestAmount.trim();
+      if (trimmed) {
+        const amt = parseFloat(trimmed);
+        if (!amt || amt <= 0) {
+          toast.error("Enter a valid amount");
+          setInterestLoading(false);
+          return;
+        }
+        body.amount = amt;
+      }
+      const res = await fetch(`/api/v1/invoices/${id}/charge-interest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setInterestOpen(false);
+        setInterestAmount("");
+        toast.success("Late fee added as a new invoice");
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't add a late fee");
+      }
+    } finally {
+      setInterestLoading(false);
+    }
+  }
+
+  async function handleApplyCredit(credit: AvailableCredit) {
+    if (!orgId || !inv) return;
+    // Apply the smaller of what's left on the credit and what's owed.
+    const amount = Math.min(credit.amountRemaining, inv.amountDue);
+    if (amount <= 0) {
+      toast.error("Nothing left to apply");
+      return;
+    }
+    setApplyingCreditId(credit.id);
+    try {
+      const res = await fetch(`/api/v1/customer-credits/${credit.id}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ invoiceId: id, amount }),
+      });
+      if (res.ok) {
+        toast.success(`Applied ${formatMoney(amount, inv.currencyCode)} credit`);
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't apply this credit");
+      }
+    } finally {
+      setApplyingCreditId(null);
+    }
+  }
 
   useEffect(() => {
     if (!orgId || !payOpen) return;
@@ -545,6 +663,47 @@ export default function InvoiceDetailPage() {
               <Copy className="mr-2 size-4" />Make a copy
             </Button>
             {["sent", "partial", "overdue"].includes(inv.status) && (
+              <Dialog open={interestOpen} onOpenChange={setInterestOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Charge the customer a late fee / interest for paying after the due date. This creates a new invoice for the fee."
+                  >
+                    <Percent className="mr-2 size-4" />Add late fee / interest
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add late fee / interest</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      This creates a separate invoice for the late fee. Leave the
+                      amount blank to use your organization&apos;s interest rate, or
+                      enter a custom amount to charge.
+                    </p>
+                    <div className="space-y-2">
+                      <Label>Custom amount (optional)</Label>
+                      <CurrencyInput
+                        prefix="$"
+                        value={interestAmount}
+                        onChange={setInterestAmount}
+                        placeholder="Use my interest rate"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleChargeInterest}
+                      loading={interestLoading}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      Add late fee
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+            {["sent", "partial", "overdue"].includes(inv.status) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -642,6 +801,7 @@ export default function InvoiceDetailPage() {
                   <th className="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Description</th>
                   <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-20">Qty</th>
                   <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-28">Price</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-28">Tax</th>
                   <th className="px-6 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-28">Amount</th>
                 </tr>
               </thead>
@@ -656,6 +816,18 @@ export default function InvoiceDetailPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-mono tabular-nums">{(line.quantity / 100).toFixed(0)}</td>
                     <td className="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(line.unitPrice, inv.currencyCode)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {line.taxRate ? (
+                        <div>
+                          <span className="font-mono">{(line.taxRate.rate / 100).toFixed(2)}%</span>
+                          {line.taxAmount > 0 && (
+                            <p className="text-[11px] font-mono">{formatMoney(line.taxAmount, inv.currencyCode)}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs">No tax</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3 text-right font-mono tabular-nums font-medium">{formatMoney(line.amount, inv.currencyCode)}</td>
                   </tr>
                 ))}
@@ -776,6 +948,53 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Available customer credit */}
+        {credits.length > 0 &&
+          inv.amountDue > 0 &&
+          !["paid", "void", "draft"].includes(inv.status) && (
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center gap-2 border-b bg-muted/30 px-5 py-3">
+                <Wallet className="size-3.5 text-muted-foreground" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Available credit
+                </p>
+              </div>
+              <p className="px-5 pt-3 text-xs text-muted-foreground">
+                This customer has credit on account (from prepayments or overpayments). Apply it to settle this invoice.
+              </p>
+              <div className="divide-y mt-1">
+                {credits.map((c) => {
+                  const applyAmount = Math.min(c.amountRemaining, inv.amountDue);
+                  return (
+                    <div key={c.id} className="flex items-center justify-between px-5 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
+                          <Wallet className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-mono font-semibold">{formatMoney(c.amountRemaining, c.currencyCode)}</span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{creditSourceLabels[c.sourceType] || c.sourceType}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{formatDate(c.date)}{c.notes ? ` · ${c.notes}` : ""}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApplyCredit(c)}
+                        loading={applyingCreditId === c.id}
+                        title={`Apply ${formatMoney(applyAmount, c.currencyCode)} to this invoice`}
+                      >
+                        Apply {formatMoney(applyAmount, c.currencyCode)}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
         {/* Document Details (snapshot) */}
         {inv.status !== "draft" && (
