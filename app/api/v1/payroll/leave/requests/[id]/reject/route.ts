@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { leaveRequest } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound, validationError } from "@/lib/api/response";
@@ -24,7 +24,10 @@ export async function POST(
     const parsed = rejectSchema.parse(body);
 
     const req = await db.query.leaveRequest.findFirst({
-      where: eq(leaveRequest.id, id),
+      where: and(
+        eq(leaveRequest.id, id),
+        eq(leaveRequest.organizationId, ctx.organizationId)
+      ),
     });
 
     if (!req) return notFound("Leave request");
@@ -36,7 +39,10 @@ export async function POST(
         status: "rejected",
         rejectionReason: parsed.reason || null,
       })
-      .where(eq(leaveRequest.id, id))
+      .where(and(
+        eq(leaveRequest.id, id),
+        eq(leaveRequest.organizationId, ctx.organizationId)
+      ))
       .returning();
 
     logAudit({ ctx, action: "reject", entityType: "leaveRequest", entityId: id, request });

@@ -24,7 +24,10 @@ export async function POST(
     if (!memberRecord) return notFound("Member");
 
     const req = await db.query.leaveRequest.findFirst({
-      where: eq(leaveRequest.id, id),
+      where: and(
+        eq(leaveRequest.id, id),
+        eq(leaveRequest.organizationId, ctx.organizationId)
+      ),
     });
 
     if (!req) return notFound("Leave request");
@@ -37,7 +40,10 @@ export async function POST(
         approvedBy: memberRecord.id,
         approvedAt: new Date(),
       })
-      .where(eq(leaveRequest.id, id))
+      .where(and(
+        eq(leaveRequest.id, id),
+        eq(leaveRequest.organizationId, ctx.organizationId)
+      ))
       .returning();
 
     // Update leave balance
