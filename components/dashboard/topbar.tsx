@@ -61,6 +61,8 @@ const LABELS: Record<string, string> = {
   "credit-notes": "Credit Notes",
   recurring: "Recurring",
   payments: "Payments",
+  "customer-prepayments": "Prepayments",
+  "revenue-schedules": "Revenue Schedules",
   new: "New",
   // Purchases
   bills: "Bills",
@@ -68,6 +70,8 @@ const LABELS: Record<string, string> = {
   orders: "Purchase Orders",
   requisitions: "Requisitions",
   "vendor-spend": "Vendor Spend",
+  "debit-notes": "Supplier Credits",
+  "goods-receipts": "Goods Received",
   // Accounting
   transactions: "Transactions",
   accounts: "Accounts",
@@ -75,6 +79,10 @@ const LABELS: Record<string, string> = {
   "fixed-assets": "Fixed Assets",
   budgets: "Budgets",
   reconcile: "Reconcile",
+  loans: "Loans",
+  "opening-balances": "Opening Balances",
+  accruals: "Accruals",
+  "recurring-journals": "Recurring Journals",
   // Settings
   general: "General",
   members: "Members",
@@ -179,7 +187,7 @@ function getLabel(segment: string): string {
   return LABELS[segment] || segment;
 }
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";
 
 const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
@@ -187,14 +195,21 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   "sales/receipts": { label: "New cash sale", drawer: "salesReceipt" },
   "sales/credit-notes": { label: "New Credit Note", drawer: "creditNote" },
   "sales/recurring": { label: "New Recurring", drawer: "recurring" },
+  "sales/customer-prepayments": { label: "New prepayment", drawer: "customerCredit" },
+  "sales/revenue-schedules": { label: "New revenue schedule", drawer: "revenueSchedule" },
   purchases: { label: "New Bill", drawer: "bill" },
   "purchases/expenses": { label: "New Expense", drawer: "expense" },
   "purchases/orders": { label: "New PO", drawer: "purchaseOrder" },
+  "purchases/debit-notes": { label: "New supplier credit", drawer: "debitNote" },
   accounting: { label: "New Entry", drawer: "entry" },
   "accounting/accounts": { label: "New Account", drawer: "account" },
   "accounting/banking": { label: "New Account", drawer: "bankAccount" },
   "accounting/fixed-assets": { label: "New Asset", drawer: "fixedAsset" },
   "accounting/budgets": { label: "New Budget", drawer: "budget" },
+  "accounting/loans": { label: "New loan", drawer: "loan" },
+  "accounting/opening-balances": { label: "Set opening balances", drawer: "openingBalance" },
+  "accounting/accruals": { label: "New accrual", drawer: "accrualSchedule" },
+  "accounting/recurring-journals": { label: "New recurring journal", drawer: "recurringJournal" },
   contacts: { label: "New Contact", drawer: "contact" },
   projects: { label: "New Project", drawer: "project" },
   inventory: { label: "New Item", drawer: "inventory" },

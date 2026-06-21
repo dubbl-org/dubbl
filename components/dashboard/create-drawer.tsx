@@ -24,6 +24,12 @@ import {
   ArrowLeftRight,
   Briefcase,
   Banknote,
+  Undo2,
+  Wallet,
+  CalendarClock,
+  Scale,
+  TrendingUp,
+  Repeat,
 } from "lucide-react";
 import {
   Sheet,
@@ -58,7 +64,7 @@ import { formatMoney, decimalToCents } from "@/lib/money";
 import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
 import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";
 
 interface DrawerInitialData {
   contactId?: string;
@@ -114,6 +120,13 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <TransferDrawer open={activeType === "transfer"} onClose={close} />
       <ContractorDrawer open={activeType === "contractor"} onClose={close} />
       <DealDrawer open={activeType === "deal"} onClose={close} initialData={initialData} />
+      <DebitNoteDrawer open={activeType === "debitNote"} onClose={close} />
+      <CustomerCreditDrawer open={activeType === "customerCredit"} onClose={close} />
+      <LoanDrawer open={activeType === "loan"} onClose={close} />
+      <OpeningBalanceDrawer open={activeType === "openingBalance"} onClose={close} />
+      <AccrualScheduleDrawer open={activeType === "accrualSchedule"} onClose={close} />
+      <RevenueScheduleDrawer open={activeType === "revenueSchedule"} onClose={close} />
+      <RecurringJournalDrawer open={activeType === "recurringJournal"} onClose={close} />
     </CreateDrawerContext.Provider>
   );
 }
@@ -631,14 +644,18 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split("T")[0];
   });
   const [reference, setReference] = useState("");
+  const [billNumber, setBillNumber] = useState("");
   const [notes, setNotes] = useState("");
+  // When the server flags a possible duplicate (409 + warning), stash the
+  // duplicate's bill number so we can show a "Create anyway" confirm.
+  const [duplicateBillNumber, setDuplicateBillNumber] = useState<string | null>(null);
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
 
   useEffect(() => {
     if (!open) {
-      setContactId(""); setReference(""); setNotes("");
+      setContactId(""); setReference(""); setBillNumber(""); setNotes(""); setDuplicateBillNumber(null);
       setIssueDate(new Date().toISOString().split("T")[0]);
       const d = new Date(); d.setDate(d.getDate() + 30);
       setDueDate(d.toISOString().split("T")[0]);
@@ -662,12 +679,11 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     }
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitBill(confirmDuplicate: boolean) {
     if (!contactId) { toast.error("Please select a supplier"); return; }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+    if (!orgId) { setSaving(false); return; }
 
     try {
       const res = await fetch("/api/v1/bills", {
@@ -675,8 +691,10 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           contactId, issueDate, dueDate,
+          billNumber: billNumber.trim() || null,
           reference: reference || null,
           notes: notes || null,
+          ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
           lines: lines.map((l) => ({
             description: l.description,
             quantity: parseFloat(l.quantity) || 1,
@@ -688,6 +706,11 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
       });
       if (!res.ok) {
         const data = await res.json();
+        // A soft duplicate warning lets the user create anyway; a hard block does not.
+        if (res.status === 409 && data.warning === "duplicate_bill") {
+          setDuplicateBillNumber(data.duplicate?.billNumber || billNumber.trim() || "this number");
+          return;
+        }
         throw new Error(data.error || "Failed to create bill");
       }
       const data = await res.json();
@@ -699,6 +722,12 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setDuplicateBillNumber(null);
+    submitBill(false);
   }
 
   return (
@@ -727,6 +756,12 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <ContactPicker value={contactId} onChange={setContactId} type="supplier" />
                 </div>
                 <div className="space-y-2">
+                  <Label>Supplier bill number</Label>
+                  <Input value={billNumber} onChange={(e) => { setBillNumber(e.target.value); setDuplicateBillNumber(null); }} placeholder="The number on their invoice" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
                   <Label>Reference</Label>
                   <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bill reference" />
                 </div>
@@ -741,6 +776,35 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
                 </div>
               </div>
+              {duplicateBillNumber && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
+                  <p className="font-medium text-amber-800 dark:text-amber-300">
+                    You already have a bill with number &ldquo;{duplicateBillNumber}&rdquo; for this supplier.
+                  </p>
+                  <p className="mt-0.5 text-amber-700 dark:text-amber-400/90">
+                    This might be a duplicate. Create it anyway?
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-amber-600 hover:bg-amber-700"
+                      disabled={saving}
+                      onClick={() => submitBill(true)}
+                    >
+                      {saving ? "Creating..." : "Create anyway"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDuplicateBillNumber(null)}
+                    >
+                      Go back
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="h-px bg-border" />
@@ -3555,6 +3619,1141 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
             </div>
           </div>
           <DrawerFooter onClose={handleClose} saving={saving} label="Create Deal" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Debit Note Drawer (supplier credit — money a supplier owes you back)
+// ---------------------------------------------------------------------------
+function DebitNoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [currencyCode, setCurrencyCode] = useState("");
+  const [lines, setLines] = useState<LineItem[]>([
+    { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setContactId(""); setReference(""); setNotes(""); setCurrencyCode("");
+      setIssueDate(new Date().toISOString().split("T")[0]);
+      setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a supplier"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/debit-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId, issueDate,
+          reference: reference || null,
+          notes: notes || null,
+          currencyCode: currencyCode || undefined,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create supplier credit");
+      }
+      const data = await res.json();
+      toast.success("Supplier credit created");
+      onClose();
+      router.push(`/purchases/debit-notes/${data.debitNote.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create supplier credit");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Undo2 className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New supplier credit</SheetTitle>
+              <SheetDescription>Record money a supplier owes you back, to reduce what you owe them.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Credit Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Supplier *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="supplier" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Original bill, etc." />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Issue Date</Label>
+                  <DatePicker value={issueDate} onChange={setIssueDate} placeholder="Issue date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <CurrencySelect value={currencyCode} onValueChange={setCurrencyCode} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Line Items</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Reason for the credit..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create supplier credit" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Customer Credit Drawer (prepayment — money received in advance)
+// ---------------------------------------------------------------------------
+function CustomerCreditDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [amount, setAmount] = useState("0.00");
+  const [sourceType, setSourceType] = useState("prepayment");
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [currencyCode, setCurrencyCode] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setContactId(""); setDate(new Date().toISOString().split("T")[0]); setAmount("0.00");
+      setSourceType("prepayment"); setBankAccountId(""); setCurrencyCode(""); setNotes("");
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/bank-accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.bankAccounts) setBankAccounts(data.bankAccounts); })
+      .catch(() => {});
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a customer"); return; }
+    if (!bankAccountId) { toast.error("Please choose where the money was paid in"); return; }
+    const cents = decimalToCents(amount);
+    if (cents <= 0) { toast.error("Please enter an amount"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/customer-credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId,
+          date,
+          amount: cents,
+          sourceType,
+          bankAccountId,
+          currencyCode: currencyCode || undefined,
+          notes: notes || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to record prepayment");
+      }
+      toast.success("Prepayment recorded");
+      onClose();
+      router.push("/sales/customer-prepayments");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record prepayment");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Wallet className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New prepayment</SheetTitle>
+              <SheetDescription>Record money a customer paid you in advance, before any invoice.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Prepayment Details</SectionLabel>
+              <div className="space-y-2">
+                <Label>Customer *</Label>
+                <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <DatePicker value={date} onChange={setDate} placeholder="Date received" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-credit-amount">Amount</Label>
+                  <CurrencyInput id="drawer-credit-amount" prefix="$" value={amount} onChange={setAmount} />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={sourceType} onValueChange={setSourceType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prepayment">Prepayment</SelectItem>
+                      <SelectItem value="overpayment">Overpayment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <CurrencySelect value={currencyCode} onValueChange={setCurrencyCode} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Payment</SectionLabel>
+              <div className="space-y-2">
+                <Label>Paid into *</Label>
+                <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose where the money landed..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.accountName} · {acc.currencyCode}
+                      </SelectItem>
+                    ))}
+                    {bankAccounts.length === 0 && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                        No bank or cash accounts yet
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  The cash or bank account the customer paid into.
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes about this prepayment..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Record prepayment" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loan Drawer
+// ---------------------------------------------------------------------------
+function LoanDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
+  const [principalAmount, setPrincipalAmount] = useState("0.00");
+  const [interestPercent, setInterestPercent] = useState("");
+  const [termMonths, setTermMonths] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [principalAccountId, setPrincipalAccountId] = useState("");
+  const [interestAccountId, setInterestAccountId] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setName(""); setPrincipalAmount("0.00"); setInterestPercent(""); setTermMonths("");
+      setStartDate(new Date().toISOString().split("T")[0]); setBankAccountId("");
+      setPrincipalAccountId(""); setInterestAccountId("");
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/bank-accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.bankAccounts) setBankAccounts(data.bankAccounts); })
+      .catch(() => {});
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { toast.error("Please enter a loan name"); return; }
+    if (!principalAccountId) { toast.error("Please choose the loan (liability) account"); return; }
+    if (!interestAccountId) { toast.error("Please choose the interest (expense) account"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/loans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name,
+          // Route expects DOLLARS for the principal (it converts to cents).
+          principalAmount: parseFloat(principalAmount) || 0,
+          // User types a percent; the route wants basis points (5% -> 500).
+          interestRate: Math.round((parseFloat(interestPercent) || 0) * 100),
+          termMonths: parseInt(termMonths) || 0,
+          startDate,
+          bankAccountId: bankAccountId || undefined,
+          principalAccountId,
+          interestAccountId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create loan");
+      }
+      const data = await res.json();
+      toast.success("Loan created");
+      onClose();
+      router.push(`/accounting/loans/${data.loan.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create loan");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Landmark className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New loan</SheetTitle>
+              <SheetDescription>Track a loan you&apos;ve taken out, its repayments and interest.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Loan Details</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-loan-name">Name *</Label>
+                <Input id="drawer-loan-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Equipment loan" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-loan-principal">Loan amount</Label>
+                  <CurrencyInput id="drawer-loan-principal" prefix="$" value={principalAmount} onChange={setPrincipalAmount} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-loan-rate">Interest rate (%)</Label>
+                  <Input id="drawer-loan-rate" type="number" step="0.01" min={0} value={interestPercent} onChange={(e) => setInterestPercent(e.target.value)} placeholder="e.g. 5" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-loan-term">Term (months)</Label>
+                  <Input id="drawer-loan-term" type="number" min={1} value={termMonths} onChange={(e) => setTermMonths(e.target.value)} placeholder="e.g. 36" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Where the money landed</SectionLabel>
+              <div className="space-y-2">
+                <Label>Paid into</Label>
+                <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose where the loan was paid in..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.accountName} · {acc.currencyCode}
+                      </SelectItem>
+                    ))}
+                    {bankAccounts.length === 0 && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                        No bank or cash accounts yet
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Accounts</SectionLabel>
+              <div className="space-y-2">
+                <Label>Loan account *</Label>
+                <AccountPicker value={principalAccountId} onChange={setPrincipalAccountId} typeFilter={["liability"]} placeholder="Choose the liability account..." />
+                <p className="text-[11px] text-muted-foreground">The liability account that tracks what you owe.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Interest account *</Label>
+                <AccountPicker value={interestAccountId} onChange={setInterestAccountId} typeFilter={["expense"]} placeholder="Choose the interest expense account..." />
+                <p className="text-[11px] text-muted-foreground">The expense account interest charges are recorded against.</p>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create loan" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Opening Balance Drawer (debit/credit rows, must balance)
+// ---------------------------------------------------------------------------
+interface OpeningBalanceRow {
+  accountId: string;
+  debit: string;
+  credit: string;
+}
+
+function OpeningBalanceDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [rows, setRows] = useState<OpeningBalanceRow[]>([
+    { accountId: "", debit: "", credit: "" },
+    { accountId: "", debit: "", credit: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setDate(new Date().toISOString().split("T")[0]);
+      setRows([
+        { accountId: "", debit: "", credit: "" },
+        { accountId: "", debit: "", credit: "" },
+      ]);
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.accounts) setAccounts(data.accounts); })
+      .catch(() => {});
+  }, [open]);
+
+  const totalDebit = rows.reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
+  const totalCredit = rows.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.0001 && totalDebit > 0;
+
+  function updateRow(index: number, field: keyof OpeningBalanceRow, value: string) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  }
+  function addRow() {
+    setRows((prev) => [...prev, { accountId: "", debit: "", credit: "" }]);
+  }
+  function removeRow(index: number) {
+    if (rows.length <= 2) return;
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isBalanced) return;
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/opening-balances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          date,
+          balances: rows
+            .filter((r) => r.accountId)
+            .map((r) => ({
+              accountId: r.accountId,
+              debitAmount: decimalToCents(r.debit),
+              creditAmount: decimalToCents(r.credit),
+            })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to set opening balances");
+      }
+      toast.success("Opening balances set");
+      onClose();
+      router.push("/accounting/opening-balances");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to set opening balances");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Scale className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">Set opening balances</SheetTitle>
+              <SheetDescription>Enter the starting balances for your accounts. The totals must match.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-2">
+              <Label>As of date</Label>
+              <DatePicker value={date} onChange={setDate} placeholder="Opening date" />
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Account balances</Label>
+                <p className="text-xs text-muted-foreground">
+                  Each line is money in (debit) or money out (credit). The Debit and
+                  Credit columns must add up to the same total.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <div className="grid min-w-[600px] grid-cols-[1fr_120px_120px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+                  <span>Account</span>
+                  <span className="text-right">Debit</span>
+                  <span className="text-right">Credit</span>
+                  <span />
+                </div>
+                {rows.map((row, i) => (
+                  <div
+                    key={i}
+                    className="grid min-w-[600px] grid-cols-[1fr_120px_120px_40px] gap-2 border-b px-3 py-2 last:border-b-0"
+                  >
+                    <Select value={row.accountId} onValueChange={(v) => updateRow(i, "accountId", v)}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.code} - {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <CurrencyInput size="sm" value={row.debit} onChange={(v) => updateRow(i, "debit", v)} />
+                    <CurrencyInput size="sm" value={row.credit} onChange={(v) => updateRow(i, "credit", v)} />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      onClick={() => removeRow(i)}
+                      disabled={rows.length <= 2}
+                    >
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="grid min-w-[600px] grid-cols-[1fr_120px_120px_40px] gap-2 border-t bg-muted/30 px-3 py-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={addRow} className="w-fit text-xs">
+                    <Plus className="mr-1 size-3" />
+                    Add line
+                  </Button>
+                  <span className="text-right text-sm font-mono font-semibold tabular-nums">{totalDebit.toFixed(2)}</span>
+                  <span className="text-right text-sm font-mono font-semibold tabular-nums">{totalCredit.toFixed(2)}</span>
+                  <span />
+                </div>
+              </div>
+              {!isBalanced && totalDebit + totalCredit > 0 && (
+                <p className="text-xs font-medium text-red-600">
+                  Debits ({totalDebit.toFixed(2)}) must equal credits ({totalCredit.toFixed(2)})
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving || !isBalanced} className="bg-emerald-600 hover:bg-emerald-700">
+              {saving ? "Saving..." : "Set opening balances"}
+            </Button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Accrual Schedule Drawer
+// ---------------------------------------------------------------------------
+function AccrualScheduleDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [description, setDescription] = useState("");
+  const [totalAmount, setTotalAmount] = useState("0.00");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState("");
+  const [periods, setPeriods] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [reverseAccountId, setReverseAccountId] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setDescription(""); setTotalAmount("0.00"); setEndDate(""); setPeriods("");
+      setAccountId(""); setReverseAccountId("");
+      setStartDate(new Date().toISOString().split("T")[0]);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!description.trim()) { toast.error("Please enter a description"); return; }
+    if (!accountId) { toast.error("Please choose an account"); return; }
+    if (!reverseAccountId) { toast.error("Please choose the reversing account"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/accrual-schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          description,
+          // Route expects DOLLARS (it multiplies by 100).
+          totalAmount: parseFloat(totalAmount) || 0,
+          startDate,
+          endDate,
+          periods: parseInt(periods) || 0,
+          accountId,
+          reverseAccountId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to create accrual");
+      }
+      const data = await res.json();
+      toast.success("Accrual created");
+      onClose();
+      router.push(`/accounting/accruals/${data.schedule.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create accrual");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><CalendarClock className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New accrual</SheetTitle>
+              <SheetDescription>Spread a cost or income evenly across several periods.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Accrual Details</SectionLabel>
+              <div className="space-y-2">
+                <Label htmlFor="drawer-accrual-desc">Description *</Label>
+                <Input id="drawer-accrual-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Annual insurance premium" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-accrual-amount">Total amount</Label>
+                  <CurrencyInput id="drawer-accrual-amount" prefix="$" value={totalAmount} onChange={setTotalAmount} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-accrual-periods">Number of periods</Label>
+                  <Input id="drawer-accrual-periods" type="number" min={1} value={periods} onChange={(e) => setPeriods(e.target.value)} placeholder="e.g. 12" />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Accounts</SectionLabel>
+              <div className="space-y-2">
+                <Label>Account *</Label>
+                <AccountPicker value={accountId} onChange={setAccountId} placeholder="Choose the account..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Reversing account *</Label>
+                <AccountPicker value={reverseAccountId} onChange={setReverseAccountId} placeholder="Choose the account each period posts against..." />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create accrual" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Revenue Schedule Drawer
+// ---------------------------------------------------------------------------
+interface InvoiceOption {
+  id: string;
+  number: string | null;
+  total: number;
+  contact?: { name?: string | null } | null;
+}
+
+function RevenueScheduleDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
+  const [invoiceId, setInvoiceId] = useState("");
+  const [totalAmount, setTotalAmount] = useState("0.00");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState("");
+  const [method, setMethod] = useState("straight_line");
+
+  useEffect(() => {
+    if (!open) {
+      setInvoiceId(""); setTotalAmount("0.00"); setEndDate(""); setMethod("straight_line");
+      setStartDate(new Date().toISOString().split("T")[0]);
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/invoices", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.data) setInvoices(data.data); })
+      .catch(() => {});
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!invoiceId) { toast.error("Please choose an invoice"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/revenue-schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          invoiceId,
+          // Route expects DOLLARS (it multiplies by 100).
+          totalAmount: parseFloat(totalAmount) || 0,
+          startDate,
+          endDate,
+          method,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to create revenue schedule");
+      }
+      const data = await res.json();
+      toast.success("Revenue schedule created");
+      onClose();
+      router.push(`/sales/revenue-schedules/${data.schedule.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create revenue schedule");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><TrendingUp className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New revenue schedule</SheetTitle>
+              <SheetDescription>Recognize income from an invoice gradually over time.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Schedule Details</SectionLabel>
+              <div className="space-y-2">
+                <Label>Invoice *</Label>
+                <Select value={invoiceId} onValueChange={setInvoiceId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose an invoice..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {invoices.map((inv) => (
+                      <SelectItem key={inv.id} value={inv.id}>
+                        {inv.number || inv.id.slice(0, 8)}
+                        {inv.contact?.name ? ` · ${inv.contact.name}` : ""}
+                      </SelectItem>
+                    ))}
+                    {invoices.length === 0 && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                        No invoices yet
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="drawer-revsched-amount">Total amount</Label>
+                  <CurrencyInput id="drawer-revsched-amount" prefix="$" value={totalAmount} onChange={setTotalAmount} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Method</Label>
+                  <Select value={method} onValueChange={setMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="straight_line">Even amounts over time</SelectItem>
+                      <SelectItem value="milestone">By milestone</SelectItem>
+                      <SelectItem value="on_completion">All on completion</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Create revenue schedule" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recurring Journal Drawer (debit/credit legs, must balance)
+// ---------------------------------------------------------------------------
+interface RecurringJournalRow {
+  accountId: string;
+  description: string;
+  debit: string;
+  credit: string;
+}
+
+function RecurringJournalDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [name, setName] = useState("");
+  const [frequency, setFrequency] = useState("monthly");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState("");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [rows, setRows] = useState<RecurringJournalRow[]>([
+    { accountId: "", description: "", debit: "", credit: "" },
+    { accountId: "", description: "", debit: "", credit: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setName(""); setFrequency("monthly"); setEndDate(""); setReference(""); setNotes("");
+      setStartDate(new Date().toISOString().split("T")[0]);
+      setRows([
+        { accountId: "", description: "", debit: "", credit: "" },
+        { accountId: "", description: "", debit: "", credit: "" },
+      ]);
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.accounts) setAccounts(data.accounts); })
+      .catch(() => {});
+  }, [open]);
+
+  const totalDebit = rows.reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
+  const totalCredit = rows.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.0001 && totalDebit > 0;
+
+  function updateRow(index: number, field: keyof RecurringJournalRow, value: string) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  }
+  function addRow() {
+    setRows((prev) => [...prev, { accountId: "", description: "", debit: "", credit: "" }]);
+  }
+  function removeRow(index: number) {
+    if (rows.length <= 2) return;
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { toast.error("Please enter a name"); return; }
+    if (!isBalanced) return;
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/recurring-journals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          name,
+          frequency,
+          startDate,
+          endDate: endDate || null,
+          reference: reference || null,
+          notes: notes || null,
+          lines: rows
+            .filter((r) => r.accountId)
+            .map((r) => ({
+              description: r.description,
+              accountId: r.accountId,
+              debitAmount: decimalToCents(r.debit),
+              creditAmount: decimalToCents(r.credit),
+            })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to create recurring journal");
+      }
+      toast.success("Recurring journal created");
+      onClose();
+      router.push("/accounting/recurring-journals");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create recurring journal");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Repeat className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New recurring journal</SheetTitle>
+              <SheetDescription>Set up an adjustment that posts automatically on a schedule.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Template Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Monthly depreciation" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Frequency</Label>
+                  <Select value={frequency} onValueChange={setFrequency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="fortnightly">Fortnightly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date (optional)</Label>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="No end date" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Reference</Label>
+                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optional reference" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Journal lines</Label>
+                <p className="text-xs text-muted-foreground">
+                  Each line is money in (debit) or money out (credit). The Debit and
+                  Credit columns must add up to the same total.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <div className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+                  <span>Account</span>
+                  <span>Description</span>
+                  <span className="text-right">Debit</span>
+                  <span className="text-right">Credit</span>
+                  <span />
+                </div>
+                {rows.map((row, i) => (
+                  <div
+                    key={i}
+                    className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-b px-3 py-2 last:border-b-0"
+                  >
+                    <Select value={row.accountId} onValueChange={(v) => updateRow(i, "accountId", v)}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.code} - {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      className="h-8 text-sm"
+                      value={row.description}
+                      onChange={(e) => updateRow(i, "description", e.target.value)}
+                      placeholder="Line memo"
+                    />
+                    <CurrencyInput size="sm" value={row.debit} onChange={(v) => updateRow(i, "debit", v)} />
+                    <CurrencyInput size="sm" value={row.credit} onChange={(v) => updateRow(i, "credit", v)} />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      onClick={() => removeRow(i)}
+                      disabled={rows.length <= 2}
+                    >
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="grid min-w-[600px] grid-cols-[1fr_1fr_120px_120px_40px] gap-2 border-t bg-muted/30 px-3 py-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={addRow} className="w-fit text-xs">
+                    <Plus className="mr-1 size-3" />
+                    Add line
+                  </Button>
+                  <span />
+                  <span className="text-right text-sm font-mono font-semibold tabular-nums">{totalDebit.toFixed(2)}</span>
+                  <span className="text-right text-sm font-mono font-semibold tabular-nums">{totalCredit.toFixed(2)}</span>
+                  <span />
+                </div>
+              </div>
+              {!isBalanced && totalDebit + totalCredit > 0 && (
+                <p className="text-xs font-medium text-red-600">
+                  Debits ({totalDebit.toFixed(2)}) must equal credits ({totalCredit.toFixed(2)})
+                </p>
+              )}
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for generated entries..." rows={3} />
+            </div>
+          </div>
+          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving || !isBalanced} className="bg-emerald-600 hover:bg-emerald-700">
+              {saving ? "Creating..." : "Create recurring journal"}
+            </Button>
+          </div>
         </form>
       </SheetContent>
     </Sheet>
