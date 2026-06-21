@@ -180,7 +180,8 @@ async function handleMarkAsSent(
   // COGS, snapshots and status update all stay in one place. We forward the
   // org context via the same x-organization-id header and call it per id with
   // an empty body (no email) so it just marks the draft as sent + posts.
-  const orgId = request.headers.get("x-organization-id") || ctx.organizationId;
+  // Always use the AUTHENTICATED org — never trust the raw request header.
+  const orgId = ctx.organizationId;
   for (const id of ids) {
     try {
       const subReq = new Request(`http://internal/api/v1/invoices/${id}/send`, {
@@ -213,6 +214,14 @@ async function handleMarkAsSent(
     }
   }
 
+  logAudit({
+    ctx,
+    action: "bulk-mark-as-sent",
+    entityType: "invoice",
+    entityId: ids.join(","),
+    changes: { requested: ids.length, sent: results.filter((r) => r.status === "sent").length },
+    request,
+  });
   return NextResponse.json({ action: "mark-as-sent", results, summary: summarize(results) });
 }
 

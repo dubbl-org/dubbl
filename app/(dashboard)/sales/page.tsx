@@ -438,7 +438,7 @@ export default function InvoicesPage() {
           toast.error(typeof data.error === "string" ? data.error : "Bulk action failed");
           return;
         }
-        const s = data.summary || { sent: 0, skipped: 0, failed: 0 };
+        const s = data.summary || { sent: 0, skipped: 0, failed: 0, total: 0 };
         const verb = action === "send-reminder" ? "Reminder" : "Invoice";
         const parts: string[] = [];
         if (s.sent) parts.push(`${s.sent} ${verb.toLowerCase()}${s.sent !== 1 ? "s" : ""} sent`);
