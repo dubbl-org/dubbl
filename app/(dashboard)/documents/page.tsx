@@ -23,9 +23,7 @@ import {
   Check as CheckIcon,
   X,
   ExternalLink,
-  ScanLine,
 } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +60,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -693,12 +690,6 @@ export default function DocumentsPage() {
             : `${folders.length} folder${folders.length !== 1 ? "s" : ""} · ${totalFiles} file${totalFiles !== 1 ? "s" : ""}${totalSize > 0 ? ` · ${formatFileSize(totalSize)}` : ""}`
         }
       >
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
-          <Link href="/documents/inbox">
-            <ScanLine className="size-3" />
-            Receipts inbox
-          </Link>
-        </Button>
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setNewFolderOpen(true)}>
           <FolderPlus className="size-3" />
           New Folder
