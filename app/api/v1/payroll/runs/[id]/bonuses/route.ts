@@ -38,7 +38,7 @@ export async function GET(
       with: { employee: true },
     });
 
-    return ok({ data: bonuses });
+    return ok({ bonuses });
   } catch (err) {
     return handleError(err);
   }

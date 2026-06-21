@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { savedReport, invoice, contact, inventoryItem } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import {
+  savedReport,
+  invoice,
+  contact,
+  inventoryItem,
+  expenseClaim,
+  bankTransaction,
+  bankAccount,
+} from "@/lib/db/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { notFound, handleError } from "@/lib/api/response";
@@ -79,6 +87,68 @@ export async function GET(
           quantityOnHand: i.quantityOnHand,
           salePrice: i.salePrice,
         }));
+        break;
+      }
+      case "expenses": {
+        const all = await db.query.expenseClaim.findMany({
+          where: and(
+            eq(expenseClaim.organizationId, ctx.organizationId),
+            notDeleted(expenseClaim.deletedAt)
+          ),
+          orderBy: desc(expenseClaim.createdAt),
+        });
+        rows = all.map((e) => ({
+          title: e.title,
+          status: e.status,
+          totalAmount: e.totalAmount,
+          currencyCode: e.currencyCode,
+          submittedAt: e.submittedAt,
+          approvedAt: e.approvedAt,
+        }));
+        break;
+      }
+      case "transactions": {
+        const orgAccounts = await db.query.bankAccount.findMany({
+          where: eq(bankAccount.organizationId, ctx.organizationId),
+          columns: { id: true },
+        });
+        const accountIds = orgAccounts.map((a) => a.id);
+        if (accountIds.length > 0) {
+          const all = await db.query.bankTransaction.findMany({
+            where: inArray(bankTransaction.bankAccountId, accountIds),
+            orderBy: desc(bankTransaction.date),
+          });
+          rows = all.map((t) => ({
+            date: t.date,
+            description: t.description,
+            amount: t.amount,
+            status: t.status,
+            payee: t.payee,
+          }));
+        }
+        break;
+      }
+      case "payroll": {
+        const all = await db.query.payrollItem.findMany({
+          with: {
+            payrollRun: {
+              columns: { organizationId: true, payPeriodStart: true, payPeriodEnd: true },
+            },
+            employee: { columns: { name: true } },
+          },
+        });
+        rows = all
+          .filter((p) => p.payrollRun?.organizationId === ctx.organizationId)
+          .map((p) => ({
+            employeeName: p.employee?.name || "-",
+            payPeriodStart: p.payrollRun?.payPeriodStart,
+            payPeriodEnd: p.payrollRun?.payPeriodEnd,
+            type: p.type,
+            grossAmount: p.grossAmount,
+            taxAmount: p.taxAmount,
+            deductions: p.deductions,
+            netAmount: p.netAmount,
+          }));
         break;
       }
     }

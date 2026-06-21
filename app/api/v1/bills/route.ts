@@ -48,6 +48,9 @@ const createSchema = z.object({
   // When the client has acknowledged a duplicate warning, pass true to post
   // anyway (only relevant under the 'warn' strategy).
   confirmDuplicate: z.boolean().optional(),
+  // When true, create the bill in 'pending_approval' rather than 'draft' so it
+  // enters the approval workflow immediately.
+  submitForApproval: z.boolean().optional().default(false),
 });
 
 export async function GET(request: Request) {
@@ -221,9 +224,10 @@ export async function POST(request: Request) {
         billNumber,
         issueDate: parsed.issueDate,
         dueDate: parsed.dueDate,
-        // 'hold' strategy parks a suspected duplicate for review rather than
-        // posting it straight to draft.
-        status: heldForDuplicate ? "pending_approval" : "draft",
+        // Enter the approval workflow when the client submits for approval, or
+        // when the 'hold' strategy parks a suspected duplicate for review rather
+        // than posting it straight to draft.
+        status: parsed.submitForApproval || heldForDuplicate ? "pending_approval" : "draft",
         reference: parsed.reference || null,
         notes: parsed.notes || null,
         subtotal,

@@ -13,6 +13,27 @@ const updateSchema = z.object({
   status: z.enum(["draft", "in_progress", "completed", "cancelled"]).optional(),
 });
 
+const stockTakeWith = {
+  warehouse: {
+    columns: {
+      id: true,
+      name: true,
+      code: true,
+    },
+  },
+  lines: {
+    with: {
+      inventoryItem: {
+        columns: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+    },
+  },
+} as const;
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -26,19 +47,7 @@ export async function GET(
         eq(stockTake.id, id),
         eq(stockTake.organizationId, ctx.organizationId)
       ),
-      with: {
-        lines: {
-          with: {
-            inventoryItem: {
-              columns: {
-                id: true,
-                name: true,
-                code: true,
-              },
-            },
-          },
-        },
-      },
+      with: stockTakeWith,
     });
 
     if (!st) {
@@ -86,7 +95,7 @@ export async function PATCH(
       updates.completedAt = new Date();
     }
 
-    const [updated] = await db
+    await db
       .update(stockTake)
       .set(updates)
       .where(
@@ -94,8 +103,15 @@ export async function PATCH(
           eq(stockTake.id, id),
           eq(stockTake.organizationId, ctx.organizationId)
         )
-      )
-      .returning();
+      );
+
+    const updated = await db.query.stockTake.findFirst({
+      where: and(
+        eq(stockTake.id, id),
+        eq(stockTake.organizationId, ctx.organizationId)
+      ),
+      with: stockTakeWith,
+    });
 
     return NextResponse.json({ stockTake: updated });
   } catch (err) {
