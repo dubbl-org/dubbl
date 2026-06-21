@@ -54,10 +54,14 @@ const documentTypeLabels: Record<string, string> = {
 // Only include a mapping when the PDF route actually exists under app/api/v1;
 // types without a PDF route are intentionally omitted so the preview button
 // simply doesn't show for them (instead of pointing the iframe at a 404).
-// Verified existing PDF routes: invoices/[id]/pdf only. quotes, credit-notes,
-// purchase-orders and debit-notes have no PDF route, so they are omitted.
+// Verified existing PDF routes: invoices, quotes, credit-notes, purchase-orders
+// and debit-notes all expose [id]/pdf.
 const documentRenderRoute: Partial<Record<string, (id: string) => string>> = {
   invoice: (id) => `/api/v1/invoices/${id}/pdf`,
+  quote: (id) => `/api/v1/quotes/${id}/pdf`,
+  credit_note: (id) => `/api/v1/credit-notes/${id}/pdf`,
+  purchase_order: (id) => `/api/v1/purchase-orders/${id}/pdf`,
+  debit_note: (id) => `/api/v1/debit-notes/${id}/pdf`,
 };
 
 function formatDateDisplay(dateStr: string | null | undefined) {
