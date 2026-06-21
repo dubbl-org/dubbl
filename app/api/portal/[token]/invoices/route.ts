@@ -49,6 +49,7 @@ export async function GET(
         total: inv.total,
         amountDue: inv.amountDue,
         currencyCode: inv.currencyCode,
+        paymentLinkToken: inv.paymentLinkToken,
       })),
     });
   } catch (err) {

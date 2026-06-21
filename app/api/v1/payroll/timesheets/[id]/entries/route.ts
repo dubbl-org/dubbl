@@ -24,6 +24,16 @@ export async function GET(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:timesheets");
 
+    const ts = await db.query.timesheet.findFirst({
+      where: and(
+        eq(timesheet.id, id),
+        eq(timesheet.organizationId, ctx.organizationId),
+        notDeleted(timesheet.deletedAt)
+      ),
+    });
+
+    if (!ts) return notFound("Timesheet");
+
     const entries = await db.query.timesheetEntry.findMany({
       where: eq(timesheetEntry.timesheetId, id),
       with: { project: true },
@@ -95,6 +105,15 @@ export async function DELETE(
       where: eq(timesheetEntry.id, entryId),
     });
     if (!entry) return notFound("Entry");
+
+    const ts = await db.query.timesheet.findFirst({
+      where: and(
+        eq(timesheet.id, entry.timesheetId),
+        eq(timesheet.organizationId, ctx.organizationId),
+        notDeleted(timesheet.deletedAt)
+      ),
+    });
+    if (!ts) return notFound("Entry");
 
     await db.delete(timesheetEntry).where(eq(timesheetEntry.id, entryId));
 
