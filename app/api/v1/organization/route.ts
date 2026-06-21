@@ -43,6 +43,9 @@ const updateSchema = z
     defaultPaymentTerms: z.string().nullable().optional(),
     industrySector: z.string().nullable().optional(),
     referralSource: z.string().nullable().optional(),
+    // Getting-started checklist: client sends true to mark onboarding done
+    // (stored as now()), or null to re-open it. Coerced to a Date below.
+    onboardingCompleted: z.boolean().optional(),
   })
   .refine(
     (data) => {
@@ -219,10 +222,16 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:billing"); // Only owner can edit org settings
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    // The getting-started checklist can be dismissed by any member, so a
+    // non-owner isn't dead-ended on it. Only when the PATCH touches another
+    // org-settings field do we require the owner-level manage:billing role.
+    const onlyTogglesOnboarding =
+      Object.keys(parsed).length === 1 && parsed.onboardingCompleted !== undefined;
+    requireRole(ctx, onlyTogglesOnboarding ? "view:data" : "manage:billing");
 
     const existing = await db.query.organization.findFirst({
       where: eq(organization.id, ctx.organizationId),
@@ -253,9 +262,17 @@ export async function PATCH(request: Request) {
       }
     }
 
+    // Map the client-friendly `onboardingCompleted` flag onto the real
+    // `onboardingCompletedAt` timestamp column (now() to complete, null to re-open).
+    const { onboardingCompleted, ...rest } = parsed;
+    const onboardingPatch =
+      onboardingCompleted === undefined
+        ? {}
+        : { onboardingCompletedAt: onboardingCompleted ? new Date() : null };
+
     const [updated] = await db
       .update(organization)
-      .set({ ...parsed, updatedAt: new Date() })
+      .set({ ...rest, ...onboardingPatch, updatedAt: new Date() })
       .where(eq(organization.id, ctx.organizationId))
       .returning();
 
