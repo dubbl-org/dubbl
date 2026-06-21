@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, DollarSign, Ban, Undo2 } from "lucide-react";
+import { ArrowLeft, Check, DollarSign, Ban, Undo2, ThumbsUp, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ interface BillDetail {
   currencyCode: string;
   contactId: string;
   notes: string | null; contact: { name: string } | null;
+  rejectionReason: string | null;
   lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; account: { code: string; name: string } | null }[];
 }
 
@@ -44,6 +45,7 @@ interface BaseAmounts {
 
 const statusConfig: Record<string, { class: string }> = {
   draft: { class: "" },
+  pending_approval: { class: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300" },
   received: { class: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" },
   partial: { class: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300" },
   paid: { class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
@@ -55,6 +57,7 @@ const statusConfig: Record<string, { class: string }> = {
 // "received" here means the bill has been approved and added to your books.
 const statusLabels: Record<string, string> = {
   draft: "draft",
+  pending_approval: "waiting for approval",
   received: "in your books",
   partial: "part paid",
   paid: "paid",
@@ -73,6 +76,10 @@ export default function BillDetailPage() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [payOpen, setPayOpen] = useState(false);
   const [creditingSupplier, setCreditingSupplier] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useDocumentTitle("Purchases · Bill Details");
@@ -95,6 +102,50 @@ export default function BillDetailPage() {
     const res = await fetch(`/api/v1/bills/${id}/receive`, { method: "POST", headers: { "x-organization-id": orgId } });
     if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill added to your books"); }
     else toast.error("Couldn't add this bill to your books");
+  }
+
+  // Approve a bill that's waiting for approval. This posts it to your books
+  // (same end state as "Add to my books") and stamps who approved it.
+  async function handleApprove() {
+    if (!orgId) return;
+    setApproving(true);
+    try {
+      const res = await fetch(`/api/v1/bills/${id}/approve`, { method: "POST", headers: { "x-organization-id": orgId } });
+      if (res.ok) {
+        toast.success("Bill approved and added to your books");
+        loadBill();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't approve this bill");
+      }
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  // Reject a bill that's waiting for approval. Sends it back to draft with the
+  // reason recorded, so it can be fixed and re-submitted.
+  async function handleReject() {
+    if (!orgId) return;
+    setRejecting(true);
+    try {
+      const res = await fetch(`/api/v1/bills/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ reason: rejectReason.trim() || undefined }),
+      });
+      if (res.ok) {
+        setRejectOpen(false);
+        setRejectReason("");
+        toast.success("Bill rejected and sent back to draft");
+        loadBill();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't reject this bill");
+      }
+    } finally {
+      setRejecting(false);
+    }
   }
 
   async function handlePay() {
@@ -199,6 +250,45 @@ export default function BillDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {b.status === "pending_approval" && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={handleApprove}
+                  loading={approving}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  title="Approve this bill and add it to your books so it counts toward what you owe"
+                >
+                  <ThumbsUp className="mr-2 size-3.5" />Approve
+                </Button>
+                <Dialog open={rejectOpen} onOpenChange={(o) => { setRejectOpen(o); if (!o) setRejectReason(""); }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" title="Send this bill back to draft with a reason">
+                      <X className="mr-2 size-3.5" />Reject
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Reject this bill?</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        This sends the bill back to draft so it can be fixed and re-submitted. Add a reason so everyone knows why.
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Reason (optional)</Label>
+                        <Input
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="e.g. amount doesn't match the order"
+                        />
+                      </div>
+                      <Button onClick={handleReject} loading={rejecting} className="w-full bg-red-600 hover:bg-red-700">
+                        Reject bill
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
             {b.status === "draft" && (
               <Button size="sm" onClick={handleReceive} className="bg-emerald-600 hover:bg-emerald-700" title="Approve this bill and add it to your books so it counts toward what you owe">
                 <Check className="mr-2 size-3.5" />Add to my books
@@ -401,6 +491,12 @@ export default function BillDetailPage() {
                 <p className="text-[11px] text-muted-foreground">Due</p>
                 <p className="text-sm mt-0.5">{b.dueDate}</p>
               </div>
+              {b.rejectionReason && (
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Last rejection reason</p>
+                  <p className="text-sm mt-0.5 whitespace-pre-wrap text-red-600">{b.rejectionReason}</p>
+                </div>
+              )}
               {b.notes ? (
                 <div>
                   <p className="text-[11px] text-muted-foreground">Notes</p>
