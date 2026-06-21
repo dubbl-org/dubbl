@@ -80,10 +80,7 @@ import {
   documentFolder,
   savedReport,
   type ReportConfig,
-  type WorkflowCondition,
-  type WorkflowAction,
   scheduledPayment,
-  workflow,
   revenueSchedule,
   revenueEntry,
 } from "./schema";
@@ -2337,65 +2334,7 @@ async function seed() {
     console.log(`  ${Math.min(pendingBills.length, 3)} scheduled payments`);
   }
 
-  // 39. Workflows
-  const existingWorkflows = await db.query.workflow.findFirst({
-    where: eq(workflow.organizationId, org.id),
-  });
-  if (!existingWorkflows) {
-    console.log("Creating workflows...");
-    const workflowData: { name: string; description: string; trigger: "invoice_overdue" | "payment_received" | "inventory_low" | "contact_created"; conditions: WorkflowCondition[]; actions: WorkflowAction[]; isActive: boolean; triggerCount?: number }[] = [
-      {
-        name: "Invoice Overdue Notification",
-        description: "Send notification when invoice becomes overdue",
-        trigger: "invoice_overdue",
-        conditions: [{ field: "amountDue", operator: "gt", value: "0" }],
-        actions: [{ type: "send_notification", config: { title: "Invoice overdue", body: "Invoice {{invoiceNumber}} is now overdue" } }],
-        isActive: true,
-        triggerCount: 3,
-      },
-      {
-        name: "Payment Thank You",
-        description: "Send thank you email when payment received",
-        trigger: "payment_received",
-        conditions: [],
-        actions: [{ type: "send_email", config: { subject: "Thank you for your payment", template: "payment_thanks" } }],
-        isActive: true,
-        triggerCount: 5,
-      },
-      {
-        name: "Low Stock Alert",
-        description: "Alert when inventory drops below reorder point",
-        trigger: "inventory_low",
-        conditions: [],
-        actions: [{ type: "send_notification", config: { title: "Low stock alert", body: "{{itemName}} is below reorder point" } }, { type: "create_task", config: { title: "Reorder {{itemName}}", priority: "high" } }],
-        isActive: true,
-        triggerCount: 1,
-      },
-      {
-        name: "New Contact Welcome",
-        description: "Create onboarding task when new contact added",
-        trigger: "contact_created",
-        conditions: [],
-        actions: [{ type: "create_task", config: { title: "Onboard: {{contactName}}", description: "Review payment terms and set up portal access" } }],
-        isActive: false,
-      },
-    ];
-    for (const w of workflowData) {
-      await db.insert(workflow).values({
-        organizationId: org.id,
-        name: w.name,
-        description: w.description,
-        trigger: w.trigger,
-        conditions: w.conditions,
-        actions: w.actions,
-        isActive: w.isActive,
-        triggerCount: w.triggerCount,
-      });
-    }
-    console.log("  4 workflows");
-  }
-
-  // 40. Payroll Settings
+  // 39. Payroll Settings
   const existingPayrollSettings = await db.query.payrollSettings.findFirst({
     where: eq(payrollSettings.organizationId, org.id),
   });
