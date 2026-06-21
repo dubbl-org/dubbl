@@ -1,11 +1,21 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { quote, invoice, invoiceLine, contact, organization } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  quote,
+  quoteLine,
+  invoice,
+  invoiceLine,
+  contact,
+  organization,
+  inventoryItem,
+} from "@/lib/db/schema";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
+import { resolvePrice } from "@/lib/api/pricing";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 
@@ -267,6 +277,404 @@ export function registerQuoteTools(server: McpServer, ctx: AuthContext) {
             fullyBilled,
           },
         };
+      })
+  );
+
+  server.tool(
+    "list_quotes",
+    "List sales quotes/estimates with an optional status filter and pagination. Amounts (subtotal, taxTotal, total, billedTotal) are in integer cents. Returns the quotes (each with its contact) and the total count.",
+    {
+      status: z
+        .enum(["draft", "sent", "accepted", "declined", "expired", "converted"])
+        .optional()
+        .describe("Filter by quote status"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(50)
+        .describe("Number of quotes to return (max 100)"),
+      page: z.number().int().min(1).optional().default(1).describe("Page number (1-based)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const conditions = [
+          eq(quote.organizationId, ctx.organizationId),
+          notDeleted(quote.deletedAt),
+        ];
+        if (params.status) conditions.push(eq(quote.status, params.status));
+
+        const offset = (params.page - 1) * params.limit;
+        const quotes = await db.query.quote.findMany({
+          where: and(...conditions),
+          orderBy: desc(quote.createdAt),
+          limit: params.limit,
+          offset,
+          with: { contact: true },
+        });
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)`.mapWith(Number) })
+          .from(quote)
+          .where(and(...conditions));
+
+        return { quotes, total: Number(countResult?.count || 0) };
+      })
+  );
+
+  server.tool(
+    "get_quote",
+    "Get a single sales quote/estimate by ID, including its line items (each with account and tax rate) and the customer contact. All amounts are in integer cents; quantity is stored as units x 100 (1.00 = 100) and discountPercent is in basis points (1000 = 10%).",
+    {
+      quoteId: z.string().describe("The UUID of the quote"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const found = await db.query.quote.findFirst({
+          where: and(
+            eq(quote.id, params.quoteId),
+            eq(quote.organizationId, ctx.organizationId),
+            notDeleted(quote.deletedAt)
+          ),
+          with: {
+            contact: true,
+            lines: { with: { account: true, taxRate: true } },
+          },
+        });
+        if (!found) throw new Error("Quote not found");
+        return { quote: found };
+      })
+  );
+
+  server.tool(
+    "create_quote",
+    "Create a draft sales quote/estimate with line items. unitPrice is in integer cents (e.g. 1250 = $12.50) and is stored directly; quantity is a decimal number of units (e.g. 1.5). discountPercent is in basis points (1000 = 10%). Lines are tax-EXCLUSIVE — tax is added on top per line via the line's taxRateId. For an inventory-item line you may omit unitPrice to resolve the price from the line/document price list (falling back to the item's default sale price); an explicit unitPrice always wins. The system computes subtotal/tax/total and assigns a quote number (QTE). Returns the created quote.",
+    {
+      contactId: z.string().describe("Customer contact UUID"),
+      issueDate: z.string().describe("Issue date (YYYY-MM-DD)"),
+      expiryDate: z.string().describe("Expiry date (YYYY-MM-DD)"),
+      reference: z.string().optional().describe("External reference"),
+      notes: z.string().optional().describe("Notes"),
+      currencyCode: z
+        .string()
+        .optional()
+        .default("USD")
+        .describe("Currency code (defaults to USD)"),
+      priceListId: z
+        .string()
+        .optional()
+        .describe(
+          "Default price list applied to inventory-item lines that don't carry their own priceListId"
+        ),
+      lines: z
+        .array(
+          z.object({
+            description: z.string().min(1).describe("Line item description"),
+            quantity: z
+              .number()
+              .optional()
+              .default(1)
+              .describe("Quantity in units (decimal, e.g. 1.5)"),
+            unitPrice: z
+              .number()
+              .int()
+              .optional()
+              .describe(
+                "Unit price in integer cents (e.g. 1250 = $12.50); stored directly. Omit for an inventory-item line to resolve from the price list / item default sale price"
+              ),
+            accountId: z.string().optional().describe("Income/account UUID for this line"),
+            taxRateId: z.string().optional().describe("Tax rate UUID applied to this line"),
+            discountPercent: z
+              .number()
+              .int()
+              .min(0)
+              .max(10000)
+              .optional()
+              .default(0)
+              .describe("Discount in basis points (1000 = 10%)"),
+            inventoryItemId: z
+              .string()
+              .optional()
+              .describe(
+                "Inventory item this line prices (used only for default-price resolution; not persisted on the quote line)"
+              ),
+            priceListId: z
+              .string()
+              .optional()
+              .describe("Per-line price list override; falls back to the document-level priceListId"),
+          })
+        )
+        .min(1)
+        .describe("Quote line items (at least one)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const quoteNumber = await getNextNumber(
+          ctx.organizationId,
+          "quote",
+          "quote_number",
+          "QTE"
+        );
+
+        const taxRateIds = params.lines.map((l) => l.taxRateId).filter(Boolean) as string[];
+        const ratesMap = await preloadTaxRates(taxRateIds);
+
+        // Preload default sale prices for inventory-item lines that don't carry
+        // an explicit unitPrice (mirrors the REST route).
+        const itemIds = [
+          ...new Set(
+            params.lines
+              .filter((l) => l.inventoryItemId && l.unitPrice === undefined)
+              .map((l) => l.inventoryItemId as string)
+          ),
+        ];
+        const itemPriceMap = new Map<string, number>();
+        if (itemIds.length > 0) {
+          const items = await db.query.inventoryItem.findMany({
+            where: and(
+              eq(inventoryItem.organizationId, ctx.organizationId),
+              inArray(inventoryItem.id, itemIds)
+            ),
+            columns: { id: true, salePrice: true },
+          });
+          for (const it of items) itemPriceMap.set(it.id, it.salePrice);
+        }
+
+        // unitPriceCents per line, in the same order as params.lines. Unlike the
+        // REST route, the unitPrice we receive is already integer cents and is
+        // stored directly (no decimalToMinorUnits conversion).
+        const unitPricesCents = await Promise.all(
+          params.lines.map(async (l) => {
+            if (l.unitPrice !== undefined) return l.unitPrice;
+            if (l.inventoryItemId) {
+              const listId = l.priceListId || params.priceListId || null;
+              if (listId) {
+                const resolved = await resolvePrice(
+                  ctx.organizationId,
+                  l.inventoryItemId,
+                  listId,
+                  l.quantity || 1,
+                  params.issueDate
+                );
+                if (resolved) return resolved.unitPrice;
+              }
+              return itemPriceMap.get(l.inventoryItemId) ?? 0;
+            }
+            return 0;
+          })
+        );
+
+        let subtotal = 0;
+        const processedLines = params.lines.map((l, i) => {
+          const unitPriceCents = unitPricesCents[i];
+          const grossAmount = Math.round(l.quantity * unitPriceCents);
+          const discountAmount = l.discountPercent
+            ? Math.round((grossAmount * l.discountPercent) / 10000)
+            : 0;
+          const amount = grossAmount - discountAmount;
+          subtotal += amount;
+          const taxRateId = l.taxRateId || null;
+          const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
+          return {
+            description: l.description,
+            quantity: Math.round(l.quantity * 100),
+            unitPrice: unitPriceCents,
+            accountId: l.accountId || null,
+            taxRateId,
+            discountPercent: l.discountPercent,
+            taxAmount,
+            amount,
+            sortOrder: i,
+          };
+        });
+
+        const taxTotal = processedLines.reduce((sum, l) => sum + l.taxAmount, 0);
+        const total = subtotal + taxTotal;
+
+        const [created] = await db
+          .insert(quote)
+          .values({
+            organizationId: ctx.organizationId,
+            contactId: params.contactId,
+            quoteNumber,
+            issueDate: params.issueDate,
+            expiryDate: params.expiryDate,
+            reference: params.reference || null,
+            notes: params.notes || null,
+            subtotal,
+            taxTotal,
+            total,
+            currencyCode: params.currencyCode,
+            createdBy: ctx.userId,
+          })
+          .returning();
+
+        await db.insert(quoteLine).values(
+          processedLines.map((l) => ({
+            quoteId: created.id,
+            ...l,
+          }))
+        );
+
+        return { quote: created };
+      })
+  );
+
+  server.tool(
+    "update_quote",
+    "Update a draft sales quote/estimate's header fields (e.g. issueDate, expiryDate, reference, notes, currencyCode, contactId). Only DRAFT quotes can be edited. This mirrors the REST PATCH: it patches the supplied header fields directly and does NOT recalculate line items or totals — to change lines, recreate the quote. Returns the updated quote.",
+    {
+      quoteId: z.string().describe("The UUID of the quote to update"),
+      contactId: z.string().optional().describe("Customer contact UUID"),
+      issueDate: z.string().optional().describe("Issue date (YYYY-MM-DD)"),
+      expiryDate: z.string().optional().describe("Expiry date (YYYY-MM-DD)"),
+      reference: z.string().nullable().optional().describe("External reference"),
+      notes: z.string().nullable().optional().describe("Notes"),
+      currencyCode: z.string().optional().describe("Currency code"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const existing = await db.query.quote.findFirst({
+          where: and(
+            eq(quote.id, params.quoteId),
+            eq(quote.organizationId, ctx.organizationId),
+            notDeleted(quote.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Quote not found");
+        if (existing.status !== "draft") {
+          throw new Error("Only draft quotes can be edited");
+        }
+
+        const { quoteId, ...fields } = params;
+        const patch: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(fields)) {
+          if (value !== undefined) patch[key] = value;
+        }
+
+        const [updated] = await db
+          .update(quote)
+          .set({ ...patch, updatedAt: new Date() })
+          .where(eq(quote.id, quoteId))
+          .returning();
+
+        return { quote: updated };
+      })
+  );
+
+  server.tool(
+    "send_quote",
+    "Mark a draft sales quote/estimate as sent. Only DRAFT quotes can be sent. Flips status to 'sent' and stamps sentAt. (This does NOT send an email; it records the send.) Returns the updated quote.",
+    {
+      quoteId: z.string().describe("The UUID of the quote to send"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const found = await db.query.quote.findFirst({
+          where: and(
+            eq(quote.id, params.quoteId),
+            eq(quote.organizationId, ctx.organizationId),
+            notDeleted(quote.deletedAt)
+          ),
+        });
+        if (!found) throw new Error("Quote not found");
+        if (found.status !== "draft") {
+          throw new Error("Only draft quotes can be sent");
+        }
+
+        const [updated] = await db
+          .update(quote)
+          .set({
+            status: "sent",
+            sentAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(quote.id, params.quoteId))
+          .returning();
+
+        return { quote: updated };
+      })
+  );
+
+  server.tool(
+    "accept_quote",
+    "Mark a sent sales quote/estimate as accepted by the customer. Only 'sent' quotes can be accepted, and the quote must not have expired (its expiryDate must be today or later). Flips status to 'accepted'. Returns the updated quote.",
+    {
+      quoteId: z.string().describe("The UUID of the quote to accept"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const found = await db.query.quote.findFirst({
+          where: and(
+            eq(quote.id, params.quoteId),
+            eq(quote.organizationId, ctx.organizationId),
+            notDeleted(quote.deletedAt)
+          ),
+        });
+        if (!found) throw new Error("Quote not found");
+        if (found.status !== "sent") {
+          throw new Error("Only sent quotes can be accepted");
+        }
+
+        const today = new Date().toISOString().split("T")[0];
+        if (found.expiryDate < today) {
+          throw new Error("This quote has expired");
+        }
+
+        const [updated] = await db
+          .update(quote)
+          .set({
+            status: "accepted",
+            updatedAt: new Date(),
+          })
+          .where(eq(quote.id, params.quoteId))
+          .returning();
+
+        return { quote: updated };
+      })
+  );
+
+  server.tool(
+    "decline_quote",
+    "Mark a sent sales quote/estimate as declined by the customer. Only 'sent' quotes can be declined. Flips status to 'declined'. Returns the updated quote.",
+    {
+      quoteId: z.string().describe("The UUID of the quote to decline"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:invoices");
+
+        const found = await db.query.quote.findFirst({
+          where: and(
+            eq(quote.id, params.quoteId),
+            eq(quote.organizationId, ctx.organizationId),
+            notDeleted(quote.deletedAt)
+          ),
+        });
+        if (!found) throw new Error("Quote not found");
+        if (found.status !== "sent") {
+          throw new Error("Only sent quotes can be declined");
+        }
+
+        const [updated] = await db
+          .update(quote)
+          .set({
+            status: "declined",
+            updatedAt: new Date(),
+          })
+          .where(eq(quote.id, params.quoteId))
+          .returning();
+
+        return { quote: updated };
       })
   );
 }

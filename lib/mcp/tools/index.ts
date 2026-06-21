@@ -41,6 +41,12 @@ import { registerOpeningBalanceTools } from "./opening-balances";
 import { registerAccrualScheduleTools } from "./accrual-schedules";
 import { registerRevenueScheduleTools } from "./revenue-schedules";
 import { registerExpenseTools } from "./expenses";
+import { registerCreditNoteTools } from "./credit-notes";
+import { registerRecurringTemplateTools } from "./recurring-templates";
+import { registerPaymentTools } from "./payments";
+import { registerPurchaseRequisitionTools } from "./purchase-requisitions";
+import { registerLandedCostTools } from "./landed-costs";
+import { registerBulkTools } from "./bulk";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -84,4 +90,10 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerAccrualScheduleTools(server, ctx);
   registerRevenueScheduleTools(server, ctx);
   registerExpenseTools(server, ctx);
+  registerCreditNoteTools(server, ctx);
+  registerRecurringTemplateTools(server, ctx);
+  registerPaymentTools(server, ctx);
+  registerPurchaseRequisitionTools(server, ctx);
+  registerLandedCostTools(server, ctx);
+  registerBulkTools(server, ctx);
 }
