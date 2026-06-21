@@ -64,7 +64,7 @@ import { formatMoney, decimalToCents, decimalToMinorUnits } from "@/lib/money";
 import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
 import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "bankTransfer" | "contractor" | "deal" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";
 
 interface DrawerInitialData {
   contactId?: string;
@@ -118,6 +118,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <StockTakeDrawer open={activeType === "stockTake"} onClose={close} />
       <CategoryDrawer open={activeType === "category"} onClose={close} />
       <TransferDrawer open={activeType === "transfer"} onClose={close} />
+      <BankTransferDrawer open={activeType === "bankTransfer"} onClose={close} />
       <ContractorDrawer open={activeType === "contractor"} onClose={close} />
       <DealDrawer open={activeType === "deal"} onClose={close} initialData={initialData} />
       <DebitNoteDrawer open={activeType === "debitNote"} onClose={close} />
@@ -1501,8 +1502,13 @@ interface ExpenseItemForm {
   amount: string;
   category: string;
   accountId: string;
+  taxRateId: string;
   receiptFileKey: string;
   receiptFileName: string;
+  // Mileage capture. When on, amount is computed from distance * rate.
+  isMileage: boolean;
+  distanceMiles: string; // miles, decimal as typed (e.g. "120.5")
+  mileageRate: string; // dollars per mile, decimal as typed (e.g. "0.67")
 }
 
 const emptyExpenseItem = (): ExpenseItemForm => ({
@@ -1511,9 +1517,22 @@ const emptyExpenseItem = (): ExpenseItemForm => ({
   amount: "",
   category: "",
   accountId: "",
+  taxRateId: "",
   receiptFileKey: "",
   receiptFileName: "",
+  isMileage: false,
+  distanceMiles: "",
+  mileageRate: "0.67",
 });
+
+// Mirrors the tax-rates API row shape ({ taxRates: [...] } from GET
+// /api/v1/tax-rates). `rate` is in basis points (e.g. 2000 = 20%).
+interface ExpenseTaxRateOption {
+  id: string;
+  name: string;
+  rate: number;
+  type?: string;
+}
 
 function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -1521,25 +1540,45 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<ExpenseItemForm[]>([emptyExpenseItem()]);
+  const [taxRates, setTaxRates] = useState<ExpenseTaxRateOption[]>([]);
 
   useEffect(() => {
     if (!open) {
       setTitle(""); setDescription("");
       setItems([emptyExpenseItem()]);
+      return;
     }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
+      .catch(() => {});
   }, [open]);
+
+  // For a mileage item the amount is computed from distance * rate; otherwise
+  // it's the amount the user typed directly.
+  function itemAmount(item: ExpenseItemForm): number {
+    if (item.isMileage) {
+      return (parseFloat(item.distanceMiles) || 0) * (parseFloat(item.mileageRate) || 0);
+    }
+    return parseFloat(item.amount) || 0;
+  }
 
   function updateItem(index: number, updates: Partial<ExpenseItemForm>) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
   }
 
-  const total = items.reduce((sum, item) => sum + decimalToCents(parseFloat(item.amount) || 0), 0);
+  const total = items.reduce((sum, item) => sum + decimalToCents(itemAmount(item)), 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { toast.error("Please enter a title"); return; }
-    if (items.some((item) => !item.description.trim() || !item.amount)) {
-      toast.error("Please fill in all item descriptions and amounts"); return;
+    if (items.some((item) => !item.description.trim())) {
+      toast.error("Please fill in all item descriptions"); return;
+    }
+    if (items.some((item) => itemAmount(item) <= 0)) {
+      toast.error("Each item needs an amount greater than zero (mileage items need distance and rate)"); return;
     }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
@@ -1555,9 +1594,14 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           items: items.map((item) => ({
             date: item.date,
             description: item.description,
-            amount: parseFloat(item.amount) || 0,
+            amount: itemAmount(item),
             category: item.category || null,
             accountId: item.accountId || null,
+            taxRateId: item.taxRateId || null,
+            isMileage: item.isMileage,
+            // distanceMiles is stored as miles x 100; mileageRate as cents per mile.
+            distanceMiles: item.isMileage ? Math.round((parseFloat(item.distanceMiles) || 0) * 100) : null,
+            mileageRate: item.isMileage ? Math.round((parseFloat(item.mileageRate) || 0) * 100) : null,
             receiptFileKey: item.receiptFileKey || null,
             receiptFileName: item.receiptFileName || null,
           })),
@@ -1624,6 +1668,15 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                         </Button>
                       )}
                     </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={item.isMileage}
+                        onChange={(e) => updateItem(index, { isMileage: e.target.checked })}
+                        className="size-4 accent-emerald-600"
+                      />
+                      <span className="text-sm font-medium">Mileage claim (work out the amount from distance)</span>
+                    </label>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                       <div className="space-y-2">
                         <Label>Date</Label>
@@ -1633,19 +1686,59 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                         <Label>Description *</Label>
                         <Input value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="What was this for?" />
                       </div>
-                      <div className="space-y-2">
-                        <Label>Amount *</Label>
-                        <CurrencyInput prefix="$" value={item.amount} onChange={(v) => updateItem(index, { amount: v })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Category</Label>
-                        <Input value={item.category} onChange={(e) => updateItem(index, { category: e.target.value })} placeholder="e.g. Travel" />
-                      </div>
+                      {item.isMileage ? (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Distance (miles) *</Label>
+                            <Input type="number" min={0} step="0.1" value={item.distanceMiles} onChange={(e) => updateItem(index, { distanceMiles: e.target.value })} placeholder="0" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Rate per mile *</Label>
+                            <CurrencyInput prefix="$" value={item.mileageRate} onChange={(v) => updateItem(index, { mileageRate: v })} />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Amount *</Label>
+                            <CurrencyInput prefix="$" value={item.amount} onChange={(v) => updateItem(index, { amount: v })} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Category</Label>
+                            <Input value={item.category} onChange={(e) => updateItem(index, { category: e.target.value })} placeholder="e.g. Travel" />
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    {item.isMileage && (
+                      <div className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">Computed amount</span>
+                        <span className="font-mono font-medium tabular-nums">{formatMoney(decimalToCents(itemAmount(item)))}</span>
+                      </div>
+                    )}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       <div className="space-y-2">
                         <Label>Account</Label>
                         <AccountPicker value={item.accountId} onChange={(val) => updateItem(index, { accountId: val })} typeFilter={["expense"]} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tax</Label>
+                        <Select
+                          value={item.taxRateId || "none"}
+                          onValueChange={(val) => updateItem(index, { taxRateId: val === "none" ? "" : val })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="No tax" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No tax</SelectItem>
+                            {taxRates
+                              .filter((t) => t.type !== "sales")
+                              .map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
                         <Label>Receipt</Label>
@@ -3330,6 +3423,147 @@ function TransferDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Transfer" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bank Transfer Drawer (move money between the org's own bank/cash accounts)
+// ---------------------------------------------------------------------------
+function BankTransferDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [fromBankAccountId, setFromBankAccountId] = useState("");
+  const [toBankAccountId, setToBankAccountId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [memo, setMemo] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setFromBankAccountId(""); setToBankAccountId(""); setAmount(""); setMemo("");
+      setDate(new Date().toISOString().split("T")[0]);
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/bank-accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.bankAccounts) setBankAccounts(data.bankAccounts); })
+      .catch(() => {});
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fromBankAccountId) { toast.error("Choose the account the money is coming from"); return; }
+    if (!toBankAccountId) { toast.error("Choose the account the money is going to"); return; }
+    if (fromBankAccountId === toBankAccountId) { toast.error("Pick two different accounts"); return; }
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { toast.error("Enter an amount greater than zero"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/bank-transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          fromBankAccountId,
+          toBankAccountId,
+          amount: amt,
+          date,
+          memo: memo.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to record transfer");
+      }
+      const data = await res.json();
+      toast.success("Transfer recorded");
+      onClose();
+      if (data.journalEntryId) router.push(`/accounting/${data.journalEntryId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record transfer");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fromCurrency = bankAccounts.find((b) => b.id === fromBankAccountId)?.currencyCode;
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><ArrowLeftRight className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">Move money between accounts</SheetTitle>
+              <SheetDescription>Record cash moving from one of your bank or cash accounts to another.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Accounts</SectionLabel>
+              <div className="space-y-2">
+                <Label>From *</Label>
+                <Select value={fromBankAccountId} onValueChange={setFromBankAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Account the money leaves" /></SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((b) => (
+                      <SelectItem key={b.id} value={b.id} disabled={b.id === toBankAccountId}>
+                        {b.accountName} ({b.currencyCode})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>To *</Label>
+                <Select value={toBankAccountId} onValueChange={setToBankAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Account the money arrives in" /></SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((b) => (
+                      <SelectItem key={b.id} value={b.id} disabled={b.id === fromBankAccountId}>
+                        {b.accountName} ({b.currencyCode})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Amount *</Label>
+                  <CurrencyInput prefix={fromCurrency ? "" : "$"} value={amount} onChange={setAmount} placeholder="0.00" />
+                  {fromCurrency && (
+                    <p className="text-[11px] text-muted-foreground">In {fromCurrency} (the from account&apos;s currency)</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <DatePicker value={date} onChange={setDate} placeholder="Transfer date" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Memo</Label>
+                <Textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Optional note about this transfer..." rows={2} />
+              </div>
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Record Transfer" />
         </form>
       </SheetContent>
     </Sheet>

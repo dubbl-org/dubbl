@@ -12,21 +12,44 @@ import { assertNotLocked } from "@/lib/api/period-lock";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
 
-const itemSchema = z.object({
-  date: z.string().min(1),
-  description: z.string().min(1),
-  amount: z.number().min(0),
-  category: z.string().nullable().optional(),
-  accountId: z.string().nullable().optional(),
-  receiptFileKey: z.string().nullable().optional(),
-  receiptFileName: z.string().nullable().optional(),
-});
+const itemSchema = z
+  .object({
+    date: z.string().min(1),
+    description: z.string().min(1),
+    amount: z.number().min(0),
+    category: z.string().nullable().optional(),
+    accountId: z.string().nullable().optional(),
+    // Tax applied to this line; the amount is treated as tax-inclusive (same as a
+    // categorized bank line). Persisted on expense_item.taxRateId.
+    taxRateId: z.string().nullable().optional(),
+    receiptFileKey: z.string().nullable().optional(),
+    receiptFileName: z.string().nullable().optional(),
+    // Mileage capture. When isMileage is true the amount is computed from
+    // distance * rate; distanceMiles is miles x 100 (2 decimals), mileageRate is
+    // cents per mile — both stored as integers on expense_item.
+    isMileage: z.boolean().optional(),
+    distanceMiles: z.number().int().min(0).nullable().optional(),
+    mileageRate: z.number().int().min(0).nullable().optional(),
+  })
+  .refine(
+    (item) =>
+      !item.isMileage ||
+      (item.distanceMiles != null && item.mileageRate != null),
+    {
+      message:
+        "Mileage items require both distanceMiles and mileageRate when isMileage is true",
+      path: ["distanceMiles"],
+    }
+  );
 
 const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
-  currencyCode: currencyCodeSchema.default("USD"),
+  // Optional — when the client omits it, the org's base/default currency is
+  // resolved below so non-USD orgs label expense claims correctly.
+  currencyCode: currencyCodeSchema.optional(),
   items: z.array(itemSchema).min(1),
 });
 
@@ -75,6 +98,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
+    // Resolve the claim currency: explicit request wins, otherwise fall back to
+    // the org's base/default currency so non-USD orgs are labelled correctly.
+    const currencyCode = await resolveDocumentCurrency(
+      ctx.organizationId,
+      parsed.currencyCode,
+      undefined
+    );
+
     // Check period lock for each item date
     for (const item of parsed.items) {
       await assertNotLocked(ctx.organizationId, item.date);
@@ -83,7 +114,7 @@ export async function POST(request: Request) {
     // Calculate total from items
     let totalAmount = 0;
     const processedItems = parsed.items.map((item, i) => {
-      const amount = decimalToMinorUnits(item.amount, parsed.currencyCode);
+      const amount = decimalToMinorUnits(item.amount, currencyCode);
       totalAmount += amount;
       return {
         date: item.date,
@@ -91,6 +122,10 @@ export async function POST(request: Request) {
         amount,
         category: item.category || null,
         accountId: item.accountId || null,
+        taxRateId: item.taxRateId || null,
+        isMileage: item.isMileage ?? false,
+        distanceMiles: item.isMileage ? (item.distanceMiles ?? null) : null,
+        mileageRate: item.isMileage ? (item.mileageRate ?? null) : null,
         receiptFileKey: item.receiptFileKey || null,
         receiptFileName: item.receiptFileName || null,
         sortOrder: i,
@@ -105,7 +140,7 @@ export async function POST(request: Request) {
         description: parsed.description || null,
         submittedBy: ctx.userId,
         totalAmount,
-        currencyCode: parsed.currencyCode,
+        currencyCode,
       })
       .returning();
 
