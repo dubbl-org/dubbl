@@ -60,7 +60,7 @@ import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picke
 import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { formatMoney, decimalToCents } from "@/lib/money";
+import { formatMoney, decimalToCents, decimalToMinorUnits } from "@/lib/money";
 import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
 import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
@@ -3780,7 +3780,7 @@ function CustomerCreditDrawer({ open, onClose }: { open: boolean; onClose: () =>
     e.preventDefault();
     if (!contactId) { toast.error("Please select a customer"); return; }
     if (!bankAccountId) { toast.error("Please choose where the money was paid in"); return; }
-    const cents = decimalToCents(amount);
+    const cents = decimalToMinorUnits(amount, currencyCode || "USD");
     if (cents <= 0) { toast.error("Please enter an amount"); return; }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
@@ -3941,6 +3941,8 @@ function LoanDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     if (!name.trim()) { toast.error("Please enter a loan name"); return; }
     if (!principalAccountId) { toast.error("Please choose the loan (liability) account"); return; }
     if (!interestAccountId) { toast.error("Please choose the interest (expense) account"); return; }
+    if (!principalAmount || parseFloat(principalAmount) <= 0) { toast.error("Please enter a loan amount greater than zero"); return; }
+    if (!termMonths || parseInt(termMonths) <= 0) { toast.error("Please enter the loan term in months"); return; }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) { setSaving(false); return; }
@@ -4276,6 +4278,9 @@ function AccrualScheduleDrawer({ open, onClose }: { open: boolean; onClose: () =
     if (!description.trim()) { toast.error("Please enter a description"); return; }
     if (!accountId) { toast.error("Please choose an account"); return; }
     if (!reverseAccountId) { toast.error("Please choose the reversing account"); return; }
+    if (parseFloat(totalAmount) <= 0) { toast.error("Please enter an amount greater than zero"); return; }
+    if (!endDate) { toast.error("Please choose an end date"); return; }
+    if (!periods || parseInt(periods) <= 0) { toast.error("Please enter how many periods to spread over"); return; }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) { setSaving(false); return; }

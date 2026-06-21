@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMoney, centsToDecimal } from "@/lib/money";
+import { formatMoney, decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
@@ -42,6 +42,7 @@ interface DebitNoteDetail {
   total: number;
   amountApplied: number;
   amountRemaining: number;
+  currencyCode: string;
   contactId: string | null;
   billId: string | null;
   contact: { name: string; email: string | null } | null;
@@ -141,7 +142,7 @@ export default function DebitNoteDetailPage() {
 
   async function handleApply() {
     if (!orgId || !applyBillId) return;
-    const amount = Math.round(parseFloat(applyAmount) * 100);
+    const amount = decimalToMinorUnits(parseFloat(applyAmount) || 0, dn?.currencyCode || "USD");
     if (!amount || amount <= 0) {
       toast.error("Enter a valid amount");
       return;
@@ -228,7 +229,7 @@ export default function DebitNoteDetailPage() {
                     <SelectContent>
                       {bills.map((b) => (
                         <SelectItem key={b.id} value={b.id}>
-                          {b.billNumber} · {b.contact?.name || "Unknown"} · Due: {formatMoney(b.amountDue)}
+                          {b.billNumber} · {b.contact?.name || "Unknown"} · Due: {formatMoney(b.amountDue, dn.currencyCode)}
                         </SelectItem>
                       ))}
                       {bills.length === 0 && (
@@ -245,10 +246,10 @@ export default function DebitNoteDetailPage() {
                     prefix="$"
                     value={applyAmount}
                     onChange={setApplyAmount}
-                    placeholder={centsToDecimal(dn.amountRemaining)}
+                    placeholder={minorUnitsToDecimal(dn.amountRemaining, dn.currencyCode)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Remaining credit: {formatMoney(dn.amountRemaining)}
+                    Remaining credit: {formatMoney(dn.amountRemaining, dn.currencyCode)}
                   </p>
                 </div>
                 <Button
@@ -287,15 +288,15 @@ export default function DebitNoteDetailPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Total</p>
-          <p className="text-xl font-bold font-mono">{formatMoney(dn.total)}</p>
+          <p className="text-xl font-bold font-mono">{formatMoney(dn.total, dn.currencyCode)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Used</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(dn.amountApplied)}</p>
+          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(dn.amountApplied, dn.currencyCode)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Remaining</p>
-          <p className="text-xl font-bold font-mono text-amber-600">{formatMoney(dn.amountRemaining)}</p>
+          <p className="text-xl font-bold font-mono text-amber-600">{formatMoney(dn.amountRemaining, dn.currencyCode)}</p>
         </div>
       </div>
 
@@ -314,17 +315,17 @@ export default function DebitNoteDetailPage() {
                 <p className="text-xs text-muted-foreground">{line.account.code} &middot; {line.account.name}</p>
               )}
             </div>
-            <span className="text-right text-sm font-mono">{(line.quantity / 100).toFixed(0)}</span>
-            <span className="text-right text-sm font-mono">{formatMoney(line.unitPrice)}</span>
-            <span className="text-right text-sm font-mono font-medium">{formatMoney(line.amount)}</span>
+            <span className="text-right text-sm font-mono">{(line.quantity / 100).toFixed(2)}</span>
+            <span className="text-right text-sm font-mono">{formatMoney(line.unitPrice, dn.currencyCode)}</span>
+            <span className="text-right text-sm font-mono font-medium">{formatMoney(line.amount, dn.currencyCode)}</span>
           </div>
         ))}
         <div className="border-t bg-muted/30 px-4 py-2 text-right flex flex-wrap justify-end gap-x-4 gap-y-1">
-          <span className="text-sm font-medium">Subtotal: {formatMoney(dn.subtotal)}</span>
+          <span className="text-sm font-medium">Subtotal: {formatMoney(dn.subtotal, dn.currencyCode)}</span>
           {dn.taxTotal > 0 && (
-            <span className="text-sm">Tax: {formatMoney(dn.taxTotal)}</span>
+            <span className="text-sm">Tax: {formatMoney(dn.taxTotal, dn.currencyCode)}</span>
           )}
-          <span className="text-sm font-bold">Total: {formatMoney(dn.total)}</span>
+          <span className="text-sm font-bold">Total: {formatMoney(dn.total, dn.currencyCode)}</span>
         </div>
       </div>
 

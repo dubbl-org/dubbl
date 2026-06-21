@@ -35,6 +35,7 @@ interface DebitNote {
   total: number;
   amountApplied: number;
   amountRemaining: number;
+  currencyCode: string;
   contact: { name: string } | null;
 }
 
@@ -96,7 +97,7 @@ function buildColumns(): Column<DebitNote>[] {
       className: "w-28 text-right",
       render: (r) => (
         <span className="font-mono text-sm tabular-nums">
-          {formatMoney(r.total)}
+          {formatMoney(r.total, r.currencyCode)}
         </span>
       ),
     },
@@ -107,7 +108,7 @@ function buildColumns(): Column<DebitNote>[] {
       className: "w-28 text-right",
       render: (r) => (
         <span className="font-mono text-sm tabular-nums">
-          {formatMoney(r.amountRemaining)}
+          {formatMoney(r.amountRemaining, r.currencyCode)}
         </span>
       ),
     },

@@ -81,7 +81,7 @@ export async function GET(request: Request) {
       orderBy: desc(goodsReceipt.createdAt),
       limit,
       offset,
-      with: { contact: true },
+      with: { contact: true, lines: true },
     });
 
     const [countResult] = await db
