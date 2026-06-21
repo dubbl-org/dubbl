@@ -57,6 +57,7 @@ const LABELS: Record<string, string> = {
   // Sales
   invoices: "Invoices",
   quotes: "Quotes",
+  receipts: "Cash Sales",
   "credit-notes": "Credit Notes",
   recurring: "Recurring",
   payments: "Payments",
@@ -178,11 +179,12 @@ function getLabel(segment: string): string {
   return LABELS[segment] || segment;
 }
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor";
 
 const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   sales: { label: "New Invoice", drawer: "invoice" },
   "sales/quotes": { label: "New Quote", drawer: "quote" },
+  "sales/receipts": { label: "New cash sale", drawer: "salesReceipt" },
   "sales/credit-notes": { label: "New Credit Note", drawer: "creditNote" },
   "sales/recurring": { label: "New Recurring", drawer: "recurring" },
   purchases: { label: "New Bill", drawer: "bill" },

@@ -23,6 +23,7 @@ import {
   Tag,
   ArrowLeftRight,
   Briefcase,
+  Banknote,
 } from "lucide-react";
 import {
   Sheet,
@@ -57,7 +58,7 @@ import { formatMoney, decimalToCents } from "@/lib/money";
 import { ReceiptOcr } from "@/components/dashboard/receipt-ocr";
 import type { ReceiptData } from "@/lib/ocr/extract-receipt";
 
-type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
+type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "deal";
 
 interface DrawerInitialData {
   contactId?: string;
@@ -97,6 +98,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <EntryDrawer open={activeType === "entry"} onClose={close} />
       <InventoryDrawer open={activeType === "inventory"} onClose={close} />
       <QuoteDrawer open={activeType === "quote"} onClose={close} />
+      <SalesReceiptDrawer open={activeType === "salesReceipt"} onClose={close} />
       <PurchaseOrderDrawer open={activeType === "purchaseOrder"} onClose={close} />
       <ExpenseDrawer open={activeType === "expense"} onClose={close} />
       <FixedAssetDrawer open={activeType === "fixedAsset"} onClose={close} />
@@ -1106,6 +1108,175 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
             </div>
           </div>
           <DrawerFooter onClose={onClose} saving={saving} label="Create Quote" />
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sales Receipt Drawer (cash sale — paid on the spot)
+// ---------------------------------------------------------------------------
+interface BankAccountOption {
+  id: string;
+  accountName: string;
+  currencyCode: string;
+}
+
+function SalesReceiptDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [contactId, setContactId] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [currencyCode, setCurrencyCode] = useState("");
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [lines, setLines] = useState<LineItem[]>([
+    { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      setContactId(""); setReference(""); setNotes(""); setCurrencyCode(""); setBankAccountId("");
+      setDate(new Date().toISOString().split("T")[0]);
+      setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+      return;
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/bank-accounts", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.bankAccounts) setBankAccounts(data.bankAccounts); })
+      .catch(() => {});
+  }, [open]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactId) { toast.error("Please select a customer"); return; }
+    if (!bankAccountId) { toast.error("Please choose where the money was paid in"); return; }
+    setSaving(true);
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) { setSaving(false); return; }
+
+    try {
+      const res = await fetch("/api/v1/sales-receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          contactId,
+          date,
+          reference: reference || null,
+          notes: notes || null,
+          currencyCode: currencyCode || undefined,
+          bankAccountId,
+          lines: lines.map((l) => ({
+            description: l.description,
+            quantity: parseFloat(l.quantity) || 1,
+            unitPrice: parseFloat(l.unitPrice) || 0,
+            accountId: l.accountId || null,
+            taxRateId: l.taxRateId || null,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to record cash sale");
+      }
+      const data = await res.json();
+      toast.success("Cash sale recorded");
+      onClose();
+      router.push(`/sales/receipts/${data.salesReceipt.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record cash sale");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+          <div className="flex items-center gap-3">
+            <DrawerIcon><Banknote className="size-5" /></DrawerIcon>
+            <div>
+              <SheetTitle className="text-lg">New Cash Sale</SheetTitle>
+              <SheetDescription>Record an over-the-counter sale that&apos;s already been paid for.</SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              <SectionLabel>Sale Details</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Customer *</Label>
+                  <ContactPicker value={contactId} onChange={setContactId} type="customer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reference</Label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Receipt reference, etc." />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <DatePicker value={date} onChange={setDate} placeholder="Sale date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <CurrencySelect value={currencyCode} onValueChange={setCurrencyCode} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>What was sold</SectionLabel>
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Payment</SectionLabel>
+              <div className="space-y-2">
+                <Label>Paid into *</Label>
+                <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose where the money landed..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.accountName} · {acc.currencyCode}
+                      </SelectItem>
+                    ))}
+                    {bankAccounts.length === 0 && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                        No bank or cash accounts yet
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  The cash or bank account the customer paid into.
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <SectionLabel>Notes</SectionLabel>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for this sale..." rows={3} />
+            </div>
+          </div>
+          <DrawerFooter onClose={onClose} saving={saving} label="Record cash sale" />
         </form>
       </SheetContent>
     </Sheet>
