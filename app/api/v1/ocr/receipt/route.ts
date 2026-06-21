@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import { extractReceiptData } from "@/lib/ocr/extract-receipt";
 
 export interface ServerReceiptData {
   vendor: string | null;
@@ -57,16 +58,15 @@ export async function POST(request: Request) {
   }
 }
 
-// Basic text extraction using buffer analysis
-// In production, integrate with Tesseract.js server-side or an AI vision API
+// Run real OCR over the decoded image bytes using the shared tesseract.js
+// extractor. We pass a Buffer (not a File) because tesseract.js's Node loader
+// only reads Buffer/Uint8Array/path/URL server-side. Accepts either a bare
+// base64 string or a full data URL ("data:image/png;base64,....").
 async function extractTextFromImage(base64: string, _mimeType: string): Promise<string> {
-  // This is a placeholder that returns empty text for server-side processing.
-  // The actual OCR happens client-side via Tesseract.js.
-  // To enable server-side OCR, install and use:
-  // - tesseract.js (Node.js compatible)
-  // - @google-cloud/vision
-  // - OpenAI Vision API
-  return "";
+  const payload = base64.includes(",") ? base64.slice(base64.indexOf(",") + 1) : base64;
+  const buffer = Buffer.from(payload, "base64");
+  const { rawText } = await extractReceiptData(buffer);
+  return rawText;
 }
 
 function extractVendor(text: string): string | null {
