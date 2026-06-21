@@ -8,6 +8,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { formatMoney } from "@/lib/money";
 import { ExportButton } from "@/components/dashboard/export-button";
 
@@ -36,8 +37,10 @@ const columns: Column<InvoiceRow>[] = [
 ];
 
 export default function AgedReceivablesPage() {
+  const today = new Date().toISOString().slice(0, 10);
   const [initialLoad, setInitialLoad] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [asAt, setAsAt] = useState(today);
   const [buckets, setBuckets] = useState<AgingBucket[]>([]);
   const [grandTotal, setGrandTotal] = useState(0);
 
@@ -47,7 +50,8 @@ export default function AgedReceivablesPage() {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    fetch("/api/v1/reports/aged-receivables", {
+    const params = new URLSearchParams({ asAt });
+    fetch(`/api/v1/reports/aged-receivables?${params}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
@@ -63,7 +67,7 @@ export default function AgedReceivablesPage() {
         }
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [asAt]);
 
   const allInvoices = buckets.flatMap((b) =>
     b.invoices.map((inv) => ({ ...inv, bucket: b.label }))
@@ -87,6 +91,13 @@ export default function AgedReceivablesPage() {
           filename="aged-receivables"
         />
       </PageHeader>
+
+      <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] text-muted-foreground">As of date:</span>
+          <DatePicker value={asAt} onChange={setAsAt} className="w-40 h-8 text-sm" />
+        </div>
+      </div>
 
       {loading ? (
         <BrandLoader className="h-48" />
