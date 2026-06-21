@@ -22,6 +22,16 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "paid",
   "overdue",
   "void",
+  // appended (safe ALTER TYPE ADD VALUE — never used as a same-tx column default)
+  "pending_approval",
+  "rejected",
+]);
+
+// Deposit/retainer invoices: a standard invoice flagged as an upfront request.
+export const invoiceTypeEnum = pgEnum("invoice_type", [
+  "standard",
+  "deposit",
+  "retainer",
 ]);
 
 export const quoteStatusEnum = pgEnum("quote_status", [
@@ -76,6 +86,9 @@ export const invoice = pgTable("invoice", {
   issueDate: date("issue_date").notNull(),
   dueDate: date("due_date").notNull(),
   status: invoiceStatusEnum("status").notNull().default("draft"),
+  invoiceType: invoiceTypeEnum("invoice_type").notNull().default("standard"),
+  depositPercent: integer("deposit_percent"), // basis points (5000 = 50%) for deposit/retainer invoices
+  dunningLevel: integer("dunning_level").notNull().default(0), // overdue-reminder escalation stage
   reference: text("reference"),
   notes: text("notes"),
   subtotal: integer("subtotal").notNull().default(0),

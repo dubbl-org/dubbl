@@ -138,6 +138,7 @@ export const organization = pgTable("organization", {
   defaultPaymentTerms: text("default_payment_terms"),
   industrySector: text("industry_sector"),
   referralSource: text("referral_source"),
+  onboardingCompletedAt: timestamp("onboarding_completed_at", { mode: "date" }), // null = show getting-started checklist
   billApprovalThreshold: integer("bill_approval_threshold"), // cents, null = no approval needed
   interestRate: integer("interest_rate"), // basis points, e.g. 500 = 5%
   interestMethod: text("interest_method"), // "simple" or "compound"
