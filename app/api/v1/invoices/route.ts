@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine, contact, organization, customerCredit, inventoryItem } from "@/lib/db/schema";
+import { invoice, invoiceLine, contact, organization, customerCredit, inventoryItem, member } from "@/lib/db/schema";
 import { eq, and, desc, asc, gte, lte, ne, inArray, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -17,6 +17,10 @@ import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
 import { resolvePrice } from "@/lib/api/pricing";
+import {
+  checkApprovalRequired,
+  createApprovalRequest,
+} from "@/lib/approvals/engine";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -50,6 +54,14 @@ const createSchema = z.object({
   // When true, exceeding the customer's credit limit hard-blocks the create
   // (HTTP 403) instead of returning a soft warning. Wired from an org policy.
   enforceCreditLimit: z.boolean().optional(),
+  // Document flavour. Deposit/retainer invoices post as normal AR documents
+  // (no special GL); they are just flagged for downstream display/workflows.
+  invoiceType: z.enum(["standard", "deposit", "retainer"]).default("standard"),
+  // For deposit invoices: the deposit percentage in basis points (e.g. 2500 = 25%).
+  depositPercent: z.number().int().min(0).max(10000).nullable().optional(),
+  // When true, create the invoice in 'pending_approval' rather than 'draft' so it
+  // enters the approval workflow immediately (and is not posted/sent).
+  submitForApproval: z.boolean().optional().default(false),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -323,6 +335,11 @@ export async function POST(request: Request) {
         amountPaid: 0,
         amountDue: total,
         currencyCode,
+        invoiceType: parsed.invoiceType,
+        depositPercent: parsed.depositPercent ?? null,
+        // Created as the schema default ('draft'); when submitForApproval is set
+        // we move it to 'pending_approval' below, but only after confirming an
+        // active approval workflow exists and an approval_request is created.
         createdBy: ctx.userId,
       })
       .returning();
@@ -336,7 +353,63 @@ export async function POST(request: Request) {
 
     logAudit({ ctx, action: "create", entityType: "invoice", entityId: created.id, request });
 
-    return NextResponse.json({ invoice: created, creditLimitWarning }, { status: 201 });
+    // Submit-for-approval on create: mirror the dedicated submit route. Resolve
+    // the creating user's member record, find a matching active workflow, create
+    // the approval_request, then flip the invoice to 'pending_approval'. If there
+    // is no active workflow (with steps) for invoices, approval cannot be
+    // required, so fall back to leaving the invoice as a normal 'draft'.
+    let result = created;
+    if (parsed.submitForApproval) {
+      const requester = await db.query.member.findFirst({
+        where: and(
+          eq(member.userId, ctx.userId),
+          eq(member.organizationId, ctx.organizationId)
+        ),
+      });
+
+      const workflow = requester
+        ? await checkApprovalRequired(
+            ctx.organizationId,
+            "invoice",
+            created as unknown as Record<string, unknown>
+          )
+        : null;
+
+      if (requester && workflow && workflow.steps.length > 0) {
+        await createApprovalRequest(
+          ctx.organizationId,
+          workflow.id,
+          "invoice",
+          created.id,
+          requester.id
+        );
+
+        const [updated] = await db
+          .update(invoice)
+          .set({ status: "pending_approval", updatedAt: new Date() })
+          .where(
+            and(
+              eq(invoice.id, created.id),
+              eq(invoice.organizationId, ctx.organizationId)
+            )
+          )
+          .returning();
+
+        if (updated) {
+          result = updated;
+          logAudit({
+            ctx,
+            action: "submit_for_approval",
+            entityType: "invoice",
+            entityId: created.id,
+            changes: { previousStatus: created.status },
+            request,
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ invoice: result, creditLimitWarning }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }

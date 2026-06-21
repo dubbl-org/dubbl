@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX, Percent, Wallet } from "lucide-react";
+import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX, Percent, Wallet, ThumbsUp, Bell } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,9 @@ interface InvoiceDetail {
   issueDate: string;
   dueDate: string;
   status: string;
+  invoiceType?: string | null;
+  depositPercent?: number | null;
+  dunningLevel?: number | null;
   subtotal: number;
   taxTotal: number;
   total: number;
@@ -124,6 +127,14 @@ const statusConfig: Record<string, { class: string; bg: string }> = {
     class: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
     bg: "bg-gray-400",
   },
+  pending_approval: {
+    class: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300",
+    bg: "bg-violet-500",
+  },
+  rejected: {
+    class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+    bg: "bg-red-500",
+  },
 };
 
 const methodLabels: Record<string, string> = {
@@ -142,6 +153,8 @@ const statusLabels: Record<string, string> = {
   paid: "paid",
   overdue: "overdue",
   void: "cancelled",
+  pending_approval: "waiting for approval",
+  rejected: "rejected",
 };
 
 interface PaymentRecord {
@@ -208,6 +221,12 @@ export default function InvoiceDetailPage() {
   // Available customer credits
   const [credits, setCredits] = useState<AvailableCredit[]>([]);
   const [applyingCreditId, setApplyingCreditId] = useState<string | null>(null);
+  // Approval actions (mirrors the bill detail flow)
+  const [approving, setApproving] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -342,6 +361,79 @@ export default function InvoiceDetailPage() {
     } finally {
       setApplyingCreditId(null);
     }
+  }
+
+  // Approve an invoice that's waiting for approval. Mirrors the bill flow.
+  async function handleApprove() {
+    if (!orgId) return;
+    setApproving(true);
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/approve`, {
+        method: "POST",
+        headers: { "x-organization-id": orgId },
+      });
+      if (res.ok) {
+        toast.success("Invoice approved");
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't approve this invoice");
+      }
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  // Reject an invoice that's waiting for approval, recording the reason.
+  async function handleReject() {
+    if (!orgId) return;
+    setRejecting(true);
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ reason: rejectReason.trim() || undefined }),
+      });
+      if (res.ok) {
+        setRejectOpen(false);
+        setRejectReason("");
+        toast.success("Invoice rejected");
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't reject this invoice");
+      }
+    } finally {
+      setRejecting(false);
+    }
+  }
+
+  // Send a draft invoice off for approval.
+  async function handleSubmitForApproval() {
+    if (!orgId) return;
+    await confirm({
+      title: "Send this invoice for approval?",
+      description: "This sends the invoice to be reviewed before it can go out to the customer.",
+      confirmLabel: "Send for approval",
+      onConfirm: async () => {
+        setSubmitting(true);
+        try {
+          const res = await fetch(`/api/v1/invoices/${id}/submit-for-approval`, {
+            method: "POST",
+            headers: { "x-organization-id": orgId },
+          });
+          if (res.ok) {
+            toast.success("Sent for approval");
+            refetchInvoice();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            toast.error(typeof data.error === "string" ? data.error : "Couldn't send this invoice for approval");
+          }
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
   }
 
   useEffect(() => {
@@ -537,6 +629,8 @@ export default function InvoiceDetailPage() {
           dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split("T")[0]; })(),
           reference: inv.reference || null,
           notes: inv.notes || null,
+          invoiceType: inv.invoiceType || "standard",
+          depositPercent: inv.depositPercent ?? null,
           lines: inv.lines.map((l) => ({
             description: l.description,
             quantity: l.quantity / 100,
@@ -579,6 +673,18 @@ export default function InvoiceDetailPage() {
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-semibold tracking-tight">{inv.invoiceNumber}</h1>
                 <Badge variant="outline" className={sc.class}>{statusLabels[inv.status] || inv.status}</Badge>
+                {(inv.invoiceType === "deposit" || inv.invoiceType === "retainer") && (
+                  <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                    {inv.invoiceType === "deposit" ? "Deposit invoice" : "Retainer invoice"}
+                    {inv.depositPercent != null && ` · ${(inv.depositPercent / 100).toFixed(inv.depositPercent % 100 === 0 ? 0 : 2)}%`}
+                  </Badge>
+                )}
+                {(inv.dunningLevel ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground" title="How many payment reminders have been sent for this invoice">
+                    <Bell className="size-3" />
+                    {inv.dunningLevel} reminder{inv.dunningLevel === 1 ? "" : "s"} sent
+                  </span>
+                )}
                 {overdueInfo && (
                   <span className={`text-xs font-medium ${overdueInfo.class}`}>{overdueInfo.label}</span>
                 )}
@@ -590,6 +696,56 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {inv.status === "pending_approval" && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={handleApprove}
+                  loading={approving}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  title="Approve this invoice so it can be sent to the customer"
+                >
+                  <ThumbsUp className="mr-2 size-4" />Approve
+                </Button>
+                <Dialog open={rejectOpen} onOpenChange={(o) => { setRejectOpen(o); if (!o) setRejectReason(""); }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" title="Reject this invoice with a reason">
+                      <X className="mr-2 size-4" />Reject
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Reject this invoice?</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        This sends the invoice back so it can be fixed and re-submitted. Add a reason so everyone knows why.
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Reason (optional)</Label>
+                        <Input
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="e.g. amount doesn't match the order"
+                        />
+                      </div>
+                      <Button onClick={handleReject} loading={rejecting} className="w-full bg-red-600 hover:bg-red-700">
+                        Reject invoice
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+            {inv.status === "draft" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSubmitForApproval}
+                loading={submitting}
+                title="Send this invoice to be reviewed before it goes out to the customer"
+              >
+                <ThumbsUp className="mr-2 size-4" />Submit for approval
+              </Button>
+            )}
             {inv.status === "draft" && (
               <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
                 <Send className="mr-2 size-4" />Send

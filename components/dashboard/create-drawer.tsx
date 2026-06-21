@@ -521,6 +521,16 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   });
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  // Deposit / retainer invoice. When on, the invoice is typed as a deposit or
+  // retainer and may carry an optional deposit percentage (stored in basis
+  // points; the user types a plain percent like 25).
+  const [isDepositRetainer, setIsDepositRetainer] = useState(false);
+  const [invoiceType, setInvoiceType] = useState<"deposit" | "retainer">("deposit");
+  const [depositPercent, setDepositPercent] = useState("");
+  // When on, the invoice is routed into the approval queue instead of being
+  // sent straight away (created awaiting approval; the invoice's own page
+  // carries the approve / reject lifecycle actions).
+  const [forApproval, setForApproval] = useState(false);
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
@@ -528,6 +538,8 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   useEffect(() => {
     if (!open) {
       setContactId(""); setReference(""); setNotes("");
+      setIsDepositRetainer(false); setInvoiceType("deposit"); setDepositPercent("");
+      setForApproval(false);
       setIssueDate(new Date().toISOString().split("T")[0]);
       const d = new Date(); d.setDate(d.getDate() + 30);
       setDueDate(d.toISOString().split("T")[0]);
@@ -542,6 +554,13 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
+    // Deposit % is entered as a plain percent and stored as basis points.
+    const pct = parseFloat(depositPercent);
+    const depositBasisPoints =
+      isDepositRetainer && depositPercent.trim() !== "" && !Number.isNaN(pct)
+        ? Math.round(pct * 100)
+        : null;
+
     try {
       const res = await fetch("/api/v1/invoices", {
         method: "POST",
@@ -550,6 +569,9 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           contactId, issueDate, dueDate,
           reference: reference || null,
           notes: notes || null,
+          invoiceType: isDepositRetainer ? invoiceType : "standard",
+          depositPercent: isDepositRetainer ? depositBasisPoints : null,
+          ...(forApproval ? { submitForApproval: true } : {}),
           lines: lines.map((l) => ({
             description: l.description,
             quantity: parseFloat(l.quantity) || 1,
@@ -564,7 +586,11 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
         throw new Error(data.error || "Failed to create invoice");
       }
       const data = await res.json();
-      toast.success("Invoice created");
+      toast.success(
+        data.invoice.status === "pending_approval"
+          ? "Invoice saved for approval — approve it from the invoice's page to send it"
+          : "Invoice created"
+      );
       onClose();
       router.push(`/sales/${data.invoice.id}`);
     } catch (err) {
@@ -610,6 +636,61 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                   <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
                 </div>
               </div>
+              <label className="flex items-start gap-3 rounded-lg border bg-muted/30 px-3 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isDepositRetainer}
+                  onChange={(e) => setIsDepositRetainer(e.target.checked)}
+                  className="mt-0.5 size-4 accent-emerald-600"
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium">This is a deposit / retainer invoice</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Bill the customer up front for a deposit or an ongoing retainer rather than for work already done.
+                  </span>
+                </span>
+              </label>
+              {isDepositRetainer && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Invoice type</Label>
+                    <Select value={invoiceType} onValueChange={(v) => setInvoiceType(v as "deposit" | "retainer")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="deposit">Deposit</SelectItem>
+                        <SelectItem value="retainer">Retainer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="drawer-invoice-deposit-pct">Deposit % (optional)</Label>
+                    <Input
+                      id="drawer-invoice-deposit-pct"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={depositPercent}
+                      onChange={(e) => setDepositPercent(e.target.value)}
+                      placeholder="e.g. 25"
+                    />
+                  </div>
+                </div>
+              )}
+              <label className="flex items-start gap-3 rounded-lg border bg-muted/30 px-3 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={forApproval}
+                  onChange={(e) => setForApproval(e.target.checked)}
+                  className="mt-0.5 size-4 accent-emerald-600"
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium">Submit for approval instead of sending</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Save the invoice for someone to approve. It won&apos;t be sent until it&apos;s approved.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="h-px bg-border" />
