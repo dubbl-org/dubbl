@@ -1230,7 +1230,7 @@ export function CreateExpenseSheet({
                   <SelectItem value="none">No tax</SelectItem>
                   {taxRates.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                      {taxOptionLabel(t, true)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1280,6 +1280,23 @@ export interface TaxRateOption {
   rate: number; // basis points
   kind?: string;
   recoverablePercent?: number;
+}
+
+// Plain label for a tax option in a dropdown, e.g. "VAT 20%". For money-OUT
+// (purchase) contexts we also spell out how much can be claimed back, so users
+// don't silently under-reclaim: "VAT 20% · fully reclaimable", "· 50%
+// reclaimable", or "· not reclaimable" for blocked / US sales tax / 0%.
+function taxOptionLabel(t: TaxRateOption, isPurchase: boolean): string {
+  const pct = (t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2);
+  const base = `${t.name} (${pct}%)`;
+  if (!isPurchase) return base;
+  const kind = t.kind || "standard";
+  const recoverableBp = t.recoverablePercent ?? 10000;
+  if (kind === "blocked" || kind === "sales_tax_us" || recoverableBp <= 0) {
+    return `${base} · not reclaimable`;
+  }
+  if (recoverableBp >= 10000) return `${base} · fully reclaimable`;
+  return `${base} · ${Math.round(recoverableBp / 100)}% reclaimable`;
 }
 
 function splitTaxPreview(
@@ -1571,7 +1588,7 @@ export function CategorizeSheet({
                 <SelectItem value="none">No tax</SelectItem>
                 {taxRates.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                    {taxOptionLabel(t, !isCredit)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2459,7 +2476,7 @@ export function SplitAccountSheet({
                         <SelectItem value="none">No tax</SelectItem>
                         {taxRates.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
-                            {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                            {taxOptionLabel(t, !isCredit)}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -615,7 +615,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
             </div>
 
             <div className="h-px bg-border" />
@@ -811,7 +811,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" />
             </div>
 
             <div className="h-px bg-border" />
@@ -1161,7 +1161,7 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
             </div>
 
             <div className="h-px bg-border" />
@@ -1301,7 +1301,7 @@ function SalesReceiptDrawer({ open, onClose }: { open: boolean; onClose: () => v
 
             <div className="space-y-4">
               <SectionLabel>What was sold</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
             </div>
 
             <div className="h-px bg-border" />
@@ -1452,7 +1452,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" />
             </div>
 
             <div className="h-px bg-border" />
@@ -2446,7 +2446,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
             </div>
 
             <div className="h-px bg-border" />
@@ -2590,7 +2590,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
             </div>
 
             <div className="h-px bg-border" />
@@ -3730,7 +3730,7 @@ function DebitNoteDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" />
             </div>
 
             <div className="h-px bg-border" />

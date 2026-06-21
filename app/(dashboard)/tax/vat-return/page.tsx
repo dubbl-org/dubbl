@@ -9,6 +9,9 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
@@ -23,10 +26,16 @@ interface VatBox {
 const CALCULATED_BOXES = ["3", "5"];
 const KEY_BOX = "5";
 
+type Basis = "accrual" | "cash";
+
 export default function VatReturnPage() {
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
+  const [basis, setBasis] = useState<Basis>("accrual");
+  // Flat-rate scheme percentage as the user types it (e.g. "14.5"). Empty = off.
+  const [flatRatePercent, setFlatRatePercent] = useState("");
+  const [flatRateOn, setFlatRateOn] = useState(false);
   const [boxes, setBoxes] = useState<VatBox[]>([]);
   const [loading, setLoading] = useState(true);
   useDocumentTitle("Tax · VAT Return");
@@ -35,7 +44,15 @@ export default function VatReturnPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
-    const params = new URLSearchParams({ startDate, endDate });
+    const params = new URLSearchParams({ startDate, endDate, basis });
+    // The API takes the flat rate in basis points (1450 = 14.5%). Only send it
+    // when the scheme is switched on and a positive percentage is entered.
+    const pct = Number(flatRatePercent);
+    if (flatRateOn && Number.isFinite(pct) && pct > 0) {
+      params.set("flatRatePercent", String(Math.round(pct * 100)));
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
     fetch(`/api/v1/reports/vat-return?${params}`, {
       headers: { "x-organization-id": orgId },
     })
@@ -50,7 +67,7 @@ export default function VatReturnPage() {
         }
       });
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, basis, flatRateOn, flatRatePercent]);
 
   const outputVat = boxes.find((b) => b.box === "1")?.amount || 0;
   const inputVat = boxes.find((b) => b.box === "4")?.amount || 0;
@@ -87,6 +104,73 @@ export default function VatReturnPage() {
         endDate={endDate}
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
+
+      {/* How VAT is counted, plus optional flat-rate scheme */}
+      <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1.5">
+          <Label className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">
+            Count VAT
+          </Label>
+          <div className="inline-flex rounded-md border p-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant={basis === "accrual" ? "secondary" : "ghost"}
+              className="h-7 text-xs"
+              onClick={() => setBasis("accrual")}
+            >
+              When you record it
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={basis === "cash" ? "secondary" : "ghost"}
+              className="h-7 text-xs"
+              onClick={() => setBasis("cash")}
+            >
+              When money moves
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {basis === "accrual"
+              ? "Counts VAT on the date you raise or enter a document."
+              : "Counts VAT only when the payment actually goes in or out."}
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="flat-rate-toggle"
+              checked={flatRateOn}
+              onCheckedChange={setFlatRateOn}
+            />
+            <Label htmlFor="flat-rate-toggle" className="text-sm font-medium">
+              Use a flat rate
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              max="100"
+              disabled={!flatRateOn}
+              value={flatRatePercent}
+              onChange={(e) => setFlatRatePercent(e.target.value)}
+              placeholder="e.g. 14.5"
+              className="h-8 w-28 text-sm"
+              aria-label="Flat rate percentage"
+            />
+            <span className="text-sm text-muted-foreground">%</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Pay a fixed percentage of your total sales instead of working out
+            VAT line by line.
+          </p>
+        </div>
+      </div>
 
       {loading ? (
         <BrandLoader className="h-48" />
