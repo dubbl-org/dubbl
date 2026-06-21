@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { ArrowLeft, Play, Search, X, FileText, CheckCircle2, XCircle, Gift, ScrollText, Send, Plus } from "lucide-react";
+import { ArrowLeft, Play, Search, X, FileText, CheckCircle2, XCircle, Gift, ScrollText, Send, Plus, BookOpen, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,7 @@ interface PayrollRunDetail {
   totalGross: number;
   totalDeductions: number;
   totalNet: number;
+  journalEntryId: string | null;
   processedAt: string | null;
   items: PayrollItemRow[];
 }
@@ -477,6 +478,38 @@ export default function PayrollRunDetailPage() {
           <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{formatMoney(run.totalNet)}</p>
         </motion.div>
       </div>
+
+      {/* Accounting entry (GL journal posted when the run was finished) */}
+      {run.journalEntryId ? (
+        <motion.button
+          {...anim(0.12)}
+          onClick={() => router.push(`/accounting/${run.journalEntryId}`)}
+          className="group flex w-full items-center justify-between gap-4 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/50"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+              <BookOpen className="size-5 text-muted-foreground" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">View accounting entry</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Wages {formatMoney(run.totalGross)} · Taxes &amp; deductions {formatMoney(run.totalDeductions)} · Net paid {formatMoney(run.totalNet)}
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </motion.button>
+      ) : run.status === "completed" ? (
+        <div className="flex items-center gap-3 rounded-xl border border-dashed bg-card p-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+            <BookOpen className="size-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">No accounting entry linked</p>
+            <p className="text-xs text-muted-foreground">This run was finished but no journal entry is on record.</p>
+          </div>
+        </div>
+      ) : null}
 
       {/* Employee items */}
       <div className="space-y-3">

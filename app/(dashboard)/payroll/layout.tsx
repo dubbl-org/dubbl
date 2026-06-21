@@ -9,6 +9,7 @@ import {
   BarChart3,
   DollarSign,
   Settings,
+  Landmark,
 } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
@@ -16,6 +17,7 @@ const TABS = [
   { href: "/payroll", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/payroll/employees", label: "Employees", icon: Users },
   { href: "/payroll/runs", label: "Runs", icon: FileText },
+  { href: "/payroll/tax-liabilities", label: "Tax Liabilities", icon: Landmark, title: "Payroll taxes you owe, and recording payments to the agencies" },
   { href: "/payroll/time-leave", label: "Time & Leave", icon: Clock },
   { href: "/payroll/contractors", label: "Contractors", icon: Briefcase },
   { href: "/payroll/compensation", label: "Compensation", icon: DollarSign },
