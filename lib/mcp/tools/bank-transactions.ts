@@ -1957,4 +1957,173 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         };
       })
   );
+
+  // -------------------------------------------------------------------------
+  // record_bank_transfer — move money between two of the org's OWN bank
+  // accounts without an imported statement line to match against.
+  // -------------------------------------------------------------------------
+  server.tool(
+    "record_bank_transfer",
+    "Record a standalone TRANSFER of money between two of the org's OWN bank/cash accounts (no imported statement line required). A transfer has no P&L impact — it posts ONE balanced journal entry that DEBITS the receiving bank's ledger account and CREDITS the sending bank's ledger account (a pure balance-sheet reclassification). Both accounts must be in the SAME currency (cross-currency FX transfers are rejected). Records the two halves as paired, already-reconciled bank transactions (money out of the from-account, money in to the to-account) that share a transferGroupId and reference each other via transferTransactionId, so both accounts' running balances reflect the move. Amounts are in integer cents (e.g. $12.50 = 1250) in the accounts' shared currency.",
+    {
+      fromBankAccountId: z
+        .string()
+        .describe("UUID of the own bank/cash account the money leaves"),
+      toBankAccountId: z
+        .string()
+        .describe("UUID of the own bank/cash account the money arrives in (must differ from the from-account)"),
+      amount: z
+        .number()
+        .int()
+        .positive()
+        .describe("Amount to move, in integer cents (e.g. $12.50 = 1250), in the accounts' shared currency"),
+      date: z.string().describe("Transfer date (YYYY-MM-DD)"),
+      memo: z.string().nullable().optional().describe("Optional note for the transfer"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:banking");
+
+        if (params.fromBankAccountId === params.toBankAccountId) {
+          throw new Error("A transfer must be between two different accounts.");
+        }
+
+        await assertNotLocked(ctx.organizationId, params.date, ctx);
+
+        // Both accounts must be the org's own, not deleted.
+        const fromAccount = await loadBankAccount(params.fromBankAccountId, ctx);
+        const toAccount = await loadBankAccount(params.toBankAccountId, ctx);
+
+        // Cross-currency FX transfers are out of scope: both legs are booked at
+        // the same amount, so mismatched currencies would post an unbalanced /
+        // mis-scaled journal entry. Reject before any writes.
+        if (fromAccount.currencyCode !== toAccount.currencyCode) {
+          throw new Error("Transfers must be between accounts in the same currency.");
+        }
+
+        // Both banks must post to a ledger account; connect them automatically
+        // (older accounts self-heal on first use) so a transfer never dead-ends.
+        const fromGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, fromAccount);
+        const toGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, toAccount);
+
+        // MCP amounts are already integer cents in the accounts' shared currency.
+        const currencyCode = fromAccount.currencyCode;
+        const abs = params.amount;
+        if (abs <= 0) {
+          throw new Error("Transfer amount must be greater than zero.");
+        }
+
+        // Pre-flight the FX rate so a missing rate fails cleanly before writes.
+        await assertBaseRateAvailable(ctx.organizationId, currencyCode, params.date);
+
+        const memo = params.memo?.trim() || null;
+        const description = `Transfer ${fromAccount.accountName} → ${toAccount.accountName}`;
+        const reference = memo;
+
+        const { entry } = await db.transaction(async (tx) => {
+          const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
+
+          const [entry] = await tx
+            .insert(journalEntry)
+            .values({
+              organizationId: ctx.organizationId,
+              entryNumber,
+              date: params.date,
+              description,
+              reference,
+              status: "posted",
+              sourceType: "bank_transfer",
+              postedAt: new Date(),
+              createdBy: ctx.userId,
+            })
+            .returning();
+
+          const { currency, rate } = await resolveBaseRate(
+            ctx.organizationId,
+            currencyCode,
+            params.date
+          );
+
+          // DR the receiving bank, CR the sending bank (both asset accounts).
+          const lines: (typeof journalLine.$inferInsert)[] = [
+            {
+              journalEntryId: entry.id,
+              accountId: toGlAccountId!,
+              description,
+              debitAmount: abs,
+              creditAmount: 0,
+            },
+            {
+              journalEntryId: entry.id,
+              accountId: fromGlAccountId!,
+              description,
+              debitAmount: 0,
+              creditAmount: abs,
+            },
+          ];
+          await tx.insert(journalLine).values(toBaseLines(lines, currency, rate));
+
+          // Record both halves as paired, already-reconciled bank transactions
+          // so each account's balance reflects the move.
+          const transferGroupId = randomUUID();
+
+          const [outLine] = await tx
+            .insert(bankTransaction)
+            .values({
+              bankAccountId: fromAccount.id,
+              date: params.date,
+              description,
+              reference,
+              amount: -abs,
+              currencyCode,
+              status: "reconciled",
+              sourceType: "transfer",
+              journalEntryId: entry.id,
+              transferGroupId,
+            })
+            .returning();
+
+          const [inLine] = await tx
+            .insert(bankTransaction)
+            .values({
+              bankAccountId: toAccount.id,
+              date: params.date,
+              description,
+              reference,
+              amount: abs,
+              currencyCode,
+              status: "reconciled",
+              sourceType: "transfer",
+              journalEntryId: entry.id,
+              transferTransactionId: outLine.id,
+              transferGroupId,
+            })
+            .returning();
+
+          await tx
+            .update(bankTransaction)
+            .set({ transferTransactionId: inLine.id })
+            .where(eq(bankTransaction.id, outLine.id));
+
+          return { entry };
+        });
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "create",
+          entityType: "bank_transfer",
+          entityId: entry.id,
+          changes: {
+            fromBankAccountId: fromAccount.id,
+            toBankAccountId: toAccount.id,
+            amount: abs,
+            currencyCode,
+            journalEntryId: entry.id,
+          },
+        });
+
+        return { journalEntryId: entry.id };
+      })
+  );
 }
