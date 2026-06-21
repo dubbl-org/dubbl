@@ -74,6 +74,9 @@ export async function DELETE(
 const patchSchema = z.object({
   visibility: z.enum(["organization", "private"]).optional(),
   fileName: z.string().min(1).optional(),
+  // Allow linking a document to a record after upload (e.g. a receipt -> the bill it became)
+  entityType: z.string().min(1).optional(),
+  entityId: z.string().min(1).optional(),
 });
 
 export async function PATCH(
@@ -100,6 +103,8 @@ export async function PATCH(
     const updates: Record<string, string> = {};
     if (parsed.visibility) updates.visibility = parsed.visibility;
     if (parsed.fileName) updates.fileName = parsed.fileName;
+    if (parsed.entityType) updates.entityType = parsed.entityType;
+    if (parsed.entityId) updates.entityId = parsed.entityId;
 
     const [updated] = await db
       .update(document)
