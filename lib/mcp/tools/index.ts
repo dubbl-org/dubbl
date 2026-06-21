@@ -47,6 +47,13 @@ import { registerPaymentTools } from "./payments";
 import { registerPurchaseRequisitionTools } from "./purchase-requisitions";
 import { registerLandedCostTools } from "./landed-costs";
 import { registerBulkTools } from "./bulk";
+import { registerBudgetTools } from "./budgets";
+import { registerCostCenterTools } from "./cost-centers";
+import { registerTagTools } from "./tags";
+import { registerTaxPeriodTools } from "./tax-periods";
+import { registerReminderTools } from "./reminders";
+import { registerCrmTools } from "./crm";
+import { registerWarehouseTools } from "./warehouses";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerOrganizationTools(server, ctx);
@@ -96,4 +103,11 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerPurchaseRequisitionTools(server, ctx);
   registerLandedCostTools(server, ctx);
   registerBulkTools(server, ctx);
+  registerBudgetTools(server, ctx);
+  registerCostCenterTools(server, ctx);
+  registerTagTools(server, ctx);
+  registerTaxPeriodTools(server, ctx);
+  registerReminderTools(server, ctx);
+  registerCrmTools(server, ctx);
+  registerWarehouseTools(server, ctx);
 }
