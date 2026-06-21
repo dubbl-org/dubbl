@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { invoice, emailConfig, organization, reminderLog } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { getAuthContext, type AuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -137,6 +137,14 @@ async function handleSendReminder(
         subject,
         status: "sent",
       });
+      // Track escalation: bump this invoice's dunning stage by one per
+      // successfully-sent reminder. Org-scoped so we never touch another org's row.
+      await db
+        .update(invoice)
+        .set({ dunningLevel: sql`${invoice.dunningLevel} + 1` })
+        .where(
+          and(eq(invoice.id, inv.id), eq(invoice.organizationId, ctx.organizationId))
+        );
       results.push({ invoiceId: id, status: "sent", message: `Sent to ${recipient}` });
       sent++;
     } catch (err) {
