@@ -150,17 +150,25 @@ const s = StyleSheet.create({
   footerText: { fontSize: 8, color: gray },
 });
 
+export interface PdfDocumentLabels {
+  title?: string;
+  numberLabel?: string;
+  partyLabel?: string;
+  amountLabel?: string;
+}
+
 interface InvoiceDocProps {
   invoice: PdfInvoiceData;
   org: OrgInfo;
   contact: ContactInfo;
   template: PdfTemplateSettings;
+  labels?: PdfDocumentLabels;
 }
 
-function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocProps) {
+function InvoiceDocument({ invoice: inv, org, contact, template, labels }: InvoiceDocProps) {
   const accent = template.accentColor || "#10b981";
   const taxLabel = getTaxIdLabel(org.countryCode);
-  const title = getInvoiceTitle(org.countryCode, !!org.taxId);
+  const title = labels?.title ?? getInvoiceTitle(org.countryCode, !!org.taxId);
   const amountDue = inv.amountDue ?? inv.total;
   const amountPaid = inv.amountPaid ?? 0;
   const hasDiscount = inv.lines.some((l) => l.discountPercent && l.discountPercent > 0);
@@ -194,7 +202,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
         {/* Metadata */}
         <View style={s.metaBlock}>
           <View style={s.metaRow}>
-            <Text style={[s.metaLabel, { fontFamily: "Helvetica-Bold" }]}>Invoice number</Text>
+            <Text style={[s.metaLabel, { fontFamily: "Helvetica-Bold" }]}>{labels?.numberLabel ?? "Invoice number"}</Text>
             <Text style={s.metaValue}>{inv.invoiceNumber}</Text>
           </View>
           <View style={s.metaRow}>
@@ -224,7 +232,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
             {org.registrationNumber && <Text style={s.partyDetail}>Reg: {org.registrationNumber}</Text>}
           </View>
           <View style={s.buyerCol}>
-            <Text style={s.billToLabel}>Bill to</Text>
+            <Text style={s.billToLabel}>{labels?.partyLabel ?? "Bill to"}</Text>
             <Text style={s.partyDetail}>{contact.name}</Text>
             {contact.address && <Text style={s.partyDetail}>{contact.address}</Text>}
             {contact.email && <Text style={s.partyDetail}>{contact.email}</Text>}
@@ -285,7 +293,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template }: InvoiceDocPro
               </View>
             )}
             <View style={s.amountDueRow}>
-              <Text style={s.amountDueLabel}>Amount due</Text>
+              <Text style={s.amountDueLabel}>{labels?.amountLabel ?? "Amount due"}</Text>
               <Text style={s.amountDueValue}>{fmtMoney(amountDue, inv.currencyCode)}</Text>
             </View>
           </View>
@@ -340,10 +348,11 @@ export async function renderInvoicePdf(
   invoice: PdfInvoiceData,
   org: OrgInfo,
   contact: ContactInfo,
-  template: PdfTemplateSettings
+  template: PdfTemplateSettings,
+  labels?: PdfDocumentLabels
 ): Promise<ArrayBuffer> {
   const buffer = await renderToBuffer(
-    <InvoiceDocument invoice={invoice} org={org} contact={contact} template={template} />
+    <InvoiceDocument invoice={invoice} org={org} contact={contact} template={template} labels={labels} />
   );
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }

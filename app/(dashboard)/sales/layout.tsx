@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, ScrollText, CreditCard, RefreshCw, Banknote, Wallet, CalendarClock } from "lucide-react";
+import { FileText, ScrollText, CreditCard, RefreshCw, Banknote, Wallet, CalendarClock, Coins } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
 const TABS = [
@@ -8,6 +8,7 @@ const TABS = [
   { href: "/sales/quotes", label: "Quotes", icon: ScrollText },
   { href: "/sales/receipts", label: "Cash Sales", icon: Banknote },
   { href: "/sales/credit-notes", label: "Credit Notes", icon: CreditCard },
+  { href: "/sales/payments", label: "Payments", icon: Coins, title: "Payments received from customers" },
   { href: "/sales/customer-prepayments", label: "Prepayments", icon: Wallet, title: "Money customers paid in advance, held as credit on their account" },
   { href: "/sales/revenue-schedules", label: "Revenue Schedules", icon: CalendarClock, title: "Recognise income from an invoice gradually over time" },
   { href: "/sales/recurring", label: "Recurring", icon: RefreshCw },

@@ -110,7 +110,13 @@ export async function GET(
           address: contactAddress,
           taxNumber: docData.contactTaxNumber,
         },
-        templateSettings
+        templateSettings,
+        {
+          title: "Credit Note",
+          numberLabel: "Credit note number",
+          partyLabel: "Credit to",
+          amountLabel: "Credit total",
+        }
       );
 
       return new NextResponse(new Uint8Array(pdfBuffer), {

@@ -108,7 +108,13 @@ export async function GET(
           address: contactAddress,
           taxNumber: docData.contactTaxNumber,
         },
-        templateSettings
+        templateSettings,
+        {
+          title: "Quote",
+          numberLabel: "Quote number",
+          partyLabel: "Quote for",
+          amountLabel: "Total",
+        }
       );
 
       return new NextResponse(new Uint8Array(pdfBuffer), {
