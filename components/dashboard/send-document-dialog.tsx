@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Send, Paperclip, Eye, Pencil, Mail, Loader2, CreditCard } from "lucide-react";
+import { Send, Paperclip, Eye, Pencil, Mail, Loader2, CreditCard, FileText, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,18 @@ const documentTypeLabels: Record<string, string> = {
   debit_note: "Debit Note",
 };
 
+// Document types that have a server route which renders the document itself
+// (not the email) so we can show a real preview of the PDF/document before sending.
+// Maps documentType -> a function producing the render endpoint for a given id.
+// Only include a mapping when the PDF route actually exists under app/api/v1;
+// types without a PDF route are intentionally omitted so the preview button
+// simply doesn't show for them (instead of pointing the iframe at a 404).
+// Verified existing PDF routes: invoices/[id]/pdf only. quotes, credit-notes,
+// purchase-orders and debit-notes have no PDF route, so they are omitted.
+const documentRenderRoute: Partial<Record<string, (id: string) => string>> = {
+  invoice: (id) => `/api/v1/invoices/${id}/pdf`,
+};
+
 function formatDateDisplay(dateStr: string | null | undefined) {
   if (!dateStr) return undefined;
   const d = new Date(dateStr + "T00:00:00");
@@ -58,7 +70,7 @@ export function SendDocumentDialog({
   open,
   onOpenChange,
   documentType,
-  documentId: _documentId,
+  documentId,
   documentNumber,
   contactEmail,
   contactName,
@@ -77,10 +89,17 @@ export function SendDocumentDialog({
   const [previewing, setPreviewing] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Document (PDF) preview — shows the actual document the recipient receives.
+  const [docPreviewing, setDocPreviewing] = useState(false);
+  const [docPreviewUrl, setDocPreviewUrl] = useState("");
+  const [docPreviewLoading, setDocPreviewLoading] = useState(false);
+  const [docPreviewError, setDocPreviewError] = useState(false);
   const [includePaymentLink, setIncludePaymentLink] = useState(false);
   const [stripeConnected, setStripeConnected] = useState<boolean | null>(null);
 
   const typeLabel = documentTypeLabels[documentType] || "Document";
+  const renderRoute = documentRenderRoute[documentType];
+  const canPreviewDocument = Boolean(renderRoute && documentId);
   const showAttachPdf = documentType === "invoice";
   const isInvoice = documentType === "invoice";
   const amountFormatted = amountDue != null ? formatMoney(amountDue) : undefined;
@@ -111,8 +130,18 @@ export function SendDocumentDialog({
       setAttachPdf(documentType === "invoice");
       setPreviewing(false);
       setPreviewHtml("");
+      setDocPreviewing(false);
+      setDocPreviewError(false);
     }
   }, [open, contactEmail, documentType]);
+
+  // Revoke the document preview blob URL whenever it changes or on unmount,
+  // so we don't leak object URLs.
+  useEffect(() => {
+    return () => {
+      if (docPreviewUrl) URL.revokeObjectURL(docPreviewUrl);
+    };
+  }, [docPreviewUrl]);
 
   // Reset stripe status when dialog closes so it re-fetches next time
   useEffect(() => {
@@ -169,6 +198,33 @@ export function SendDocumentDialog({
       setPreviewing(false);
     } finally {
       setPreviewLoading(false);
+    }
+  }
+
+  async function handleDocumentPreview() {
+    if (!orgId || !renderRoute || !documentId) return;
+    setDocPreviewing(true);
+    setDocPreviewLoading(true);
+    setDocPreviewError(false);
+    try {
+      // Fetch via fetch() (not a raw iframe src) so we can send the
+      // x-organization-id header the document route requires, then render
+      // the response through a blob URL.
+      const res = await fetch(`${renderRoute(documentId)}?format=pdf`, {
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) {
+        setDocPreviewError(true);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      // Replace any previous URL (effect cleanup revokes the old one).
+      setDocPreviewUrl(url);
+    } catch {
+      setDocPreviewError(true);
+    } finally {
+      setDocPreviewLoading(false);
     }
   }
 
@@ -246,7 +302,49 @@ export function SendDocumentDialog({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto">
-          {previewing ? (
+          {docPreviewing ? (
+            /* ---- Document (PDF) Preview ---- */
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between px-4 py-2.5 sm:px-6 border-b bg-muted/30">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {typeLabel} Preview
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5"
+                  onClick={() => setDocPreviewing(false)}
+                >
+                  <ArrowLeft className="size-3" />
+                  Back
+                </Button>
+              </div>
+              {docPreviewLoading ? (
+                <div className="flex-1 flex items-center justify-center py-20">
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : docPreviewError ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+                  <FileText className="size-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Couldn&apos;t load the {typeLabel.toLowerCase()} preview.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={handleDocumentPreview}>
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex-1 bg-[#525659] p-2">
+                  <iframe
+                    src={docPreviewUrl}
+                    className="w-full h-full border-0 rounded-lg bg-white"
+                    style={{ minHeight: 700 }}
+                    title={`${typeLabel} preview`}
+                  />
+                </div>
+              )}
+            </div>
+          ) : previewing ? (
             /* ---- Email Preview ---- */
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between px-4 py-2.5 sm:px-6 border-b bg-muted/30">
@@ -399,16 +497,30 @@ export function SendDocumentDialog({
                   </div>
                 )}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handlePreview}
-                >
-                  <Eye className="size-3.5" />
-                  Preview Email
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handlePreview}
+                  >
+                    <Eye className="size-3.5" />
+                    Preview Email
+                  </Button>
+                  {canPreviewDocument && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handleDocumentPreview}
+                    >
+                      <FileText className="size-3.5" />
+                      Preview {typeLabel}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
