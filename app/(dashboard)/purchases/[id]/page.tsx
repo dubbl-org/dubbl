@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, DollarSign, Ban, Undo2, ThumbsUp, X } from "lucide-react";
+import { ArrowLeft, Check, DollarSign, Ban, Undo2, ThumbsUp, X, GitCompareArrows, FileBarChart, PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, minorUnitsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
 import { RateNote, type RateInfo } from "@/components/ui/rate-note";
+import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
 import Link from "next/link";
 
 interface BillDetail {
@@ -27,7 +28,7 @@ interface BillDetail {
   contactId: string;
   notes: string | null; contact: { name: string } | null;
   rejectionReason: string | null;
-  lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; account: { code: string; name: string } | null }[];
+  lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; goodsReceiptLineId: string | null; account: { code: string; name: string } | null }[];
 }
 
 interface BaseAmounts {
@@ -250,6 +251,16 @@ export default function BillDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              title="See every bill, payment and credit for this supplier on one running statement"
+            >
+              <Link href={`/contacts/${b.contactId}/statement`}>
+                <FileBarChart className="mr-2 size-3.5" />Supplier statement
+              </Link>
+            </Button>
             {b.status === "pending_approval" && (
               <>
                 <Button
@@ -507,6 +518,56 @@ export default function BillDetailPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Order match — which bill lines are tied back to a goods receipt
+            (what actually arrived). This is the audit trail that the bill
+            matches the order/delivery. */}
+        {b.lines.some((l) => l.goodsReceiptLineId) ? (
+          <div className="rounded-xl border bg-card p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <GitCompareArrows className="size-4 text-muted-foreground" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Order match</p>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              These bill lines are linked to a goods receipt, so what you were billed is checked against what actually arrived. Any price or quantity difference is recorded against the order when this bill is added to your books.
+            </p>
+            <div className="space-y-1.5">
+              {b.lines.map((line) => (
+                <div
+                  key={line.id}
+                  className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm truncate">{line.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(line.quantity / 100).toFixed(0)} × {formatMoney(line.unitPrice, b.currencyCode)}
+                    </p>
+                  </div>
+                  {line.goodsReceiptLineId ? (
+                    <Badge variant="outline" className="shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      <PackageCheck className="mr-1 size-3" />Matched to delivery
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="shrink-0 text-muted-foreground">
+                      Not on an order
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Supplier document trail — attach the supplier's PDF/receipt to this bill. */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Supplier documents</p>
+          <ReceiptAttachments
+            orgId={orgId}
+            entityType="bill"
+            entityId={b.id}
+            label="Attach the supplier's invoice or receipt (optional)"
+          />
         </div>
       </div>
       {confirmDialog}

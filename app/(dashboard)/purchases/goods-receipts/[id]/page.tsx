@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Truck, PackageCheck, BookOpen } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Truck, PackageCheck, BookOpen, ReceiptText, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { toast } from "sonner";
 import Link from "next/link";
 
 interface GoodsReceiptDetail {
@@ -47,10 +48,34 @@ const statusLabels: Record<string, string> = {
 
 export default function GoodsReceiptDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [gr, setGr] = useState<GoodsReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [billing, setBilling] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+
+  async function handleCreateBill() {
+    if (!orgId) return;
+    setBilling(true);
+    try {
+      const res = await fetch(`/api/v1/goods-receipts/${id}/create-bill`, {
+        method: "POST",
+        headers: { "x-organization-id": orgId },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Could not create a bill from this goods receipt");
+        return;
+      }
+      toast.success("Draft bill created");
+      router.push(`/purchases/${data.bill.id}`);
+    } catch {
+      toast.error("Could not create a bill from this goods receipt");
+    } finally {
+      setBilling(false);
+    }
+  }
 
   useEntityTitle(gr?.receiptNumber);
 
@@ -87,6 +112,21 @@ export default function GoodsReceiptDetailPage() {
             <Link href={`/purchases/orders/${gr.purchaseOrder.id}`}>
               <Truck className="mr-2 size-4" />View order {gr.purchaseOrder.poNumber}
             </Link>
+          </Button>
+        )}
+        {gr.status === "received" && (
+          <Button
+            size="sm"
+            onClick={handleCreateBill}
+            disabled={billing}
+            title="Create a draft supplier bill for the items received here, ready to review and pay"
+          >
+            {billing ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <ReceiptText className="mr-2 size-4" />
+            )}
+            Create a bill from this
           </Button>
         )}
         {journalEntryId && (
