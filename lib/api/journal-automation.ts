@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { journalEntry, journalLine, chartAccount, organization, taxRate, inventoryItem, inventoryMovement } from "@/lib/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { recordInventoryReceipt, recordInventoryIssue, type ValuedItem } from "./inventory-valuation";
 import { getExchangeRate, convertAmount, MissingExchangeRateError } from "@/lib/currency/converter";
 import { convertLinesToBase, realizedSettlementLegs } from "@/lib/currency/convert-entry";
@@ -291,6 +291,80 @@ export async function getNextEntryNumber(
 }
 
 /**
+ * Post a true REVERSING entry for an already-posted journal entry: a new posted
+ * entry whose lines mirror the original with debit/credit swapped. Both entries
+ * stay `posted` so reports (which count posted only) net the pair to zero, and
+ * the audit trail is preserved — unlike flipping the original to `void`, which
+ * makes the amount silently vanish from every report (even closed periods) with
+ * no offsetting record.
+ *
+ * Links the pair via reversesEntryId / reversedByEntryId. Returns the reversal
+ * entry, or null when the original has no lines (nothing to reverse).
+ *
+ * The caller is responsible for the period-lock check (assertNotLocked on the
+ * reversal date) and for running this inside a db.transaction so the reversal
+ * commits/rolls back with the document status change.
+ */
+export async function reverseJournalEntry(
+  ctx: JournalAutomationContext,
+  data: {
+    entryId: string;
+    date: string;
+    description: string;
+    reference?: string | null;
+    sourceType: string;
+    sourceId?: string | null;
+  },
+  tx: Tx
+): Promise<typeof journalEntry.$inferSelect | null> {
+  const originalLines = await tx.query.journalLine.findMany({
+    where: eq(journalLine.journalEntryId, data.entryId),
+  });
+  if (originalLines.length === 0) return null;
+
+  const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
+  const [reversal] = await tx
+    .insert(journalEntry)
+    .values({
+      organizationId: ctx.organizationId,
+      entryNumber,
+      date: data.date,
+      description: data.description,
+      reference: data.reference ?? null,
+      status: "posted",
+      sourceType: data.sourceType,
+      sourceId: data.sourceId ?? null,
+      reversesEntryId: data.entryId,
+      postedAt: new Date(),
+      createdBy: ctx.userId,
+    })
+    .returning();
+
+  await tx.insert(journalLine).values(
+    originalLines.map((l) => ({
+      journalEntryId: reversal.id,
+      accountId: l.accountId,
+      description: data.description,
+      debitAmount: l.creditAmount,
+      creditAmount: l.debitAmount,
+      currencyCode: l.currencyCode,
+      exchangeRate: l.exchangeRate,
+      costCenterId: l.costCenterId,
+      projectId: l.projectId,
+    }))
+  );
+
+  // Link the original back to its reversal so the UI can show "Reversed" and
+  // never offers to reverse it twice.
+  await tx
+    .update(journalEntry)
+    .set({ reversedByEntryId: reversal.id, updatedAt: new Date() })
+    .where(eq(journalEntry.id, data.entryId));
+
+  return reversal;
+}
+
+/**
  * Create journal entry when an invoice is sent/approved.
  * DR Accounts Receivable (asset)
  * CR Revenue (per line account)
@@ -488,6 +562,9 @@ export async function createBillJournalEntry(
   };
 
   // DR Expense accounts per line (absorbing any blocked input tax into cost).
+  // Track the first posted expense line so the legacy remainder path (below) can
+  // fold any irrecoverable slice of leftover tax back into a real cost line.
+  let firstExpenseLineIndex: number | null = null;
   for (const line of billData.lines) {
     if (!line.accountId || line.amount <= 0) continue;
 
@@ -533,6 +610,7 @@ export async function createBillJournalEntry(
       }
     }
 
+    if (firstExpenseLineIndex === null) firstExpenseLineIndex = lines.length;
     lines.push({
       journalEntryId: entry.id,
       accountId: line.accountId,
@@ -544,7 +622,46 @@ export async function createBillJournalEntry(
 
   // DR Input VAT for any tax NOT handled per-line (legacy: whole remainder to
   // 1500) PLUS the recoverable slices accumulated from per-line taxRateIds.
-  const legacyTaxRemainder = Math.max(0, billData.taxTotal - perLineTaxHandled);
+  //
+  // The legacy remainder (tax on lines that carry no taxRateId) used to post in
+  // full to Input VAT 1500 with no recoverability split, which over-reclaims for
+  // non-recoverable / partial / reverse-charge supplies. If a recoverability can
+  // be determined for the remainder — via the org's default tax rate — split it
+  // like the per-line path: the recoverable slice → 1500, the blocked slice is
+  // absorbed into a real cost line (the first posted expense line). The total
+  // posted debits are unchanged (the absorbed slice just moves from 1500 to the
+  // expense line), so the entry stays balanced to the cent.
+  let legacyTaxRemainder = Math.max(0, billData.taxTotal - perLineTaxHandled);
+  if (legacyTaxRemainder > 0 && firstExpenseLineIndex !== null) {
+    const defaultRate = await db.query.taxRate.findFirst({
+      where: and(
+        eq(taxRate.organizationId, ctx.organizationId),
+        eq(taxRate.isDefault, true),
+        isNull(taxRate.deletedAt)
+      ),
+      columns: { kind: true, recoverablePercent: true },
+    });
+    // Only adjust when the determinable default rate is actually less than fully
+    // recoverable; a 100%-recoverable standard rate matches the legacy behaviour
+    // (whole remainder to 1500), so there is nothing to absorb.
+    if (
+      defaultRate &&
+      defaultRate.kind !== "reverse_charge" &&
+      defaultRate.recoverablePercent < 10000
+    ) {
+      const recoverableRemainder = Math.round(
+        (legacyTaxRemainder * defaultRate.recoverablePercent) / 10000
+      );
+      const absorbedRemainder = legacyTaxRemainder - recoverableRemainder;
+      const expenseLine = lines[firstExpenseLineIndex];
+      expenseLine.debitAmount = (expenseLine.debitAmount ?? 0) + absorbedRemainder;
+      recoverableToInputVat += recoverableRemainder;
+      legacyTaxRemainder = 0; // fully accounted: recoverable slice + absorbed slice
+    }
+    // If no default rate is determinable (or it is fully recoverable), fall
+    // through with the remainder intact — keeping the legacy whole-remainder-to
+    // -1500 behaviour rather than guessing recoverability we cannot establish.
+  }
   const inputVatDebit = legacyTaxRemainder + recoverableToInputVat;
   if (inputVatDebit > 0) {
     // Always ensure-on-demand the Input VAT control account (1500). Previously

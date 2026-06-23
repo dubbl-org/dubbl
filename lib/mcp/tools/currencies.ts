@@ -170,4 +170,27 @@ export function registerCurrencyTools(server: McpServer, ctx: AuthContext) {
         return { exchangeRate: { ...saved, rateDecimal: saved.rate / RATE_SCALE } };
       })
   );
+
+  server.tool(
+    "delete_exchange_rate",
+    "Delete a stored exchange rate by its id (requires the manage:tax-config role). Only deletes rates belonging to the organization. Returns { success: true } on success; errors if no matching rate exists.",
+    {
+      id: z.string().describe("The exchange rate's id (UUID) to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:tax-config");
+        const existing = await db.query.exchangeRate.findFirst({
+          where: and(
+            eq(exchangeRate.id, params.id),
+            eq(exchangeRate.organizationId, ctx.organizationId)
+          ),
+        });
+        if (!existing) {
+          throw new Error(`Exchange rate not found: ${params.id}`);
+        }
+        await db.delete(exchangeRate).where(eq(exchangeRate.id, params.id));
+        return { success: true };
+      })
+  );
 }

@@ -59,6 +59,7 @@ interface BankAccountContextValue {
   // Transaction actions
   handleReconcile: (txId: string) => Promise<void>;
   handleExclude: (txId: string) => Promise<void>;
+  handleUndo: (tx: Transaction) => Promise<void>;
   handleOpenMatch: (tx: Transaction) => void;
   handleOpenExpense: (tx: Transaction) => void;
   handleOpenCategorize: (tx: Transaction) => void;
@@ -257,6 +258,25 @@ export default function BankAccountDetailLayout({ children }: { children: React.
     }
   }
 
+  // Undo an already-done line: reverse the bookkeeping (and unwind any matched
+  // invoice/bill/transfer) and move it back to the to-do list so it can be
+  // re-done. Backed by the same /unreconcile endpoint used everywhere.
+  async function handleUndo(tx: Transaction) {
+    if (!orgId) return;
+    try {
+      const res = await fetch(`/api/v1/bank-transactions/${tx.id}/unreconcile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast.success("Moved back to your to-do list");
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't undo this");
+    }
+  }
+
   async function handleOpenMatch(tx: Transaction) {
     if (!orgId) return;
     setMatchTx(tx);
@@ -415,6 +435,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       refetch: fetchData,
       handleReconcile,
       handleExclude,
+      handleUndo,
       handleOpenMatch,
       handleOpenExpense,
       handleOpenCategorize,

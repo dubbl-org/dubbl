@@ -75,6 +75,24 @@ export async function GET(request: Request) {
       )
     );
 
+    // Current-year (un-closed) earnings as at each date: revenue − expenses
+    // that haven't been closed to retained earnings yet. Without this the sheet
+    // is off by year-to-date profit for any date inside the open year and does
+    // NOT balance — the whole point of a balance sheet.
+    const plPerDate = await Promise.all(
+      allDates.map((date) =>
+        aggregateAsAt(ctx.organizationId, date, {
+          accountTypes: ["revenue", "expense"],
+        })
+      )
+    );
+    const earningsByDate = plPerDate.map((accts) =>
+      accts.reduce(
+        (s, a) => s + (a.type === "revenue" ? a.balance : -a.balance),
+        0
+      )
+    );
+
     // Index each date's aggregates by accountId for O(1) lookup. The
     // includeEmptyAccounts path returns the same account set per date, but we
     // index defensively so a missing account simply reads as a zero balance.
@@ -117,6 +135,16 @@ export async function GET(request: Request) {
     const assets = buildSection("asset");
     const liabilities = buildSection("liability");
     const equity = buildSection("equity");
+    // Carry current-year earnings into equity so Assets = Liabilities + Equity.
+    if (earningsByDate.some((v) => v !== 0)) {
+      equity.accounts.push({
+        accountId: "current-year-earnings",
+        code: "",
+        name: "Current Year Earnings",
+        balances: earningsByDate,
+      });
+      equity.totals = equity.totals.map((t, i) => t + earningsByDate[i]);
+    }
     const sections = [assets, liabilities, equity];
 
     const hasComparatives = compareDates.length > 0;

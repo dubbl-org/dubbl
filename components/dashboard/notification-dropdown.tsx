@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bell,
@@ -32,6 +33,43 @@ interface Notification {
   entityId: string | null;
   readAt: string | null;
   createdAt: string;
+}
+
+interface ApprovalRequest {
+  id: string;
+  entityType: "bill" | "expense" | "invoice" | "journal_entry" | "purchase_order";
+  entityId: string;
+  status: string;
+  currentStepOrder: number;
+  createdAt: string;
+  requestedBy?: { user?: { name?: string | null; email?: string | null } | null } | null;
+}
+
+// Plain-language label for what is awaiting sign-off
+const APPROVAL_ENTITY_LABELS: Record<ApprovalRequest["entityType"], string> = {
+  bill: "Bill",
+  expense: "Expense",
+  invoice: "Invoice",
+  journal_entry: "Journal entry",
+  purchase_order: "Purchase order",
+};
+
+// Where the user goes to review and sign off on each item
+function approvalEntityHref(req: ApprovalRequest): string {
+  switch (req.entityType) {
+    case "bill":
+      return `/purchases/${req.entityId}`;
+    case "purchase_order":
+      return `/purchases/orders/${req.entityId}`;
+    case "expense":
+      return `/purchases/expenses/${req.entityId}`;
+    case "invoice":
+      return `/sales/${req.entityId}`;
+    case "journal_entry":
+      return `/accounting/${req.entityId}`;
+    default:
+      return "/notifications";
+  }
 }
 
 const TYPE_ICONS: Record<string, typeof Bell> = {
@@ -70,11 +108,51 @@ function relativeTime(date: string) {
 
 export function NotificationDropdown() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? null;
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+
+  // Resolve the current user's member id (approvals are keyed by member, not user)
+  const resolveMemberId = useCallback(async (orgId: string): Promise<string | null> => {
+    if (!userId) return null;
+    try {
+      const res = await fetch("/api/v1/members", {
+        headers: { "x-organization-id": orgId },
+      });
+      const data = await res.json();
+      const mine = (data.members as { id: string; userId: string }[] | undefined)?.find(
+        (m) => m.userId === userId
+      );
+      return mine?.id ?? null;
+    } catch {
+      return null;
+    }
+  }, [userId]);
+
+  const fetchApprovals = useCallback(async () => {
+    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+    if (!orgId) return;
+    const memberId = await resolveMemberId(orgId);
+    if (!memberId) {
+      setApprovals([]);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/v1/approval-requests?status=pending&approverId=${memberId}&limit=8`,
+        { headers: { "x-organization-id": orgId } }
+      );
+      const data = await res.json();
+      if (Array.isArray(data.data)) setApprovals(data.data as ApprovalRequest[]);
+    } catch {
+      // ignore
+    }
+  }, [resolveMemberId]);
 
   const fetchNotifications = useCallback(() => {
     const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -94,7 +172,7 @@ export function NotificationDropdown() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Fetch unread count on mount
+  // Fetch unread count + pending approvals on mount (for the bell badge)
   useEffect(() => {
     const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
     if (!orgId) return;
@@ -106,12 +184,17 @@ export function NotificationDropdown() {
         if (data.unreadCount !== undefined) setUnreadCount(data.unreadCount);
       })
       .catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchApprovals();
+  }, [fetchApprovals]);
 
   const handleOpenChange = useCallback((next: boolean) => {
     setOpen(next);
-    if (next) fetchNotifications();
-  }, [fetchNotifications]);
+    if (next) {
+      fetchNotifications();
+      fetchApprovals();
+    }
+  }, [fetchNotifications, fetchApprovals]);
 
   const markAsRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -144,6 +227,9 @@ export function NotificationDropdown() {
     });
   };
 
+  const approvalCount = approvals.length;
+  const badgeCount = unreadCount + approvalCount;
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -154,7 +240,7 @@ export function NotificationDropdown() {
         >
           <Bell className="size-3.5" />
           <AnimatePresence>
-            {unreadCount > 0 && (
+            {badgeCount > 0 && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -162,7 +248,7 @@ export function NotificationDropdown() {
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
                 className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-medium text-white"
               >
-                {unreadCount > 9 ? "9+" : unreadCount}
+                {badgeCount > 9 ? "9+" : badgeCount}
               </motion.span>
             )}
           </AnimatePresence>
@@ -196,11 +282,63 @@ export function NotificationDropdown() {
 
         {/* Notification list */}
         <div className="max-h-[400px] overflow-y-auto overscroll-contain">
+          {/* Pending approvals awaiting this user's sign-off */}
+          {approvalCount > 0 && (
+            <div className="border-b">
+              <div className="flex items-center justify-between px-4 pt-2.5 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="size-3 text-purple-500" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Waiting for you to approve
+                  </span>
+                </div>
+                <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-semibold">
+                  {approvalCount}
+                </span>
+              </div>
+              {approvals.map((req) => {
+                const requester =
+                  req.requestedBy?.user?.name ||
+                  req.requestedBy?.user?.email ||
+                  "Someone";
+                return (
+                  <button
+                    key={req.id}
+                    onClick={() => {
+                      setOpen(false);
+                      router.push(approvalEntityHref(req));
+                    }}
+                    className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 group border-b border-border/50 last:border-0 bg-purple-500/[0.03]"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg text-purple-500 bg-purple-500/10">
+                      <ShieldCheck className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[13px] leading-snug font-medium text-foreground">
+                          {APPROVAL_ENTITY_LABELS[req.entityType]} needs your approval
+                        </p>
+                        <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0 pt-0.5">
+                          {relativeTime(req.createdAt)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground/70 line-clamp-1">
+                        Sent by {requester} &middot; Tap to review &amp; sign off
+                      </p>
+                    </div>
+                    <ArrowRight className="size-3 shrink-0 self-center text-muted-foreground/40 group-hover:text-foreground transition-colors" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {loading && !hasFetched ? (
             <div className="flex items-center justify-center py-12">
               <div className="size-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground animate-spin" />
             </div>
           ) : notifications.length === 0 ? (
+            approvalCount > 0 ? null : (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
               <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
                 <Bell className="size-5 text-muted-foreground" />
@@ -208,6 +346,7 @@ export function NotificationDropdown() {
               <p className="mt-3 text-sm font-medium text-muted-foreground">All caught up</p>
               <p className="mt-0.5 text-xs text-muted-foreground/60">No notifications yet</p>
             </div>
+            )
           ) : (
             notifications.map((n) => {
               const Icon = TYPE_ICONS[n.type] || Bell;

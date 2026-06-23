@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  ArrowLeftRight,
 } from "lucide-react";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -296,6 +297,15 @@ export default function BankingPage() {
           >
             {showBalances ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
             {showBalances ? "Hide" : "Show"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openDrawer("bankTransfer")}
+            title="Move money between your own accounts"
+          >
+            <ArrowLeftRight className="mr-2 size-4" />
+            Move money
           </Button>
           <Button
             onClick={() => openDrawer("bankAccount")}

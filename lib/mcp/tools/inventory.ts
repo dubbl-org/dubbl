@@ -16,7 +16,7 @@ import {
   auditLog,
 } from "@/lib/db/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import {
@@ -970,6 +970,314 @@ export function registerInventoryTools(server: McpServer, ctx: AuthContext) {
           page: params.page,
           limit: params.limit,
         };
+      })
+  );
+
+  // ─── Create item ──────────────────────────────────────────────────
+  server.tool(
+    "create_inventory_item",
+    "Create an inventory item (product). code and name are required; code must be unique within the org. purchasePrice and salePrice are integer cents (e.g. $12.50 = 1250). If quantityOnHand > 0 AND purchasePrice > 0, the opening stock is received through the valuation path (setting averageCost / totalValue) and a balanced opening-balance journal entry is posted (DR Inventory / CR Opening Balance Equity 3000); otherwise the item is created at zero on-hand and zero value (storing a quantity without a cost would leave stock at $0 and post $0 COGS on later sales). Returns the created item.",
+    {
+      code: z.string().min(1).describe("Item code (unique within the org)"),
+      name: z.string().min(1).describe("Item name"),
+      description: z.string().nullable().optional().describe("Optional longer description"),
+      category: z.string().nullable().optional().describe("Optional free-text category label"),
+      categoryId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Optional inventory category UUID"),
+      sku: z.string().nullable().optional().describe("Optional stock-keeping unit"),
+      purchasePrice: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .default(0)
+        .describe("Purchase/cost price in integer cents (default 0); also the unit cost used for any opening stock"),
+      salePrice: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .default(0)
+        .describe("Sale price in integer cents (default 0)"),
+      costAccountId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Optional COGS/cost chart-account UUID"),
+      revenueAccountId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Optional revenue chart-account UUID"),
+      inventoryAccountId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Optional inventory asset chart-account UUID; falls back to the inventory control account for opening-stock posting"),
+      quantityOnHand: z
+        .number()
+        .int()
+        .optional()
+        .default(0)
+        .describe("Opening on-hand quantity in whole units (default 0); only received as stock when purchasePrice > 0"),
+      reorderPoint: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .default(0)
+        .describe("Reorder point in whole units (default 0)"),
+      isActive: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe("Whether the item is active (default true)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:inventory");
+
+        const openingQty = params.quantityOnHand ?? 0;
+        const unitCost = params.purchasePrice ?? 0;
+        const hasOpeningStock = openingQty > 0 && unitCost > 0;
+
+        const created = await db.transaction(async (tx) => {
+          // Insert at zero on-hand/value, then add any opening stock through the
+          // valuation path so averageCost / totalValue / FIFO layers are set.
+          const [item] = await tx
+            .insert(inventoryItem)
+            .values({
+              organizationId: ctx.organizationId,
+              code: params.code,
+              name: params.name,
+              description: params.description ?? null,
+              category: params.category ?? null,
+              categoryId: params.categoryId ?? null,
+              sku: params.sku ?? null,
+              purchasePrice: params.purchasePrice,
+              salePrice: params.salePrice,
+              costAccountId: params.costAccountId ?? null,
+              revenueAccountId: params.revenueAccountId ?? null,
+              inventoryAccountId: params.inventoryAccountId ?? null,
+              reorderPoint: params.reorderPoint,
+              isActive: params.isActive,
+              quantityOnHand: 0,
+              averageCost: 0,
+              totalValue: 0,
+            })
+            .returning();
+
+          if (hasOpeningStock) {
+            await recordInventoryReceipt(tx, {
+              item: item as ValuedItem,
+              quantity: openingQty,
+              unitCost,
+              type: "initial",
+              referenceType: "opening_balance",
+              referenceId: item.id,
+              createdBy: ctx.userId,
+            });
+
+            // Post the opening balance to the GL: DR Inventory / CR Opening
+            // Balance Equity (the standard counter-account for starting balances).
+            const today = new Date().toISOString().slice(0, 10);
+            const { base } = await resolveBaseRate(ctx.organizationId, undefined, today);
+            const invAcct =
+              (item.inventoryAccountId ? { id: item.inventoryAccountId } : null) ??
+              (await ensureControlAccount(ctx.organizationId, "inventory", base, tx));
+            const openingEquity = await ensureAccountByCode(
+              ctx.organizationId,
+              { code: "3000", name: "Opening Balance Equity", type: "equity", subType: "other_equity" },
+              base,
+              tx
+            );
+            const value = openingQty * unitCost;
+            if (invAcct?.id && openingEquity?.id && value > 0) {
+              const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
+              const [entry] = await tx
+                .insert(journalEntry)
+                .values({
+                  organizationId: ctx.organizationId,
+                  entryNumber,
+                  date: today,
+                  description: `Opening stock: ${item.name}`,
+                  reference: item.sku ?? null,
+                  status: "posted",
+                  sourceType: "inventory_opening",
+                  sourceId: item.id,
+                  postedAt: new Date(),
+                  createdBy: ctx.userId,
+                })
+                .returning();
+              await tx.insert(journalLine).values([
+                { journalEntryId: entry.id, accountId: invAcct.id, description: `Opening stock: ${item.name}`, debitAmount: value, creditAmount: 0, currencyCode: base },
+                { journalEntryId: entry.id, accountId: openingEquity.id, description: `Opening stock: ${item.name}`, debitAmount: 0, creditAmount: value, currencyCode: base },
+              ]);
+            }
+          }
+
+          return (
+            (await tx.query.inventoryItem.findFirst({ where: eq(inventoryItem.id, item.id) })) ?? item
+          );
+        });
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "create",
+          entityType: "inventory_item",
+          entityId: created.id,
+        });
+
+        return { inventoryItem: created };
+      })
+  );
+
+  // ─── Get item ─────────────────────────────────────────────────────
+  server.tool(
+    "get_inventory_item",
+    "Get a single inventory item by ID. Returns the full item: quantityOnHand (whole units), averageCost / standardCost / totalValue / purchasePrice / salePrice (integer cents — totalValue is the on-hand book value), costMethod, reorder point, the linked cost/revenue/inventory account ids, and active flag.",
+    {
+      inventoryItemId: z.string().uuid().describe("The UUID of the inventory item"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const found = await db.query.inventoryItem.findFirst({
+          where: and(
+            eq(inventoryItem.id, params.inventoryItemId),
+            eq(inventoryItem.organizationId, ctx.organizationId),
+            notDeleted(inventoryItem.deletedAt)
+          ),
+        });
+        if (!found) throw new Error("Inventory item not found");
+        return { inventoryItem: found };
+      })
+  );
+
+  // ─── Update item ──────────────────────────────────────────────────
+  server.tool(
+    "update_inventory_item",
+    "Update an inventory item's master fields (not stock). Only the fields you pass are changed. purchasePrice and salePrice are integer cents. This does NOT change quantityOnHand, averageCost, or totalValue — use adjust_inventory_stock to change quantity or value. Returns the updated item.",
+    {
+      inventoryItemId: z.string().uuid().describe("The UUID of the inventory item to update"),
+      code: z.string().min(1).optional().describe("Item code (unique within the org)"),
+      name: z.string().min(1).optional().describe("Item name"),
+      description: z.string().nullable().optional().describe("Longer description (null to clear)"),
+      category: z.string().nullable().optional().describe("Free-text category label (null to clear)"),
+      categoryId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Inventory category UUID (null to clear)"),
+      sku: z.string().nullable().optional().describe("Stock-keeping unit (null to clear)"),
+      purchasePrice: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Purchase/cost price in integer cents"),
+      salePrice: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Sale price in integer cents"),
+      costAccountId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("COGS/cost chart-account UUID (null to clear)"),
+      revenueAccountId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Revenue chart-account UUID (null to clear)"),
+      inventoryAccountId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Inventory asset chart-account UUID (null to clear)"),
+      reorderPoint: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Reorder point in whole units"),
+      isActive: z.boolean().optional().describe("Whether the item is active"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:inventory");
+
+        const { inventoryItemId, ...fields } = params;
+
+        const existing = await db.query.inventoryItem.findFirst({
+          where: and(
+            eq(inventoryItem.id, inventoryItemId),
+            eq(inventoryItem.organizationId, ctx.organizationId),
+            notDeleted(inventoryItem.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Inventory item not found");
+
+        const [updated] = await db
+          .update(inventoryItem)
+          .set({ ...fields, updatedAt: new Date() })
+          .where(eq(inventoryItem.id, inventoryItemId))
+          .returning();
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "update",
+          entityType: "inventory_item",
+          entityId: inventoryItemId,
+          changes: fields,
+        });
+
+        return { inventoryItem: updated };
+      })
+  );
+
+  // ─── Delete item ──────────────────────────────────────────────────
+  server.tool(
+    "delete_inventory_item",
+    "Soft-delete an inventory item (sets deletedAt; the row and its history are retained). The item stops appearing in lists and lookups. Returns { success: true }.",
+    {
+      inventoryItemId: z.string().uuid().describe("The UUID of the inventory item to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:inventory");
+
+        const existing = await db.query.inventoryItem.findFirst({
+          where: and(
+            eq(inventoryItem.id, params.inventoryItemId),
+            eq(inventoryItem.organizationId, ctx.organizationId),
+            notDeleted(inventoryItem.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Inventory item not found");
+
+        await db
+          .update(inventoryItem)
+          .set(softDelete())
+          .where(eq(inventoryItem.id, params.inventoryItemId));
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "delete",
+          entityType: "inventory_item",
+          entityId: params.inventoryItemId,
+        });
+
+        return { success: true };
       })
   );
 }

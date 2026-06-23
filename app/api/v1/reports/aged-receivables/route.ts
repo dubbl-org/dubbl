@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, organization } from "@/lib/db/schema";
-import { eq, and, isNull, ne } from "drizzle-orm";
+import { invoice, organization, payment, paymentAllocation } from "@/lib/db/schema";
+import { eq, and, isNull, ne, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import type { Statement } from "@/lib/reports/statement-export";
+
+/** Inclusive YYYY-MM-DD validator. */
+function isValidDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+}
 
 interface AgingBucket {
   label: string;
@@ -26,18 +31,65 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const format = (url.searchParams.get("format") || "json").toLowerCase();
 
+    // Optional `asAt` (YYYY-MM-DD). When present the report is computed as a
+    // historical snapshot at that date: aging buckets/daysOverdue are measured
+    // from `asAt`, and each invoice's open balance excludes payments dated
+    // after `asAt` (and excludes invoices issued after `asAt`). Defaults to now.
+    const asAtParam = url.searchParams.get("asAt");
+    if (asAtParam && !isValidDate(asAtParam)) {
+      throw new Error(`Invalid asAt: ${asAtParam} (expected YYYY-MM-DD)`);
+    }
+    const isHistorical = Boolean(asAtParam);
+    const today = asAtParam ? new Date(`${asAtParam}T00:00:00Z`) : new Date();
+    const asAtStr = asAtParam ?? today.toISOString().slice(0, 10);
+
+    // For a historical snapshot we must also consider invoices now marked
+    // "paid" — they may still have been open as at the chosen date — and then
+    // reconstruct each invoice's open balance from its payment allocations
+    // dated on or before `asAt`.
     const invoices = await db.query.invoice.findMany({
       where: and(
         eq(invoice.organizationId, ctx.organizationId),
         isNull(invoice.deletedAt),
         ne(invoice.status, "void"),
-        ne(invoice.status, "paid"),
+        ...(isHistorical ? [] : [ne(invoice.status, "paid")]),
         ne(invoice.status, "draft")
       ),
       with: { contact: true },
     });
 
-    const today = new Date();
+    // open balance as at `asAt`, keyed by invoice id (historical mode only).
+    const openByInvoice = new Map<string, number>();
+    if (isHistorical && invoices.length > 0) {
+      for (const inv of invoices) openByInvoice.set(inv.id, inv.total);
+      const allocations = await db
+        .select({
+          documentId: paymentAllocation.documentId,
+          amount: paymentAllocation.amount,
+          paymentDate: payment.date,
+        })
+        .from(paymentAllocation)
+        .innerJoin(payment, eq(paymentAllocation.paymentId, payment.id))
+        .where(
+          and(
+            eq(paymentAllocation.documentType, "invoice"),
+            inArray(
+              paymentAllocation.documentId,
+              invoices.map((i) => i.id)
+            ),
+            isNull(payment.deletedAt)
+          )
+        );
+      for (const a of allocations) {
+        // Only payments dated on or before asAt reduce the historical balance.
+        // (payment.date is a YYYY-MM-DD string, so a string compare is safe.)
+        if (a.paymentDate > asAtStr) continue;
+        openByInvoice.set(
+          a.documentId,
+          (openByInvoice.get(a.documentId) ?? 0) - a.amount
+        );
+      }
+    }
     const buckets: AgingBucket[] = [
       { label: "Current", total: 0, count: 0, invoices: [] },
       { label: "1-30 days", total: 0, count: 0, invoices: [] },
@@ -47,6 +99,14 @@ export async function GET(request: Request) {
     ];
 
     for (const inv of invoices) {
+      // In historical mode, skip invoices not yet issued as at the date and
+      // use the reconstructed open balance; otherwise use the stored snapshot.
+      if (isHistorical && inv.issueDate > asAtStr) continue;
+      const amountDue = isHistorical
+        ? openByInvoice.get(inv.id) ?? inv.amountDue
+        : inv.amountDue;
+      if (isHistorical && amountDue <= 0) continue;
+
       const due = new Date(inv.dueDate);
       const daysOverdue = Math.floor(
         (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)
@@ -64,12 +124,12 @@ export async function GET(request: Request) {
         invoiceNumber: inv.invoiceNumber,
         contactName: inv.contact?.name || "Unknown",
         dueDate: inv.dueDate,
-        amountDue: inv.amountDue,
+        amountDue,
         daysOverdue: Math.max(0, daysOverdue),
       };
 
       buckets[bucketIdx].invoices.push(entry);
-      buckets[bucketIdx].total += inv.amountDue;
+      buckets[bucketIdx].total += amountDue;
       buckets[bucketIdx].count += 1;
     }
 
@@ -81,7 +141,7 @@ export async function GET(request: Request) {
         columns: { defaultCurrency: true },
       });
       const currency = org?.defaultCurrency || "USD";
-      const asAt = new Date().toISOString().slice(0, 10);
+      const asAt = asAtStr;
 
       const statement: Statement = {
         title: "Aged Receivables",
@@ -120,7 +180,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({ buckets, grandTotal });
+    return NextResponse.json({ asAt: asAtStr, buckets, grandTotal });
   } catch (err) {
     return handleError(err);
   }

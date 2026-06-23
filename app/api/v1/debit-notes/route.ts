@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { debitNote, debitNoteLine } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
@@ -41,6 +41,10 @@ export async function GET(request: Request) {
     const { page, limit, offset } = parsePagination(url);
     const status = url.searchParams.get("status");
     const contactId = url.searchParams.get("contactId");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const sortBy = url.searchParams.get("sortBy") || "created";
+    const sortOrder = url.searchParams.get("sortOrder") === "asc" ? asc : desc;
 
     const conditions = [
       eq(debitNote.organizationId, ctx.organizationId),
@@ -55,9 +59,20 @@ export async function GET(request: Request) {
       conditions.push(eq(debitNote.contactId, contactId));
     }
 
+    if (from) conditions.push(gte(debitNote.issueDate, from));
+    if (to) conditions.push(lte(debitNote.issueDate, to));
+
+    const SORT_COLUMNS = {
+      created: debitNote.createdAt,
+      date: debitNote.issueDate,
+      total: debitNote.total,
+      number: debitNote.debitNoteNumber,
+    } as const;
+    const sortCol = SORT_COLUMNS[sortBy as keyof typeof SORT_COLUMNS] || debitNote.createdAt;
+
     const debitNotes = await db.query.debitNote.findMany({
       where: and(...conditions),
-      orderBy: desc(debitNote.createdAt),
+      orderBy: sortOrder(sortCol),
       limit,
       offset,
       with: { contact: true },
@@ -95,7 +110,7 @@ export async function POST(request: Request) {
     // Calculate totals
     let subtotal = 0;
     const processedLines = parsed.lines.map((l, i) => {
-      const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+      const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, parsed.currencyCode);
       const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
       const amount = grossAmount - discountAmount;
       subtotal += amount;
@@ -104,7 +119,7 @@ export async function POST(request: Request) {
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
-        unitPrice: decimalToCents(l.unitPrice),
+        unitPrice: decimalToMinorUnits(l.unitPrice, parsed.currencyCode),
         accountId: l.accountId || null,
         taxRateId,
         discountPercent: l.discountPercent,

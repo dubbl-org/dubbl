@@ -7,6 +7,8 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { createInventoryAdjustmentJournalEntry } from "@/lib/api/journal-automation";
+import { type ValuedItem } from "@/lib/api/inventory-valuation";
 import { z } from "zod";
 
 const bulkSchema = z.object({
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
     requireRole(ctx, "manage:inventory");
 
     const body = await request.json();
-    const { action, ids, category, adjustment } = bulkSchema.parse(body);
+    const { action, ids, category, adjustment, reason } = bulkSchema.parse(body);
 
     // Verify all items belong to this org
     const items = await db.query.inventoryItem.findMany({
@@ -113,14 +115,29 @@ export async function POST(request: Request) {
             );
           }
         }
-        for (const item of items) {
-          await db
-            .update(inventoryItem)
-            .set({
-              quantityOnHand: item.quantityOnHand + adjustment,
-              updatedAt: new Date(),
-            })
-            .where(eq(inventoryItem.id, item.id));
+        // Post a real adjustment per item: move the quantity, revalue the stock
+        // (shrinkage/found at cost), and post the GL (DR/CR Inventory Shrinkage
+        // vs Inventory) — instead of silently changing only the count, which
+        // left the balance sheet out of step with units.
+        {
+          const today = new Date().toISOString().slice(0, 10);
+          await db.transaction(async (tx) => {
+            for (const item of items) {
+              await createInventoryAdjustmentJournalEntry(
+                { organizationId: ctx.organizationId, userId: ctx.userId },
+                {
+                  item: item as ValuedItem & { inventoryAccountId?: string | null },
+                  qtyDelta: adjustment,
+                  reason: reason || "Bulk stock adjustment",
+                  date: today,
+                },
+                tx
+              );
+            }
+          });
+          for (const item of items) {
+            logAudit({ ctx, action: "adjust_stock", entityType: "inventory_item", entityId: item.id, changes: { qtyDelta: adjustment }, request });
+          }
         }
         break;
     }

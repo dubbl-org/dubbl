@@ -15,7 +15,7 @@ import { handleError, validationError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import {
   calculateSimpleInterest,
   calculateCompoundInterest,
@@ -105,7 +105,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const parsed = bodySchema.parse(body);
     const interestAmountCents = parsed.amount
-      ? decimalToCents(parsed.amount)
+      ? decimalToMinorUnits(parsed.amount, found.currencyCode)
       : calculatedInterest;
 
     if (interestAmountCents <= 0) {

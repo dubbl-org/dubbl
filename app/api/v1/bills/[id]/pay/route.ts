@@ -8,6 +8,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const paySchema = z.object({
@@ -43,9 +44,24 @@ export async function POST(
         { status: 400 }
       );
     }
+    // Don't accept more than is outstanding — an overpayment would drive the
+    // balance negative and overstate cash out.
+    if (parsed.amount > found.amountDue) {
+      return NextResponse.json(
+        { error: "Payment is more than the amount still due on this bill." },
+        { status: 400 }
+      );
+    }
+    // The payment posts a GL entry on parsed.date — block locked/closed periods.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
 
+    // Settle against the bill's OUTSTANDING balance (amountDue), not a fresh
+    // total - paid. For reverse-charge bills the payable is the net only (the
+    // self-accounted VAT never leaves the bank), so amountDue < total; deriving
+    // the remainder from total left a phantom balance = the RC VAT and the bill
+    // could never reach "paid".
     const newAmountPaid = found.amountPaid + parsed.amount;
-    const newAmountDue = found.total - newAmountPaid;
+    const newAmountDue = found.amountDue - parsed.amount;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
     // Generate payment number

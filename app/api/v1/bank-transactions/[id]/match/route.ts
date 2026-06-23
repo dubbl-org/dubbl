@@ -639,6 +639,11 @@ export async function POST(
       return NextResponse.json({ error: "amount is required" }, { status: 400 });
     }
     const paymentDate = parsed.date || transaction.date;
+    // The bank line's amount is in the bank account's currency. Recording a
+    // payment here books that raw amount in the DOCUMENT's currency, so a
+    // currency mismatch (e.g. a USD line against a EUR invoice) would mark the
+    // document paid by the wrong figure and post incorrect GL. Require a match.
+    const bankCurrency = transaction.currencyCode || account.currencyCode;
 
     if (isInvoiceMatch) {
       // Match to invoice (incoming payment)
@@ -652,6 +657,12 @@ export async function POST(
       if (!found) return notFound("Invoice");
       if (found.status === "draft" || found.status === "void") {
         return NextResponse.json({ error: "Cannot record payment for this invoice status" }, { status: 400 });
+      }
+      if (found.currencyCode !== bankCurrency) {
+        return NextResponse.json(
+          { error: `This invoice is in ${found.currencyCode} but the bank account is in ${bankCurrency}. Match it to a document in the same currency.` },
+          { status: 400 }
+        );
       }
 
       const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
@@ -752,11 +763,19 @@ export async function POST(
     if (found.status === "draft" || found.status === "void") {
       return NextResponse.json({ error: "Cannot record payment for this bill status" }, { status: 400 });
     }
+    if (found.currencyCode !== bankCurrency) {
+      return NextResponse.json(
+        { error: `This bill is in ${found.currencyCode} but the bank account is in ${bankCurrency}. Match it to a document in the same currency.` },
+        { status: 400 }
+      );
+    }
 
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
+    // Settle against the outstanding balance (amountDue), not total - paid, so
+    // reverse-charge bills (payable < total) can still reach "paid".
     const newAmountPaid = found.amountPaid + parsed.amount;
-    const newAmountDue = found.total - newAmountPaid;
+    const newAmountDue = found.amountDue - parsed.amount;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
     const { created } = await db.transaction(async (tx) => {

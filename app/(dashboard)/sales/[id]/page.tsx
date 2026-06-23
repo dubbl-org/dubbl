@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX } from "lucide-react";
+import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX, Percent, Wallet, ThumbsUp, Bell } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
-import { formatMoney, centsToDecimal } from "@/lib/money";
+import { formatMoney, minorUnitsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
 import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import { useConfirm } from "@/lib/hooks/use-confirm";
@@ -41,6 +41,7 @@ import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
+import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
 import Link from "next/link";
 
 interface InvoiceDetail {
@@ -49,6 +50,9 @@ interface InvoiceDetail {
   issueDate: string;
   dueDate: string;
   status: string;
+  invoiceType?: string | null;
+  depositPercent?: number | null;
+  dunningLevel?: number | null;
   subtotal: number;
   taxTotal: number;
   total: number;
@@ -65,9 +69,28 @@ interface InvoiceDetail {
     quantity: number;
     unitPrice: number;
     amount: number;
+    taxAmount: number;
     account: { code: string; name: string; id: string } | null;
+    taxRate: { id: string; name: string; rate: number } | null;
   }[];
 }
+
+interface AvailableCredit {
+  id: string;
+  date: string;
+  currencyCode: string;
+  originalAmount: number;
+  amountRemaining: number;
+  sourceType: string;
+  notes: string | null;
+}
+
+// Plain-language label for where the credit came from.
+const creditSourceLabels: Record<string, string> = {
+  prepayment: "Prepayment",
+  overpayment: "Overpayment",
+  credit_note: "Credit note",
+};
 
 interface BaseAmounts {
   baseCurrency: string;
@@ -104,6 +127,14 @@ const statusConfig: Record<string, { class: string; bg: string }> = {
     class: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
     bg: "bg-gray-400",
   },
+  pending_approval: {
+    class: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300",
+    bg: "bg-violet-500",
+  },
+  rejected: {
+    class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+    bg: "bg-red-500",
+  },
 };
 
 const methodLabels: Record<string, string> = {
@@ -122,6 +153,8 @@ const statusLabels: Record<string, string> = {
   paid: "paid",
   overdue: "overdue",
   void: "cancelled",
+  pending_approval: "waiting for approval",
+  rejected: "rejected",
 };
 
 interface PaymentRecord {
@@ -181,6 +214,19 @@ export default function InvoiceDetailPage() {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
   const [orgName, setOrgName] = useState("");
+  // Late fee / interest
+  const [interestOpen, setInterestOpen] = useState(false);
+  const [interestAmount, setInterestAmount] = useState("");
+  const [interestLoading, setInterestLoading] = useState(false);
+  // Available customer credits
+  const [credits, setCredits] = useState<AvailableCredit[]>([]);
+  const [applyingCreditId, setApplyingCreditId] = useState<string | null>(null);
+  // Approval actions (mirrors the bill detail flow)
+  const [approving, setApproving] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -223,7 +269,172 @@ export default function InvoiceDetailPage() {
         if (data.organization?.name) setOrgName(data.organization.name);
       })
       .catch(() => {});
+
+    fetch(`/api/v1/invoices/${id}/available-credits`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.credits)) setCredits(data.credits);
+      })
+      .catch(() => {});
   }, [id, orgId]);
+
+  // Re-pull the invoice (+ payments + base) and available credits after an
+  // action that changes balances (late fee, applying a credit).
+  function refetchInvoice() {
+    if (!orgId) return;
+    fetch(`/api/v1/invoices/${id}`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.invoice) setInv(data.invoice);
+        if (data.payments) setPayments(data.payments);
+        if (data.base) setBase(data.base);
+      })
+      .catch(() => {});
+    fetch(`/api/v1/invoices/${id}/available-credits`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.credits)) setCredits(data.credits);
+      })
+      .catch(() => {});
+  }
+
+  async function handleChargeInterest() {
+    if (!orgId) return;
+    setInterestLoading(true);
+    try {
+      const body: { amount?: number } = {};
+      const trimmed = interestAmount.trim();
+      if (trimmed) {
+        const amt = parseFloat(trimmed);
+        if (!amt || amt <= 0) {
+          toast.error("Enter a valid amount");
+          setInterestLoading(false);
+          return;
+        }
+        body.amount = amt;
+      }
+      const res = await fetch(`/api/v1/invoices/${id}/charge-interest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setInterestOpen(false);
+        setInterestAmount("");
+        toast.success("Late fee added as a new invoice");
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't add a late fee");
+      }
+    } finally {
+      setInterestLoading(false);
+    }
+  }
+
+  async function handleApplyCredit(credit: AvailableCredit) {
+    if (!orgId || !inv) return;
+    // Apply the smaller of what's left on the credit and what's owed.
+    const amount = Math.min(credit.amountRemaining, inv.amountDue);
+    if (amount <= 0) {
+      toast.error("Nothing left to apply");
+      return;
+    }
+    setApplyingCreditId(credit.id);
+    try {
+      const res = await fetch(`/api/v1/customer-credits/${credit.id}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ invoiceId: id, amount }),
+      });
+      if (res.ok) {
+        toast.success(`Applied ${formatMoney(amount, inv.currencyCode)} credit`);
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't apply this credit");
+      }
+    } finally {
+      setApplyingCreditId(null);
+    }
+  }
+
+  // Approve an invoice that's waiting for approval. Mirrors the bill flow.
+  async function handleApprove() {
+    if (!orgId) return;
+    setApproving(true);
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/approve`, {
+        method: "POST",
+        headers: { "x-organization-id": orgId },
+      });
+      if (res.ok) {
+        toast.success("Invoice approved");
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't approve this invoice");
+      }
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  // Reject an invoice that's waiting for approval, recording the reason.
+  async function handleReject() {
+    if (!orgId) return;
+    setRejecting(true);
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ reason: rejectReason.trim() || undefined }),
+      });
+      if (res.ok) {
+        setRejectOpen(false);
+        setRejectReason("");
+        toast.success("Invoice rejected");
+        refetchInvoice();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't reject this invoice");
+      }
+    } finally {
+      setRejecting(false);
+    }
+  }
+
+  // Send a draft invoice off for approval.
+  async function handleSubmitForApproval() {
+    if (!orgId) return;
+    await confirm({
+      title: "Send this invoice for approval?",
+      description: "This sends the invoice to be reviewed before it can go out to the customer.",
+      confirmLabel: "Send for approval",
+      onConfirm: async () => {
+        setSubmitting(true);
+        try {
+          const res = await fetch(`/api/v1/invoices/${id}/submit-for-approval`, {
+            method: "POST",
+            headers: { "x-organization-id": orgId },
+          });
+          if (res.ok) {
+            toast.success("Sent for approval");
+            refetchInvoice();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            toast.error(typeof data.error === "string" ? data.error : "Couldn't send this invoice for approval");
+          }
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
+  }
 
   useEffect(() => {
     if (!orgId || !payOpen) return;
@@ -418,6 +629,8 @@ export default function InvoiceDetailPage() {
           dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split("T")[0]; })(),
           reference: inv.reference || null,
           notes: inv.notes || null,
+          invoiceType: inv.invoiceType || "standard",
+          depositPercent: inv.depositPercent ?? null,
           lines: inv.lines.map((l) => ({
             description: l.description,
             quantity: l.quantity / 100,
@@ -460,6 +673,18 @@ export default function InvoiceDetailPage() {
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-semibold tracking-tight">{inv.invoiceNumber}</h1>
                 <Badge variant="outline" className={sc.class}>{statusLabels[inv.status] || inv.status}</Badge>
+                {(inv.invoiceType === "deposit" || inv.invoiceType === "retainer") && (
+                  <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                    {inv.invoiceType === "deposit" ? "Deposit invoice" : "Retainer invoice"}
+                    {inv.depositPercent != null && ` · ${(inv.depositPercent / 100).toFixed(inv.depositPercent % 100 === 0 ? 0 : 2)}%`}
+                  </Badge>
+                )}
+                {(inv.dunningLevel ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground" title="How many payment reminders have been sent for this invoice">
+                    <Bell className="size-3" />
+                    {inv.dunningLevel} reminder{inv.dunningLevel === 1 ? "" : "s"} sent
+                  </span>
+                )}
                 {overdueInfo && (
                   <span className={`text-xs font-medium ${overdueInfo.class}`}>{overdueInfo.label}</span>
                 )}
@@ -471,6 +696,56 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {inv.status === "pending_approval" && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={handleApprove}
+                  loading={approving}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  title="Approve this invoice so it can be sent to the customer"
+                >
+                  <ThumbsUp className="mr-2 size-4" />Approve
+                </Button>
+                <Dialog open={rejectOpen} onOpenChange={(o) => { setRejectOpen(o); if (!o) setRejectReason(""); }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" title="Reject this invoice with a reason">
+                      <X className="mr-2 size-4" />Reject
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Reject this invoice?</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        This sends the invoice back so it can be fixed and re-submitted. Add a reason so everyone knows why.
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Reason (optional)</Label>
+                        <Input
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="e.g. amount doesn't match the order"
+                        />
+                      </div>
+                      <Button onClick={handleReject} loading={rejecting} className="w-full bg-red-600 hover:bg-red-700">
+                        Reject invoice
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+            {inv.status === "draft" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSubmitForApproval}
+                loading={submitting}
+                title="Send this invoice to be reviewed before it goes out to the customer"
+              >
+                <ThumbsUp className="mr-2 size-4" />Submit for approval
+              </Button>
+            )}
             {inv.status === "draft" && (
               <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
                 <Send className="mr-2 size-4" />Send
@@ -494,7 +769,7 @@ export default function InvoiceDetailPage() {
                         prefix="$"
                         value={payAmount}
                         onChange={setPayAmount}
-                        placeholder={centsToDecimal(inv.amountDue)}
+                        placeholder={minorUnitsToDecimal(inv.amountDue, inv.currencyCode)}
                       />
                     </div>
                     <div className="space-y-2">
@@ -544,6 +819,47 @@ export default function InvoiceDetailPage() {
             <Button variant="outline" size="sm" onClick={handleDuplicate} loading={duplicating} title="Make a copy of this invoice you can edit and send again">
               <Copy className="mr-2 size-4" />Make a copy
             </Button>
+            {["sent", "partial", "overdue"].includes(inv.status) && (
+              <Dialog open={interestOpen} onOpenChange={setInterestOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Charge the customer a late fee / interest for paying after the due date. This creates a new invoice for the fee."
+                  >
+                    <Percent className="mr-2 size-4" />Add late fee / interest
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add late fee / interest</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      This creates a separate invoice for the late fee. Leave the
+                      amount blank to use your organization&apos;s interest rate, or
+                      enter a custom amount to charge.
+                    </p>
+                    <div className="space-y-2">
+                      <Label>Custom amount (optional)</Label>
+                      <CurrencyInput
+                        prefix="$"
+                        value={interestAmount}
+                        onChange={setInterestAmount}
+                        placeholder="Use my interest rate"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleChargeInterest}
+                      loading={interestLoading}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      Add late fee
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
             {["sent", "partial", "overdue"].includes(inv.status) && (
               <Button
                 variant="outline"
@@ -642,6 +958,7 @@ export default function InvoiceDetailPage() {
                   <th className="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Description</th>
                   <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-20">Qty</th>
                   <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-28">Price</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-28">Tax</th>
                   <th className="px-6 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-28">Amount</th>
                 </tr>
               </thead>
@@ -656,6 +973,18 @@ export default function InvoiceDetailPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-mono tabular-nums">{(line.quantity / 100).toFixed(0)}</td>
                     <td className="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground">{formatMoney(line.unitPrice, inv.currencyCode)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {line.taxRate ? (
+                        <div>
+                          <span className="font-mono">{(line.taxRate.rate / 100).toFixed(2)}%</span>
+                          {line.taxAmount > 0 && (
+                            <p className="text-[11px] font-mono">{formatMoney(line.taxAmount, inv.currencyCode)}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs">No tax</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3 text-right font-mono tabular-nums font-medium">{formatMoney(line.amount, inv.currencyCode)}</td>
                   </tr>
                 ))}
@@ -702,6 +1031,20 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Attachments */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Attachments</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Attach the customer&apos;s purchase order, a signed copy, or any other file for this invoice.
+          </p>
+          <ReceiptAttachments
+            orgId={orgId}
+            entityType="invoice"
+            entityId={id}
+            label="Add a file (purchase order, signed copy, etc.)"
+          />
         </div>
 
         {/* Payment summary + Notes row */}
@@ -776,6 +1119,53 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Available customer credit */}
+        {credits.length > 0 &&
+          inv.amountDue > 0 &&
+          !["paid", "void", "draft"].includes(inv.status) && (
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center gap-2 border-b bg-muted/30 px-5 py-3">
+                <Wallet className="size-3.5 text-muted-foreground" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Available credit
+                </p>
+              </div>
+              <p className="px-5 pt-3 text-xs text-muted-foreground">
+                This customer has credit on account (from prepayments or overpayments). Apply it to settle this invoice.
+              </p>
+              <div className="divide-y mt-1">
+                {credits.map((c) => {
+                  const applyAmount = Math.min(c.amountRemaining, inv.amountDue);
+                  return (
+                    <div key={c.id} className="flex items-center justify-between px-5 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
+                          <Wallet className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-mono font-semibold">{formatMoney(c.amountRemaining, c.currencyCode)}</span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{creditSourceLabels[c.sourceType] || c.sourceType}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{formatDate(c.date)}{c.notes ? ` · ${c.notes}` : ""}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApplyCredit(c)}
+                        loading={applyingCreditId === c.id}
+                        title={`Apply ${formatMoney(applyAmount, c.currencyCode)} to this invoice`}
+                      >
+                        Apply {formatMoney(applyAmount, c.currencyCode)}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
         {/* Document Details (snapshot) */}
         {inv.status !== "draft" && (

@@ -16,6 +16,10 @@ import {
   Users,
   AlertTriangle,
   Gauge,
+  Rocket,
+  CheckCircle2,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { GrainGradient } from "@paper-design/shaders-react";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -289,6 +293,9 @@ export default function DashboardPage() {
     uncategorizedTransactions: number;
     accountsNeedingReconciliation: { bankAccountName: string; lastReconDate: string | null }[];
   } | null>(null);
+  // Getting-started checklist: show while the org has never completed onboarding.
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [dismissingOnboarding, setDismissingOnboarding] = useState(false);
 
   useDocumentTitle("Dashboard \u00B7 Overview");
 
@@ -382,7 +389,32 @@ export default function DashboardPage() {
       .then((data) => setActionAlerts(data))
       .catch(() => {});
 
+    // Decide whether to show the getting-started checklist (org never onboarded).
+    fetch("/api/v1/organization", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.organization && !data.organization.onboardingCompletedAt) {
+          setShowOnboarding(true);
+        }
+      })
+      .catch(() => {});
+
   }, []);
+
+  const dismissOnboarding = () => {
+    setDismissingOnboarding(true);
+    const id = localStorage.getItem("activeOrgId");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (id) headers["x-organization-id"] = id;
+    fetch("/api/v1/organization", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ onboardingCompleted: true }),
+    })
+      .then(() => setShowOnboarding(false))
+      .catch(() => {})
+      .finally(() => setDismissingOnboarding(false));
+  };
 
   const receivablesCount = receivables.buckets.reduce(
     (sum, b) => sum + b.count,
@@ -497,6 +529,74 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* Getting started checklist */}
+            {showOnboarding && (
+              <div className="relative rounded-lg border bg-card p-5">
+                <button
+                  onClick={dismissOnboarding}
+                  disabled={dismissingOnboarding}
+                  aria-label="Dismiss getting started"
+                  className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                >
+                  <X className="size-4" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <Rocket className="size-4 text-emerald-600" />
+                  <h3 className="text-sm font-semibold">Getting started</h3>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  A few quick steps to set up your books. Tackle them in any order.
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {[
+                    {
+                      label: "Add a bank account",
+                      desc: "Connect or add the account you bank with",
+                      href: "/accounting/banking",
+                    },
+                    {
+                      label: "Set opening balances",
+                      desc: "Enter what you had when you started",
+                      href: "/accounting/opening-balances",
+                    },
+                    {
+                      label: "Set up tax",
+                      desc: "Choose the tax rates you charge and pay",
+                      href: "/tax",
+                    },
+                    {
+                      label: "Create your first invoice",
+                      desc: "Bill a customer and get paid",
+                      href: "/sales",
+                    },
+                  ].map((step) => (
+                    <button
+                      key={step.href}
+                      onClick={() => router.push(step.href)}
+                      className="flex items-start gap-3 rounded-lg border bg-background p-3 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    >
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-muted-foreground/40" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{step.label}</p>
+                        <p className="text-xs text-muted-foreground">{step.desc}</p>
+                      </div>
+                      <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground/40" />
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={dismissOnboarding}
+                    disabled={dismissingOnboarding}
+                  >
+                    {dismissingOnboarding ? "Saving…" : "Dismiss / All done"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Budget Alerts */}
             {budgetAlerts.length > 0 && (

@@ -219,6 +219,36 @@ const reportCategories = [
       },
     ],
   },
+  {
+    title: "Save, schedule & reconcile",
+    description: "Keep reports handy, send them automatically, and check your bank is reconciled.",
+    reports: [
+      {
+        title: "Bank reconciliation status",
+        description: "Across all your accounts, what's matched to the bank and what's still outstanding.",
+        href: "/reports/bank-reconciliation-status",
+        icon: FileCheck2,
+      },
+      {
+        title: "Bank cash flow",
+        description: "Money in and out of your bank and cash accounts over a period.",
+        href: "/reports/bank-cash-flow",
+        icon: ArrowDownUp,
+      },
+      {
+        title: "Saved reports",
+        description: "Reports you've saved to run again later with the same settings.",
+        href: "/reports/saved",
+        icon: FileText,
+      },
+      {
+        title: "Scheduled report emails",
+        description: "Have reports emailed to you or your accountant automatically.",
+        href: "/reports/schedules",
+        icon: CalendarDays,
+      },
+    ],
+  },
 ];
 
 export default function ReportsPage() {

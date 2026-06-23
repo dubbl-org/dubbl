@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useRouter } from "next/navigation";
-import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X, Target } from "lucide-react";
+import { Users, Search, Loader2, MoreHorizontal, Trash2, ExternalLink, UserPlus, Building2, Truck, ArrowRight, X, Target, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -47,6 +47,9 @@ interface Contact {
   is1099Vendor: boolean;
   currencyCode: string | null;
   createdAt: string;
+  owesYou?: number; // customer outstanding (cents)
+  youOwe?: number; // supplier outstanding (cents)
+  overdue?: number; // total overdue across customer + supplier (cents)
 }
 
 const typeLabel: Record<Contact["type"], string> = {
@@ -115,6 +118,54 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
           {r.creditLimit != null
             ? formatMoney(r.creditLimit, r.currencyCode || "USD")
             : "No limit"}
+        </span>
+      ),
+    },
+    {
+      key: "owesYou",
+      header: "Owes you",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="text-sm tabular-nums">
+          {r.owesYou && r.owesYou > 0 ? (
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+              {formatMoney(r.owesYou, r.currencyCode || "USD")}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "youOwe",
+      header: "You owe",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="text-sm tabular-nums">
+          {r.youOwe && r.youOwe > 0 ? (
+            <span className="font-medium text-orange-600 dark:text-orange-400">
+              {formatMoney(r.youOwe, r.currencyCode || "USD")}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "overdue",
+      header: "Overdue",
+      className: "w-28 text-right",
+      render: (r) => (
+        <span className="text-sm tabular-nums">
+          {r.overdue && r.overdue > 0 ? (
+            <span className="font-semibold text-red-600 dark:text-red-400">
+              {formatMoney(r.overdue, r.currencyCode || "USD")}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
         </span>
       ),
     },
@@ -487,13 +538,25 @@ export default function ContactsPage() {
           title="Contacts"
           description="Manage your customers, suppliers, and business relationships."
         >
-          <Tabs value={typeFilter} onValueChange={setTypeFilter}>
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="customer">Customers</TabsTrigger>
-              <TabsTrigger value="supplier">Suppliers</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => router.push("/reports/duplicate-detection")}
+              title="Check for contacts entered twice (duplicate invoices or bills)"
+            >
+              <Copy className="mr-1.5 size-4" />
+              Find duplicates
+            </Button>
+            <Tabs value={typeFilter} onValueChange={setTypeFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="customer">Customers</TabsTrigger>
+                <TabsTrigger value="supplier">Suppliers</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </PageHeader>
 
         {/* Summary + search */}

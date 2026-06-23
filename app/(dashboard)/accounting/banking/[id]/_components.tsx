@@ -11,12 +11,14 @@ import {
   Link2,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Plus,
   Scale,
   Search,
   Split,
   Tags,
   Trash2,
+  Undo2,
   Upload,
   X,
   XCircle,
@@ -170,6 +172,9 @@ export interface Transaction {
   accountId?: string | null;
   accountCode?: string | null;
   accountName?: string | null;
+  // Set when categorized — used to pre-fill the sheet when editing the line.
+  taxRateId?: string | null;
+  contactId?: string | null;
   journalEntryId?: string | null;
   reconciliationId?: string | null;
   transferTransactionId?: string | null;
@@ -331,6 +336,7 @@ export function TransactionRow({
   onMatch,
   onTransfer,
   onSplit,
+  onUndo,
   selected,
   onSelectChange,
 }: {
@@ -349,6 +355,9 @@ export function TransactionRow({
   onMatch?: (tx: Transaction) => void;
   onTransfer?: (tx: Transaction) => void;
   onSplit?: (tx: Transaction) => void;
+  // Reverse an already-done line (categorize / match / transfer / cleared) back
+  // to the to-do list so it can be redone. Optional so existing callers compile.
+  onUndo?: (tx: Transaction) => void;
   // Batch selection (optional). When provided, an unreconciled row shows a checkbox.
   selected?: boolean;
   onSelectChange?: (id: string, checked: boolean) => void;
@@ -356,8 +365,17 @@ export function TransactionRow({
   const isCredit = tx.amount > 0;
   const selectable = !!onSelectChange && tx.status === "unreconciled";
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
   const derived = deriveTxState(tx);
   const stateMeta = DERIVED_STATE_META[derived];
+  // A plain categorization (single account, no payment/transfer/statement
+  // match) can be corrected in place. Payment matches and splits don't set
+  // accountId; transfers/statement matches carry extra state — those use Undo.
+  const canEditCategory =
+    derived === "categorized" &&
+    !!tx.accountId &&
+    !tx.transferTransactionId &&
+    !tx.reconciliationId;
   return (
     <div
       className={cn(
@@ -462,6 +480,64 @@ export function TransactionRow({
           {tx.status === "excluded" && (
             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onExclude(tx.id)} title="Bring this transaction back into your books">Stop ignoring</Button>
           )}
+          {/* A line you've already dealt with: let the user fix it. Plain
+              categorizations can be edited in place; everything else (matches,
+              transfers, cleared) can be undone back to the to-do list. */}
+          {tx.status === "reconciled" && (
+            <>
+              {canEditCategory ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => onCategorize(tx)}
+                  title="Change the category, tax or contact for this line"
+                >
+                  <Pencil className="mr-1.5 size-3.5" />Edit
+                </Button>
+              ) : derived === "cleared" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => onCategorize(tx)}
+                  title="Record what this money was actually for"
+                >
+                  <Tags className="mr-1.5 size-3.5" />Categorize
+                </Button>
+              ) : onUndo ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setConfirmUndo(true)}
+                  title="Reverse this and move the line back to your to-do list"
+                >
+                  <Undo2 className="mr-1.5 size-3.5" />Undo
+                </Button>
+              ) : null}
+              {/* When a primary action is shown, tuck Undo into the menu. */}
+              {onUndo && (canEditCategory || derived === "cleared") && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+                      title="More actions"
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => setConfirmUndo(true)} title="Reverse this and move the line back to your to-do list so you can redo it">
+                      <Undo2 className="mr-2 size-3.5" />Undo — move back to to-do
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </>
+          )}
         </div>
         <span className={cn(
           "font-mono text-sm font-medium tabular-nums w-24 text-right",
@@ -505,6 +581,45 @@ export function TransactionRow({
               onClick={() => { onReconcile(tx.id); setConfirmClear(false); }}
             >
               Mark as cleared
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmUndo} onOpenChange={setConfirmUndo}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Undo this?</DialogTitle>
+            <DialogDescription>
+              The line goes back to your to-do list so you can record it differently.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="font-medium">{tx.description}</p>
+              {derived === "categorized" && tx.accountName && (
+                <p className="mt-0.5 text-xs text-muted-foreground">Currently in your books as {tx.accountName}</p>
+              )}
+              <p className={cn(
+                "mt-1 font-mono text-xs tabular-nums",
+                isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              )}>
+                {tx.date} · {isCredit ? "+" : ""}{formatMoney(tx.amount, cur)}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {derived === "cleared"
+                ? "This just un-marks it as cleared — nothing was in your books."
+                : "We reverse the bookkeeping this created (and unwind any matched invoice, bill, or transfer). Nothing is deleted permanently — you can redo it straight away."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmUndo(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { onUndo?.(tx); setConfirmUndo(false); }}
+            >
+              <Undo2 className="mr-2 size-3.5" />Undo
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1115,7 +1230,7 @@ export function CreateExpenseSheet({
                   <SelectItem value="none">No tax</SelectItem>
                   {taxRates.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                      {taxOptionLabel(t, true)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1165,6 +1280,23 @@ export interface TaxRateOption {
   rate: number; // basis points
   kind?: string;
   recoverablePercent?: number;
+}
+
+// Plain label for a tax option in a dropdown, e.g. "VAT 20%". For money-OUT
+// (purchase) contexts we also spell out how much can be claimed back, so users
+// don't silently under-reclaim: "VAT 20% · fully reclaimable", "· 50%
+// reclaimable", or "· not reclaimable" for blocked / US sales tax / 0%.
+function taxOptionLabel(t: TaxRateOption, isPurchase: boolean): string {
+  const pct = (t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2);
+  const base = `${t.name} (${pct}%)`;
+  if (!isPurchase) return base;
+  const kind = t.kind || "standard";
+  const recoverableBp = t.recoverablePercent ?? 10000;
+  if (kind === "blocked" || kind === "sales_tax_us" || recoverableBp <= 0) {
+    return `${base} · not reclaimable`;
+  }
+  if (recoverableBp >= 10000) return `${base} · fully reclaimable`;
+  return `${base} · ${Math.round(recoverableBp / 100)}% reclaimable`;
 }
 
 function splitTaxPreview(
@@ -1223,13 +1355,17 @@ export function CategorizeSheet({
   const [choiceHint, setChoiceHint] = useState<string>("");
 
   const isCredit = (transaction?.amount ?? 0) > 0;
+  // Editing an already-coded line vs. categorizing a fresh one. When editing we
+  // pre-fill the category/tax/contact so the user can correct a mistake instead
+  // of starting over; saving re-posts (the endpoint reverses the old entry).
+  const isEditing = !!transaction?.journalEntryId;
 
   useEffect(() => {
     if (transaction) {
-      setAccountId("");
-      setContactId("");
+      setAccountId(transaction.accountId ?? "");
+      setContactId(transaction.contactId ?? "");
       setMemo("");
-      setTaxRateId("none");
+      setTaxRateId(transaction.taxRateId ?? "none");
       setCostCenterId("");
       setProjectId("");
       setChoice("");
@@ -1369,7 +1505,7 @@ export function CategorizeSheet({
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      toast.success("Assigned and added to your books");
+      toast.success(isEditing ? "Category updated" : "Assigned and added to your books");
       onCategorized();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't assign this transaction");
@@ -1382,9 +1518,11 @@ export function CategorizeSheet({
     <Sheet open={!!transaction} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
         <SheetHeader className="px-4 pt-5 pb-4 sm:px-6 border-b shrink-0">
-          <SheetTitle className="text-lg">Assign to a category</SheetTitle>
+          <SheetTitle className="text-lg">{isEditing ? "Edit category" : "Assign to a category"}</SheetTitle>
           <SheetDescription>
-            Choose what this {isCredit ? "money in" : "money out"} was for. This adds it to your books.
+            {isEditing
+              ? "Change what this was recorded as. We update your books to match."
+              : `Choose what this ${isCredit ? "money in" : "money out"} was for. This adds it to your books.`}
           </SheetDescription>
         </SheetHeader>
 
@@ -1450,7 +1588,7 @@ export function CategorizeSheet({
                 <SelectItem value="none">No tax</SelectItem>
                 {taxRates.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                    {taxOptionLabel(t, !isCredit)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1497,7 +1635,7 @@ export function CategorizeSheet({
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving || !accountId} className="bg-emerald-600 hover:bg-emerald-700">
-            {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Saving…</> : "Assign to category"}
+            {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Saving…</> : isEditing ? "Save changes" : "Assign to category"}
           </Button>
         </div>
       </SheetContent>
@@ -2338,7 +2476,7 @@ export function SplitAccountSheet({
                         <SelectItem value="none">No tax</SelectItem>
                         {taxRates.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
-                            {t.name} ({(t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2)}%)
+                            {taxOptionLabel(t, !isCredit)}
                           </SelectItem>
                         ))}
                       </SelectContent>

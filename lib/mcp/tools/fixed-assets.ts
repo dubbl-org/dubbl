@@ -313,6 +313,252 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
       })
   );
 
+  server.tool(
+    "list_asset_categories",
+    "List asset categories (asset classes) for the organization, optionally filtered by active status. Each category carries its default depreciation method/convention, defaultUsefulLifeMonths, defaultResidualValue (integer cents), defaultDepreciationRateBp (declining-balance rate in basis points, 2000 = 20%) and its default chart-account UUIDs (asset/depreciation/accumulated-depreciation/CWIP). Use to find a categoryId before creating an asset or updating/deleting a category. Returns categories plus pagination (total/page/limit).",
+    {
+      isActive: z
+        .boolean()
+        .optional()
+        .describe("Filter by active status; omit to return both active and inactive categories"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .default(50)
+        .describe("Max rows to return (max 200)"),
+      page: z.number().int().min(1).optional().default(1).describe("Page number (1-based)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:assets");
+
+        const conditions = [
+          eq(assetCategory.organizationId, ctx.organizationId),
+          notDeleted(assetCategory.deletedAt),
+        ];
+        if (params.isActive !== undefined) {
+          conditions.push(eq(assetCategory.isActive, params.isActive));
+        }
+
+        const offset = (params.page - 1) * params.limit;
+        const rows = await db.query.assetCategory.findMany({
+          where: and(...conditions),
+          orderBy: assetCategory.name,
+          limit: params.limit,
+          offset,
+        });
+
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)`.mapWith(Number) })
+          .from(assetCategory)
+          .where(and(...conditions));
+
+        return {
+          categories: rows,
+          total: Number(countResult?.count ?? 0),
+          page: params.page,
+          limit: params.limit,
+        };
+      })
+  );
+
+  server.tool(
+    "get_asset_category",
+    "Fetch a single asset category by its UUID, including its resolved default chart accounts (asset/depreciation/accumulated-depreciation/CWIP). Monetary defaults are integer cents and defaultDepreciationRateBp is in basis points. Returns the category, or an error if not found in the organization.",
+    {
+      categoryId: z.string().uuid().describe("UUID of the asset category to fetch"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:assets");
+
+        const category = await db.query.assetCategory.findFirst({
+          where: and(
+            eq(assetCategory.id, params.categoryId),
+            eq(assetCategory.organizationId, ctx.organizationId),
+            notDeleted(assetCategory.deletedAt)
+          ),
+          with: {
+            assetAccount: true,
+            depreciationAccount: true,
+            accumulatedDepAccount: true,
+            cwipAccount: true,
+          },
+        });
+        if (!category) throw new Error("Asset category not found");
+
+        return { category };
+      })
+  );
+
+  server.tool(
+    "update_asset_category",
+    "Update an asset category's defaults. Only the fields you pass are changed; omitted fields are left untouched. 'defaultResidualValue' is integer cents; 'defaultDepreciationRateBp' is the declining-balance rate in basis points (2000 = 20%); 'defaultUsefulLifeMonths' is in months. Account fields are chart-account UUIDs. Set isActive=false to hide the category from new-asset selection without deleting it. Returns the updated category.",
+    {
+      categoryId: z.string().uuid().describe("UUID of the asset category to update"),
+      name: z.string().min(1).optional().describe("New category name"),
+      defaultDepreciationMethod: z
+        .enum(depreciationMethods)
+        .optional()
+        .describe("Default depreciation method for assets in this category"),
+      defaultConvention: z
+        .enum(conventions)
+        .optional()
+        .describe("Default first/last-period timing convention"),
+      defaultUsefulLifeMonths: z
+        .number()
+        .int()
+        .min(1)
+        .nullable()
+        .optional()
+        .describe("Default useful life in months (null to clear)"),
+      defaultResidualValue: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Default residual/salvage value in integer cents"),
+      defaultDepreciationRateBp: z
+        .number()
+        .int()
+        .min(0)
+        .max(100000)
+        .nullable()
+        .optional()
+        .describe("Default declining-balance rate in basis points (2000 = 20%; null to clear)"),
+      assetAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Default chart account UUID for asset cost (null to clear)"),
+      depreciationAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Default chart account UUID for depreciation expense (null to clear)"),
+      accumulatedDepAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Default chart account UUID for accumulated depreciation (null to clear)"),
+      cwipAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Default chart account UUID for CWIP cost accumulation (null to clear)"),
+      isActive: z
+        .boolean()
+        .optional()
+        .describe("Whether the category is active and selectable for new assets"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:assets");
+
+        const existing = await db.query.assetCategory.findFirst({
+          where: and(
+            eq(assetCategory.id, params.categoryId),
+            eq(assetCategory.organizationId, ctx.organizationId),
+            notDeleted(assetCategory.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Asset category not found");
+
+        const updates: Partial<typeof assetCategory.$inferInsert> = {};
+        if (params.name !== undefined) updates.name = params.name;
+        if (params.defaultDepreciationMethod !== undefined)
+          updates.defaultDepreciationMethod = params.defaultDepreciationMethod;
+        if (params.defaultConvention !== undefined)
+          updates.defaultConvention = params.defaultConvention;
+        if (params.defaultUsefulLifeMonths !== undefined)
+          updates.defaultUsefulLifeMonths = params.defaultUsefulLifeMonths;
+        if (params.defaultResidualValue !== undefined)
+          updates.defaultResidualValue = params.defaultResidualValue;
+        if (params.defaultDepreciationRateBp !== undefined)
+          updates.defaultDepreciationRateBp = params.defaultDepreciationRateBp;
+        if (params.assetAccountId !== undefined)
+          updates.assetAccountId = params.assetAccountId;
+        if (params.depreciationAccountId !== undefined)
+          updates.depreciationAccountId = params.depreciationAccountId;
+        if (params.accumulatedDepAccountId !== undefined)
+          updates.accumulatedDepAccountId = params.accumulatedDepAccountId;
+        if (params.cwipAccountId !== undefined)
+          updates.cwipAccountId = params.cwipAccountId;
+        if (params.isActive !== undefined) updates.isActive = params.isActive;
+
+        const [updated] = await db
+          .update(assetCategory)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(
+            and(
+              eq(assetCategory.id, params.categoryId),
+              eq(assetCategory.organizationId, ctx.organizationId)
+            )
+          )
+          .returning();
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "update",
+          entityType: "asset_category",
+          entityId: params.categoryId,
+          changes: updates,
+        });
+
+        return { category: updated };
+      })
+  );
+
+  server.tool(
+    "delete_asset_category",
+    "Soft-delete an asset category. The category is hidden from listings and new-asset selection but its row is retained; assets already created in the category keep their copied defaults and are not affected. Returns success.",
+    {
+      categoryId: z.string().uuid().describe("UUID of the asset category to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:assets");
+
+        const existing = await db.query.assetCategory.findFirst({
+          where: and(
+            eq(assetCategory.id, params.categoryId),
+            eq(assetCategory.organizationId, ctx.organizationId),
+            notDeleted(assetCategory.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Asset category not found");
+
+        await db
+          .update(assetCategory)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(assetCategory.id, params.categoryId),
+              eq(assetCategory.organizationId, ctx.organizationId)
+            )
+          );
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "delete",
+          entityType: "asset_category",
+          entityId: params.categoryId,
+          changes: { name: existing.name },
+        });
+
+        return { success: true };
+      })
+  );
+
   // ─── Run depreciation ──────────────────────────────────────────────
   server.tool(
     "run_asset_depreciation",

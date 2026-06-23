@@ -14,7 +14,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import {
   createCategorizationJournalEntry,
   assertBaseRateAvailable,
@@ -87,7 +87,7 @@ export async function POST(
     // Calculate total from items
     let totalAmount = 0;
     const processedItems = parsed.items.map((item, i) => {
-      const amount = decimalToCents(item.amount);
+      const amount = decimalToMinorUnits(item.amount, parsed.currencyCode);
       totalAmount += amount;
       return {
         date: item.date,

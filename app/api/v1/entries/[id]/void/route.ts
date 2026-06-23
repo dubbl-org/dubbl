@@ -6,6 +6,8 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { reverseJournalEntry } from "@/lib/api/journal-automation";
 import { centsToDecimal } from "@/lib/money";
 import { z } from "zod";
 
@@ -41,16 +43,41 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (entry.reversedByEntryId) {
+      return NextResponse.json(
+        { error: "This entry has already been reversed" },
+        { status: 400 }
+      );
+    }
+    // The reversal posts on the original entry's date — block it if that period
+    // is locked or in a closed fiscal year.
+    await assertNotLocked(ctx.organizationId, entry.date, ctx);
 
-    await db
-      .update(journalEntry)
-      .set({
-        status: "void",
-        voidedAt: new Date(),
-        voidReason: reason,
-        updatedAt: new Date(),
-      })
-      .where(eq(journalEntry.id, id));
+    // Reverse the entry by posting a mirror (debit/credit swapped) and marking
+    // the original "reversed", keeping BOTH posted so reports net the pair to
+    // zero. Previously this just flipped status to "void", which silently
+    // deleted the amount from every report (even closed periods) with no
+    // offsetting record — the opposite of what the UI promised.
+    await db.transaction(async (tx) => {
+      await reverseJournalEntry(
+        { organizationId: ctx.organizationId, userId: ctx.userId },
+        {
+          entryId: id,
+          date: entry.date,
+          description: `Reversal of entry #${entry.entryNumber}${reason ? ` — ${reason}` : ""}`,
+          reference: entry.reference,
+          sourceType: "manual_reversal",
+          sourceId: entry.id,
+        },
+        tx
+      );
+      // Stamp the original as reversed (reverseJournalEntry already set
+      // reversedByEntryId; this records why and when).
+      await tx
+        .update(journalEntry)
+        .set({ voidedAt: new Date(), voidReason: reason, updatedAt: new Date() })
+        .where(eq(journalEntry.id, id));
+    });
 
     const full = await db.query.journalEntry.findFirst({
       where: eq(journalEntry.id, id),

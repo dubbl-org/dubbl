@@ -51,6 +51,14 @@ export async function POST(
         { status: 400 }
       );
     }
+    // Don't accept more than is outstanding — an overpayment would drive the
+    // balance negative and overstate cash received.
+    if (parsed.amount > found.amountDue) {
+      return NextResponse.json(
+        { error: "Payment is more than the amount still due on this invoice." },
+        { status: 400 }
+      );
+    }
 
     const newAmountPaid = found.amountPaid + parsed.amount;
     const newAmountDue = found.total - newAmountPaid;

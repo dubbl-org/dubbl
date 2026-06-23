@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fixedAsset, depreciationEntry, assetCategory } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { fixedAsset, depreciationEntry, assetRevaluation, assetCategory } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
@@ -67,6 +67,10 @@ export async function GET(
         depreciationEntries: {
           with: { journalEntry: true },
           orderBy: depreciationEntry.date,
+        },
+        revaluations: {
+          with: { journalEntry: true },
+          orderBy: desc(assetRevaluation.date),
         },
       },
     });

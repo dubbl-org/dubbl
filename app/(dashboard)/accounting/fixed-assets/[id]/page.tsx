@@ -12,8 +12,10 @@ import {
   PackageCheck,
   ChevronDown,
   CircleSlash,
+  Hammer,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +48,25 @@ interface DepEntry {
   journalEntry: { id: string; entryNumber: number } | null;
 }
 
+interface RevaluationEntry {
+  id: string;
+  date: string;
+  previousCarryingAmount: number;
+  revaluedAmount: number;
+  changeAmount: number;
+  isImpairment: boolean;
+  notes: string | null;
+  journalEntry?: { id: string; entryNumber: number } | null;
+}
+
+interface CwipCostEntry {
+  id: string;
+  date: string;
+  description: string | null;
+  amount: number;
+  journalEntry?: { id: string; entryNumber: number } | null;
+}
+
 interface AssetDetail {
   id: string;
   name: string;
@@ -66,6 +87,7 @@ interface AssetDetail {
   depreciationAccount: { code: string; name: string } | null;
   accumulatedDepAccount: { code: string; name: string } | null;
   depreciationEntries: DepEntry[];
+  revaluations?: RevaluationEntry[];
 }
 
 const statusColors: Record<string, string> = {
@@ -112,6 +134,13 @@ export default function FixedAssetDetailPage() {
   // Bring into use (capitalize) dialog state.
   const [capitalizeOpen, setCapitalizeOpen] = useState(false);
   const [capitalizeDate, setCapitalizeDate] = useState(today);
+  // Add construction cost (CWIP) dialog state.
+  const [costOpen, setCostOpen] = useState(false);
+  const [costAmount, setCostAmount] = useState("");
+  const [costDate, setCostDate] = useState(today);
+  const [costDescription, setCostDescription] = useState("");
+  const [costSourceAccountId, setCostSourceAccountId] = useState("");
+  const [cwipCosts, setCwipCosts] = useState<CwipCostEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -132,6 +161,14 @@ export default function FixedAssetDetailPage() {
         if (data.asset) setAsset(data.asset);
       })
       .finally(() => setLoading(false));
+    // Construction costs are served by their own endpoint so the history is
+    // reliable regardless of what the asset GET embeds.
+    fetch(`/api/v1/fixed-assets/${id}/cwip-cost`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => (r.ok ? r.json() : { costs: [] }))
+      .then((data) => setCwipCosts(data.costs ?? []))
+      .catch(() => setCwipCosts([]));
   }, [id, orgId]);
 
   async function reloadAsset() {
@@ -140,6 +177,16 @@ export default function FixedAssetDetailPage() {
       headers: { "x-organization-id": orgId },
     }).then((r) => r.json());
     if (data.asset) setAsset(data.asset);
+  }
+
+  async function reloadCwipCosts() {
+    if (!orgId) return;
+    const data = await fetch(`/api/v1/fixed-assets/${id}/cwip-cost`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => (r.ok ? r.json() : { costs: [] }))
+      .catch(() => ({ costs: [] }));
+    setCwipCosts(data.costs ?? []);
   }
 
   async function handleDepreciate() {
@@ -276,12 +323,60 @@ export default function FixedAssetDetailPage() {
         setCapitalizeOpen(false);
         toast.success("Item brought into use");
         await reloadAsset();
+        await reloadCwipCosts();
       } else {
         const data = await res.json();
         toast.error(
           typeof data.error === "string"
             ? data.error
             : "Couldn't bring this item into use"
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAddCost() {
+    if (!orgId) return;
+    const amount = Math.round(parseFloat(costAmount || "0") * 100);
+    if (amount <= 0) {
+      toast.error("Enter an amount greater than zero");
+      return;
+    }
+    if (!costSourceAccountId) {
+      toast.error("Choose where the money came from");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/fixed-assets/${id}/cwip-cost`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": orgId,
+        },
+        body: JSON.stringify({
+          amount,
+          date: costDate,
+          description: costDescription || undefined,
+          sourceAccountId: costSourceAccountId,
+        }),
+      });
+      if (res.ok) {
+        setCostOpen(false);
+        setCostAmount("");
+        setCostDescription("");
+        setCostSourceAccountId("");
+        toast.success("Construction cost added");
+        await reloadAsset();
+        await reloadCwipCosts();
+      } else {
+        const data = await res.json();
+        toast.error(
+          typeof data.error === "string"
+            ? data.error
+            : "Couldn't add the construction cost"
         );
       }
     } finally {
@@ -368,15 +463,26 @@ export default function FixedAssetDetailPage() {
         </Button>
         {(asset.isCwip || asset.status === "in_progress") &&
           asset.status !== "disposed" && (
-            <Button
-              size="sm"
-              onClick={() => setCapitalizeOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-              title="Mark this item as ready and in use, so its value starts spreading over time"
-            >
-              <PackageCheck className="mr-2 size-4" />
-              Bring into use
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCostOpen(true)}
+                title="Add money spent building or preparing this item before it's in use"
+              >
+                <Hammer className="mr-2 size-4" />
+                Add construction cost
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setCapitalizeOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700"
+                title="Mark this item as ready and in use, so its value starts spreading over time"
+              >
+                <PackageCheck className="mr-2 size-4" />
+                Bring into use
+              </Button>
+            </>
           )}
         {asset.status === "active" && (
           <>
@@ -614,6 +720,64 @@ export default function FixedAssetDetailPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Add construction cost (CWIP) */}
+      <Dialog open={costOpen} onOpenChange={setCostOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add construction cost</DialogTitle>
+            <DialogDescription>
+              Record money spent building or preparing this item before it&apos;s
+              in use. It&apos;s added to what the item has cost you so far and
+              recorded in your books.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Amount</Label>
+              <CurrencyInput
+                prefix="$"
+                value={costAmount}
+                onChange={setCostAmount}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={costDate}
+                onChange={(e) => setCostDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Where the money came from</Label>
+              <AccountPicker
+                value={costSourceAccountId}
+                onChange={setCostSourceAccountId}
+                placeholder="Choose an account (e.g. bank)"
+              />
+              <p className="text-xs text-muted-foreground">
+                The account this cost was paid from or charged to.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>What it was for (optional)</Label>
+              <Textarea
+                value={costDescription}
+                onChange={(e) => setCostDescription(e.target.value)}
+                placeholder="e.g. Contractor labour, materials"
+              />
+            </div>
+            <Button
+              onClick={handleAddCost}
+              disabled={busy}
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+            >
+              Add cost
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge
           variant="outline"
@@ -758,6 +922,123 @@ export default function FixedAssetDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Construction costs (CWIP) */}
+      {(asset.isCwip ||
+        asset.status === "in_progress" ||
+        cwipCosts.length > 0) && (
+        <div className="rounded-lg border">
+          <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-3">
+            <h3 className="text-sm font-semibold">Construction costs</h3>
+            {cwipCosts.length > 0 && (
+              <span className="text-sm font-mono text-muted-foreground">
+                Total:{" "}
+                {formatMoney(
+                  cwipCosts.reduce((s, c) => s + c.amount, 0)
+                )}
+              </span>
+            )}
+          </div>
+          {cwipCosts.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No construction costs recorded yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[480px] grid-cols-[120px_1fr_120px_120px] gap-2 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground">
+                <span>Date</span>
+                <span>What it was for</span>
+                <span className="text-right">Amount</span>
+                <span className="text-right">Bookkeeping entry</span>
+              </div>
+              {cwipCosts.map((cost) => (
+                <div
+                  key={cost.id}
+                  className="grid min-w-[480px] grid-cols-[120px_1fr_120px_120px] gap-2 border-b px-4 py-2 last:border-b-0"
+                >
+                  <span className="text-sm">{cost.date}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {cost.description || "-"}
+                  </span>
+                  <span className="text-right text-sm font-mono">
+                    {formatMoney(cost.amount)}
+                  </span>
+                  <span className="text-right text-sm text-muted-foreground">
+                    {cost.journalEntry
+                      ? `#${cost.journalEntry.entryNumber}`
+                      : "-"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Value changes (revaluations / write-downs) */}
+      {asset.revaluations && asset.revaluations.length > 0 && (
+        <div className="rounded-lg border">
+          <div className="border-b bg-muted/50 px-4 py-3">
+            <h3 className="text-sm font-semibold">Value changes over time</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Times you recorded a higher value or wrote the item down.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="grid min-w-[560px] grid-cols-[110px_1fr_130px_130px_110px] gap-2 border-b bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground">
+              <span>Date</span>
+              <span>Type</span>
+              <span className="text-right">New value</span>
+              <span className="text-right">Change</span>
+              <span className="text-right">Entry</span>
+            </div>
+            {asset.revaluations.map((rev) => (
+              <div
+                key={rev.id}
+                className="grid min-w-[560px] grid-cols-[110px_1fr_130px_130px_110px] gap-2 border-b px-4 py-2 last:border-b-0"
+              >
+                <span className="text-sm">{rev.date}</span>
+                <span className="text-sm">
+                  {rev.isImpairment ? (
+                    <span className="inline-flex items-center text-amber-700">
+                      <CircleSlash className="mr-1.5 size-3.5" />
+                      Written down
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center text-emerald-700">
+                      <TrendingUp className="mr-1.5 size-3.5" />
+                      Higher value
+                    </span>
+                  )}
+                  {rev.notes && (
+                    <span className="block text-xs text-muted-foreground">
+                      {rev.notes}
+                    </span>
+                  )}
+                </span>
+                <span className="text-right text-sm font-mono">
+                  {formatMoney(rev.revaluedAmount)}
+                </span>
+                <span
+                  className={`text-right text-sm font-mono ${
+                    rev.changeAmount < 0
+                      ? "text-amber-600"
+                      : "text-emerald-600"
+                  }`}
+                >
+                  {rev.changeAmount < 0 ? "-" : "+"}
+                  {formatMoney(Math.abs(rev.changeAmount))}
+                </span>
+                <span className="text-right text-sm text-muted-foreground">
+                  {rev.journalEntry
+                    ? `#${rev.journalEntry.entryNumber}`
+                    : "-"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {confirmDialog}
     </div>
   );

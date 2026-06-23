@@ -8,7 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { logAudit } from "@/lib/api/audit";
@@ -48,6 +48,9 @@ const createSchema = z.object({
   // When the client has acknowledged a duplicate warning, pass true to post
   // anyway (only relevant under the 'warn' strategy).
   confirmDuplicate: z.boolean().optional(),
+  // When true, create the bill in 'pending_approval' rather than 'draft' so it
+  // enters the approval workflow immediately.
+  submitForApproval: z.boolean().optional().default(false),
 });
 
 export async function GET(request: Request) {
@@ -179,7 +182,7 @@ export async function POST(request: Request) {
     // for reporting, but NETTED OUT of amountDue because the supplier is paid net.
     let reverseChargeVat = 0;
     const processedLines = parsed.lines.map((l, i) => {
-      const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+      const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, currencyCode);
       const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
       const amount = grossAmount - discountAmount;
       subtotal += amount;
@@ -191,7 +194,7 @@ export async function POST(request: Request) {
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
-        unitPrice: decimalToCents(l.unitPrice),
+        unitPrice: decimalToMinorUnits(l.unitPrice, currencyCode),
         accountId: l.accountId || null,
         taxRateId,
         discountPercent: l.discountPercent,
@@ -221,9 +224,10 @@ export async function POST(request: Request) {
         billNumber,
         issueDate: parsed.issueDate,
         dueDate: parsed.dueDate,
-        // 'hold' strategy parks a suspected duplicate for review rather than
-        // posting it straight to draft.
-        status: heldForDuplicate ? "pending_approval" : "draft",
+        // Enter the approval workflow when the client submits for approval, or
+        // when the 'hold' strategy parks a suspected duplicate for review rather
+        // than posting it straight to draft.
+        status: parsed.submitForApproval || heldForDuplicate ? "pending_approval" : "draft",
         reference: parsed.reference || null,
         notes: parsed.notes || null,
         subtotal,

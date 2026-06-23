@@ -432,7 +432,7 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "auto_reconcile_bank_transactions",
-    "Automatically reconcile unreconciled bank transactions by fuzzy-matching against invoices, bills, and journal entries. Returns counts of checked, reconciled, and skipped transactions.",
+    "Automatically link unreconciled bank lines to ALREADY-POSTED cash journal entries (e.g. payments recorded manually) that move a bank ledger account and aren't already linked, by fuzzy-matching amount/date/description. Does NOT touch open invoices/bills — reconciling those means recording a payment, which must be done explicitly via match_to_invoice / match_to_bill. Returns counts of checked, reconciled, and skipped transactions.",
     {
       bankAccountId: z
         .string()

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import Link from "next/link";
 import { ArrowLeft, Banknote, Search, X } from "lucide-react";
@@ -29,6 +30,7 @@ interface Payment {
   paymentNumber: string;
   date: string;
   amount: number;
+  currencyCode: string;
   method: string;
   reference: string | null;
   contact: { name: string } | null;
@@ -95,7 +97,7 @@ function buildColumns(): Column<Payment>[] {
       className: "w-28 text-right",
       render: (r) => (
         <span className="font-mono text-sm tabular-nums font-medium text-emerald-600">
-          {formatMoney(r.amount)}
+          {formatMoney(r.amount, r.currencyCode)}
         </span>
       ),
     },
@@ -116,6 +118,7 @@ function buildColumns(): Column<Payment>[] {
 }
 
 export default function PaymentsPage() {
+  const router = useRouter();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -342,6 +345,7 @@ export default function PaymentsPage() {
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={handleSort}
+            onRowClick={(r) => router.push(`/sales/payments/${r.id}`)}
           />
         </ContentReveal>
       )}

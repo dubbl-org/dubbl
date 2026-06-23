@@ -19,6 +19,25 @@ export function decimalToCents(value: string | number, decimals = 2): number {
 }
 
 /**
+ * Currency-aware conversions: scale by the currency's REAL minor units, so a
+ * 0-decimal currency (JPY/KRW) and a 3-decimal one (KWD/BHD/OMR) round-trip
+ * correctly — unlike the fixed 2-decimal helpers above which over/under-scale
+ * those currencies. These are the helpers the write boundary should use once
+ * the codebase threads the document currency through to amount conversion
+ * (alongside a one-off migration of any existing non-2dp data).
+ */
+export function decimalToMinorUnits(
+  value: string | number,
+  currency = "USD"
+): number {
+  return decimalToCents(value, getCurrencyMinorUnits(currency));
+}
+
+export function minorUnitsToDecimal(units: number, currency = "USD"): string {
+  return centsToDecimal(units, getCurrencyMinorUnits(currency));
+}
+
+/**
  * Format an integer minor-unit amount as a currency string.
  * Scales and sets fraction digits by the currency's real minor units, so
  * 1250 → "$12.50" (USD), 1250 → "¥1,250" (JPY), 1250 → "KWD 1.250" (KWD).

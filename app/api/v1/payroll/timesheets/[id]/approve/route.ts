@@ -43,8 +43,10 @@ export async function POST(
         approvedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(timesheet.id, id))
+      .where(and(eq(timesheet.id, id), eq(timesheet.organizationId, ctx.organizationId)))
       .returning();
+
+    if (!updated) return notFound("Timesheet");
 
     logAudit({ ctx, action: "approve", entityType: "timesheet", entityId: id, request });
 

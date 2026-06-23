@@ -7,7 +7,7 @@ import {
   bill,
   organization,
 } from "@/lib/db/schema";
-import { eq, and, isNull, notInArray } from "drizzle-orm";
+import { eq, and, isNull, notInArray, sql } from "drizzle-orm";
 import { sendEmail } from "./smtp-client";
 import { renderTemplate } from "./template-engine";
 import { formatMoney } from "@/lib/money";
@@ -126,6 +126,10 @@ export async function processReminders(orgId: string) {
       const subject = renderTemplate(rule.subjectTemplate, vars);
       const html = renderTemplate(rule.bodyTemplate, vars);
 
+      // Track whether any reminder actually went out for this document so we
+      // bump the invoice's dunning (escalation) stage exactly once per run, not
+      // once per recipient.
+      let remindedThisDoc = false;
       for (const recipient of recipients) {
         try {
           await sendEmail(config, { to: recipient, subject, html });
@@ -138,6 +142,7 @@ export async function processReminders(orgId: string) {
             subject,
             status: "sent",
           });
+          remindedThisDoc = true;
           sent++;
         } catch (err: unknown) {
           await db.insert(reminderLog).values({
@@ -152,6 +157,18 @@ export async function processReminders(orgId: string) {
           });
           failed++;
         }
+      }
+
+      // After sending, advance the invoice's dunning stage by one. Only invoices
+      // carry a dunningLevel; bills don't, so this is invoice-only. Org-scoped
+      // so we never touch another org's row.
+      if (remindedThisDoc && rule.documentType === "invoice") {
+        await db
+          .update(invoice)
+          .set({ dunningLevel: sql`${invoice.dunningLevel} + 1` })
+          .where(
+            and(eq(invoice.id, doc.id), eq(invoice.organizationId, orgId))
+          );
       }
     }
   }

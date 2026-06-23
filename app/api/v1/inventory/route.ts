@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inventoryItem } from "@/lib/db/schema";
+import { inventoryItem, journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and, or, ilike, desc, asc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -8,6 +8,13 @@ import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { recordInventoryReceipt, type ValuedItem } from "@/lib/api/inventory-valuation";
+import {
+  getNextEntryNumber,
+  ensureControlAccount,
+  ensureAccountByCode,
+  resolveBaseRate,
+} from "@/lib/api/journal-automation";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -148,13 +155,80 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const [created] = await db
-      .insert(inventoryItem)
-      .values({
-        organizationId: ctx.organizationId,
-        ...parsed,
-      })
-      .returning();
+    const openingQty = parsed.quantityOnHand ?? 0;
+    const unitCost = parsed.purchasePrice ?? 0;
+    const hasOpeningStock = openingQty > 0 && unitCost > 0;
+
+    const created = await db.transaction(async (tx) => {
+      // Insert at zero on-hand/value, then add any opening stock through the
+      // valuation path so averageCost / totalValue / FIFO layers are set. Storing
+      // a quantity without a cost (the old behaviour) left stock at $0, so every
+      // later sale posted $0 COGS and overstated profit.
+      const [item] = await tx
+        .insert(inventoryItem)
+        .values({
+          organizationId: ctx.organizationId,
+          ...parsed,
+          quantityOnHand: 0,
+          averageCost: 0,
+          totalValue: 0,
+        })
+        .returning();
+
+      if (hasOpeningStock) {
+        await recordInventoryReceipt(tx, {
+          item: item as ValuedItem,
+          quantity: openingQty,
+          unitCost,
+          type: "initial",
+          referenceType: "opening_balance",
+          referenceId: item.id,
+          createdBy: ctx.userId,
+        });
+
+        // Post the opening balance to the GL: DR Inventory / CR Opening Balance
+        // Equity (the standard counter-account for starting balances), so the
+        // balance sheet reflects the stock you began with.
+        const today = new Date().toISOString().slice(0, 10);
+        const { base } = await resolveBaseRate(ctx.organizationId, undefined, today);
+        const invAcct =
+          (item.inventoryAccountId ? { id: item.inventoryAccountId } : null) ??
+          (await ensureControlAccount(ctx.organizationId, "inventory", base, tx));
+        const openingEquity = await ensureAccountByCode(
+          ctx.organizationId,
+          { code: "3000", name: "Opening Balance Equity", type: "equity", subType: "other_equity" },
+          base,
+          tx
+        );
+        const value = openingQty * unitCost;
+        if (invAcct?.id && openingEquity?.id && value > 0) {
+          const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
+          const [entry] = await tx
+            .insert(journalEntry)
+            .values({
+              organizationId: ctx.organizationId,
+              entryNumber,
+              date: today,
+              description: `Opening stock: ${item.name}`,
+              reference: item.sku ?? null,
+              status: "posted",
+              sourceType: "inventory_opening",
+              sourceId: item.id,
+              postedAt: new Date(),
+              createdBy: ctx.userId,
+            })
+            .returning();
+          await tx.insert(journalLine).values([
+            { journalEntryId: entry.id, accountId: invAcct.id, description: `Opening stock: ${item.name}`, debitAmount: value, creditAmount: 0, currencyCode: base },
+            { journalEntryId: entry.id, accountId: openingEquity.id, description: `Opening stock: ${item.name}`, debitAmount: 0, creditAmount: value, currencyCode: base },
+          ]);
+        }
+      }
+
+      return (
+        (await tx.query.inventoryItem.findFirst({ where: eq(inventoryItem.id, item.id) })) ?? item
+      );
+    });
 
     logAudit({ ctx, action: "create", entityType: "inventory_item", entityId: created.id, request });
 

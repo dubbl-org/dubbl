@@ -3,14 +3,22 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Save, Loader2, Warehouse, Printer } from "lucide-react";
+import { Trash2, Save, Loader2, Warehouse, Printer, Scale } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { centsToDecimal } from "@/lib/money";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { centsToDecimal, formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
@@ -36,6 +44,12 @@ export default function InventoryItemDetailsPage() {
   const [invPurchasePrice, setInvPurchasePrice] = useState(centsToDecimal(item.purchasePrice));
   const [invSalePrice, setInvSalePrice] = useState(centsToDecimal(item.salePrice));
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
+  // "Revalue stock" sheet: set the book value directly (mark-to-market) without
+  // changing the count.
+  const [revalueOpen, setRevalueOpen] = useState(false);
+  const [revalueValue, setRevalueValue] = useState("");
+  const [revalueReason, setRevalueReason] = useState("");
+  const [revalueBusy, setRevalueBusy] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
   useDocumentTitle("Inventory · Product Details");
 
@@ -104,6 +118,62 @@ export default function InventoryItemDetailsPage() {
     });
     toast.success("Item deleted");
     router.push("/inventory");
+  }
+
+  const currentBookValue = item.totalValue ?? item.quantityOnHand * item.purchasePrice;
+
+  function openRevalue() {
+    // Pre-fill with the current value so the user adjusts from a known starting point.
+    setRevalueValue(centsToDecimal(currentBookValue));
+    setRevalueReason("");
+    setRevalueOpen(true);
+  }
+
+  async function handleRevalue() {
+    if (!orgId) return;
+    const newTotalValue = Math.round(parseFloat(revalueValue || "0") * 100);
+    if (Number.isNaN(newTotalValue) || newTotalValue < 0 || !revalueReason.trim()) {
+      toast.error("Enter the new value and a reason");
+      return;
+    }
+    if (newTotalValue === currentBookValue) {
+      toast.error("That's the same as the current value");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: "Revalue this stock?",
+      description: `Its book value will change from ${formatMoney(currentBookValue)} to ${formatMoney(newTotalValue)}. The count stays the same.`,
+      confirmLabel: "Revalue",
+    });
+    if (!confirmed) return;
+
+    setRevalueBusy(true);
+    try {
+      const res = await fetch(`/api/v1/inventory/${id}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          adjustmentType: "revaluation",
+          newTotalValue,
+          reason: revalueReason,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Couldn't revalue the stock");
+      }
+      const data = await res.json();
+      setItem(() => data.inventoryItem);
+      setRevalueOpen(false);
+      setRevalueValue("");
+      setRevalueReason("");
+      toast.success("Stock revalued");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't revalue the stock");
+    } finally {
+      setRevalueBusy(false);
+    }
   }
 
   function printBarcode() {
@@ -304,6 +374,28 @@ export default function InventoryItemDetailsPage() {
         </Section>
       </div>
 
+      {/* Revalue stock */}
+      <div className="h-px bg-border mt-10" />
+      <div className="mt-10">
+        <Section
+          title="Revalue stock"
+          description="Set what this stock is worth in your books (e.g. mark to market). The count stays the same — only its value changes."
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border px-4 py-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Current value in your books</p>
+              <p className="text-lg font-bold font-mono tabular-nums truncate">
+                {formatMoney(currentBookValue)}
+              </p>
+            </div>
+            <Button type="button" size="sm" variant="outline" onClick={openRevalue}>
+              <Scale className="mr-1.5 size-3.5" />
+              Revalue stock
+            </Button>
+          </div>
+        </Section>
+      </div>
+
       <div className="h-px bg-border mt-10" />
       <div className="mt-10">
         <Section title="Danger zone" description="Irreversible actions for this item.">
@@ -325,6 +417,50 @@ export default function InventoryItemDetailsPage() {
         </div>
       </Section>
       </div>
+
+      {/* Revalue stock sheet */}
+      <Sheet open={revalueOpen} onOpenChange={setRevalueOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Revalue stock</SheetTitle>
+            <SheetDescription>
+              Set what this stock is worth in your books. Use this when its value
+              has changed (for example, market price moved). The count stays the
+              same — only its value changes.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-4">
+            <div className="rounded-lg bg-muted p-3">
+              <p className="text-xs text-muted-foreground">Current value in your books</p>
+              <p className="text-xl font-bold font-mono tabular-nums truncate">
+                {formatMoney(currentBookValue)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>New value</Label>
+              <CurrencyInput
+                prefix="$"
+                value={revalueValue}
+                onChange={setRevalueValue}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Reason *</Label>
+              <Input
+                value={revalueReason}
+                onChange={(e) => setRevalueReason(e.target.value)}
+                placeholder="e.g. Market price changed, revaluation"
+              />
+            </div>
+          </div>
+          <SheetFooter>
+            <Button variant="outline" onClick={() => setRevalueOpen(false)}>Cancel</Button>
+            <Button onClick={handleRevalue} disabled={revalueBusy} className="bg-emerald-600 hover:bg-emerald-700">
+              Revalue stock
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {confirmDialog}
     </>

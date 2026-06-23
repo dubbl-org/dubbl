@@ -16,11 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { cn } from "@/lib/utils";
 
 interface TimesheetDetail {
   id: string;
@@ -60,6 +68,12 @@ export default function TimesheetDetailPage() {
   const [ts, setTs] = useState<TimesheetDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // Reject dialog
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   // New entry form
   const [newDate, setNewDate] = useState("");
@@ -135,34 +149,45 @@ export default function TimesheetDetailPage() {
   }
 
   async function handleApprove() {
-    if (!orgId) return;
-    const res = await fetch(`/api/v1/payroll/timesheets/${id}/approve`, {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    });
-    if (res.ok) {
-      toast.success("Timesheet approved");
-      fetchTimesheet();
+    if (!orgId || approving) return;
+    setApproving(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/timesheets/${id}/approve`, {
+        method: "POST",
+        headers: { "x-organization-id": orgId },
+      });
+      if (res.ok) {
+        toast.success("Timesheet approved");
+        fetchTimesheet();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
+      }
+    } finally {
+      setApproving(false);
     }
   }
 
   async function handleReject() {
-    if (!orgId) return;
-    const confirmed = await confirm({
-      title: "Reject timesheet?",
-      description: "The employee will need to resubmit.",
-      confirmLabel: "Reject",
-      destructive: true,
-    });
-    if (!confirmed) return;
-    const res = await fetch(`/api/v1/payroll/timesheets/${id}/reject`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-      body: JSON.stringify({}),
-    });
-    if (res.ok) {
-      toast.success("Timesheet rejected");
-      fetchTimesheet();
+    if (!orgId || rejecting) return;
+    setRejecting(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/timesheets/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ reason: rejectReason.trim() || undefined }),
+      });
+      if (res.ok) {
+        toast.success("Timesheet rejected");
+        setRejectOpen(false);
+        setRejectReason("");
+        fetchTimesheet();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
+      }
+    } finally {
+      setRejecting(false);
     }
   }
 
@@ -207,10 +232,10 @@ export default function TimesheetDetailPage() {
           )}
           {ts.status === "submitted" && (
             <>
-              <Button size="sm" onClick={handleApprove} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button size="sm" onClick={handleApprove} disabled={approving} className="bg-emerald-600 hover:bg-emerald-700">
                 <CheckCircle className="mr-1.5 size-3.5" /> Approve
               </Button>
-              <Button size="sm" variant="destructive" onClick={handleReject}>
+              <Button size="sm" variant="destructive" onClick={() => setRejectOpen(true)}>
                 <XCircle className="mr-1.5 size-3.5" /> Reject
               </Button>
             </>
@@ -289,6 +314,35 @@ export default function TimesheetDetailPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={rejectOpen} onOpenChange={(open) => { if (!rejecting) { setRejectOpen(open); if (!open) setRejectReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject timesheet</DialogTitle>
+            <DialogDescription>
+              Let the employee know what to fix. They&apos;ll need to update and resubmit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Reason</Label>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Hours on June 18 look too high — please double-check."
+              rows={4}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={rejecting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleReject} disabled={rejecting}>
+              <XCircle className="mr-1.5 size-3.5" /> Reject timesheet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {confirmDialog}
     </ContentReveal>

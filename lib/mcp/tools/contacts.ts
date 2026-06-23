@@ -29,7 +29,7 @@ import {
   entityTag,
 } from "@/lib/db/schema";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
@@ -469,6 +469,45 @@ export function registerContactTools(server: McpServer, ctx: AuthContext) {
           sourceContactId: params.sourceContactId,
           targetContactId: params.targetContactId,
         };
+      })
+  );
+
+  server.tool(
+    "delete_contact",
+    "Soft-delete a contact by ID. The contact is marked deleted (not physically removed) and excluded from future listings. Requires the manage:contacts permission.",
+    {
+      contactId: z
+        .string()
+        .describe("The UUID of the contact to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:contacts");
+
+        const existing = await db.query.contact.findFirst({
+          where: and(
+            eq(contact.id, params.contactId),
+            eq(contact.organizationId, ctx.organizationId),
+            notDeleted(contact.deletedAt)
+          ),
+        });
+
+        if (!existing) throw new Error("Contact not found");
+
+        await db
+          .update(contact)
+          .set(softDelete())
+          .where(eq(contact.id, params.contactId));
+
+        await logAudit({
+          ctx,
+          action: "delete",
+          entityType: "contact",
+          entityId: params.contactId,
+          changes: existing as Record<string, unknown>,
+        });
+
+        return { success: true, contactId: params.contactId };
       })
   );
 }

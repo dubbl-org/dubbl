@@ -8,7 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { toBaseAmounts } from "@/lib/currency/base-amount";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
 
@@ -130,7 +130,7 @@ export async function PATCH(
 
       let subtotal = 0;
       const processedLines = lines.map((l, i) => {
-        const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+        const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, existing.currencyCode);
         const discountAmount = l.discountPercent
           ? Math.round((grossAmount * l.discountPercent) / 10000)
           : 0;
@@ -141,7 +141,7 @@ export async function PATCH(
         return {
           description: l.description,
           quantity: Math.round(l.quantity * 100),
-          unitPrice: decimalToCents(l.unitPrice),
+          unitPrice: decimalToMinorUnits(l.unitPrice, existing.currencyCode),
           accountId: l.accountId || null,
           taxRateId,
           discountPercent: l.discountPercent,

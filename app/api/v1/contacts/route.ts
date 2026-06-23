@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { contact } from "@/lib/db/schema";
-import { eq, and, or, ilike, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { contact, invoice, bill } from "@/lib/db/schema";
+import { eq, and, or, ilike, desc, asc, gte, lte, inArray, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -79,8 +79,69 @@ export async function GET(request: Request) {
       .from(contact)
       .where(and(...conditions));
 
+    // Outstanding balance + overdue per contact (for the current page only, org-scoped).
+    // Customer balance = unpaid invoices ("Owes you"); supplier balance = unpaid bills ("You owe").
+    const contactIds = contacts.map((c) => c.id);
+    const owedByCustomer = new Map<string, { outstanding: number; overdue: number }>();
+    const owedToSupplier = new Map<string, { outstanding: number; overdue: number }>();
+
+    if (contactIds.length > 0) {
+      // Invoices the org has issued -> what customers owe the org.
+      const invoiceRows = await db
+        .select({
+          contactId: invoice.contactId,
+          outstanding: sql<number>`coalesce(sum(${invoice.amountDue}), 0)::int`,
+          overdue: sql<number>`coalesce(sum(case when ${invoice.dueDate} < current_date then ${invoice.amountDue} else 0 end), 0)::int`,
+        })
+        .from(invoice)
+        .where(
+          and(
+            eq(invoice.organizationId, ctx.organizationId),
+            notDeleted(invoice.deletedAt),
+            inArray(invoice.contactId, contactIds),
+            inArray(invoice.status, ["sent", "partial", "overdue"]),
+          )
+        )
+        .groupBy(invoice.contactId);
+      for (const row of invoiceRows) {
+        owedByCustomer.set(row.contactId, { outstanding: row.outstanding, overdue: row.overdue });
+      }
+
+      // Bills the org has received -> what the org owes suppliers.
+      const billRows = await db
+        .select({
+          contactId: bill.contactId,
+          outstanding: sql<number>`coalesce(sum(${bill.amountDue}), 0)::int`,
+          overdue: sql<number>`coalesce(sum(case when ${bill.dueDate} < current_date then ${bill.amountDue} else 0 end), 0)::int`,
+        })
+        .from(bill)
+        .where(
+          and(
+            eq(bill.organizationId, ctx.organizationId),
+            notDeleted(bill.deletedAt),
+            inArray(bill.contactId, contactIds),
+            inArray(bill.status, ["received", "partial", "overdue"]),
+          )
+        )
+        .groupBy(bill.contactId);
+      for (const row of billRows) {
+        owedToSupplier.set(row.contactId, { outstanding: row.outstanding, overdue: row.overdue });
+      }
+    }
+
+    const contactsWithBalance = contacts.map((c) => {
+      const customer = owedByCustomer.get(c.id) || { outstanding: 0, overdue: 0 };
+      const supplier = owedToSupplier.get(c.id) || { outstanding: 0, overdue: 0 };
+      return {
+        ...c,
+        owesYou: customer.outstanding, // customer outstanding (cents)
+        youOwe: supplier.outstanding, // supplier outstanding (cents)
+        overdue: customer.overdue + supplier.overdue, // total overdue across both (cents)
+      };
+    });
+
     return NextResponse.json(
-      paginatedResponse(contacts, Number(countResult?.count || 0), page, limit)
+      paginatedResponse(contactsWithBalance, Number(countResult?.count || 0), page, limit)
     );
   } catch (err) {
     return handleError(err);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { FileText, Download, ArrowLeft } from "lucide-react";
+import { FileText, Download, ArrowLeft, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
@@ -17,7 +17,16 @@ interface PortalInvoice {
   total: number;
   amountDue: number;
   currencyCode: string;
+  // Per-invoice token for the public online-payment flow (/pay/{token}).
+  // Present only when an online payment link has been generated for this
+  // invoice (i.e. when online payment is available). When absent, the
+  // "Pay now" button is hidden and we degrade to PDF-only.
+  paymentLinkToken?: string | null;
 }
+
+// Statuses for which the invoice can still be paid online. Mirrors the
+// payable check in /api/pay/[token]/checkout (rejects paid/void/draft).
+const PAYABLE_STATUSES = new Set(["sent", "partial", "overdue"]);
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
@@ -89,6 +98,14 @@ export default function PortalInvoicesPage() {
                       PDF
                     </Button>
                   </a>
+                  {PAYABLE_STATUSES.has(inv.status) && inv.paymentLinkToken && (
+                    <a href={`/pay/${inv.paymentLinkToken}`}>
+                      <Button size="sm" className="h-7 text-xs gap-1">
+                        <CreditCard className="size-3" />
+                        Pay now
+                      </Button>
+                    </a>
+                  )}
                 </div>
               </div>
             ))}

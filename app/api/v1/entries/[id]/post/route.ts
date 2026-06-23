@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { centsToDecimal } from "@/lib/money";
 
 export async function POST(
@@ -33,6 +34,10 @@ export async function POST(
         { status: 400 }
       );
     }
+    // The lock is only checked at create time, but the normal flow is
+    // draft-now / finalize-later — so posting must re-check, or a draft can be
+    // finalized straight into a period that has since been locked or closed.
+    await assertNotLocked(ctx.organizationId, entry.date, ctx);
 
     await db
       .update(journalEntry)

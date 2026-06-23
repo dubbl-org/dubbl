@@ -74,14 +74,36 @@ export async function POST(request: Request) {
     await assertNotLocked(ctx.organizationId, parsed.date);
     await checkMonthlyLimit(ctx.organizationId, journalEntry, journalEntry.organizationId, journalEntry.createdAt, "entriesPerMonth");
 
-    // Validate balance
+    // Validate balance. A single-currency entry must balance in its own
+    // amounts. A multi-currency entry (lines in different currencies, or any
+    // non-1.0 exchange rate) must balance in BASE currency — comparing raw
+    // amounts across currencies is meaningless and would let an unbalanced
+    // entry post.
     const totalDebit = parsed.lines.reduce((sum, l) => sum + l.debitAmount, 0);
     const totalCredit = parsed.lines.reduce((sum, l) => sum + l.creditAmount, 0);
-    if (totalDebit !== totalCredit) {
-      return NextResponse.json(
-        { error: "Debits must equal credits" },
-        { status: 400 }
-      );
+    const firstCurrency = parsed.lines[0]?.currencyCode;
+    const isMultiCurrency = parsed.lines.some(
+      (l) => l.currencyCode !== firstCurrency || l.exchangeRate !== 1_000_000
+    );
+    if (!isMultiCurrency) {
+      if (totalDebit !== totalCredit) {
+        return NextResponse.json(
+          { error: "Debits must equal credits" },
+          { status: 400 }
+        );
+      }
+    } else {
+      const toBase = (amount: number, rate: number) =>
+        Math.round((amount * rate) / 1_000_000);
+      const baseDebit = parsed.lines.reduce((s, l) => s + toBase(l.debitAmount, l.exchangeRate), 0);
+      const baseCredit = parsed.lines.reduce((s, l) => s + toBase(l.creditAmount, l.exchangeRate), 0);
+      // Allow up to one cent of per-line rounding slack.
+      if (Math.abs(baseDebit - baseCredit) > parsed.lines.length) {
+        return NextResponse.json(
+          { error: "In your base currency, total debits must equal total credits." },
+          { status: 400 }
+        );
+      }
     }
     if (totalDebit === 0) {
       return NextResponse.json(

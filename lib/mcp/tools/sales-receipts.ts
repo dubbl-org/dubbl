@@ -17,7 +17,7 @@ import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { checkMultiCurrency } from "@/lib/api/check-limit";
@@ -202,7 +202,7 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
 
         let subtotal = 0;
         const processedLines = params.lines.map((l, i) => {
-          const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+          const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, currencyCode);
           const discountAmount = l.discountPercent
             ? Math.round((grossAmount * l.discountPercent) / 10000)
             : 0;
@@ -213,7 +213,7 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
           return {
             description: l.description,
             quantity: Math.round(l.quantity * 100),
-            unitPrice: decimalToCents(l.unitPrice),
+            unitPrice: decimalToMinorUnits(l.unitPrice, currencyCode),
             accountId: l.accountId ?? null,
             taxRateId,
             discountPercent: l.discountPercent,

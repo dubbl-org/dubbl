@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { chartAccount, journalLine, journalEntry } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import { centsToDecimal } from "@/lib/money";
@@ -9,6 +9,21 @@ import { centsToDecimal } from "@/lib/money";
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    const url = new URL(request.url);
+    // A P&L is always "for a period". Honor the from/to filters so the report
+    // reflects the chosen range (a month, a quarter, a year) instead of silently
+    // summing every posted entry since the beginning of time.
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+
+    // Date filters live on the posted-entry join so an account with no entries
+    // in range still renders (at zero) via the outer join.
+    const postedInRange = and(
+      eq(journalLine.journalEntryId, journalEntry.id),
+      eq(journalEntry.status, "posted"),
+      from ? gte(journalEntry.date, from) : undefined,
+      to ? lte(journalEntry.date, to) : undefined
+    );
 
     const accounts = await db
       .select({
@@ -20,13 +35,7 @@ export async function GET(request: Request) {
       })
       .from(chartAccount)
       .leftJoin(journalLine, eq(journalLine.accountId, chartAccount.id))
-      .leftJoin(
-        journalEntry,
-        and(
-          eq(journalLine.journalEntryId, journalEntry.id),
-          eq(journalEntry.status, "posted")
-        )
-      )
+      .leftJoin(journalEntry, postedInRange)
       .where(
         and(
           eq(chartAccount.organizationId, ctx.organizationId),
@@ -50,16 +59,18 @@ export async function GET(request: Request) {
         const credit = Number(a.creditTotal);
         return s + (isExpense ? debit - credit : credit - debit);
       }, 0);
-      return { accounts: accts, total: centsToDecimal(totalCents) };
+      return { accounts: accts, total: centsToDecimal(totalCents), totalCents };
     }
 
     const revenue = buildSection("revenue");
     const expenses = buildSection("expense");
-    const netIncomeCents = parseFloat(revenue.total) * 100 - parseFloat(expenses.total) * 100;
+    // Net income in integer cents (never float math on dollar strings).
+    const netIncomeCents = revenue.totalCents - expenses.totalCents;
 
     return NextResponse.json({
-      revenue,
-      expenses,
+      period: { from: from || null, to: to || null },
+      revenue: { accounts: revenue.accounts, total: revenue.total },
+      expenses: { accounts: expenses.accounts, total: expenses.total },
       netIncome: centsToDecimal(netIncomeCents),
     });
   } catch (err) {

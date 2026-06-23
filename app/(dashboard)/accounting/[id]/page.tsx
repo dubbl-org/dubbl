@@ -14,6 +14,8 @@ import {
   FileText,
   Clock,
   AlertTriangle,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,9 +28,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, decimalToCents } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -38,6 +51,7 @@ import Link from "next/link";
 
 interface Line {
   id: string;
+  accountId: string;
   accountCode: string;
   accountName: string;
   description: string | null;
@@ -114,13 +128,14 @@ export default function EntryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [voidReason, setVoidReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useDocumentTitle("Accounting \u00B7 Entry Details");
   useEntityTitle(entry ? `JE-${entry.entryNumber}` : undefined);
 
-  useEffect(() => {
+  function loadEntry() {
     if (!orgId) return;
     fetch(`/api/v1/entries/${id}`, {
       headers: { "x-organization-id": orgId },
@@ -130,6 +145,11 @@ export default function EntryDetailPage() {
         if (data.entry) setEntry(data.entry);
       })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadEntry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, orgId]);
 
   async function postEntry() {
@@ -254,6 +274,11 @@ export default function EntryDetailPage() {
                   Entry #{entry.entryNumber}
                 </h1>
                 <Badge variant="outline" className={sc.class}>{sc.label}</Badge>
+                {entry.voidedAt && (
+                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    Reversed
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {entry.description}
@@ -263,6 +288,16 @@ export default function EntryDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             {entry.status === "draft" && (
               <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditOpen(true)}
+                  disabled={actionLoading}
+                  title="Change this draft entry before finalizing it"
+                >
+                  <Pencil className="mr-2 size-4" />
+                  Edit
+                </Button>
                 <Button
                   size="sm"
                   onClick={postEntry}
@@ -284,7 +319,7 @@ export default function EntryDetailPage() {
                 </Button>
               </>
             )}
-            {entry.status === "posted" && (
+            {entry.status === "posted" && !entry.voidedAt && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button
@@ -561,8 +596,203 @@ export default function EntryDetailPage() {
           </div>
         </div>
 
+        {entry.status === "draft" && (
+          <EditEntrySheet
+            open={editOpen}
+            onClose={() => setEditOpen(false)}
+            entry={entry}
+            orgId={orgId}
+            onSaved={() => { setEditOpen(false); loadEntry(); }}
+          />
+        )}
+
         {confirmDialog}
       </div>
     </ContentReveal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit draft entry — full header + line replace (PUT /api/v1/entries/[id]).
+// ---------------------------------------------------------------------------
+interface EditLine {
+  accountId: string;
+  description: string;
+  debit: string;
+  credit: string;
+}
+
+function EditEntrySheet({
+  open,
+  onClose,
+  entry,
+  orgId,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  entry: Entry;
+  orgId: string | null;
+  onSaved: () => void;
+}) {
+  const [date, setDate] = useState(entry.date);
+  const [description, setDescription] = useState(entry.description);
+  const [reference, setReference] = useState(entry.reference ?? "");
+  const [lines, setLines] = useState<EditLine[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setDate(entry.date);
+      setDescription(entry.description);
+      setReference(entry.reference ?? "");
+      setLines(
+        entry.lines.map((l) => ({
+          accountId: l.accountId,
+          description: l.description ?? "",
+          debit: parseFloat(l.debitAmount) > 0 ? l.debitAmount : "",
+          credit: parseFloat(l.creditAmount) > 0 ? l.creditAmount : "",
+        }))
+      );
+    }
+  }, [open, entry]);
+
+  function update(i: number, patch: Partial<EditLine>) {
+    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  }
+  function addLine() {
+    setLines((prev) => [...prev, { accountId: "", description: "", debit: "", credit: "" }]);
+  }
+  function removeLine(i: number) {
+    setLines((prev) => (prev.length <= 2 ? prev : prev.filter((_, idx) => idx !== i)));
+  }
+
+  const totalDebit = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const totalCredit = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  const balanced = Math.abs(totalDebit - totalCredit) < 0.005 && totalDebit > 0;
+
+  async function save() {
+    if (!orgId) return;
+    if (!description.trim()) { toast.error("Add a description"); return; }
+    const validLines = lines.filter(
+      (l) => l.accountId && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0)
+    );
+    if (validLines.length < 2) { toast.error("Add at least two lines with an account and an amount"); return; }
+    if (!balanced) { toast.error("Debits must equal credits"); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/v1/entries/${entry.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          date,
+          description: description.trim(),
+          reference: reference.trim() || null,
+          lines: validLines.map((l) => ({
+            accountId: l.accountId,
+            description: l.description.trim() || null,
+            debitAmount: decimalToCents(l.debit || 0),
+            creditAmount: decimalToCents(l.credit || 0),
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast.success("Entry updated");
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update this entry");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0">
+        <SheetHeader className="px-4 pt-5 pb-4 sm:px-6 border-b shrink-0">
+          <SheetTitle className="text-lg">Edit entry #{entry.entryNumber}</SheetTitle>
+          <SheetDescription>Change this draft before you finalize it.</SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Date</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Reference (optional)</Label>
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. ADJ-001" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Description</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this entry for?" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Lines</Label>
+              <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addLine}>
+                <Plus className="mr-1 size-3.5" />Add line
+              </Button>
+            </div>
+            {lines.map((l, i) => (
+              <div key={i} className="grid grid-cols-[1fr_90px_90px_auto] gap-2 items-start">
+                <div className="space-y-1">
+                  <AccountPicker value={l.accountId} onChange={(v) => update(i, { accountId: v })} allowCreate />
+                  <Input
+                    value={l.description}
+                    onChange={(e) => update(i, { description: e.target.value })}
+                    placeholder="Line note (optional)"
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <CurrencyInput
+                  prefix="$"
+                  value={l.debit}
+                  onChange={(v) => update(i, { debit: v, credit: v ? "" : l.credit })}
+                  placeholder="Debit"
+                />
+                <CurrencyInput
+                  prefix="$"
+                  value={l.credit}
+                  onChange={(v) => update(i, { credit: v, debit: v ? "" : l.debit })}
+                  placeholder="Credit"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground hover:text-red-600"
+                  onClick={() => removeLine(i)}
+                  disabled={lines.length <= 2}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Total debits</span><span className="font-mono tabular-nums">{formatMoney(Math.round(totalDebit * 100))}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Total credits</span><span className="font-mono tabular-nums">{formatMoney(Math.round(totalCredit * 100))}</span></div>
+            <div className="mt-1 flex justify-between border-t pt-1">
+              <span className="text-muted-foreground">Difference</span>
+              <span className={cn("font-mono tabular-nums font-semibold", balanced ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                {formatMoney(Math.round(Math.abs(totalDebit - totalCredit) * 100))}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving || !balanced} className="bg-emerald-600 hover:bg-emerald-700">
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

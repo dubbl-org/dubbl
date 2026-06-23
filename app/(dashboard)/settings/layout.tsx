@@ -7,7 +7,7 @@ import {
   Settings, Users, CreditCard, Key, ScrollText, Target,
   Bell, BellRing, GitBranch, Tags, Shield, ShieldCheck,
   ListFilter, Webhook, CheckCircle2, Zap, PaintbrushVertical, ArrowLeftRight,
-  Trash2, Database,
+  Trash2, Database, PackageCheck,
 } from "lucide-react";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,7 @@ const GROUPS: NavGroup[] = [
       { href: "/settings/pipelines", label: "Pipelines", icon: Target },
       { href: "/settings/bank-rules", label: "Bank Rules", icon: ListFilter },
       { href: "/settings/approval-workflows", label: "Approvals", icon: CheckCircle2 },
+      { href: "/settings/procurement", label: "Bill Matching", icon: PackageCheck },
       { href: "/settings/webhooks", label: "Webhooks", icon: Webhook },
     ],
   },

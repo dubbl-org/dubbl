@@ -22,6 +22,20 @@
       "when": 1781925643876,
       "tag": "0002_old_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782020328688,
+      "tag": "0003_same_frog_thor",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782035443582,
+      "tag": "0004_faithful_paper_doll",
+      "breakpoints": true
     }
   ]
 }

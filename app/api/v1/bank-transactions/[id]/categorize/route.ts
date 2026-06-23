@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, chartAccount, auditLog } from "@/lib/db/schema";
+import { bankTransaction, bankAccount, chartAccount, journalEntry, payment, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -8,6 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createCategorizationJournalEntry, assertBaseRateAvailable } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 // Code a bank transaction directly to a ledger account ("Categorize"). This is
@@ -47,8 +48,38 @@ export async function POST(
     });
     if (!account) return notFound("Bank transaction");
 
-    if (transaction.status === "reconciled") {
-      return NextResponse.json({ error: "Transaction already reconciled" }, { status: 400 });
+    // An already-coded line can be RE-categorized in place (fixing a wrong
+    // category/tax/contact) — we revert the previous posting and post fresh
+    // below. But only a plain categorization is safe to re-code here: lines
+    // matched to an invoice/bill, transfer legs, and statement-reconciled
+    // lines carry extra state (payments, paired legs, reconciliations) that
+    // only Undo unwinds correctly, so steer those to Undo first.
+    const isEdit = transaction.status === "reconciled";
+    if (isEdit) {
+      if (transaction.transferTransactionId) {
+        return NextResponse.json(
+          { error: "This line is recorded as a transfer between your accounts. Undo it first, then categorize it." },
+          { status: 400 }
+        );
+      }
+      if (transaction.reconciliationId) {
+        return NextResponse.json(
+          { error: "This line is part of a completed statement match. Undo the match first, then categorize it." },
+          { status: 400 }
+        );
+      }
+      const linkedPayment = await db.query.payment.findFirst({
+        where: and(eq(payment.bankTransactionId, id), notDeleted(payment.deletedAt)),
+        columns: { id: true },
+      });
+      if (linkedPayment) {
+        return NextResponse.json(
+          { error: "This line is matched to an invoice or bill. Undo the match first, then categorize it." },
+          { status: 400 }
+        );
+      }
+      // Can't re-code a line dated in a locked or closed period.
+      await assertNotLocked(ctx.organizationId, transaction.date, ctx);
     }
 
     // Connect the bank account to its ledger account automatically (older
@@ -72,7 +103,28 @@ export async function POST(
     // Pre-flight the FX rate so a missing rate fails cleanly (422) before writes.
     await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
-    const { entry } = await db.transaction(async (tx) => {
+    const { entry, previousJournalEntryId } = await db.transaction(async (tx) => {
+      // Re-categorizing: void the previous categorization entry in the SAME tx
+      // so the GL is never double-counted and the trial balance ties back to
+      // the bank, then post the corrected entry below.
+      if (isEdit && transaction.journalEntryId) {
+        await tx
+          .update(journalEntry)
+          .set({
+            status: "void",
+            voidedAt: new Date(),
+            voidReason: "Re-categorized",
+            deletedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(journalEntry.id, transaction.journalEntryId),
+              eq(journalEntry.organizationId, ctx.organizationId)
+            )
+          );
+      }
+
       const entry = await createCategorizationJournalEntry(
         { organizationId: ctx.organizationId, userId: ctx.userId },
         {
@@ -101,16 +153,21 @@ export async function POST(
         })
         .where(eq(bankTransaction.id, id));
 
-      return { entry };
+      return { entry, previousJournalEntryId: transaction.journalEntryId };
     });
 
     await db.insert(auditLog).values({
       organizationId: ctx.organizationId,
       userId: ctx.userId,
-      action: "categorized",
+      action: isEdit ? "recategorized" : "categorized",
       entityType: "bank_transaction",
       entityId: id,
-      changes: { accountId: parsed.accountId, journalEntryId: entry?.id || null, amount: transaction.amount },
+      changes: {
+        accountId: parsed.accountId,
+        journalEntryId: entry?.id || null,
+        amount: transaction.amount,
+        ...(isEdit ? { previousJournalEntryId } : {}),
+      },
     });
 
     return NextResponse.json({ journalEntryId: entry?.id || null }, { status: 201 });

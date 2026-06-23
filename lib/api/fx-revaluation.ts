@@ -14,6 +14,10 @@ import {
   reverseLegs,
   type SettlementLeg,
 } from "@/lib/currency/convert-entry";
+import { assertNotLocked, PeriodLockedError } from "@/lib/api/period-lock";
+
+/** Either the pool or an open transaction. */
+type Exec = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
 
 /**
  * Period-end unrealised FX revaluation (reverse-and-rebook).
@@ -75,8 +79,8 @@ async function ensureAccount(orgId: string, def: AccountDef, base: string) {
   return findAccount(orgId, def.code);
 }
 
-async function nextEntryNumber(orgId: string) {
-  const [m] = await db
+async function nextEntryNumber(orgId: string, exec: Exec = db) {
+  const [m] = await exec
     .select({
       max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
     })
@@ -136,6 +140,28 @@ export async function processFxRevaluationForOrg(
   const apLegs = revaluationLegs("payable", apDelta);
   if (arLegs.length === 0 && apLegs.length === 0) return { posted: false };
 
+  // Idempotency: if a revaluation for this period-end already exists, don't
+  // post again. The scheduled job retries on failure, so without this a retry
+  // (or a re-run) would double-book the unrealised gain/loss.
+  const already = await db.query.journalEntry.findFirst({
+    where: and(
+      eq(journalEntry.organizationId, orgId),
+      eq(journalEntry.sourceType, "fx_revaluation"),
+      eq(journalEntry.date, asOfDate),
+      isNull(journalEntry.deletedAt)
+    ),
+    columns: { id: true },
+  });
+  if (already) return { posted: false, reason: "already posted" };
+
+  // Don't revalue into a locked/closed period.
+  try {
+    await assertNotLocked(orgId, asOfDate);
+  } catch (err) {
+    if (err instanceof PeriodLockedError) return { posted: false, reason: "period locked" };
+    throw err;
+  }
+
   const [arAccount, apAccount, gainAccount, lossAccount] = await Promise.all([
     findAccount(orgId, "1200"),
     findAccount(orgId, "2100"),
@@ -168,40 +194,47 @@ export async function processFxRevaluationForOrg(
       currencyCode: base,
     }));
 
-  await postEntry(
-    orgId,
-    asOfDate,
-    "fx_revaluation",
-    `Unrealised FX revaluation ${asOfDate}`,
-    (entryId, desc) => [
-      ...buildLines(entryId, arLegs, arAccount.id, desc),
-      ...buildLines(entryId, apLegs, apAccount.id, desc),
-    ]
-  );
+  // Post the revaluation and its reversal atomically, so a crash between them
+  // can never leave a revaluation without its offsetting reversal.
+  await db.transaction(async (tx) => {
+    await postEntry(
+      tx,
+      orgId,
+      asOfDate,
+      "fx_revaluation",
+      `Unrealised FX revaluation ${asOfDate}`,
+      (entryId, desc) => [
+        ...buildLines(entryId, arLegs, arAccount.id, desc),
+        ...buildLines(entryId, apLegs, apAccount.id, desc),
+      ]
+    );
 
-  await postEntry(
-    orgId,
-    reversalDate,
-    "fx_revaluation_reversal",
-    `Reverse unrealised FX revaluation ${asOfDate}`,
-    (entryId, desc) => [
-      ...buildLines(entryId, reverseLegs(arLegs), arAccount.id, desc),
-      ...buildLines(entryId, reverseLegs(apLegs), apAccount.id, desc),
-    ]
-  );
+    await postEntry(
+      tx,
+      orgId,
+      reversalDate,
+      "fx_revaluation_reversal",
+      `Reverse unrealised FX revaluation ${asOfDate}`,
+      (entryId, desc) => [
+        ...buildLines(entryId, reverseLegs(arLegs), arAccount.id, desc),
+        ...buildLines(entryId, reverseLegs(apLegs), apAccount.id, desc),
+      ]
+    );
+  });
 
   return { posted: true };
 }
 
 async function postEntry(
+  exec: Exec,
   orgId: string,
   date: string,
   sourceType: string,
   description: string,
   lines: (entryId: string, desc: string) => (typeof journalLine.$inferInsert)[]
 ) {
-  const entryNumber = await nextEntryNumber(orgId);
-  const [entry] = await db
+  const entryNumber = await nextEntryNumber(orgId, exec);
+  const [entry] = await exec
     .insert(journalEntry)
     .values({
       organizationId: orgId,
@@ -214,7 +247,7 @@ async function postEntry(
       postedAt: new Date(),
     })
     .returning();
-  await db.insert(journalLine).values(lines(entry.id, description));
+  await exec.insert(journalLine).values(lines(entry.id, description));
   return entry;
 }
 

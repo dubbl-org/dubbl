@@ -63,9 +63,11 @@ const targetSchema = z
 const recodeSchema = z.object({
   filter: filterSchema,
   target: targetSchema,
-  // When false (default), posted entries are also recoded. Set true to limit the
-  // recode to draft entries only.
-  draftOnly: z.boolean().optional().default(false),
+  // Defaults to draft-only so a bulk recode never silently overwrites the
+  // account/cost-centre/project on already-posted, already-reported entries
+  // (breaking ledger immutability with no reversing trail). Pass false to
+  // deliberately include posted entries — that path is still audited per line.
+  draftOnly: z.boolean().optional().default(true),
 });
 
 export async function POST(request: Request) {

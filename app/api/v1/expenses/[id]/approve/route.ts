@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { createExpenseClaimApprovalJournalEntry } from "@/lib/api/expense-claims";
 
 export async function POST(
@@ -40,6 +41,9 @@ export async function POST(
     }
 
     const approvedAt = new Date();
+    // Approval posts a GL entry dated today — don't let it land in a locked or
+    // closed period.
+    await assertNotLocked(ctx.organizationId, approvedAt.toISOString().slice(0, 10), ctx);
     // Post the approval entry (DR expense accounts / CR Employee Reimbursements
     // Payable) and flip status to approved atomically, so the obligation is
     // recognized in AP the moment the claim is approved.

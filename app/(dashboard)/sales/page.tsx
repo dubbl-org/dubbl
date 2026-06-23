@@ -3,8 +3,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
-import { Plus, FileText, X, Banknote, Search, Loader2 } from "lucide-react";
+import { Plus, FileText, X, Banknote, Search, Loader2, Send, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -91,8 +93,29 @@ function getOverdueInfo(dueDate: string, status: string) {
   return { label: `${days}d overdue`, color: "text-red-700 font-semibold" };
 }
 
-function buildColumns(): Column<Invoice>[] {
+function buildColumns(
+  selectedIds: Set<string>,
+  toggleOne: (id: string) => void
+): Column<Invoice>[] {
   return [
+    {
+      key: "select",
+      header: "",
+      className: "w-10",
+      render: (r) => (
+        <div
+          // Stop the row's navigation click from firing when ticking the box.
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center"
+        >
+          <Checkbox
+            checked={selectedIds.has(r.id)}
+            onCheckedChange={() => toggleOne(r.id)}
+            aria-label={`Select invoice ${r.invoiceNumber}`}
+          />
+        </div>
+      ),
+    },
     {
       key: "number",
       header: "Number",
@@ -195,10 +218,26 @@ export default function InvoicesPage() {
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Bulk selection of invoice rows.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRunning, setBulkRunning] = useState(false);
+
   const PAGE_SIZE = 50;
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const columns = useMemo(() => buildColumns(), []);
+  const toggleOne = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const columns = useMemo(
+    () => buildColumns(selectedIds, toggleOne),
+    [selectedIds, toggleOne]
+  );
 
   const buildParams = useCallback((p: number) => {
     const params = new URLSearchParams();
@@ -320,6 +359,104 @@ export default function InvoicesPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchKey((k) => k + 1);
   }, [debouncedSearch]);
+
+  // Drop any selected ids that fall out of the current filtered view so the
+  // selection (and the bulk toolbar count) always reflects what's visible.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(filteredInvoices.map((i) => i.id));
+      const next = new Set<string>();
+      for (const id of prev) if (visible.has(id)) next.add(id);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredInvoices]);
+
+  const selectedInvoices = useMemo(
+    () => filteredInvoices.filter((i) => selectedIds.has(i.id)),
+    [filteredInvoices, selectedIds]
+  );
+  // "Reminder-eligible" = something is still owed (not draft/paid/cancelled).
+  const remindableSelected = useMemo(
+    () => selectedInvoices.filter((i) => !["draft", "void", "paid"].includes(i.status)),
+    [selectedInvoices]
+  );
+  // "Mark as sent" only applies to drafts.
+  const draftSelected = useMemo(
+    () => selectedInvoices.filter((i) => i.status === "draft"),
+    [selectedInvoices]
+  );
+
+  const allVisibleSelected =
+    filteredInvoices.length > 0 && selectedIds.size === filteredInvoices.length;
+  const someVisibleSelected = selectedIds.size > 0 && !allVisibleSelected;
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === filteredInvoices.length) return new Set();
+      return new Set(filteredInvoices.map((i) => i.id));
+    });
+  }, [filteredInvoices]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Refresh the visible rows + summary after a bulk action mutates statuses.
+  const refreshList = useCallback(() => {
+    if (!orgId) return;
+    fetch(`/api/v1/invoices?${buildParams(1)}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setInvoices(data.data || []);
+        setTotalCount(data.pagination?.total || 0);
+        setPage(1);
+        setFetchKey((k) => k + 1);
+      })
+      .catch(() => {});
+    fetch(`/api/v1/invoices/summary`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => setSummary(data))
+      .catch(() => {});
+  }, [orgId, buildParams]);
+
+  const runBulkAction = useCallback(
+    async (action: "send-reminder" | "mark-as-sent", ids: string[]) => {
+      if (!orgId || ids.length === 0 || bulkRunning) return;
+      setBulkRunning(true);
+      try {
+        const res = await fetch(`/api/v1/invoices/bulk`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-organization-id": orgId,
+          },
+          body: JSON.stringify({ action, invoiceIds: ids }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(typeof data.error === "string" ? data.error : "Bulk action failed");
+          return;
+        }
+        const s = data.summary || { sent: 0, skipped: 0, failed: 0, total: 0 };
+        const verb = action === "send-reminder" ? "Reminder" : "Invoice";
+        const parts: string[] = [];
+        if (s.sent) parts.push(`${s.sent} ${verb.toLowerCase()}${s.sent !== 1 ? "s" : ""} sent`);
+        if (s.skipped) parts.push(`${s.skipped} skipped`);
+        if (s.failed) parts.push(`${s.failed} failed`);
+        const msg = parts.join(", ") || "Nothing to do";
+        if (s.failed) toast.error(msg);
+        else toast.success(msg);
+        clearSelection();
+        if (action === "mark-as-sent" && s.sent) refreshList();
+      } catch {
+        toast.error("Bulk action failed. Please check your connection.");
+      } finally {
+        setBulkRunning(false);
+      }
+    },
+    [orgId, bulkRunning, clearSelection, refreshList]
+  );
 
   const outstanding = summary?.outstanding || 0;
   const overdue = summary?.overdue || 0;
@@ -564,6 +701,61 @@ export default function InvoicesPage() {
             </Button>
           )}
         </div>
+
+        {/* Bulk-actions toolbar — appears once one or more rows are ticked. */}
+        {!refetching && !pendingSearch && selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+            <Checkbox
+              checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+              onCheckedChange={toggleAll}
+              aria-label="Select all invoices"
+            />
+            <span className="text-xs font-medium">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-border mx-1" />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              disabled={bulkRunning || remindableSelected.length === 0}
+              onClick={() => runBulkAction("send-reminder", remindableSelected.map((i) => i.id))}
+            >
+              {bulkRunning ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <Send className="mr-1.5 size-3.5" />
+              )}
+              Send reminder
+              {remindableSelected.length > 0 && ` (${remindableSelected.length})`}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              disabled={bulkRunning || draftSelected.length === 0}
+              onClick={() => runBulkAction("mark-as-sent", draftSelected.map((i) => i.id))}
+            >
+              {bulkRunning ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-1.5 size-3.5" />
+              )}
+              Mark as sent
+              {draftSelected.length > 0 && ` (${draftSelected.length})`}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs text-muted-foreground ml-auto"
+              onClick={clearSelection}
+              disabled={bulkRunning}
+            >
+              <X className="mr-1 size-3" />
+              Clear
+            </Button>
+          </div>
+        )}
 
         {refetching || pendingSearch ? (
           <BrandLoader className="h-48" />

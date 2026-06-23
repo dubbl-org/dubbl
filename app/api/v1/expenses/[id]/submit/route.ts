@@ -26,9 +26,12 @@ export async function POST(
     });
 
     if (!found) return notFound("Expense claim");
-    if (found.status !== "draft") {
+    // A fresh draft is submitted; a rejected claim that's been corrected is
+    // re-submitted (clearing the previous rejection so it returns to the
+    // approval queue clean).
+    if (found.status !== "draft" && found.status !== "rejected") {
       return NextResponse.json(
-        { error: "Only draft expense claims can be submitted" },
+        { error: "Only draft or rejected expense claims can be submitted" },
         { status: 400 }
       );
     }
@@ -38,6 +41,8 @@ export async function POST(
       .set({
         status: "submitted",
         submittedAt: new Date(),
+        rejectedAt: null,
+        rejectionReason: null,
         updatedAt: new Date(),
       })
       .where(eq(expenseClaim.id, id))

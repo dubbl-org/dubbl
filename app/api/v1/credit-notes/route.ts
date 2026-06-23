@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
-import { decimalToCents } from "@/lib/money";
+import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     // Calculate totals
     let subtotal = 0;
     const processedLines = parsed.lines.map((l, i) => {
-      const grossAmount = decimalToCents(l.quantity * l.unitPrice);
+      const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, parsed.currencyCode);
       const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
       const amount = grossAmount - discountAmount;
       subtotal += amount;
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
       return {
         description: l.description,
         quantity: Math.round(l.quantity * 100),
-        unitPrice: decimalToCents(l.unitPrice),
+        unitPrice: decimalToMinorUnits(l.unitPrice, parsed.currencyCode),
         accountId: l.accountId || null,
         taxRateId,
         discountPercent: l.discountPercent,

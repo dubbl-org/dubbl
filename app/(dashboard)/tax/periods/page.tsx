@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Plus,
   CalendarDays,
@@ -434,10 +435,9 @@ export default function TaxPeriodsPage() {
     }
   }, [orgId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchPeriods();
-  }, [orgId]);
+  }, [fetchPeriods]);
 
   async function handleDelete(id: string) {
     if (!orgId) return;
@@ -592,7 +592,11 @@ export default function TaxPeriodsPage() {
                           "bg-red-50/30 dark:bg-red-950/10"
                       )}
                     >
-                      <td className="px-4 py-2.5 font-medium">{p.name}</td>
+                      <td className="px-4 py-2.5 font-medium">
+                        <Link href={`/tax/periods/${p.id}`} className="hover:underline hover:text-emerald-700 dark:hover:text-emerald-400">
+                          {p.name}
+                        </Link>
+                      </td>
                       <td className="px-4 py-2.5 text-muted-foreground">
                         <span className="whitespace-nowrap">
                           {new Date(p.startDate).toLocaleDateString("en-US", {
