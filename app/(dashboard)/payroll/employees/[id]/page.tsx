@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Trash2, Users, Power, PowerOff } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Users, Power, PowerOff, Plus, DollarSign } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
@@ -51,9 +58,24 @@ interface EmployeeDetail {
 
 interface EmployeeDeduction {
   id: string;
-  deductionType: { name: string; category: string; timing: string };
-  amount: number;
-  isPercentage: boolean;
+  timing: string;
+  amount: number | null;
+  percent: number | null;
+  isActive: boolean;
+  deductionType: {
+    name: string;
+    category: string;
+    defaultAmount: number | null;
+    defaultPercent: number | null;
+  };
+}
+
+interface DeductionTypeOption {
+  id: string;
+  name: string;
+  category: string;
+  defaultAmount: number | null;
+  defaultPercent: number | null;
   isActive: boolean;
 }
 
@@ -106,6 +128,17 @@ export default function EmployeeDetailPage() {
 
   // New section state
   const [deductions, setDeductions] = useState<EmployeeDeduction[]>([]);
+  const [deductionTypes, setDeductionTypes] = useState<DeductionTypeOption[]>([]);
+  const [deductionSheetOpen, setDeductionSheetOpen] = useState(false);
+  const [assigningDeduction, setAssigningDeduction] = useState(false);
+  const [deductionForm, setDeductionForm] = useState({
+    deductionTypeId: "",
+    timing: "recurring",
+    amount: "",
+    percent: "",
+    startDate: "",
+    endDate: "",
+  });
   const [taxConfig, setTaxConfig] = useState<TaxConfig | null>(null);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [compensationBand, setCompensationBand] = useState<CompensationBand | null>(null);
@@ -177,7 +210,14 @@ export default function EmployeeDetailPage() {
     fetch(`/api/v1/payroll/employees/${id}/deductions`, { headers })
       .then((r) => r.json())
       .then((data) => {
-        if (data.deductions) setDeductions(data.deductions);
+        if (data.data) setDeductions(data.data);
+      })
+      .catch(() => {});
+
+    fetch(`/api/v1/payroll/deductions/types`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) setDeductionTypes(data.data);
       })
       .catch(() => {});
 
@@ -216,6 +256,60 @@ export default function EmployeeDetailPage() {
       })
       .catch(() => {});
   }, [orgId, emp?.compensationBandId]);
+
+  async function handleAssignDeduction() {
+    if (!orgId) return;
+    if (!deductionForm.deductionTypeId) {
+      toast.error("Select a deduction type");
+      return;
+    }
+    setAssigningDeduction(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/employees/${id}/deductions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": orgId,
+        },
+        body: JSON.stringify({
+          deductionTypeId: deductionForm.deductionTypeId,
+          timing: deductionForm.timing,
+          amount: deductionForm.amount
+            ? Math.round(parseFloat(deductionForm.amount) * 100)
+            : undefined,
+          percent: deductionForm.percent
+            ? parseFloat(deductionForm.percent)
+            : undefined,
+          startDate: deductionForm.startDate || undefined,
+          endDate: deductionForm.endDate || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Failed to assign deduction");
+      }
+      // The POST response doesn't include the joined deduction type, so refetch the list.
+      const listRes = await fetch(`/api/v1/payroll/employees/${id}/deductions`, {
+        headers: { "x-organization-id": orgId },
+      });
+      const listData = await listRes.json();
+      if (listData.data) setDeductions(listData.data);
+      toast.success("Deduction assigned");
+      setDeductionSheetOpen(false);
+      setDeductionForm({
+        deductionTypeId: "",
+        timing: "recurring",
+        amount: "",
+        percent: "",
+        startDate: "",
+        endDate: "",
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign deduction");
+    } finally {
+      setAssigningDeduction(false);
+    }
+  }
 
   async function handleSaveTaxConfig() {
     if (!orgId) return;
@@ -550,57 +644,208 @@ export default function EmployeeDetailPage() {
 
         {/* Deductions */}
         <Section title="Deductions" description="Assigned deductions for this employee. Manage deduction types in settings.">
-          {deductions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No deductions assigned.</p>
-          ) : (
-            <div className="space-y-2">
-              {deductions.map((d) => (
-                <div
-                  key={d.id}
-                  className="flex items-center justify-between rounded-md border px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{d.deductionType.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className="text-[11px]">
-                          {d.deductionType.category}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[11px]",
-                            d.deductionType.timing === "pre_tax"
-                              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                          )}
-                        >
-                          {d.deductionType.timing === "pre_tax" ? "Pre-tax" : "Post-tax"}
-                        </Badge>
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeductionSheetOpen(true)}
+              >
+                <Plus className="mr-1.5 size-3.5" />
+                Assign Deduction
+              </Button>
+            </div>
+            {deductions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No deductions assigned.</p>
+            ) : (
+              <div className="space-y-2">
+                {deductions.map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex items-center justify-between rounded-md border px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{d.deductionType.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge variant="outline" className="text-[11px]">
+                            {d.timing === "one_time" ? "One-time" : "Recurring"}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[11px]",
+                              d.deductionType.category === "pre_tax"
+                                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            )}
+                          >
+                            {d.deductionType.category === "pre_tax" ? "Pre-tax" : "Post-tax"}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-mono tabular-nums">
+                        {d.percent != null
+                          ? `${d.percent}%`
+                          : d.amount != null
+                            ? formatMoney(d.amount)
+                            : d.deductionType.defaultPercent != null
+                              ? `${d.deductionType.defaultPercent}%`
+                              : d.deductionType.defaultAmount != null
+                                ? formatMoney(d.deductionType.defaultAmount)
+                                : "—"}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[11px]",
+                          d.isActive
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            : ""
+                        )}
+                      >
+                        {d.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-mono tabular-nums">
-                      {d.isPercentage ? `${d.amount}%` : formatMoney(d.amount)}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[11px]",
-                        d.isActive
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                          : ""
-                      )}
-                    >
-                      {d.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </Section>
+
+        {/* Assign Deduction Drawer */}
+        <Sheet open={deductionSheetOpen} onOpenChange={setDeductionSheetOpen}>
+          <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
+            <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  <DollarSign className="size-5" />
+                </div>
+                <div>
+                  <SheetTitle>Assign Deduction</SheetTitle>
+                  <SheetDescription>
+                    Apply a deduction type to this employee&apos;s pay.
+                  </SheetDescription>
+                </div>
+              </div>
+            </SheetHeader>
+            <form onSubmit={(e) => { e.preventDefault(); handleAssignDeduction(); }}>
+              <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
+                <div className="space-y-2">
+                  <Label>Deduction Type</Label>
+                  <Select
+                    value={deductionForm.deductionTypeId}
+                    onValueChange={(v) =>
+                      setDeductionForm((f) => ({ ...f, deductionTypeId: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select deduction type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deductionTypes
+                        .filter((t) => t.isActive)
+                        .map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {deductionTypes.filter((t) => t.isActive).length === 0 && (
+                    <p className="text-[12px] text-muted-foreground">
+                      No deduction types yet — create one in Payroll → Settings first.
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Timing</Label>
+                  <Select
+                    value={deductionForm.timing}
+                    onValueChange={(v) =>
+                      setDeductionForm((f) => ({ ...f, timing: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recurring">Recurring</SelectItem>
+                      <SelectItem value="one_time">One-time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Amount ($)</Label>
+                    <CurrencyInput
+                      prefix="$"
+                      value={deductionForm.amount}
+                      onChange={(v) =>
+                        setDeductionForm((f) => ({ ...f, amount: v }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Percent (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={deductionForm.percent}
+                      onChange={(e) =>
+                        setDeductionForm((f) => ({ ...f, percent: e.target.value }))
+                      }
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </Section>
+                <p className="text-[12px] text-muted-foreground -mt-2">
+                  Optional — overrides the type&apos;s default. Leave both blank to use the default.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={deductionForm.startDate}
+                      onChange={(e) =>
+                        setDeductionForm((f) => ({ ...f, startDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={deductionForm.endDate}
+                      onChange={(e) =>
+                        setDeductionForm((f) => ({ ...f, endDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="border-t px-4 py-3 sm:px-6 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeductionSheetOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={assigningDeduction}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {assigningDeduction ? "Assigning..." : "Assign"}
+                </Button>
+              </div>
+            </form>
+          </SheetContent>
+        </Sheet>
 
         <div className="h-px bg-border" />
 
