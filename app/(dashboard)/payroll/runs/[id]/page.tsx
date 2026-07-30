@@ -52,6 +52,7 @@ interface PayrollRunDetail {
 
 interface PayrollItemRow {
   id: string;
+  employeeId: string;
   grossAmount: number;
   taxAmount: number;
   deductions: number;
@@ -630,7 +631,7 @@ export default function PayrollRunDetailPage() {
                     <SelectContent>
                       {(run.items || []).map((item) =>
                         item.employee ? (
-                          <SelectItem key={item.id} value={item.id}>
+                          <SelectItem key={item.id} value={item.employeeId}>
                             {item.employee.name} ({item.employee.employeeNumber})
                           </SelectItem>
                         ) : null
