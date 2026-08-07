@@ -287,7 +287,7 @@ export default function AssetCategoriesPage() {
         r.isActive ? (
           <Badge
             variant="outline"
-            className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+            className="border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
           >
             active
           </Badge>
@@ -332,7 +332,7 @@ export default function AssetCategoriesPage() {
         </div>
         <Button
           onClick={openCreate}
-          className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+          className="bg-primary hover:bg-primary/90 shrink-0"
         >
           <Plus className="mr-2 size-4" />
           New Category
@@ -588,7 +588,7 @@ export default function AssetCategoriesPage() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {editingId ? "Save changes" : "Create category"}

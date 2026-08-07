@@ -66,7 +66,7 @@ const statusConfig: Record<string, { class: string }> = {
   draft: { class: "" },
   sent: { class: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" },
   partial: { class: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300" },
-  received: { class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
+  received: { class: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary" },
   closed: { class: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300" },
   void: { class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300" },
 };
@@ -87,7 +87,7 @@ const statusLabels: Record<string, string> = {
 
 function DrawerIcon({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
       {children}
     </div>
   );
@@ -118,7 +118,7 @@ function DrawerFooter({
       <Button
         type="submit"
         disabled={saving}
-        className="bg-emerald-600 hover:bg-emerald-700"
+        className="bg-primary hover:bg-primary/90"
       >
         {saving ? "Saving..." : label}
       </Button>
@@ -471,7 +471,7 @@ export default function PODetailPage() {
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="mr-2 size-3.5" />Edit
                 </Button>
-                <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+                <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-primary hover:bg-primary/90">
                   <Send className="mr-2 size-3.5" />Send
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600 hover:text-red-700">
@@ -490,7 +490,7 @@ export default function PODetailPage() {
               </Button>
             )}
             {["sent", "partial", "received"].includes(po.status) && (
-              <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700" title="Turn this order into a bill you can pay">
+              <Button size="sm" onClick={handleConvert} className="bg-primary hover:bg-primary/90" title="Turn this order into a bill you can pay">
                 <ShoppingCart className="mr-2 size-3.5" />Create a bill from this order
               </Button>
             )}

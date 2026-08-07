@@ -275,7 +275,7 @@ export default function VatReturnPage() {
                 </span>
                 <span className={cn(
                   "font-mono text-sm tabular-nums font-semibold",
-                  netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                  netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-primary dark:text-primary"
                 )}>
                   {formatMoney(Math.abs(netVat))}
                 </span>
@@ -288,7 +288,7 @@ export default function VatReturnPage() {
             "rounded-xl border-2 p-5",
             netVat >= 0
               ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
-              : "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+              : "border-primary/20 bg-accent dark:border-primary/20 dark:bg-accent"
           )}>
             <div className="flex items-center justify-between">
               <div>
@@ -297,7 +297,7 @@ export default function VatReturnPage() {
                 </p>
                 <p className={cn(
                   "mt-1 text-2xl font-bold font-mono tabular-nums",
-                  netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                  netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-primary dark:text-primary"
                 )}>
                   {formatMoney(Math.abs(netVat))}
                 </p>
@@ -306,12 +306,12 @@ export default function VatReturnPage() {
                 "flex size-12 items-center justify-center rounded-xl",
                 netVat >= 0
                   ? "bg-red-100 dark:bg-red-900/40"
-                  : "bg-emerald-100 dark:bg-emerald-900/40"
+                  : "bg-accent dark:bg-primary"
               )}>
                 {netVat >= 0 ? (
                   <ArrowUpRight className="size-5 text-red-600 dark:text-red-400" />
                 ) : (
-                  <ArrowDownLeft className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  <ArrowDownLeft className="size-5 text-primary dark:text-primary" />
                 )}
               </div>
             </div>
@@ -347,7 +347,7 @@ export default function VatReturnPage() {
                       <div className={cn(
                         "flex size-8 items-center justify-center rounded-md text-xs font-bold font-mono",
                         isKey
-                          ? "bg-emerald-600 text-white dark:bg-emerald-500"
+                          ? "bg-primary text-white dark:bg-primary"
                           : "bg-muted text-muted-foreground"
                       )}>
                         {b.box}
@@ -364,7 +364,7 @@ export default function VatReturnPage() {
                         "font-mono text-sm tabular-nums",
                         isKey && "text-base font-bold",
                         isKey && netVat >= 0 && "text-red-600 dark:text-red-400",
-                        isKey && netVat < 0 && "text-emerald-600 dark:text-emerald-400",
+                        isKey && netVat < 0 && "text-primary dark:text-primary",
                         !isKey && "font-medium"
                       )}>
                         {formatMoney(Math.abs(b.amount))}
@@ -378,7 +378,7 @@ export default function VatReturnPage() {
                     key={b.box}
                     className={cn(
                       i < boxes.length - 1 && "border-b",
-                      isKey && "bg-emerald-50/60 dark:bg-emerald-950/20",
+                      isKey && "bg-accent dark:bg-accent",
                       isCalc && !isKey && "bg-muted/30"
                     )}
                   >

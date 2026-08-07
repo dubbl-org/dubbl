@@ -201,7 +201,7 @@ export default function BankSettingsPage() {
         <div className="h-px bg-border" />
 
         <div className="flex justify-end">
-          <Button type="submit" size="sm" loading={saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button type="submit" size="sm" loading={saving} className="bg-primary hover:bg-primary/90">
             Save changes
           </Button>
         </div>

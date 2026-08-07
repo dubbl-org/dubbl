@@ -273,7 +273,7 @@ export default function MilestonesPage() {
           <p className="text-lg font-bold font-mono tabular-nums mt-0.5">{completed}/{total}</p>
           {total > 0 && (
             <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-2">
-              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct(completed, total)}%` }} />
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct(completed, total)}%` }} />
             </div>
           )}
         </div>
@@ -283,7 +283,7 @@ export default function MilestonesPage() {
         </div>
         <div className="rounded-lg border bg-card p-3">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Completed Value</p>
-          <p className="text-lg font-bold font-mono tabular-nums text-emerald-600 mt-0.5">{formatMoney(completedAmount)}</p>
+          <p className="text-lg font-bold font-mono tabular-nums text-primary mt-0.5">{formatMoney(completedAmount)}</p>
         </div>
         {isBillable && (
           <div className="rounded-lg border bg-card p-3">
@@ -304,7 +304,7 @@ export default function MilestonesPage() {
             <FileText className="size-3.5" />Create Invoice
           </Button>
         )}
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
+        <Button size="sm" className="bg-primary hover:bg-primary/90 h-8" onClick={() => setAddOpen(true)}>
           <Plus className="size-3.5" />Milestone
         </Button>
       </div>
@@ -314,7 +314,7 @@ export default function MilestonesPage() {
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Target className="size-5" />
               </div>
               <div>
@@ -354,7 +354,7 @@ export default function MilestonesPage() {
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving || !title.trim()} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleAdd} disabled={saving || !title.trim()} className="bg-primary hover:bg-primary/90">
               {saving ? "Creating..." : "Create Milestone"}
             </Button>
           </div>
@@ -377,9 +377,9 @@ export default function MilestonesPage() {
                   {togglingId === ms.id ? (
                     <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />
                   ) : ms.status === "completed" ? (
-                    <CheckCircle2 className="size-5 text-emerald-500" />
+                    <CheckCircle2 className="size-5 text-primary" />
                   ) : (
-                    <Target className="size-5 text-muted-foreground/40 hover:text-emerald-400 transition-colors" />
+                    <Target className="size-5 text-muted-foreground/40 hover:text-primary transition-colors" />
                   )}
                 </button>
                 <div className="flex-1 min-w-0">
@@ -400,7 +400,7 @@ export default function MilestonesPage() {
                     )}
                   </div>
                 )}
-                <button onClick={() => { setAssignMilestoneId(ms.id); setAssignments([]); }} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-emerald-600 transition-opacity" title="Manage Assignments">
+                <button onClick={() => { setAssignMilestoneId(ms.id); setAssignments([]); }} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity" title="Manage Assignments">
                   <Users className="size-3" />
                 </button>
                 <button onClick={() => deleteMilestone(ms.id)} disabled={deletingId === ms.id} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingId === ms.id && "opacity-100 pointer-events-none")}>
@@ -417,7 +417,7 @@ export default function MilestonesPage() {
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Users className="size-5" />
               </div>
               <div>
@@ -446,7 +446,7 @@ export default function MilestonesPage() {
                       </div>
                       <span className="text-[11px] font-mono text-muted-foreground shrink-0">{formatMoney(a.amount)}</span>
                       {a.paid ? (
-                        <Badge variant="outline" className="text-[9px] h-4 bg-emerald-50 text-emerald-700 border-emerald-200">Paid</Badge>
+                        <Badge variant="outline" className="text-[9px] h-4 bg-accent text-primary border-primary/20">Paid</Badge>
                       ) : (
                         <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => markAssignmentPaid(a.id)}>
                           <DollarSign className="size-3 mr-1" />Mark Paid
@@ -489,7 +489,7 @@ export default function MilestonesPage() {
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAssignMilestoneId(null)}>Close</Button>
-            <Button onClick={handleAddAssignment} disabled={assignSaving || assignMemberId === "none"} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleAddAssignment} disabled={assignSaving || assignMemberId === "none"} className="bg-primary hover:bg-primary/90">
               {assignSaving ? "Adding..." : "Add Assignment"}
             </Button>
           </div>
@@ -621,7 +621,7 @@ export default function MilestonesPage() {
                         </div>
                         <div className="flex items-center justify-between text-[13px]">
                           <span className="text-muted-foreground">Remaining</span>
-                          <span className="font-mono tabular-nums font-medium text-emerald-600">{formatMoney(uninvoicedData.remaining ?? 0)}</span>
+                          <span className="font-mono tabular-nums font-medium text-primary">{formatMoney(uninvoicedData.remaining ?? 0)}</span>
                         </div>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">

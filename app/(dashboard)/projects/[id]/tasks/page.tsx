@@ -304,7 +304,7 @@ export default function TasksPage() {
               <Columns3 className="size-3.5" />
             </button>
           </div>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
+          <Button size="sm" className="bg-primary hover:bg-primary/90 h-8" onClick={() => setAddOpen(true)}>
             <Plus className="size-3.5" />Task
           </Button>
         </div>
@@ -315,7 +315,7 @@ export default function TasksPage() {
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Plus className="size-5" />
               </div>
               <div>
@@ -459,7 +459,7 @@ export default function TasksPage() {
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving || !title.trim()} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleAdd} disabled={saving || !title.trim()} className="bg-primary hover:bg-primary/90">
               {saving ? "Creating..." : "Create Task"}
             </Button>
           </div>
@@ -572,9 +572,9 @@ function TaskListView({ tasks, proj, labels, onToggle, onDelete, onView, togglin
               {togglingId === task.id ? (
                 <Loader2 className="size-4 text-muted-foreground/40 animate-spin" />
               ) : task.status === "done" ? (
-                <CheckCircle2 className="size-4 text-emerald-500" />
+                <CheckCircle2 className="size-4 text-primary" />
               ) : (
-                <CircleDashed className="size-4 text-muted-foreground/40 hover:text-emerald-400 transition-colors" />
+                <CircleDashed className="size-4 text-muted-foreground/40 hover:text-primary transition-colors" />
               )}
             </button>
             <div className="flex-1 min-w-0">
@@ -776,11 +776,11 @@ function TaskDetailDrawer({
                 <Loader2 className="size-5 animate-spin" />
               </div>
             ) : task.status === "done" ? (
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <CheckCircle2 className="size-5" />
               </div>
             ) : (
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600 transition-colors">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground hover:bg-accent hover:text-primary transition-colors">
                 <CircleDashed className="size-5" />
               </div>
             )}
@@ -926,7 +926,7 @@ function TaskDetailDrawer({
           </div>
           {checklist.length > 0 && (
             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${checklist.length > 0 ? (checkDone / checklist.length) * 100 : 0}%` }} />
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${checklist.length > 0 ? (checkDone / checklist.length) * 100 : 0}%` }} />
             </div>
           )}
           <div className="space-y-1">
@@ -978,7 +978,7 @@ function TaskDetailDrawer({
             />
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
               onClick={() => onAddComment(task.id)}
               disabled={commentSaving || !newComment.trim()}
             >
@@ -1017,7 +1017,7 @@ function TaskDetailDrawer({
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { onToggleStatus(task.id, task.status); onClose(); }} disabled={togglingId === task.id}>
+          <Button className="bg-primary hover:bg-primary/90" onClick={() => { onToggleStatus(task.id, task.status); onClose(); }} disabled={togglingId === task.id}>
             {togglingId === task.id ? "Saving..." : task.status === "done" ? "Reopen Task" : "Mark Done"}
           </Button>
         </div>

@@ -33,7 +33,7 @@ function AnimatedBeams() {
             ease: "linear",
           }}
         >
-          <div className="h-full w-full bg-gradient-to-b from-transparent via-emerald-400/30 to-transparent shadow-[0_0_8px_1px_rgba(52,211,153,0.2)]" />
+          <div className="h-full w-full bg-gradient-to-b from-transparent via-primary to-transparent shadow-[0_0_8px_1px_rgba(52,211,153,0.2)]" />
         </motion.div>
       ))}
     </>
@@ -44,7 +44,7 @@ function RadialGlows() {
   return (
     <>
       <motion.div
-        className="absolute top-[15%] left-[25%] h-[350px] w-[350px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.05] blur-[120px]"
+        className="absolute top-[15%] left-[25%] h-[350px] w-[350px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary[0.05] blur-[120px]"
         animate={{ opacity: [0.3, 0.6, 0.3], scale: [0.95, 1.05, 0.95] }}
         transition={{
           duration: 7,

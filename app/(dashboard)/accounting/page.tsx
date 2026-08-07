@@ -48,7 +48,7 @@ interface Entry {
 
 const statusColors: Record<string, string> = {
   posted:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   draft: "",
   void: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
@@ -219,7 +219,7 @@ export default function TransactionsPage() {
           <Button
             onClick={() => openDrawer("entry")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New manual entry
@@ -252,8 +252,8 @@ export default function TransactionsPage() {
                   icon: BarChart3,
                   label: "Generate reports",
                   sub: "View trial balance, income statement, and more",
-                  color: "bg-emerald-500",
-                  ring: "ring-emerald-200 dark:ring-emerald-900",
+                  color: "bg-primary",
+                  ring: "ring-primary dark:ring-primary",
                 },
               ].map(({ step, icon: StepIcon, label, sub, color, ring }, i) => (
                 <div
@@ -291,7 +291,7 @@ export default function TransactionsPage() {
             <Button
               onClick={() => openDrawer("entry")}
               size="lg"
-              className="mt-5 bg-emerald-600 hover:bg-emerald-700"
+              className="mt-5 bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New manual entry
@@ -341,7 +341,7 @@ export default function TransactionsPage() {
           {/* In your books count */}
           <div>
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <CheckCircle2 className="size-3 text-emerald-500" />
+              <CheckCircle2 className="size-3 text-primary" />
               In your books
             </p>
             <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
@@ -375,7 +375,7 @@ export default function TransactionsPage() {
         <Button
           onClick={() => openDrawer("entry")}
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+          className="bg-primary hover:bg-primary/90 shrink-0"
         >
           <Plus className="mr-2 size-4" />
           New manual entry

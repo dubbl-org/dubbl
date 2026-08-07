@@ -221,7 +221,7 @@ export function BulkImportWizard({
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
               <Upload className="size-5" />
             </div>
             <div>
@@ -243,7 +243,7 @@ export function BulkImportWizard({
                 <div key={label} className="flex items-center gap-1.5">
                   <div className={`flex size-5 items-center justify-center rounded-full text-[10px] font-medium transition-colors ${
                     i <= stepIndex
-                      ? "bg-emerald-600 text-white dark:bg-emerald-500"
+                      ? "bg-primary text-white dark:bg-primary"
                       : "bg-muted text-muted-foreground"
                   }`}>
                     {i + 1}
@@ -264,8 +264,8 @@ export function BulkImportWizard({
             <div
               className={`flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors cursor-pointer ${
                 dragActive
-                  ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
-                  : "border-border hover:border-emerald-500/40 hover:bg-muted/50"
+                  ? "border-primary bg-accent dark:bg-accent"
+                  : "border-border hover:border-primary hover:bg-muted/50"
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
               onDragLeave={() => setDragActive(false)}
@@ -368,7 +368,7 @@ export function BulkImportWizard({
                         <TableCell className="text-xs tabular-nums">{p.row}</TableCell>
                         <TableCell>
                           {p.valid
-                            ? <CheckCircle2 className="size-3.5 text-emerald-500" />
+                            ? <CheckCircle2 className="size-3.5 text-primary" />
                             : <XCircle className="size-3.5 text-destructive" />
                           }
                         </TableCell>
@@ -397,7 +397,7 @@ export function BulkImportWizard({
             <div className="space-y-4">
               <div className="flex items-center gap-6 rounded-lg border p-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-emerald-600 tabular-nums">{result.processedRows}</p>
+                  <p className="text-2xl font-bold text-primary tabular-nums">{result.processedRows}</p>
                   <p className="text-[11px] text-muted-foreground">Imported</p>
                 </div>
                 {result.errorRows > 0 && (
@@ -444,7 +444,7 @@ export function BulkImportWizard({
                 <Button
                   size="sm"
                   disabled={loading || !allRequiredMapped}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                   onClick={handlePreview}
                 >
                   {loading ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
@@ -455,7 +455,7 @@ export function BulkImportWizard({
                 <Button
                   size="sm"
                   disabled={validCount === 0}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                   onClick={handleImport}
                 >
                   Import {validCount} rows
@@ -464,7 +464,7 @@ export function BulkImportWizard({
               {step === "results" && (
                 <Button
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                   onClick={() => { reset(); onOpenChange(false); }}
                 >
                   Done

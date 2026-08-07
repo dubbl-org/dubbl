@@ -138,7 +138,7 @@ export default function InventoryItemSuppliersPage() {
           description="Link suppliers to track purchasing sources and lead times."
           compact
         >
-          <Button size="sm" onClick={() => setLinkOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button size="sm" onClick={() => setLinkOpen(true)} className="bg-primary hover:bg-primary/90">
             <Link2 className="mr-1.5 size-3.5" />
             Link Supplier
           </Button>
@@ -161,7 +161,7 @@ export default function InventoryItemSuppliersPage() {
                     <span className="text-xs text-muted-foreground">Price: {formatMoney(s.purchasePrice)}</span>
                   )}
                   {s.isPreferred && (
-                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px]">
+                    <Badge variant="outline" className="border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary text-[10px]">
                       Preferred
                     </Badge>
                   )}
@@ -232,7 +232,7 @@ export default function InventoryItemSuppliersPage() {
           </div>
           <SheetFooter>
             <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={handleLink} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleLink} className="bg-primary hover:bg-primary/90">
               Link Supplier
             </Button>
           </SheetFooter>

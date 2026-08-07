@@ -206,7 +206,7 @@ export default function PaymentDetailPage() {
             <DialogTrigger asChild>
               <Button
                 size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
                 title="Put the leftover money from this payment toward an open invoice"
                 onClick={() => setApplyAmount(minorUnitsToDecimal(unallocated, cur))}
               >
@@ -254,7 +254,7 @@ export default function PaymentDetailPage() {
                   onClick={handleAllocate}
                   loading={applyLoading}
                   disabled={!applyInvoiceId}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-primary hover:bg-primary/90"
                 >
                   Put toward the invoice
                 </Button>
@@ -278,14 +278,14 @@ export default function PaymentDetailPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border p-4">
           <div className="flex items-center gap-2">
-            <Banknote className="size-3.5 text-emerald-600" />
+            <Banknote className="size-3.5 text-primary" />
             <p className="text-xs text-muted-foreground">Payment amount</p>
           </div>
           <p className="text-xl font-bold font-mono mt-1">{formatMoney(pmt.amount, cur)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Put toward invoices</p>
-          <p className="text-xl font-bold font-mono text-emerald-600 mt-1">{formatMoney(allocatedTotal, cur)}</p>
+          <p className="text-xl font-bold font-mono text-primary mt-1">{formatMoney(allocatedTotal, cur)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <div className="flex items-center gap-2">
@@ -333,7 +333,7 @@ export default function PaymentDetailPage() {
                       <span className="text-muted-foreground">· {inv.contact.name}</span>
                     )}
                   </div>
-                  <span className="font-mono text-sm tabular-nums font-medium text-emerald-600">
+                  <span className="font-mono text-sm tabular-nums font-medium text-primary">
                     {formatMoney(a.amount, cur)}
                   </span>
                 </li>

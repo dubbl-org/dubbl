@@ -313,7 +313,7 @@ export default function CRMPage() {
             <Button
               onClick={handleSetupPipeline}
               disabled={setupLoading}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               {setupLoading ? "Setting up..." : "Create Pipeline"}
@@ -361,7 +361,7 @@ export default function CRMPage() {
                 <div className="mt-4 h-px bg-border" />
                 <div className="mt-3 flex items-center justify-between">
                   <p className="text-[11px] text-muted-foreground font-mono tabular-nums">3 deals · $192,500 in pipeline</p>
-                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                  <Badge variant="outline" className="text-[10px] bg-accent text-primary border-primary/20 dark:bg-accent dark:text-primary dark:border-primary/20">
                     55% avg. probability
                   </Badge>
                 </div>
@@ -374,7 +374,7 @@ export default function CRMPage() {
               </p>
               {[
                 { title: "Track deals through stages", desc: "Create deals, assign contacts, and drag them through your customizable pipeline stages.", icon: Handshake, color: "border-l-blue-400" },
-                { title: "Forecast revenue", desc: "Set deal values and win probabilities to project expected revenue across your pipeline.", icon: DollarSign, color: "border-l-emerald-400" },
+                { title: "Forecast revenue", desc: "Set deal values and win probabilities to project expected revenue across your pipeline.", icon: DollarSign, color: "border-l-primary" },
                 { title: "Log every interaction", desc: "Record calls, emails, meetings, and notes so you never lose context on a deal.", icon: Users, color: "border-l-orange-400" },
                 { title: "Analyze performance", desc: "Track conversion rates, deal velocity, and stage distribution at a glance.", icon: BarChart3, color: "border-l-violet-400" },
               ].map(({ title, desc, icon: Icon, color }) => (
@@ -419,7 +419,7 @@ export default function CRMPage() {
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="font-mono tabular-nums">{summary.activeCount} active</span>
               {summary.wonCount > 0 && (
-                <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono tabular-nums text-primary dark:text-primary">
                   {summary.wonCount} won · {formatMoney(summary.wonValue)}
                 </span>
               )}

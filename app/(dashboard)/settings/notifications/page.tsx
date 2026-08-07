@@ -24,7 +24,7 @@ import { toast } from "sonner";
 
 const NOTIFICATION_TYPES = [
   { type: "invoice_overdue", label: "Invoice Overdue", description: "When an invoice passes its due date", icon: FileText, color: "text-red-500 bg-red-500/10" },
-  { type: "payment_received", label: "Payment Received", description: "When a payment is recorded", icon: DollarSign, color: "text-emerald-500 bg-emerald-500/10" },
+  { type: "payment_received", label: "Payment Received", description: "When a payment is recorded", icon: DollarSign, color: "text-primary bg-primary" },
   { type: "inventory_low", label: "Low Inventory", description: "When stock falls below minimum threshold", icon: Package, color: "text-amber-500 bg-amber-500/10" },
   { type: "payroll_due", label: "Payroll Due", description: "When a payroll run is approaching", icon: Landmark, color: "text-blue-500 bg-blue-500/10" },
   { type: "approval_needed", label: "Approval Needed", description: "When something requires your approval", icon: ShieldCheck, color: "text-purple-500 bg-purple-500/10" },

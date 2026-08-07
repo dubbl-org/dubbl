@@ -297,7 +297,7 @@ export default function ApprovalWorkflowsPage() {
         <Button
           size="sm"
           onClick={openCreate}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-1.5 size-3.5" />
           Create Workflow
@@ -585,7 +585,7 @@ export default function ApprovalWorkflowsPage() {
                 steps.some((s) => !s.approverId) ||
                 saving
               }
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />

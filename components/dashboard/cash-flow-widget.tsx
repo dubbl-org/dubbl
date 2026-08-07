@@ -55,7 +55,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
             className={cn(
               "font-mono tabular-nums font-medium",
               entry.dataKey === "inflows"
-                ? "text-emerald-600"
+                ? "text-primary"
                 : entry.dataKey === "outflows"
                 ? "text-red-600"
                 : ""
@@ -232,7 +232,7 @@ export function CashFlowWidget() {
           <div className="mt-4 grid grid-cols-3 gap-4 border-t pt-4">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Expected In</p>
-              <p className="text-sm font-bold font-mono tabular-nums text-emerald-600">
+              <p className="text-sm font-bold font-mono tabular-nums text-primary">
                 {formatMoney(forecast.totalInflows)}
               </p>
             </div>
@@ -248,7 +248,7 @@ export function CashFlowWidget() {
                 className={cn(
                   "text-sm font-bold font-mono tabular-nums",
                   forecast.netForecast >= 0
-                    ? "text-emerald-600"
+                    ? "text-primary"
                     : "text-red-600"
                 )}
               >

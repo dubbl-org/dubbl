@@ -311,7 +311,7 @@ export default function InventoryItemDetailsPage() {
             type="submit"
             size="sm"
             disabled={saving}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? (
               <>
@@ -455,7 +455,7 @@ export default function InventoryItemDetailsPage() {
           </div>
           <SheetFooter>
             <Button variant="outline" onClick={() => setRevalueOpen(false)}>Cancel</Button>
-            <Button onClick={handleRevalue} disabled={revalueBusy} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleRevalue} disabled={revalueBusy} className="bg-primary hover:bg-primary/90">
               Revalue stock
             </Button>
           </SheetFooter>

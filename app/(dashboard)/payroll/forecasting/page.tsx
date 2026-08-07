@@ -100,7 +100,7 @@ export default function ForecastingPage() {
         </motion.div>
         <motion.div {...anim(0.05)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">12-Month Net</p>
-          <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(totalNet)}</p>
+          <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-primary dark:text-primary">{formatMoney(totalNet)}</p>
         </motion.div>
         <motion.div {...anim(0.1)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Headcount</p>
@@ -166,12 +166,12 @@ export default function ForecastingPage() {
             </div>
             <div className="rounded-xl border bg-card p-4">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Projected Monthly</p>
-              <p className="mt-1 text-xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(whatIf.projected.monthlyGross)}</p>
+              <p className="mt-1 text-xl font-bold font-mono tabular-nums text-primary dark:text-primary">{formatMoney(whatIf.projected.monthlyGross)}</p>
               <p className="text-xs text-muted-foreground">{whatIf.projected.headcount} employees</p>
             </div>
             <div className="rounded-xl border bg-card p-4">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Difference</p>
-              <p className={`mt-1 text-xl font-bold font-mono tabular-nums ${whatIf.difference.monthlyGross >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+              <p className={`mt-1 text-xl font-bold font-mono tabular-nums ${whatIf.difference.monthlyGross >= 0 ? "text-red-600 dark:text-red-400" : "text-primary dark:text-primary"}`}>
                 {whatIf.difference.monthlyGross >= 0 ? "+" : ""}{formatMoney(whatIf.difference.monthlyGross)}
               </p>
               <p className="text-xs text-muted-foreground">per month</p>

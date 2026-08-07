@@ -162,14 +162,14 @@ function PerformanceTable({
               return (
                 <tr key={e.contactId} className="border-b last:border-b-0">
                   <td className="px-4 py-2.5 font-medium">{e.contactName}</td>
-                  <td className={cn("px-4 py-2.5 text-right font-mono tabular-nums font-medium", overTerms ? "text-red-600" : "text-emerald-600")}>
+                  <td className={cn("px-4 py-2.5 text-right font-mono tabular-nums font-medium", overTerms ? "text-red-600" : "text-primary")}>
                     {e.avgDays}d
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">{e.avgTermDays}d</td>
                   <td className="px-4 py-2.5 text-right text-muted-foreground">{getCount(e)}</td>
                   <td className="px-4 py-2.5 text-right font-mono tabular-nums">{formatMoney(getTotal(e))}</td>
                   <td className="px-4 py-2.5 text-right text-red-600">{e.lateCount > 0 ? e.lateCount : "-"}</td>
-                  <td className={cn("px-4 py-2.5 text-right font-mono tabular-nums", e.onTimeRate >= 80 ? "text-emerald-600" : "text-red-600")}>
+                  <td className={cn("px-4 py-2.5 text-right font-mono tabular-nums", e.onTimeRate >= 80 ? "text-primary" : "text-red-600")}>
                     {e.onTimeRate}%
                   </td>
                 </tr>

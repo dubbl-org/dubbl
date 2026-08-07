@@ -46,13 +46,13 @@ const ENTITY_ICONS: Record<string, LucideIcon> = {
 };
 
 const ACTION_CONFIG: Record<string, { icon: LucideIcon; color: string; bg: string }> = {
-  created: { icon: Plus, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40 ring-emerald-100 dark:ring-emerald-900/40" },
+  created: { icon: Plus, color: "text-primary dark:text-primary", bg: "bg-accent dark:bg-accent ring-primary dark:ring-primary" },
   updated: { icon: Pencil, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40 ring-blue-100 dark:ring-blue-900/40" },
   deleted: { icon: Trash2, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950/40 ring-red-100 dark:ring-red-900/40" },
   sent: { icon: Send, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/40 ring-violet-100 dark:ring-violet-900/40" },
-  posted: { icon: Check, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40 ring-emerald-100 dark:ring-emerald-900/40" },
+  posted: { icon: Check, color: "text-primary dark:text-primary", bg: "bg-accent dark:bg-accent ring-primary dark:ring-primary" },
   voided: { icon: XCircle, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950/40 ring-red-100 dark:ring-red-900/40" },
-  approved: { icon: Check, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40 ring-emerald-100 dark:ring-emerald-900/40" },
+  approved: { icon: Check, color: "text-primary dark:text-primary", bg: "bg-accent dark:bg-accent ring-primary dark:ring-primary" },
 };
 
 const DEFAULT_ACTION = { icon: ArrowLeftRight, color: "text-muted-foreground", bg: "bg-muted ring-border" };

@@ -14,7 +14,7 @@ export default function BankImportsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
-        <Button size="sm" onClick={openImport} className="bg-emerald-600 hover:bg-emerald-700">
+        <Button size="sm" onClick={openImport} className="bg-primary hover:bg-primary/90">
           <Upload className="mr-2 size-3.5" />Import Statement
         </Button>
       </div>

@@ -125,8 +125,8 @@ export default function BillingPage() {
     return (
       <ContentReveal className="space-y-6">
         <div className="rounded-xl border bg-card p-8 text-center">
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
-            <Check className="size-6 text-emerald-600 dark:text-emerald-400" />
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-accent dark:bg-primary">
+            <Check className="size-6 text-primary dark:text-primary" />
           </div>
           <h3 className="text-lg font-semibold">All features unlocked</h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
@@ -167,7 +167,7 @@ export default function BillingPage() {
             )}
           >
             Annual
-            <span className="ml-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Save 17%</span>
+            <span className="ml-1.5 text-[10px] text-primary dark:text-primary font-semibold">Save 17%</span>
           </button>
         </div>
 
@@ -176,13 +176,13 @@ export default function BillingPage() {
           <div
             className={cn(
               "flex flex-col rounded-xl border p-6",
-              !isPro && "border-emerald-300 ring-1 ring-emerald-300 dark:border-emerald-800 dark:ring-emerald-800"
+              !isPro && "border-primary/30 ring-1 ring-primary dark:border-primary/20 dark:ring-primary"
             )}
           >
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Free</h4>
               {!isPro && (
-                <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-400">
+                <Badge className="bg-accent text-primary border-0 dark:bg-primary dark:text-primary">
                   Current
                 </Badge>
               )}
@@ -193,19 +193,19 @@ export default function BillingPage() {
             <p className="mt-2 text-xs text-muted-foreground">For individuals getting started</p>
             <ul className="mt-4 flex-1 space-y-2">
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 1 team member included
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 25 emails/mo
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 All core features
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 Community support
               </li>
             </ul>
@@ -220,13 +220,13 @@ export default function BillingPage() {
           <div
             className={cn(
               "flex flex-col rounded-xl border p-6",
-              isPro && "border-emerald-300 ring-1 ring-emerald-300 dark:border-emerald-800 dark:ring-emerald-800"
+              isPro && "border-primary/30 ring-1 ring-primary dark:border-primary/20 dark:ring-primary"
             )}
           >
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Pro</h4>
               {isPro && (
-                <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-400">
+                <Badge className="bg-accent text-primary border-0 dark:bg-primary dark:text-primary">
                   Current · {seatCount} seat{seatCount !== 1 ? "s" : ""}
                 </Badge>
               )}
@@ -269,23 +269,23 @@ export default function BillingPage() {
             </AnimatePresence>
             <ul className="mt-4 flex-1 space-y-2">
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 Unlimited team members
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 100 emails/mo
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 All features + API access
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 Priority support
               </li>
               <li className="flex items-center gap-2 text-[13px]">
-                <Check className="size-3.5 shrink-0 text-emerald-600" />
+                <Check className="size-3.5 shrink-0 text-primary" />
                 Audit log
               </li>
             </ul>
@@ -303,7 +303,7 @@ export default function BillingPage() {
               ) : (
                 <Button
                   size="sm"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-primary hover:bg-primary/90"
                   onClick={() => checkout("seats", "pro")}
                   disabled={checkoutLoading !== null}
                 >
@@ -356,7 +356,7 @@ export default function BillingPage() {
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
-                    isCritical ? "bg-red-500" : isHigh ? "bg-amber-500" : "bg-emerald-500"
+                    isCritical ? "bg-red-500" : isHigh ? "bg-amber-500" : "bg-primary"
                   )}
                   style={{ width: `${Math.max(pct, 0.5)}%` }}
                 />
@@ -395,7 +395,7 @@ export default function BillingPage() {
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
-                    isCritical ? "bg-red-500" : isHigh ? "bg-amber-500" : "bg-emerald-500"
+                    isCritical ? "bg-red-500" : isHigh ? "bg-amber-500" : "bg-primary"
                   )}
                   style={{ width: `${Math.max(pct, 0.5)}%` }}
                 />
@@ -419,14 +419,14 @@ export default function BillingPage() {
                 className={cn(
                   "flex flex-col rounded-xl border p-5 transition-shadow",
                   isCurrent
-                    ? "border-emerald-300 ring-1 ring-emerald-300 dark:border-emerald-800 dark:ring-emerald-800"
+                    ? "border-primary/30 ring-1 ring-primary dark:border-primary/20 dark:ring-primary"
                     : "hover:shadow-sm"
                 )}
               >
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold">{plan.name}</h4>
                   {isCurrent && (
-                    <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] dark:bg-emerald-900/60 dark:text-emerald-400">
+                    <Badge className="bg-accent text-primary border-0 text-[10px] dark:bg-primary dark:text-primary">
                       Current
                     </Badge>
                   )}
@@ -455,11 +455,11 @@ export default function BillingPage() {
                 <p className="mt-2 text-[11px] text-muted-foreground">{plan.description}</p>
                 <ul className="mt-3 flex-1 space-y-1.5">
                   <li className="flex items-center gap-2 text-[12px]">
-                    <Check className="size-3 shrink-0 text-emerald-600" />
+                    <Check className="size-3 shrink-0 text-primary" />
                     {plan.storage} file storage
                   </li>
                   <li className="flex items-center gap-2 text-[12px]">
-                    <Check className="size-3 shrink-0 text-emerald-600" />
+                    <Check className="size-3 shrink-0 text-primary" />
                     {plan.emails.toLocaleString()} emails/mo
                   </li>
                 </ul>
@@ -474,7 +474,7 @@ export default function BillingPage() {
                       size="sm"
                       className={cn(
                         "w-full text-xs",
-                        plan.id !== "free" && "bg-emerald-600 hover:bg-emerald-700"
+                        plan.id !== "free" && "bg-primary hover:bg-primary/90"
                       )}
                       onClick={() => checkout("storage", plan.id)}
                       disabled={checkoutLoading !== null}
@@ -497,7 +497,7 @@ export default function BillingPage() {
           <div className="max-w-lg">
             <h3 className="text-sm font-semibold">Open source, transparent pricing</h3>
             <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-              dubbl is open source. Our pricing is designed to be fair and sustainable. The free tier gives you everything you need to get started. Storage plans are organization-wide and cover all data, not just file uploads. Need more storage or have special requirements? We are happy to help.
+              PayrollPro is open source. Our pricing is designed to be fair and sustainable. The free tier gives you everything you need to get started. Storage plans are organization-wide and cover all data, not just file uploads. Need more storage or have special requirements? We are happy to help.
             </p>
           </div>
           <Button

@@ -134,9 +134,9 @@ export default function ApiKeysPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">API Keys</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create and manage keys for programmatic access to the dubbl API
+            Create and manage keys for programmatic access to the PayrollPro API
             {keys.length > 0 && (
-              <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <span className="ml-2 inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary dark:bg-accent dark:text-primary">
                 {keys.length}/{maxKeys}
               </span>
             )}
@@ -149,7 +149,7 @@ export default function ApiKeysPage() {
             setCreateOpen(true);
           }}
           disabled={!apiAccess || keys.length >= maxKeys}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-primary hover:bg-primary/90 disabled:opacity-50"
         >
           <Plus className="mr-1.5 size-3.5" />
           New Key
@@ -165,7 +165,7 @@ export default function ApiKeysPage() {
         <EmptyState
           icon={Key}
           title="No API keys yet"
-          description="Create your first API key to start integrating with the dubbl API programmatically."
+          description="Create your first API key to start integrating with the PayrollPro API programmatically."
         >
           <Button
             size="sm"
@@ -174,7 +174,7 @@ export default function ApiKeysPage() {
               setCreateOpen(true);
             }}
             disabled={!apiAccess}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+            className="bg-primary hover:bg-primary/90 disabled:opacity-50"
           >
             <Plus className="mr-1.5 size-3.5" />
             Create your first key
@@ -190,8 +190,8 @@ export default function ApiKeysPage() {
               }`}
             >
               {/* Key icon */}
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                <Key className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+                <Key className="size-4 text-primary dark:text-primary" />
               </div>
 
               {/* Name + prefix */}
@@ -251,7 +251,7 @@ export default function ApiKeysPage() {
               <Copy className="size-3" />
             </Button>
           </div>
-          <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed font-mono text-emerald-400">
+          <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed font-mono text-primary">
             <code>{curlExample}</code>
           </pre>
         </div>
@@ -321,7 +321,7 @@ export default function ApiKeysPage() {
                 <Button
                   onClick={createKey}
                   disabled={!name || saving}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {saving ? "Creating..." : "Create Key"}
                 </Button>

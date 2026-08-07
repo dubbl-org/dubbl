@@ -91,7 +91,7 @@ interface AssetDetail {
 }
 
 const statusColors: Record<string, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  active: "border-primary/20 bg-accent text-primary",
   fully_depreciated: "border-amber-200 bg-amber-50 text-amber-700",
   disposed: "border-gray-200 bg-gray-50 text-gray-700",
   in_progress: "border-blue-200 bg-blue-50 text-blue-700",
@@ -476,7 +476,7 @@ export default function FixedAssetDetailPage() {
               <Button
                 size="sm"
                 onClick={() => setCapitalizeOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
                 title="Mark this item as ready and in use, so its value starts spreading over time"
               >
                 <PackageCheck className="mr-2 size-4" />
@@ -489,7 +489,7 @@ export default function FixedAssetDetailPage() {
             <Button
               size="sm"
               onClick={handleDepreciate}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
               title="Record this period's drop in value as the item is used (spreads its cost over time)"
             >
               <TrendingDown className="mr-2 size-4" />
@@ -633,7 +633,7 @@ export default function FixedAssetDetailPage() {
             <Button
               onClick={handleRevalue}
               disabled={busy}
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               Save new value
             </Button>
@@ -712,7 +712,7 @@ export default function FixedAssetDetailPage() {
             <Button
               onClick={handleCapitalize}
               disabled={busy}
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               Bring into use
             </Button>
@@ -770,7 +770,7 @@ export default function FixedAssetDetailPage() {
             <Button
               onClick={handleAddCost}
               disabled={busy}
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               Add cost
             </Button>
@@ -809,7 +809,7 @@ export default function FixedAssetDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Current value</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">
+          <p className="text-xl font-bold font-mono text-primary">
             {formatMoney(asset.netBookValue)}
           </p>
         </div>
@@ -1005,7 +1005,7 @@ export default function FixedAssetDetailPage() {
                       Written down
                     </span>
                   ) : (
-                    <span className="inline-flex items-center text-emerald-700">
+                    <span className="inline-flex items-center text-primary">
                       <TrendingUp className="mr-1.5 size-3.5" />
                       Higher value
                     </span>
@@ -1023,7 +1023,7 @@ export default function FixedAssetDetailPage() {
                   className={`text-right text-sm font-mono ${
                     rev.changeAmount < 0
                       ? "text-amber-600"
-                      : "text-emerald-600"
+                      : "text-primary"
                   }`}
                 >
                   {rev.changeAmount < 0 ? "-" : "+"}

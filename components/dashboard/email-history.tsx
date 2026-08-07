@@ -94,7 +94,7 @@ export function EmailHistory({ documentType, documentId }: EmailHistoryProps) {
                   variant="outline"
                   className={
                     email.status === "sent"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                      ? "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
                       : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
                   }
                 >

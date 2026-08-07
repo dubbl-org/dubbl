@@ -80,7 +80,7 @@ type SortKey = "createdAt" | "fromWarehouse" | "toWarehouse" | "items" | "status
 const STATUS_STYLES: Record<string, string> = {
   draft: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300",
   in_transit: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  completed: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   cancelled: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
@@ -337,8 +337,8 @@ export default function TransfersPage() {
             {/* Destination warehouse */}
             <div className="rounded-xl border bg-card p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                  <Warehouse className="size-4 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex size-8 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+                  <Warehouse className="size-4 text-primary dark:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">East DC</p>
@@ -353,7 +353,7 @@ export default function TransfersPage() {
                 ].map((item) => (
                   <div key={item.name} className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5">
                     <span className="text-xs">{item.name}</span>
-                    <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400">+{item.qty}</span>
+                    <span className="text-xs font-mono text-primary dark:text-primary">+{item.qty}</span>
                   </div>
                 ))}
               </div>
@@ -364,7 +364,7 @@ export default function TransfersPage() {
           <div className="flex justify-center">
             <Button
               onClick={() => openDrawer("transfer")}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New Transfer
@@ -376,7 +376,7 @@ export default function TransfersPage() {
             {[
               { label: "Draft", color: "bg-slate-400" },
               { label: "In Transit", color: "bg-blue-400" },
-              { label: "Completed", color: "bg-emerald-400" },
+              { label: "Completed", color: "bg-primary" },
               { label: "Cancelled", color: "bg-red-400" },
             ].map(({ label, color }) => (
               <div key={label} className="flex items-center gap-1.5">
@@ -400,7 +400,7 @@ export default function TransfersPage() {
           { label: "Total", value: stats.total, color: "" },
           { label: "Draft", value: stats.draft, color: "" },
           { label: "In Transit", value: stats.inTransit, color: "text-blue-600 dark:text-blue-400" },
-          { label: "Completed", value: stats.completed, color: "text-emerald-600 dark:text-emerald-400" },
+          { label: "Completed", value: stats.completed, color: "text-primary dark:text-primary" },
           { label: "Total Units", value: stats.totalItems, color: "", hidden: "hidden lg:block" },
         ].map((stat, i) => (
           <motion.div
@@ -431,7 +431,7 @@ export default function TransfersPage() {
 
           <Button
             size="sm"
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+            className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
             onClick={() => openDrawer("transfer")}
           >
             <Plus className="size-3" />
@@ -545,7 +545,7 @@ export default function TransfersPage() {
                         {new Date(transfer.createdAt).toLocaleDateString()}
                       </p>
                       {transfer.completedAt && (
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                        <p className="text-[10px] text-primary dark:text-primary">
                           Completed {new Date(transfer.completedAt).toLocaleDateString()}
                         </p>
                       )}
@@ -590,7 +590,7 @@ export default function TransfersPage() {
                   Created {new Date(activeTransfer.createdAt).toLocaleDateString()}
                 </span>
                 {activeTransfer.completedAt && (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs text-primary dark:text-primary">
                     Completed {new Date(activeTransfer.completedAt).toLocaleDateString()}
                   </span>
                 )}
@@ -642,7 +642,7 @@ export default function TransfersPage() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-primary hover:bg-primary/90"
                     onClick={() => handleComplete(activeTransfer)}
                     disabled={completing}
                   >

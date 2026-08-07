@@ -140,7 +140,7 @@ export default function CategoriesPage() {
         >
           <Button
             onClick={() => { setEditCategory(null); setEditOpen(true); }}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="size-3.5 mr-1.5" />
             New Category
@@ -158,7 +158,7 @@ export default function CategoriesPage() {
         </div>
         <Button
           size="sm"
-          className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+          className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
           onClick={() => { setEditCategory(null); setEditOpen(true); }}
         >
           <Plus className="size-3" />
@@ -248,7 +248,7 @@ export default function CategoriesPage() {
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={() => { setEditOpen(false); setEditCategory(null); }}>Cancel</Button>
-              <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90">
                 {saving ? "Saving..." : editCategory ? "Update" : "Create"}
               </Button>
             </SheetFooter>

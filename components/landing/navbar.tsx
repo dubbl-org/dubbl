@@ -50,7 +50,7 @@ export function Navbar() {
           <Link href="/" className="flex items-center gap-2.5 group">
             <Logo />
             <span className="text-[15px] font-semibold tracking-tight text-foreground">
-              dubbl
+              PayrollPro
             </span>
           </Link>
 
@@ -80,7 +80,7 @@ export function Navbar() {
             <Button
               asChild
               size="sm"
-              className="rounded-full bg-emerald-600 px-5 text-white hover:bg-emerald-500 transition-all duration-200 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:shadow-[0_0_25px_rgba(16,185,129,0.2)]"
+              className="rounded-full bg-primary px-5 text-white hover:bg-primary/90 transition-all duration-200 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:shadow-[0_0_25px_rgba(16,185,129,0.2)]"
             >
               <Link href="/sign-up" className="flex items-center gap-1.5">
                 Get Started
@@ -108,7 +108,7 @@ export function Navbar() {
                   <div className="flex items-center gap-2.5 px-6 pt-6 pb-4">
                     <Logo />
                     <SheetTitle className="text-[15px] font-semibold tracking-tight">
-                      dubbl
+                      PayrollPro
                     </SheetTitle>
                   </div>
 
@@ -146,7 +146,7 @@ export function Navbar() {
                     </Button>
                     <Button
                       asChild
-                      className="w-full rounded-full bg-emerald-600 text-white hover:bg-emerald-500 transition-all duration-200"
+                      className="w-full rounded-full bg-primary text-white hover:bg-primary/90 transition-all duration-200"
                     >
                       <Link
                         href="/sign-up"

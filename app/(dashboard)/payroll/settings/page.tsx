@@ -430,7 +430,7 @@ export default function PayrollSettingsPage() {
                 size="sm"
                 onClick={handleSaveSettings}
                 disabled={saving}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Save className="mr-1.5 size-3.5" />
                 {saving ? "Saving..." : "Save Settings"}
@@ -532,7 +532,7 @@ export default function PayrollSettingsPage() {
                           {s.startTime} - {s.endTime} · {s.shiftType}{s.premiumPercent ? ` · +${s.premiumPercent}%` : ""}
                         </p>
                       </div>
-                      <Badge variant="outline" className={cn("text-[10px]", s.isActive ? "text-emerald-600" : "text-muted-foreground")}>
+                      <Badge variant="outline" className={cn("text-[10px]", s.isActive ? "text-primary" : "text-muted-foreground")}>
                         {s.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </div>
@@ -590,7 +590,7 @@ export default function PayrollSettingsPage() {
                       <p className="text-sm font-medium">{c.name}</p>
                       <p className="text-xs text-muted-foreground">{c.steps.length} step(s)</p>
                     </div>
-                    <Badge variant="outline" className={cn("text-[10px]", c.isActive ? "text-emerald-600" : "text-muted-foreground")}>
+                    <Badge variant="outline" className={cn("text-[10px]", c.isActive ? "text-primary" : "text-muted-foreground")}>
                       {c.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
@@ -657,7 +657,7 @@ export default function PayrollSettingsPage() {
         <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <DollarSign className="size-5" />
               </div>
               <div>
@@ -695,7 +695,7 @@ export default function PayrollSettingsPage() {
             </div>
             <div className="border-t px-4 py-3 sm:px-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setDeductionDrawer(false)}>Cancel</Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Create</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">Create</Button>
             </div>
           </form>
         </SheetContent>
@@ -706,7 +706,7 @@ export default function PayrollSettingsPage() {
         <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Shield className="size-5" />
               </div>
               <div>
@@ -749,7 +749,7 @@ export default function PayrollSettingsPage() {
             </div>
             <div className="border-t px-4 py-3 sm:px-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setBracketDrawer(false)}>Cancel</Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Create</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">Create</Button>
             </div>
           </form>
         </SheetContent>
@@ -760,7 +760,7 @@ export default function PayrollSettingsPage() {
         <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Clock className="size-5" />
               </div>
               <div>
@@ -805,7 +805,7 @@ export default function PayrollSettingsPage() {
             </div>
             <div className="border-t px-4 py-3 sm:px-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShiftDrawer(false)}>Cancel</Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Create</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">Create</Button>
             </div>
           </form>
         </SheetContent>
@@ -816,7 +816,7 @@ export default function PayrollSettingsPage() {
         <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <CalendarDays className="size-5" />
               </div>
               <div>
@@ -871,7 +871,7 @@ export default function PayrollSettingsPage() {
             </div>
             <div className="border-t px-4 py-3 sm:px-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setLeaveDrawer(false)}>Cancel</Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Create</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">Create</Button>
             </div>
           </form>
         </SheetContent>
@@ -882,7 +882,7 @@ export default function PayrollSettingsPage() {
         <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Layers className="size-5" />
               </div>
               <div>
@@ -920,7 +920,7 @@ export default function PayrollSettingsPage() {
             </div>
             <div className="border-t px-4 py-3 sm:px-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setBandDrawer(false)}>Cancel</Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Create</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">Create</Button>
             </div>
           </form>
         </SheetContent>

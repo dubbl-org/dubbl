@@ -219,7 +219,7 @@ export default function BankCashFlowPage() {
                   periods.map((p) => (
                     <TableRow key={p.startDate}>
                       <TableCell className="font-medium text-sm">{p.label}</TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums text-emerald-600">
+                      <TableCell className="text-right font-mono text-sm tabular-nums text-primary">
                         {formatMoney(p.inflows, currency)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums text-rose-600">

@@ -284,7 +284,7 @@ export default function WebhooksPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Send real-time event notifications to external services
               {webhooks.length > 0 && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <span className="ml-2 inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary dark:bg-accent dark:text-primary">
                   {webhooks.length} configured
                 </span>
               )}
@@ -330,8 +330,8 @@ export default function WebhooksPage() {
                   }`}
                 >
                   {/* Icon */}
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                    <Webhook className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+                    <Webhook className="size-4 text-primary dark:text-primary" />
                   </div>
 
                   {/* URL + description (clickable to expand) */}
@@ -360,7 +360,7 @@ export default function WebhooksPage() {
                       variant={wh.isActive ? "default" : "outline"}
                       className={`text-xs ${
                         wh.isActive
-                          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          ? "bg-accent text-primary hover:bg-accent dark:bg-accent dark:text-primary"
                           : ""
                       }`}
                     >
@@ -441,7 +441,7 @@ export default function WebhooksPage() {
                             className="flex items-center gap-3 rounded-lg border bg-background px-4 py-2.5 text-sm"
                           >
                             {d.status === "success" ? (
-                              <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+                              <CheckCircle2 className="size-4 shrink-0 text-primary" />
                             ) : (
                               <XCircle className="size-4 shrink-0 text-red-500" />
                             )}

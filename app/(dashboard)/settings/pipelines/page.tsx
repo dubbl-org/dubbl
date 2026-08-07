@@ -179,7 +179,7 @@ function SortableStageRow({
             autoFocus
           />
           <Button type="button" variant="ghost" size="sm" className="size-7 p-0" onClick={save}>
-            <Check className="size-3.5 text-emerald-600" />
+            <Check className="size-3.5 text-primary" />
           </Button>
           <Button type="button" variant="ghost" size="sm" className="size-7 p-0" onClick={() => { setName(stage.name); setEditing(false); }}>
             <X className="size-3.5" />
@@ -349,7 +349,7 @@ function PipelineEditor({
                   type="checkbox"
                   checked={isDefault}
                   onChange={(e) => { setIsDefault(e.target.checked); setDirty(true); }}
-                  className="size-4 rounded border-border accent-emerald-600"
+                  className="size-4 rounded border-border accent-primary"
                 />
                 <span className="text-sm">Set as default pipeline</span>
               </label>
@@ -396,7 +396,7 @@ function PipelineEditor({
           {/* Footer */}
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit" disabled={saving || !name.trim() || stages.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button type="submit" disabled={saving || !name.trim() || stages.length === 0} className="bg-primary hover:bg-primary/90">
               {saving ? "Saving..." : isNew ? "Create Pipeline" : "Save Changes"}
             </Button>
           </div>
@@ -489,7 +489,7 @@ export default function PipelinesSettingsPage() {
             Manage your deal pipelines and customize stages.
           </p>
         </div>
-        <Button size="sm" className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={handleNew}>
+        <Button size="sm" className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90" onClick={handleNew}>
           <Plus className="size-3" /> New Pipeline
         </Button>
       </div>
@@ -503,7 +503,7 @@ export default function PipelinesSettingsPage() {
           <p className="text-xs text-muted-foreground mt-1 max-w-xs">
             Create your first pipeline to start tracking deals through custom stages.
           </p>
-          <Button size="sm" className="mt-4 bg-emerald-600 hover:bg-emerald-700" onClick={handleNew}>
+          <Button size="sm" className="mt-4 bg-primary hover:bg-primary/90" onClick={handleNew}>
             Create Pipeline
           </Button>
         </div>
@@ -517,7 +517,7 @@ export default function PipelinesSettingsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold">{p.name}</span>
                     {p.isDefault && (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] dark:bg-emerald-900/60 dark:text-emerald-400">
+                      <Badge className="bg-accent text-primary border-0 text-[10px] dark:bg-primary dark:text-primary">
                         Default
                       </Badge>
                     )}

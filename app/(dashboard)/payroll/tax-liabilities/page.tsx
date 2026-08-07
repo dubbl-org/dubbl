@@ -331,7 +331,7 @@ export default function TaxLiabilitiesPage() {
         </div>
         <Button
           onClick={() => openRecordPayment()}
-          className="bg-emerald-600 shrink-0 hover:bg-emerald-700"
+          className="bg-primary shrink-0 hover:bg-primary/90"
         >
           <Plus className="mr-2 size-4" />
           Record payment
@@ -530,7 +530,7 @@ export default function TaxLiabilitiesPage() {
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {submitting ? "Recording..." : "Record payment"}
             </Button>

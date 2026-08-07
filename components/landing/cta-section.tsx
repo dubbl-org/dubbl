@@ -14,32 +14,32 @@ export function CTASection() {
       {/* Decorative dashed elements */}
 
       {/* Top-left dashed rectangle */}
-      <div className="absolute -left-16 -top-12 size-64 rounded-2xl border-2 border-dashed border-emerald-500/20">
-        <div className="absolute -left-1 -top-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -right-1 -top-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -bottom-1 -left-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -bottom-1 -right-1 size-2 rounded-full bg-emerald-500" />
+      <div className="absolute -left-16 -top-12 size-64 rounded-2xl border-2 border-dashed border-primary">
+        <div className="absolute -left-1 -top-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -right-1 -top-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -bottom-1 -left-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -bottom-1 -right-1 size-2 rounded-full bg-primary" />
       </div>
 
       {/* Center-right dashed square */}
-      <div className="absolute -right-20 top-1/2 size-48 -translate-y-1/2 rounded-2xl border-2 border-dashed border-emerald-500/20">
-        <div className="absolute -left-1 -top-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -right-1 -top-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -bottom-1 -left-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -bottom-1 -right-1 size-2 rounded-full bg-emerald-500" />
+      <div className="absolute -right-20 top-1/2 size-48 -translate-y-1/2 rounded-2xl border-2 border-dashed border-primary">
+        <div className="absolute -left-1 -top-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -right-1 -top-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -bottom-1 -left-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -bottom-1 -right-1 size-2 rounded-full bg-primary" />
       </div>
 
       {/* Bottom-left dashed rectangle */}
-      <div className="absolute -bottom-16 left-24 h-40 w-56 rounded-2xl border-2 border-dashed border-emerald-500/20">
-        <div className="absolute -left-1 -top-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -right-1 -top-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -bottom-1 -left-1 size-2 rounded-full bg-emerald-500" />
-        <div className="absolute -bottom-1 -right-1 size-2 rounded-full bg-emerald-500" />
+      <div className="absolute -bottom-16 left-24 h-40 w-56 rounded-2xl border-2 border-dashed border-primary">
+        <div className="absolute -left-1 -top-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -right-1 -top-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -bottom-1 -left-1 size-2 rounded-full bg-primary" />
+        <div className="absolute -bottom-1 -right-1 size-2 rounded-full bg-primary" />
       </div>
 
       {/* Subtle gradient glow behind text */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="h-[400px] w-[600px] rounded-full bg-emerald-500/10 blur-[120px]" />
+        <div className="h-[400px] w-[600px] rounded-full bg-primary blur-[120px]" />
       </div>
 
       <Container className="relative">
@@ -58,7 +58,7 @@ export function CTASection() {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/sign-up"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-8 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-8 text-sm font-medium text-white transition-colors hover:bg-primary/90"
               >
                 Get Started
                 <ArrowRight className="size-4" />

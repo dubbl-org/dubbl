@@ -349,7 +349,7 @@ export default function BatchDetailPage() {
               size="sm"
               onClick={handleSubmit}
               disabled={submitting || batch.items.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {submitting ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />
@@ -380,7 +380,7 @@ export default function BatchDetailPage() {
           <>
             <div className="rounded-lg border p-3">
               <p className="text-[11px] text-muted-foreground">Completed</p>
-              <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+              <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-primary dark:text-primary">
                 {completedCount}
               </p>
             </div>

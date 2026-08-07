@@ -295,7 +295,7 @@ export default function MembersPage() {
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAddTeamOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddTeam} disabled={savingTeam || selectedTeamId === "none"} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleAddTeam} disabled={savingTeam || selectedTeamId === "none"} className="bg-primary hover:bg-primary/90">
               {savingTeam ? "Assigning..." : "Assign Team"}
             </Button>
           </div>
@@ -313,7 +313,7 @@ export default function MembersPage() {
           {contributors.length > 0 && <><span className="text-border">|</span><span>{contributors.length} contributor{contributors.length !== 1 ? "s" : ""}</span></>}
           {viewers.length > 0 && <><span className="text-border">|</span><span>{viewers.length} viewer{viewers.length !== 1 ? "s" : ""}</span></>}
         </div>
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={() => setAddOpen(true)}>
+        <Button size="sm" className="bg-primary hover:bg-primary/90 h-8" onClick={() => setAddOpen(true)}>
           <Plus className="size-3.5" />Add Member
         </Button>
       </div>
@@ -323,7 +323,7 @@ export default function MembersPage() {
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                 <Users className="size-5" />
               </div>
               <div>
@@ -394,7 +394,7 @@ export default function MembersPage() {
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving || selectedMemberId === "none"} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleAdd} disabled={saving || selectedMemberId === "none"} className="bg-primary hover:bg-primary/90">
               {saving ? "Adding..." : "Add Member"}
             </Button>
           </div>
@@ -409,9 +409,9 @@ export default function MembersPage() {
       ) : (
         <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((m) => (
-            <div key={m.id} className="rounded-lg border bg-card p-4 group hover:border-emerald-200 transition-colors relative">
+            <div key={m.id} className="rounded-lg border bg-card p-4 group hover:border-primary transition-colors relative">
               <div className="flex items-start gap-3">
-                <div className="size-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-semibold shrink-0">
+                <div className="size-9 rounded-full bg-accent text-primary flex items-center justify-center text-sm font-semibold shrink-0">
                   {(m.member.user.name || m.member.user.email)[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">

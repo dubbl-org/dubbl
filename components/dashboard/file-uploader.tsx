@@ -145,8 +145,8 @@ export function FileUploader({
       className={cn(
         "relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors",
         dragging
-          ? "border-emerald-500 bg-emerald-50"
-          : "border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50",
+          ? "border-primary bg-accent"
+          : "border-muted-foreground/25 hover:border-primary hover:bg-muted/50",
         uploading && "pointer-events-none opacity-60",
         className
       )}
@@ -161,12 +161,12 @@ export function FileUploader({
 
       {uploading ? (
         <>
-          <Loader2 className="size-6 animate-spin text-emerald-600" />
+          <Loader2 className="size-6 animate-spin text-primary" />
           <p className="mt-2 text-xs text-muted-foreground">Uploading...</p>
         </>
       ) : fileName ? (
         <>
-          <FileText className="size-6 text-emerald-600" />
+          <FileText className="size-6 text-primary" />
           <p className="mt-2 max-w-full truncate text-xs font-medium">
             {fileName}
           </p>

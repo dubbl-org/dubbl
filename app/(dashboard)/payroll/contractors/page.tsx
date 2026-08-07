@@ -240,7 +240,7 @@ export default function ContractorsPage() {
               <Button
                 onClick={() => openDrawer("contractor")}
                 size="lg"
-                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+                className="bg-primary hover:bg-primary/90 shadow-md shadow-primary"
               >
                 <Plus className="mr-2 size-4" />
                 Add Your First Contractor
@@ -277,7 +277,7 @@ export default function ContractorsPage() {
             <Users className="size-4" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Active Contractors</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate text-primary dark:text-primary">
             {activeCount}
           </p>
         </motion.div>
@@ -389,7 +389,7 @@ export default function ContractorsPage() {
                           )}
                         </span>
                       )}
-                      <Badge variant="outline" className={cn("text-[11px]", c.isActive ? "text-emerald-600" : "text-muted-foreground")}>
+                      <Badge variant="outline" className={cn("text-[11px]", c.isActive ? "text-primary" : "text-muted-foreground")}>
                         {c.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </div>

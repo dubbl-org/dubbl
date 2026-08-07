@@ -34,18 +34,18 @@ const row1: Integration[] = [
   { name: "Stripe", category: "Payments", icon: CreditCard, color: "text-blue-500" },
   { name: "QuickBooks", category: "CSV Import", icon: FileText, color: "text-amber-500" },
   { name: "Xero", category: "CSV Import", icon: ArrowLeftRight, color: "text-amber-500" },
-  { name: "FreshBooks", category: "CSV Import", icon: Receipt, color: "text-emerald-500" },
+  { name: "FreshBooks", category: "CSV Import", icon: Receipt, color: "text-primary" },
   { name: "Wave", category: "CSV Import", icon: Waves, color: "text-amber-500" },
   { name: "REST API", category: "Custom", icon: Code2, color: "text-purple-500" },
 ];
 
 const row2: Integration[] = [
   { name: "CSV Import", category: "Any Format", icon: FileText, color: "text-blue-500" },
-  { name: "Bank Feeds", category: "Coming Soon", icon: Landmark, color: "text-emerald-500" },
+  { name: "Bank Feeds", category: "Coming Soon", icon: Landmark, color: "text-primary" },
   { name: "Invoicing", category: "Built-in", icon: Send, color: "text-blue-500" },
   { name: "Inventory", category: "Built-in", icon: ShoppingBag, color: "text-purple-500" },
-  { name: "Projects", category: "Built-in", icon: Store, color: "text-emerald-500" },
-  { name: "Self-Host", category: "Full Control", icon: Building2, color: "text-emerald-500" },
+  { name: "Projects", category: "Built-in", icon: Store, color: "text-primary" },
+  { name: "Self-Host", category: "Full Control", icon: Building2, color: "text-primary" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -75,7 +75,7 @@ function MarqueeRow({
         {doubled.map((item, i) => (
           <div
             key={`${item.name}-${i}`}
-            className="flex shrink-0 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 transition-colors hover:border-emerald-300/50 dark:hover:border-emerald-700/50"
+            className="flex shrink-0 items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 transition-colors hover:border-primary dark:hover:border-primary"
           >
             <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
               <item.icon

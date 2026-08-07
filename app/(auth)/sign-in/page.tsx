@@ -143,19 +143,7 @@ function SignInContent() {
 
   return (
     <div>
-      <motion.div
-        className="mb-7"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <h1 className="text-[28px] font-extrabold tracking-tight text-foreground">
-          Welcome back
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Sign in to your account
-        </p>
-      </motion.div>
+      {/* heading provided by auth layout */}
 
       {isDev && (
         <motion.div
@@ -193,7 +181,7 @@ function SignInContent() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 rounded-lg text-sm font-medium"
+                className="h-9 text-sm font-medium"
                 onClick={() => signIn("google", { callbackUrl })}
               >
                 <GoogleIcon className="size-4" />
@@ -204,7 +192,7 @@ function SignInContent() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 rounded-lg text-sm font-medium"
+                className="h-9 text-sm font-medium"
                 onClick={() => signIn("apple", { callbackUrl })}
               >
                 <AppleIcon className="size-4" />
@@ -248,7 +236,7 @@ function SignInContent() {
             placeholder="you@example.com"
             required
             autoFocus
-            className="h-11 rounded-lg"
+            className="h-9 text-sm"
           />
         </div>
 
@@ -263,7 +251,7 @@ function SignInContent() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Your password"
             required
-            className="h-11 rounded-lg"
+            className="h-9 text-sm"
           />
         </div>
 
@@ -282,7 +270,7 @@ function SignInContent() {
               placeholder="6-digit code or backup code"
               required
               autoFocus
-              className="h-11 rounded-lg"
+              className="h-9 text-sm"
             />
             <p className="text-xs text-muted-foreground">
               Enter the code from your authenticator app, or a backup code.
@@ -292,7 +280,7 @@ function SignInContent() {
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-lg bg-emerald-600 shadow-md shadow-emerald-600/15 transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
+          className="w-full h-9 text-sm"
           disabled={loading}
         >
           {loading ? (
@@ -316,7 +304,7 @@ function SignInContent() {
           Don&apos;t have an account?{" "}
           <Link
             href="/sign-up"
-            className="font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+            className="font-medium text-primary transition-colors hover:text-primary dark:text-primary dark:hover:text-primary"
           >
             Sign up
           </Link>

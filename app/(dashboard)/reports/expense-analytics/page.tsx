@@ -40,7 +40,7 @@ const CATEGORY_COLORS = [
   "bg-amber-500",
   "bg-yellow-500",
   "bg-lime-500",
-  "bg-emerald-500",
+  "bg-primary",
   "bg-teal-500",
   "bg-cyan-500",
   "bg-blue-500",

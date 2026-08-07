@@ -319,7 +319,7 @@ export default function ReconcilePage() {
             size="sm"
             onClick={() => finishStatementCheck()}
             disabled={acting}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
             title="Mark every in-your-books line in this period as on the statement and close the check"
           >
             <CheckCircle className="mr-1.5 size-3.5" />
@@ -355,7 +355,7 @@ export default function ReconcilePage() {
             <p className={cn(
               "mt-1 text-xl font-semibold font-mono tabular-nums",
               selectedIds.size > 0
-                ? selectedTotal < 0 ? "text-red-600" : "text-emerald-600"
+                ? selectedTotal < 0 ? "text-red-600" : "text-primary"
                 : "text-muted-foreground/30"
             )}>
               {selectedIds.size > 0 ? formatMoney(selectedTotal) : "-"}
@@ -373,7 +373,7 @@ export default function ReconcilePage() {
               size="sm"
               onClick={() => finishStatementCheck([...selectedIds])}
               disabled={acting || !activeRec}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
               title={activeRec ? "Mark these lines as on your statement and finish the check" : "Start a statement check first"}
             >
               <CheckCircle className="mr-1.5 size-3.5" />
@@ -415,7 +415,7 @@ export default function ReconcilePage() {
       {/* Transaction list */}
       {filteredTransactions.length === 0 && transactions.length === 0 ? (
         <div className="rounded-xl border border-dashed py-16 text-center">
-          <CheckCircle className="size-8 text-emerald-500 mx-auto" />
+          <CheckCircle className="size-8 text-primary mx-auto" />
           <h3 className="mt-3 text-sm font-semibold">All caught up</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Nothing left to match to your statement.
@@ -472,7 +472,7 @@ export default function ReconcilePage() {
                     !categorized
                       ? "cursor-not-allowed opacity-60 hover:bg-muted/20"
                       : selected
-                        ? "bg-emerald-50/50 dark:bg-emerald-950/20"
+                        ? "bg-accent dark:bg-accent"
                         : "hover:bg-muted/40"
                   )}
                 >
@@ -482,7 +482,7 @@ export default function ReconcilePage() {
                       !categorized
                         ? "border border-dashed border-muted-foreground/30"
                         : selected
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-primary text-white"
                           : "border border-muted-foreground/25"
                     )}
                   >
@@ -492,7 +492,7 @@ export default function ReconcilePage() {
                   <div className={cn(
                     "flex size-8 shrink-0 items-center justify-center rounded-full",
                     isIncome
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                      ? "bg-accent text-primary dark:bg-accent dark:text-primary"
                       : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
                   )}>
                     {isIncome ? <ArrowDownRight className="size-4" /> : <ArrowUpRight className="size-4" />}
@@ -528,7 +528,7 @@ export default function ReconcilePage() {
 
                   <p className={cn(
                     "font-mono text-sm font-medium tabular-nums shrink-0",
-                    isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                    isIncome ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                   )}>
                     {isIncome ? "+" : ""}{formatMoney(tx.amount)}
                   </p>
@@ -559,7 +559,7 @@ export default function ReconcilePage() {
                   variant="outline"
                   className={
                     rec.status === "completed"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      ? "border-primary/20 bg-accent text-primary"
                       : "border-amber-200 bg-amber-50 text-amber-700"
                   }
                 >
@@ -650,7 +650,7 @@ export default function ReconcilePage() {
             <Button
               onClick={createReconciliation}
               disabled={!recForm.startDate || !recForm.endDate || savingRec}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {savingRec ? "Starting..." : "Start checking"}
             </Button>

@@ -40,12 +40,12 @@ const values = [
 function TerminalBlock() {
   const lines = [
     { text: "$ git clone https://github.com/dubbl-org/dubbl.git", delay: 0.3 },
-    { text: "$ cd dubbl && docker compose up -d", delay: 0.7 },
+    { text: "$ cd payrollpro && docker compose up -d", delay: 0.7 },
     { text: "", delay: 1.0 },
-    { text: "  ✓ Container dubbl-db     Started", delay: 1.2, success: true },
-    { text: "  ✓ Container dubbl-app    Started", delay: 1.4, success: true },
+    { text: "  ✓ Container payrollpro-db     Started", delay: 1.2, success: true },
+    { text: "  ✓ Container payrollpro-app    Started", delay: 1.4, success: true },
     { text: "", delay: 1.6 },
-    { text: "  dubbl running at http://localhost:3000", delay: 1.8, highlight: true },
+    { text: "  PayrollPro running at http://localhost:3000", delay: 1.8, highlight: true },
   ];
 
   return (
@@ -68,7 +68,7 @@ function TerminalBlock() {
             transition={{ duration: 0.3, delay: line.delay }}
             className={
               line.success
-                ? "text-emerald-400"
+                ? "text-primary"
                 : line.highlight
                   ? "text-white font-medium"
                   : "text-white/60"
@@ -79,7 +79,7 @@ function TerminalBlock() {
         ))}
         {/* Blinking cursor */}
         <motion.span
-          className="inline-block h-4 w-2 bg-emerald-400"
+          className="inline-block h-4 w-2 bg-primary"
           animate={{ opacity: [1, 1, 0, 0] }}
           transition={{ duration: 1, repeat: Infinity, times: [0, 0.5, 0.5, 1] }}
         />
@@ -102,7 +102,7 @@ export function OpenSource() {
               <SectionHeader
                 badge="Open Source"
                 title="Fork it. Extend it. Own it."
-                subtitle="dubbl is fully open source under the Apache 2.0 license. No vendor lock-in, no hidden fees, no surprises. Your data, your rules."
+                subtitle="PayrollPro is fully open source under the Apache 2.0 license. No vendor lock-in, no hidden fees, no surprises. Your data, your rules."
                 align="left"
                 className="mb-8 md:mb-10"
               />
@@ -156,7 +156,7 @@ export function OpenSource() {
               >
                 <Button
                   size="lg"
-                  className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                  className="bg-primary text-white hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
                   asChild
                 >
                   <a

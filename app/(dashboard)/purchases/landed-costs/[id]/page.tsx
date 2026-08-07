@@ -135,7 +135,7 @@ export default function LandedCostDetailPage() {
                 variant={item.status === "draft" ? "secondary" : "default"}
                 className={
                   item.status === "allocated"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    ? "bg-primary hover:bg-primary/90"
                     : ""
                 }
               >
@@ -152,7 +152,7 @@ export default function LandedCostDetailPage() {
           <Button
             size="sm"
             onClick={handleAllocate}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             Allocate
           </Button>

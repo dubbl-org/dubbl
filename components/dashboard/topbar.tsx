@@ -296,8 +296,8 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
   }, []);
 
   return (
-    <header className="shrink-0">
-      <div className="mx-auto flex h-14 w-full max-w-[1250px] items-center justify-between gap-2 px-3 sm:px-6">
+    <header className="sticky top-0 z-40 shrink-0 bg-card border-b border-border">
+      <div className="mx-auto flex h-12 w-full max-w-[1250px] items-center justify-between gap-2 px-3 sm:px-6">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {isMobile && (
             <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={toggleSidebar}>
@@ -305,8 +305,8 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
             </Button>
           )}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <Logo className="h-5 w-auto" />
-            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">dubbl</span>
+            <Logo className="h-6 w-6 rounded-md" />
+            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">PayrollPro</span>
           </Link>
           <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
           {parentLabel && effectiveSegments.length > 1 && (

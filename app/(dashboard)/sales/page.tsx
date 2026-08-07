@@ -53,7 +53,7 @@ const statusColors: Record<string, string> = {
   draft: "",
   sent: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   partial: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  paid: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   overdue: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
@@ -178,7 +178,7 @@ function buildColumns(
       className: "w-28 text-right",
       render: (r) => {
         const color = r.amountDue < 0
-          ? "text-emerald-600"
+          ? "text-primary"
           : r.amountDue > 0 && r.status !== "draft"
             ? "text-amber-600"
             : "";
@@ -484,7 +484,7 @@ export default function InvoicesPage() {
               {[
                 { step: "1", label: "Create", sub: "Draft your invoice with line items and pricing", color: "bg-blue-500", ring: "ring-blue-200 dark:ring-blue-900" },
                 { step: "2", label: "Send", sub: "Email it directly to your customer", color: "bg-amber-500", ring: "ring-amber-200 dark:ring-amber-900" },
-                { step: "3", label: "Get paid", sub: "Track payments and outstanding balances", color: "bg-emerald-500", ring: "ring-emerald-200 dark:ring-emerald-900" },
+                { step: "3", label: "Get paid", sub: "Track payments and outstanding balances", color: "bg-primary", ring: "ring-primary dark:ring-primary" },
               ].map(({ step, label, sub, color, ring }, i) => (
                 <div key={step} className="flex flex-col items-center text-center relative">
                   {i < 2 && (
@@ -507,7 +507,7 @@ export default function InvoicesPage() {
             <Button
               onClick={() => openDrawer("invoice")}
               size="lg"
-              className="mt-5 bg-emerald-600 hover:bg-emerald-700"
+              className="mt-5 bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New Invoice
@@ -549,7 +549,7 @@ export default function InvoicesPage() {
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Aging Breakdown</p>
             <div className="h-2.5 w-full rounded-full overflow-hidden flex">
               {([
-                { key: "current" as const, color: "bg-emerald-500" },
+                { key: "current" as const, color: "bg-primary" },
                 { key: "1-30" as const, color: "bg-amber-400" },
                 { key: "31-60" as const, color: "bg-orange-500" },
                 { key: "60+" as const, color: "bg-red-500" },
@@ -562,7 +562,7 @@ export default function InvoicesPage() {
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
               {([
-                { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                { key: "current" as const, color: "bg-primary", label: "Current" },
                 { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
                 { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
                 { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
@@ -597,12 +597,12 @@ export default function InvoicesPage() {
                   className="flex items-center justify-between py-1.5 text-sm"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Banknote className="size-3.5 text-emerald-600 shrink-0" />
+                    <Banknote className="size-3.5 text-primary shrink-0" />
                     <span className="font-mono text-xs">{p.paymentNumber}</span>
                     <span className="text-xs text-muted-foreground truncate">{p.contact?.name || "-"}</span>
                     <span className="text-[11px] text-muted-foreground hidden sm:inline">{p.date}</span>
                   </div>
-                  <span className="text-xs font-mono font-medium text-emerald-600 shrink-0 ml-2">
+                  <span className="text-xs font-mono font-medium text-primary shrink-0 ml-2">
                     {formatMoney(p.amount)}
                   </span>
                 </div>
@@ -631,7 +631,7 @@ export default function InvoicesPage() {
           <Button
             onClick={() => openDrawer("invoice")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New Invoice

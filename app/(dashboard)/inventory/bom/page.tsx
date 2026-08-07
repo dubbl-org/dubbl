@@ -149,7 +149,7 @@ export default function BOMListPage() {
                   title: "Assembly orders",
                   desc: "Create work orders that deduct components and add finished items to inventory.",
                   icon: ListChecks,
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "Wastage tracking",

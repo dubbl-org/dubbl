@@ -168,14 +168,14 @@ export default function BudgetOverviewPage() {
               <span>Spent: <span className="font-mono tabular-nums text-foreground">{formatMoney(totalActual)}</span></span>
               <span className={cn(
                 "font-mono tabular-nums",
-                over ? "text-red-600" : "text-emerald-600"
+                over ? "text-red-600" : "text-primary"
               )}>
                 {over ? "Over by " + formatMoney(Math.abs(totalVariance)) : formatMoney(totalVariance) + " remaining"}
               </span>
             </div>
             <span className={cn(
               "text-xs font-mono tabular-nums font-medium",
-              over ? "text-red-600" : overallPct > 80 ? "text-amber-600" : "text-emerald-600"
+              over ? "text-red-600" : overallPct > 80 ? "text-amber-600" : "text-primary"
             )}>
               {overallPct}%
             </span>
@@ -244,7 +244,7 @@ function ViewLineCard({
           {actual > 0 && (
             <p className={cn(
               "text-xs font-mono tabular-nums",
-              over ? "text-red-600" : "text-emerald-600"
+              over ? "text-red-600" : "text-primary"
             )}>
               {over ? "Over by " : "Under by "}{formatMoney(Math.abs(variance))}
             </p>
@@ -256,7 +256,7 @@ function ViewLineCard({
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+              over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-primary"
             )}
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
@@ -294,7 +294,7 @@ function ViewLineCard({
                       <span className="font-mono tabular-nums text-blue-600">{formatMoney(p.actual)}</span>
                       <span className={cn(
                         "font-mono tabular-nums",
-                        pOver ? "text-red-600" : "text-emerald-600"
+                        pOver ? "text-red-600" : "text-primary"
                       )}>
                         {pOver ? "+" : "-"}{formatMoney(Math.abs(p.variance))}
                       </span>
@@ -362,7 +362,7 @@ function PeriodBreakdownTable({ comparisons }: { comparisons: { periods: PeriodC
                   <td className="px-4 py-2 text-right font-mono tabular-nums text-sm text-blue-600">{formatMoney(p.actual)}</td>
                   <td className={cn(
                     "px-4 py-2 text-right font-mono tabular-nums text-sm",
-                    variance >= 0 ? "text-emerald-600" : "text-red-600"
+                    variance >= 0 ? "text-primary" : "text-red-600"
                   )}>
                     {variance >= 0 ? "" : "-"}{formatMoney(Math.abs(variance))}
                   </td>
@@ -377,7 +377,7 @@ function PeriodBreakdownTable({ comparisons }: { comparisons: { periods: PeriodC
               <td className="px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold text-blue-600">{formatMoney(totActual)}</td>
               <td className={cn(
                 "px-4 py-2 text-right font-mono tabular-nums text-sm font-semibold",
-                totVariance >= 0 ? "text-emerald-600" : "text-red-600"
+                totVariance >= 0 ? "text-primary" : "text-red-600"
               )}>
                 {totVariance >= 0 ? "" : "-"}{formatMoney(Math.abs(totVariance))}
               </td>

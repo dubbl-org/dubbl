@@ -44,7 +44,7 @@ interface RecurringTemplate {
 
 const statusColors: Record<string, string> = {
   active:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   paused:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400",
   completed:

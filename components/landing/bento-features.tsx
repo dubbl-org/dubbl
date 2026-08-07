@@ -34,7 +34,7 @@ function WindowChrome({ children, title }: { children: React.ReactNode; title: s
         <div className="flex items-center gap-1.5">
           <div className="size-2 rounded-full bg-rose-400/70" />
           <div className="size-2 rounded-full bg-amber-400/70" />
-          <div className="size-2 rounded-full bg-emerald-400/70" />
+          <div className="size-2 rounded-full bg-primary" />
         </div>
         <span className="text-[10px] font-medium text-muted-foreground">{title}</span>
       </div>
@@ -112,10 +112,10 @@ function LedgerMockup() {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: false }}
         transition={{ delay: 0.75, duration: 0.3 }}
-        className="mt-2.5 flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 dark:border-emerald-900 dark:bg-emerald-950/40"
+        className="mt-2.5 flex items-center gap-1.5 rounded-md border border-primary/20 bg-accent px-2.5 py-1.5 dark:border-primary/20 dark:bg-accent"
       >
-        <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-        <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+        <CheckCircle2 className="size-3.5 text-primary dark:text-primary" />
+        <span className="text-[11px] font-medium text-primary dark:text-primary">
           Balanced — Debits equal Credits
         </span>
       </motion.div>
@@ -186,7 +186,7 @@ function ReportsMockup() {
             <p
               className={cn(
                 "mt-0.5 text-[10px] font-semibold tabular-nums",
-                kpi.positive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                kpi.positive ? "text-primary dark:text-primary" : "text-amber-600 dark:text-amber-400"
               )}
             >
               {kpi.change}
@@ -228,14 +228,14 @@ function ReportsMockup() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: false }}
             transition={{ delay: 0.6, duration: 0.5 }}
-            className="fill-emerald-500/8 dark:fill-emerald-400/10"
+            className="fill-primary dark:fill-primary"
           />
 
           {/* Revenue line */}
           <motion.path
             d={toPath(revenuePoints)}
             fill="none"
-            className="stroke-emerald-500 dark:stroke-emerald-400"
+            className="stroke-primary dark:stroke-primary"
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -282,7 +282,7 @@ function ReportsMockup() {
         {/* Legend */}
         <div className="mt-1.5 flex items-center justify-center gap-4">
           <div className="flex items-center gap-1.5">
-            <div className="h-0.5 w-4 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+            <div className="h-0.5 w-4 rounded-full bg-primary dark:bg-primary" />
             <span className="text-[9px] font-medium text-muted-foreground">Revenue</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -340,7 +340,7 @@ function ReconciliationMockup() {
                     className={cn(
                       "size-2 shrink-0 rounded-full",
                       item.status === "matched"
-                        ? "bg-emerald-500"
+                        ? "bg-primary"
                         : "bg-amber-500"
                     )}
                   />
@@ -366,7 +366,7 @@ function ReconciliationMockup() {
               className="flex h-[52px] items-center"
             >
               {item.status === "matched" ? (
-                <Link2 className="size-3 text-emerald-500 dark:text-emerald-400" />
+                <Link2 className="size-3 text-primary dark:text-primary" />
               ) : (
                 <div className="size-3 rounded-full border border-dashed border-amber-400" />
               )}
@@ -409,7 +409,7 @@ function ReconciliationMockup() {
                     className={cn(
                       "size-2 shrink-0 rounded-full",
                       item.status === "matched"
-                        ? "bg-emerald-500"
+                        ? "bg-primary"
                         : "bg-amber-500"
                     )}
                   />
@@ -433,7 +433,7 @@ function ReconciliationMockup() {
         className="mt-2.5 flex items-center justify-between rounded-md border border-border bg-muted/40 px-2.5 py-1.5"
       >
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="flex items-center gap-1 text-[10px] font-medium text-primary dark:text-primary">
             <CheckCircle2 className="size-3" /> 3 matched
           </span>
           <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
@@ -460,7 +460,7 @@ function AuditTrailMockup() {
       entityType: "entry",
       time: "2 min ago",
       icon: FileText,
-      color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+      color: "bg-accent text-primary dark:bg-primary dark:text-primary",
     },
     {
       user: "BM",
@@ -627,7 +627,7 @@ const secondaryFeatures = [
     description:
       "Connect AI assistants directly to your business data. 15 built-in tool modules let AI agents manage contacts, invoices, inventory, and more.",
     icon: Plug,
-    iconColor: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400",
+    iconColor: "bg-accent text-primary dark:bg-accent dark:text-primary",
   },
 ];
 

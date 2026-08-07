@@ -241,7 +241,7 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
         <Button
           type="submit"
           disabled={!isBalanced || loading}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
         >
           {loading ? "Saving..." : (submitLabel || "Save Entry")}
         </Button>

@@ -37,7 +37,7 @@ const ledgerColumns: Column<LedgerEntry>[] = [
     render: (r) => (
       <a
         href={`/accounting/${r.entryId}`}
-        className="font-mono text-xs text-emerald-600 hover:underline"
+        className="font-mono text-xs text-primary hover:underline"
       >
         {r.entryNumber}
       </a>

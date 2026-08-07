@@ -9,7 +9,7 @@ import {
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "How dubbl (Mindroot Ltd) collects, uses, and protects your personal data under the UK GDPR.",
+    "How PayrollPro (Mindroot Ltd) collects, uses, and protects your personal data under the UK GDPR.",
 };
 
 const sections: LegalSection[] = [
@@ -19,7 +19,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          The data controller for personal data processed through dubbl.dev is:
+          The data controller for personal data processed through PayrollPro is:
         </p>
         <p>
           <strong>Mindroot Ltd</strong>
@@ -78,7 +78,7 @@ const sections: LegalSection[] = [
         <ul>
           <li>
             <strong>Service delivery</strong> ·providing, maintaining, and
-            improving the dubbl platform.
+            improving the PayrollPro platform.
           </li>
           <li>
             <strong>Payments</strong> ·processing subscriptions and invoices
@@ -313,7 +313,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           This privacy policy applies exclusively to the hosted service at{" "}
-          <strong>dubbl.dev</strong>. If you self-host dubbl using our
+          <strong>PayrollPro</strong>. If you self-host PayrollPro using our
           open-source code, you are responsible for your own data processing,
           privacy policy, and compliance with applicable data protection laws.
         </p>
@@ -326,7 +326,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          dubbl is not directed at individuals under the age of 16. We do not
+          PayrollPro is not directed at individuals under the age of 16. We do not
           knowingly collect personal data from children. If you believe we have
           inadvertently collected data from a child, please contact us at{" "}
           <a href="mailto:team@dubbl.dev">team@dubbl.dev</a> and we will
@@ -386,7 +386,7 @@ export default function PrivacyPage() {
     <LegalPageLayout
       badge="Legal"
       title="Privacy Policy"
-      subtitle="How we collect, use, and protect your personal data at dubbl."
+      subtitle="How we collect, use, and protect your personal data at PayrollPro."
       lastUpdated="2 March 2026"
       sections={sections}
     />

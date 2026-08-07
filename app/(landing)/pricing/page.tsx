@@ -88,8 +88,8 @@ const featureRows: { label: string; free: boolean; pro: boolean }[] = [
 function ComparisonValue({ value }: { value: boolean | string }) {
   if (typeof value === "boolean") {
     return value ? (
-      <div className="mx-auto flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950">
-        <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+      <div className="mx-auto flex size-6 items-center justify-center rounded-full bg-accent dark:bg-accent">
+        <Check className="size-3.5 text-primary dark:text-primary" />
       </div>
     ) : (
       <Minus className="mx-auto size-4 text-muted-foreground/25" />
@@ -105,11 +105,11 @@ function ComparisonValue({ value }: { value: boolean | string }) {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center gap-3">
-      <div className="h-px flex-1 bg-gradient-to-r from-emerald-500/40 to-transparent" />
-      <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
+      <div className="h-px flex-1 bg-gradient-to-r from-primary to-transparent" />
+      <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary dark:text-primary">
         {children}
       </span>
-      <div className="h-px flex-1 bg-gradient-to-l from-emerald-500/40 to-transparent" />
+      <div className="h-px flex-1 bg-gradient-to-l from-primary to-transparent" />
     </div>
   );
 }
@@ -133,15 +133,15 @@ export default function PricingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 dark:border-emerald-800 dark:bg-emerald-950">
-            <div className="size-1.5 rounded-full bg-emerald-500" />
-            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-accent px-4 py-1.5 dark:border-primary/20 dark:bg-accent">
+            <div className="size-1.5 rounded-full bg-primary" />
+            <span className="text-xs font-medium text-primary dark:text-primary">
               Transparent pricing
             </span>
           </div>
           <h1 className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.1] tracking-tight sm:text-6xl lg:text-7xl">
             Start free,{" "}
-            <span className="italic bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 bg-clip-text text-transparent dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-300">
+            <span className="italic bg-gradient-to-r from-primary via-primary to-teal-400 bg-clip-text text-transparent dark:from-primary dark:via-primary dark:to-teal-300">
               scale smart
             </span>
           </h1>
@@ -174,7 +174,7 @@ export default function PricingPage() {
               )}
             >
               Annual
-              <span className="ml-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Save 17%</span>
+              <span className="ml-1.5 text-xs text-primary dark:text-primary font-semibold">Save 17%</span>
             </button>
           </div>
         </motion.div>
@@ -230,7 +230,7 @@ export default function PricingPage() {
                       "Community support",
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-2 text-[13px]">
-                        <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <Check className="size-3.5 shrink-0 text-primary dark:text-primary" />
                         <span className="text-muted-foreground">{f}</span>
                       </div>
                     ))}
@@ -246,12 +246,12 @@ export default function PricingPage() {
             </div>
 
             {/* Pro */}
-            <div className="group relative flex flex-col rounded-2xl border-2 border-emerald-500/40 bg-card transition-shadow hover:shadow-lg hover:shadow-emerald-500/10 dark:border-emerald-500/30">
+            <div className="group relative flex flex-col rounded-2xl border-2 border-primary bg-card transition-shadow hover:shadow-lg hover:shadow-primary dark:border-primary">
               {/* Badge */}
               <div className="absolute right-6 top-6">
-                <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 dark:border-emerald-800 dark:bg-emerald-950">
-                  <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-accent px-3 py-1 dark:border-primary/20 dark:bg-accent">
+                  <div className="size-1.5 rounded-full bg-primary animate-pulse" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-primary dark:text-primary">
                     Popular
                   </span>
                 </div>
@@ -259,8 +259,8 @@ export default function PricingPage() {
 
               <div className="flex flex-1 flex-col p-8 lg:p-10">
                 <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950">
-                    <Zap className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-accent dark:bg-accent">
+                    <Zap className="size-5 text-primary dark:text-primary" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Pro</h3>
@@ -327,7 +327,7 @@ export default function PricingPage() {
                       "Priority support",
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-2 text-[13px]">
-                        <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <Check className="size-3.5 shrink-0 text-primary dark:text-primary" />
                         <span className="text-muted-foreground">{f}</span>
                       </div>
                     ))}
@@ -336,7 +336,7 @@ export default function PricingPage() {
 
                 <div className="mt-10">
                   <Button
-                    className="w-full h-12 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
+                    className="w-full h-12 text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors"
                     asChild
                   >
                     <a href="/sign-up?plan=pro">
@@ -383,7 +383,7 @@ export default function PricingPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 + i * 0.08 }}
-                  className="group relative flex flex-col rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-black/5 hover:border-emerald-500/30"
+                  className="group relative flex flex-col rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-black/5 hover:border-primary"
                 >
                   <div className="flex flex-1 flex-col p-6">
                     <div className="flex items-center justify-between">
@@ -432,14 +432,14 @@ export default function PricingPage() {
                     <div className="mt-5 space-y-3 flex-1">
                       <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <FileBox className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <FileBox className="size-3.5 text-primary dark:text-primary" />
                           <span className="text-xs text-muted-foreground">Files</span>
                         </div>
                         <span className="font-mono text-sm font-semibold tabular-nums">{files}</span>
                       </div>
                       <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <Mail className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <Mail className="size-3.5 text-primary dark:text-primary" />
                           <span className="text-xs text-muted-foreground">Emails</span>
                         </div>
                         <span className="font-mono text-sm font-semibold tabular-nums">{emails}</span>
@@ -459,7 +459,7 @@ export default function PricingPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full text-xs group-hover:border-emerald-500/40 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
+                          className="w-full text-xs group-hover:border-primary group-hover:text-primary dark:group-hover:text-primary transition-colors"
                           asChild
                         >
                           <a href="/sign-up">Add {meta.name}</a>
@@ -484,8 +484,8 @@ export default function PricingPage() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="max-w-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <Github className="size-5 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  <Github className="size-5 text-primary dark:text-primary" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-primary dark:text-primary">
                     Open Source
                   </span>
                 </div>
@@ -493,7 +493,7 @@ export default function PricingPage() {
                   Self-host with zero limits
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  dubbl is Apache 2.0 licensed. Self-hosted instances unlock
+                  PayrollPro is Apache 2.0 licensed. Self-hosted instances unlock
                   every feature with no user caps and no telemetry. Cloud plans
                   fund development.
                 </p>
@@ -542,10 +542,10 @@ export default function PricingPage() {
                   </th>
                   <th className="py-4 pr-6 text-center w-[22.5%]">
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="text-sm font-semibold text-primary dark:text-primary">
                         Pro
                       </span>
-                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                      <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-primary dark:bg-accent dark:text-primary">
                         ${price("pro")}/seat
                       </span>
                     </div>
@@ -557,7 +557,7 @@ export default function PricingPage() {
                 <tr>
                   <td
                     colSpan={3}
-                    className="px-6 pb-1 pt-6 text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-600 dark:text-emerald-400"
+                    className="px-6 pb-1 pt-6 text-[10px] font-bold uppercase tracking-[0.15em] text-primary dark:text-primary"
                   >
                     Limits
                   </td>
@@ -584,7 +584,7 @@ export default function PricingPage() {
                 <tr>
                   <td
                     colSpan={3}
-                    className="px-6 pb-1 pt-6 text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-600 dark:text-emerald-400"
+                    className="px-6 pb-1 pt-6 text-[10px] font-bold uppercase tracking-[0.15em] text-primary dark:text-primary"
                   >
                     Features &amp; Support
                   </td>
@@ -676,7 +676,7 @@ export default function PricingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 px-8 py-16 text-center lg:px-16 lg:py-20">
+          <div className="relative overflow-hidden rounded-2xl border border-primary px-8 py-16 text-center lg:px-16 lg:py-20">
             <GrainGradient
               className="pointer-events-none !absolute !inset-0 !rounded-none"
               width="100%"
@@ -705,7 +705,7 @@ export default function PricingPage() {
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
                   href="/sign-up"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-8 text-sm font-medium text-emerald-700 transition-colors hover:bg-white/90"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-8 text-sm font-medium text-primary transition-colors hover:bg-white/90"
                 >
                   Get Started
                   <ArrowRight className="size-4" />

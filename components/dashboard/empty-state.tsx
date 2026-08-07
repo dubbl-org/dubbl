@@ -21,8 +21,8 @@ export function EmptyState({
       "flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-16 px-6 text-center",
       !compact && "min-h-[50vh]"
     )}>
-      <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-        <Icon className="size-6 text-emerald-600 dark:text-emerald-400" />
+      <div className="flex size-12 items-center justify-center rounded-xl bg-accent dark:bg-accent">
+        <Icon className="size-6 text-primary dark:text-primary" />
       </div>
       <h3 className="mt-4 text-sm font-medium">{title}</h3>
       <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">

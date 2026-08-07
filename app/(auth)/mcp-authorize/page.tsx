@@ -108,15 +108,15 @@ function McpAuthorizeContent() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-          <Shield className="size-6 text-emerald-600 dark:text-emerald-400" />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent dark:bg-primary">
+          <Shield className="size-6 text-primary dark:text-primary" />
         </div>
         <h1 className="text-[28px] font-extrabold tracking-tight text-foreground">
           Authorize MCP Access
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{clientName}</span>{" "}
-          wants to access your dubbl data via MCP
+          wants to access your PayrollPro data via MCP
         </p>
       </motion.div>
 
@@ -180,7 +180,7 @@ function McpAuthorizeContent() {
             Deny
           </Button>
           <Button
-            className="h-11 flex-1 rounded-lg bg-emerald-600 shadow-md shadow-emerald-600/15 transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
+            className="h-11 flex-1 rounded-lg bg-primary shadow-md shadow-primary transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary active:scale-[0.98]"
             onClick={handleApprove}
             disabled={loading || !selectedOrg}
           >

@@ -21,7 +21,7 @@ interface QuoteDetail {
 }
 
 const statusColors: Record<string, string> = {
-  draft: "", sent: "border-blue-200 bg-blue-50 text-blue-700", accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  draft: "", sent: "border-blue-200 bg-blue-50 text-blue-700", accepted: "border-primary/20 bg-accent text-primary",
   declined: "border-red-200 bg-red-50 text-red-700", expired: "border-gray-200 bg-gray-50 text-gray-700", converted: "border-purple-200 bg-purple-50 text-purple-700",
 };
 
@@ -78,12 +78,12 @@ export default function QuoteDetailPage() {
     <div className="space-y-6">
       <PageHeader title={q.quoteNumber} description={`To: ${q.contact?.name || "Unknown"}`}>
         <Button variant="outline" size="sm" asChild><Link href="/sales/quotes"><ArrowLeft className="mr-2 size-4" />Back</Link></Button>
-        {q.status === "draft" && <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700"><Send className="mr-2 size-4" />Send</Button>}
+        {q.status === "draft" && <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-primary hover:bg-primary/90"><Send className="mr-2 size-4" />Send</Button>}
         {q.status === "sent" && <>
-          <Button size="sm" onClick={() => action("accept")} className="bg-emerald-600 hover:bg-emerald-700"><Check className="mr-2 size-4" />Accept</Button>
+          <Button size="sm" onClick={() => action("accept")} className="bg-primary hover:bg-primary/90"><Check className="mr-2 size-4" />Accept</Button>
           <Button size="sm" variant="outline" onClick={() => action("decline")} className="text-red-600"><X className="mr-2 size-4" />Decline</Button>
         </>}
-        {q.status === "accepted" && <Button size="sm" onClick={handleConvert} className="bg-emerald-600 hover:bg-emerald-700" title="Turn this accepted quote into an invoice you can send and get paid on"><FileText className="mr-2 size-4" />Create an invoice from this quote</Button>}
+        {q.status === "accepted" && <Button size="sm" onClick={handleConvert} className="bg-primary hover:bg-primary/90" title="Turn this accepted quote into an invoice you can send and get paid on"><FileText className="mr-2 size-4" />Create an invoice from this quote</Button>}
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">

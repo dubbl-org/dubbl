@@ -17,7 +17,7 @@ export default function DashboardLayout({
       <SidebarProvider>
         <CreateDrawerProvider>
           <AppSidebar />
-          <SidebarInset className="bg-content-bg">
+          <SidebarInset className="bg-background">
             <Topbar />
             <div className="mx-auto w-full max-w-[1250px] flex-1 px-3 py-4 sm:px-6 sm:py-6">
               {children}

@@ -105,7 +105,7 @@ export default function Form1099Page() {
             variant={year === y ? "default" : "outline"}
             size="sm"
             onClick={() => setYear(y)}
-            className={year === y ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+            className={year === y ? "bg-primary hover:bg-primary/90" : ""}
           >
             {y}
           </Button>
@@ -176,7 +176,7 @@ export default function Form1099Page() {
                         <span className={cn(
                           "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                           v.reportable
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            ? "bg-accent text-primary dark:bg-accent dark:text-primary"
                             : "bg-muted text-muted-foreground"
                         )}>
                           {v.reportable ? "Yes — file a 1099" : "Below threshold"}

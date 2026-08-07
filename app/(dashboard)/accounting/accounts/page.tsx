@@ -34,7 +34,7 @@ const TYPE_META: Record<string, { dot: string; bg: string; text: string; border:
   asset: { dot: "bg-blue-500", bg: "bg-blue-500/8", text: "text-blue-700 dark:text-blue-400", border: "border-blue-200 dark:border-blue-800" },
   liability: { dot: "bg-orange-500", bg: "bg-orange-500/8", text: "text-orange-700 dark:text-orange-400", border: "border-orange-200 dark:border-orange-800" },
   equity: { dot: "bg-purple-500", bg: "bg-purple-500/8", text: "text-purple-700 dark:text-purple-400", border: "border-purple-200 dark:border-purple-800" },
-  revenue: { dot: "bg-emerald-500", bg: "bg-emerald-500/8", text: "text-emerald-700 dark:text-emerald-400", border: "border-emerald-200 dark:border-emerald-800" },
+  revenue: { dot: "bg-primary", bg: "bg-primary", text: "text-primary dark:text-primary", border: "border-primary/20 dark:border-primary/20" },
   expense: { dot: "bg-red-500", bg: "bg-red-500/8", text: "text-red-700 dark:text-red-400", border: "border-red-200 dark:border-red-800" },
 };
 
@@ -122,14 +122,14 @@ export default function AccountsPage() {
       asset: "bg-blue-500/10 dark:bg-blue-500/15",
       liability: "bg-orange-500/10 dark:bg-orange-500/15",
       equity: "bg-purple-500/10 dark:bg-purple-500/15",
-      revenue: "bg-emerald-500/10 dark:bg-emerald-500/15",
+      revenue: "bg-primary dark:bg-primary",
       expense: "bg-red-500/10 dark:bg-red-500/15",
     };
     const TYPE_DOT: Record<string, string> = {
       asset: "bg-blue-500",
       liability: "bg-orange-500",
       equity: "bg-purple-500",
-      revenue: "bg-emerald-500",
+      revenue: "bg-primary",
       expense: "bg-red-500",
     };
     const TYPE_EXAMPLES: Record<string, string[]> = {
@@ -153,7 +153,7 @@ export default function AccountsPage() {
           <Button
             onClick={() => openDrawer("account")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New account
@@ -198,7 +198,7 @@ export default function AccountsPage() {
         <Button
           onClick={() => openDrawer("account")}
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-2 size-4" />
           New account

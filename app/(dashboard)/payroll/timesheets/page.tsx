@@ -38,7 +38,7 @@ type StatusFilter = "all" | "draft" | "submitted" | "approved" | "rejected";
 const statusColors: Record<string, string> = {
   draft: "",
   submitted: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  approved: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  approved: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
@@ -122,7 +122,7 @@ export default function TimesheetsPage() {
               <TabsTrigger value="rejected">Rejected</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button size="sm" className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={() => setDialogOpen(true)}>
+          <Button size="sm" className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90" onClick={() => setDialogOpen(true)}>
             <Plus className="size-3" />
             New Timesheet
           </Button>
@@ -200,7 +200,7 @@ export default function TimesheetsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={creating} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleCreate} disabled={creating} className="bg-primary hover:bg-primary/90">
               {creating ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>

@@ -29,7 +29,7 @@ export function LoginAlertEmail({
       <Section style={content}>
         <Text style={heading}>New sign-in detected</Text>
         <Text style={subtext}>
-          Hi {userName}, we noticed a sign-in to your dubbl account from an IP
+          Hi {userName}, we noticed a sign-in to your PayrollPro account from an IP
           address we have not seen before. If this was you, no action is needed.
         </Text>
 

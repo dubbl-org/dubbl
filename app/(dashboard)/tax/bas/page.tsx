@@ -148,7 +148,7 @@ export default function BasPage() {
                 </span>
                 <span className={cn(
                   "font-mono text-sm tabular-nums font-semibold",
-                  netGst >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                  netGst >= 0 ? "text-red-600 dark:text-red-400" : "text-primary dark:text-primary"
                 )}>
                   {formatMoney(Math.abs(netGst))}
                 </span>
@@ -162,7 +162,7 @@ export default function BasPage() {
               "rounded-xl border-2 p-5",
               netField.amount >= 0
                 ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
-                : "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+                : "border-primary/20 bg-accent dark:border-primary/20 dark:bg-accent"
             )}>
               <div className="flex items-center justify-between">
                 <div>
@@ -171,7 +171,7 @@ export default function BasPage() {
                   </p>
                   <p className={cn(
                     "mt-1 text-2xl font-bold font-mono tabular-nums",
-                    netField.amount >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                    netField.amount >= 0 ? "text-red-600 dark:text-red-400" : "text-primary dark:text-primary"
                   )}>
                     {formatMoney(Math.abs(netField.amount))}
                   </p>
@@ -180,12 +180,12 @@ export default function BasPage() {
                   "flex size-12 items-center justify-center rounded-xl",
                   netField.amount >= 0
                     ? "bg-red-100 dark:bg-red-900/40"
-                    : "bg-emerald-100 dark:bg-emerald-900/40"
+                    : "bg-accent dark:bg-primary"
                 )}>
                   {netField.amount >= 0 ? (
                     <ArrowUpRight className="size-5 text-red-600 dark:text-red-400" />
                   ) : (
-                    <ArrowDownLeft className="size-5 text-emerald-600 dark:text-emerald-400" />
+                    <ArrowDownLeft className="size-5 text-primary dark:text-primary" />
                   )}
                 </div>
               </div>

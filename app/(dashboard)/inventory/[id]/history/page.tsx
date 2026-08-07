@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const movementTypeColors: Record<string, string> = {
   adjustment: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
   stock_take: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
-  purchase: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  purchase: "bg-accent text-primary border-primary/20 dark:bg-accent dark:text-primary dark:border-primary/20",
   sale: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800",
   transfer_in: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:border-cyan-800",
   transfer_out: "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950 dark:text-pink-300 dark:border-pink-800",
@@ -71,7 +71,7 @@ export default function InventoryItemHistoryPage() {
               <div className="flex items-center gap-2">
                 <span className={cn(
                   "text-sm font-mono font-semibold tabular-nums",
-                  isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  isPositive ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                 )}>
                   {isPositive ? "+" : ""}{qty}
                 </span>

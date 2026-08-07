@@ -210,7 +210,7 @@ export default function AnalyticsPage() {
                 <Button
                   onClick={() => router.push("/payroll/runs")}
                   size="lg"
-                  className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+                  className="bg-primary hover:bg-primary/90 shadow-md shadow-primary"
                 >
                   Go to Payroll Runs
                 </Button>
@@ -270,7 +270,7 @@ export default function AnalyticsPage() {
           </motion.div>
           <motion.div {...anim(0.1)} className="rounded-xl border bg-card p-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Net</p>
-            <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+            <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-primary dark:text-primary">
               {formatMoney(summary.totalNet)}
             </p>
           </motion.div>
@@ -403,7 +403,7 @@ export default function AnalyticsPage() {
               </motion.div>
               <motion.div {...anim(0.05)} className="rounded-xl border bg-card p-4">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Projected Monthly</p>
-                <p className="mt-1 text-xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                <p className="mt-1 text-xl font-bold font-mono tabular-nums text-primary dark:text-primary">
                   {formatMoney(whatIf.projected.monthlyGross)}
                 </p>
                 <p className="text-xs text-muted-foreground">{whatIf.projected.headcount} employees</p>
@@ -415,7 +415,7 @@ export default function AnalyticsPage() {
                     "mt-1 text-xl font-bold font-mono tabular-nums",
                     whatIf.difference.monthlyGross >= 0
                       ? "text-red-600 dark:text-red-400"
-                      : "text-emerald-600 dark:text-emerald-400"
+                      : "text-primary dark:text-primary"
                   )}
                 >
                   {whatIf.difference.monthlyGross >= 0 ? "+" : ""}

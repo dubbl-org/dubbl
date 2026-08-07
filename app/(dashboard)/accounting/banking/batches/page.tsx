@@ -192,7 +192,7 @@ export default function PaymentBatchesPage() {
         <Button
           size="sm"
           onClick={openCreateDialog}
-          className="h-8 bg-emerald-600 hover:bg-emerald-700 text-xs"
+          className="h-8 bg-primary hover:bg-primary/90 text-xs"
         >
           <Plus className="mr-1.5 size-3.5" />
           Create Batch
@@ -214,7 +214,7 @@ export default function PaymentBatchesPage() {
           <Button
             size="sm"
             onClick={openCreateDialog}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             Create Batch
@@ -312,7 +312,7 @@ export default function PaymentBatchesPage() {
                           className={cn(
                             "size-4 rounded border flex items-center justify-center transition-colors",
                             isSelected
-                              ? "bg-emerald-600 border-emerald-600"
+                              ? "bg-primary border-primary/40"
                               : "border-border"
                           )}
                         >
@@ -383,7 +383,7 @@ export default function PaymentBatchesPage() {
               disabled={
                 saving || !batchName || selectedBills.length === 0
               }
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               Create Batch

@@ -130,10 +130,10 @@ function NavItemLink({ item, active, badge }: { item: NavItem; active: boolean; 
       <Link
         href={item.href}
         className={cn(
-          "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+          "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-150",
           active
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+            ? "bg-sidebar-accent text-sidebar-primary font-semibold border-l-[3px] border-sidebar-primary -ml-px"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         )}
       >
         <IconComp ref={iconRef} size={16} className="shrink-0" />
@@ -203,10 +203,10 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
       >
         <CollapsibleTrigger
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-all duration-150",
             projectsActive
-              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-              : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              ? "bg-sidebar-accent text-sidebar-primary font-semibold border-l-[3px] border-sidebar-primary -ml-px"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
           <LayersIcon ref={iconRef} size={16} className="shrink-0" />

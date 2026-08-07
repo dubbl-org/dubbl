@@ -126,7 +126,7 @@ export default function TrackingReportPage() {
             variant={dimension === "costCenterId" ? "default" : "outline"}
             size="sm"
             onClick={() => setDimension("costCenterId")}
-            className={dimension === "costCenterId" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+            className={dimension === "costCenterId" ? "bg-primary hover:bg-primary/90" : ""}
           >
             Department
           </Button>
@@ -134,7 +134,7 @@ export default function TrackingReportPage() {
             variant={dimension === "projectId" ? "default" : "outline"}
             size="sm"
             onClick={() => setDimension("projectId")}
-            className={dimension === "projectId" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+            className={dimension === "projectId" ? "bg-primary hover:bg-primary/90" : ""}
           >
             Project
           </Button>
@@ -186,7 +186,7 @@ export default function TrackingReportPage() {
                   />
                 ))}
                 {data.netIncome && (
-                  <TableRow className="bg-emerald-50 dark:bg-emerald-950/30 font-bold">
+                  <TableRow className="bg-accent dark:bg-accent font-bold">
                     <TableCell>Profit (money in minus costs)</TableCell>
                     {data.netIncome.byColumn.map((amt, i) => (
                       <TableCell key={i} className="text-right font-mono tabular-nums">
@@ -232,7 +232,7 @@ function RenderSection({
           {columns.map((c, i) => (
             <TableCell key={c.key} className="text-right font-mono tabular-nums">
               {a.amounts[i] !== 0 ? (
-                <Link href={ledgerHref(a.accountId, c)} className="hover:text-emerald-600 hover:underline">
+                <Link href={ledgerHref(a.accountId, c)} className="hover:text-primary hover:underline">
                   {formatMoney(a.amounts[i])}
                 </Link>
               ) : (

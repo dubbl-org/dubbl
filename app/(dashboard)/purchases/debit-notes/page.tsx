@@ -43,7 +43,7 @@ const statusColors: Record<string, string> = {
   draft: "",
   sent: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   applied:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -272,7 +272,7 @@ export default function DebitNotesPage() {
             </div>
             <Button
               onClick={() => openDrawer("debitNote")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               New supplier credit
@@ -384,7 +384,7 @@ export default function DebitNotesPage() {
           <Button
             onClick={() => openDrawer("debitNote")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New supplier credit

@@ -56,8 +56,8 @@ export default function ReportPackPage() {
       <ContentReveal>
         <div className="rounded-xl border bg-card/80 p-5 sm:p-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-              <Package2 className="size-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex size-9 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+              <Package2 className="size-5 text-primary dark:text-primary" />
             </div>
             <div>
               <h3 className="text-sm font-semibold">What&apos;s in the bundle</h3>
@@ -70,7 +70,7 @@ export default function ReportPackPage() {
           <ul className="mt-4 space-y-2.5">
             {INCLUDED.map((item) => (
               <li key={item.name} className="flex items-start gap-2.5">
-                <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                <Check className="mt-0.5 size-4 shrink-0 text-primary" />
                 <div>
                   <p className="text-sm font-medium">{item.name}</p>
                   <p className="text-xs text-muted-foreground">{item.desc}</p>
@@ -79,7 +79,7 @@ export default function ReportPackPage() {
             ))}
           </ul>
 
-          <Button asChild className="mt-5 bg-emerald-600 hover:bg-emerald-700">
+          <Button asChild className="mt-5 bg-primary hover:bg-primary/90">
             <a href={downloadUrl}>
               <FileSpreadsheet className="mr-1.5 size-4" />
               Download the bundle (spreadsheet)

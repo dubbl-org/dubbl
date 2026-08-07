@@ -49,7 +49,7 @@ interface LineItem {
 
 const statusColors: Record<string, string> = {
   active:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   paused:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   completed:
@@ -198,7 +198,7 @@ export default function RecurringBillsPage() {
         </div>
         <Button
           onClick={() => setDrawerOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-2 size-4" />
           New Recurring Bill
@@ -414,7 +414,7 @@ export default function RecurringBillsPage() {
             </div>
 
             <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className="w-full bg-primary hover:bg-primary/90"
               onClick={handleSubmit}
               disabled={submitting || !name || !contactId || !startDate}
             >

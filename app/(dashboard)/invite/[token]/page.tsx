@@ -99,8 +99,8 @@ export default function InviteAcceptPage() {
         <div className="rounded-xl border bg-card p-8 shadow-sm">
           {/* Logo */}
           <div className="flex items-center gap-2.5 mb-8">
-            <Logo className="h-7 w-9" />
-            <span className="text-lg font-bold tracking-tight text-emerald-600">dubbl</span>
+            <Logo />
+            <span className="text-lg font-bold tracking-tight text-primary">PayrollPro</span>
           </div>
 
           {state === "loading" && (
@@ -125,8 +125,8 @@ export default function InviteAcceptPage() {
               </div>
 
               <div className="rounded-lg bg-muted/50 p-4 flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50">
-                  <Users className="size-5 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex size-10 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+                  <Users className="size-5 text-primary dark:text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">{info.orgName}</p>
@@ -136,7 +136,7 @@ export default function InviteAcceptPage() {
 
               <Button
                 onClick={handleAccept}
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                className="w-full bg-primary hover:bg-primary/90"
                 size="lg"
               >
                 Accept Invitation
@@ -146,7 +146,7 @@ export default function InviteAcceptPage() {
 
           {state === "accepting" && (
             <div className="flex flex-col items-center py-8">
-              <Loader2 className="size-8 text-emerald-600 animate-spin" />
+              <Loader2 className="size-8 text-primary animate-spin" />
               <p className="mt-4 text-sm text-muted-foreground">Joining organization...</p>
             </div>
           )}
@@ -154,8 +154,8 @@ export default function InviteAcceptPage() {
           {state === "success" && (
             <div className="space-y-6">
               <div className="flex flex-col items-center text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50">
-                  <CheckCircle2 className="size-6 text-emerald-600" />
+                <div className="flex size-12 items-center justify-center rounded-full bg-accent dark:bg-accent">
+                  <CheckCircle2 className="size-6 text-primary" />
                 </div>
                 <h1 className="mt-4 text-xl font-semibold">You&apos;re in!</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -164,7 +164,7 @@ export default function InviteAcceptPage() {
               </div>
               <Button
                 onClick={goToDashboard}
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                className="w-full bg-primary hover:bg-primary/90"
                 size="lg"
               >
                 Go to Dashboard
@@ -185,7 +185,7 @@ export default function InviteAcceptPage() {
                 <Button variant="outline" className="flex-1" onClick={() => router.push("/")}>
                   Go Home
                 </Button>
-                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => router.push("/sign-in")}>
+                <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={() => router.push("/sign-in")}>
                   Sign In
                 </Button>
               </div>

@@ -151,7 +151,7 @@ export default function BudgetsPage() {
           <Button
             onClick={() => openDrawer("budget")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New Budget
@@ -176,11 +176,11 @@ export default function BudgetsPage() {
               <div key={label} className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">{label}</span>
-                  <span className={cn("text-xs font-medium", pct > 80 ? "text-amber-500/70" : "text-emerald-500/70")}>{pct}%</span>
+                  <span className={cn("text-xs font-medium", pct > 80 ? "text-amber-500/70" : "text-primary")}>{pct}%</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                   <div
-                    className={cn("h-full rounded-full", pct > 80 ? "bg-amber-500/50" : "bg-emerald-500/50")}
+                    className={cn("h-full rounded-full", pct > 80 ? "bg-amber-500/50" : "bg-primary")}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -225,7 +225,7 @@ export default function BudgetsPage() {
         <Button
           onClick={() => openDrawer("budget")}
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-2 size-4" />
           New Budget
@@ -321,7 +321,7 @@ export default function BudgetsPage() {
                         <div className="flex items-center gap-2 justify-end text-[11px] text-muted-foreground">
                           <span className={cn(
                             "font-mono tabular-nums",
-                            over ? "text-red-600" : "text-emerald-600"
+                            over ? "text-red-600" : "text-primary"
                           )}>
                             {over ? "Over by " + formatMoney(Math.abs(remaining)) : formatMoney(remaining) + " left"}
                           </span>
@@ -338,7 +338,7 @@ export default function BudgetsPage() {
                     <div
                       className={cn(
                         "h-full rounded-full transition-all",
-                        over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                        over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-primary"
                       )}
                       style={{ width: `${Math.min(pct, 100)}%` }}
                     />
@@ -368,7 +368,7 @@ export default function BudgetsPage() {
                               <div
                                 className={cn(
                                   "h-full rounded-full",
-                                  lineOver ? "bg-red-500" : linePct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                                  lineOver ? "bg-red-500" : linePct > 80 ? "bg-amber-500" : "bg-primary"
                                 )}
                                 style={{ width: `${Math.min(linePct, 100)}%` }}
                               />
@@ -379,7 +379,7 @@ export default function BudgetsPage() {
                             <div className="text-right shrink-0">
                               <p className={cn(
                                 "text-[11px] font-mono tabular-nums",
-                                periodOver ? "text-red-600" : "text-emerald-600"
+                                periodOver ? "text-red-600" : "text-primary"
                               )}>
                                 {periodOver
                                   ? "+" + formatMoney(Math.abs(periodRemaining!))

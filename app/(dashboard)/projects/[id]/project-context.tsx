@@ -237,7 +237,7 @@ export function pct(a: number, b: number): number {
 }
 
 export const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
-  active: { label: "Active", color: "border-emerald-200 bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  active: { label: "Active", color: "border-primary/20 bg-accent text-primary", dot: "bg-primary" },
   completed: { label: "Completed", color: "border-blue-200 bg-blue-50 text-blue-700", dot: "bg-blue-500" },
   on_hold: { label: "On Hold", color: "border-amber-200 bg-amber-50 text-amber-700", dot: "bg-amber-500" },
   cancelled: { label: "Cancelled", color: "border-red-200 bg-red-50 text-red-700", dot: "bg-red-500" },
@@ -256,7 +256,7 @@ export const taskStatusConfig: Record<string, { label: string; bg: string; text:
   todo: { label: "To Do", bg: "bg-slate-100", text: "text-slate-700", bar: "bg-slate-400" },
   in_progress: { label: "In Progress", bg: "bg-amber-50", text: "text-amber-700", bar: "bg-amber-400" },
   in_review: { label: "In Review", bg: "bg-purple-50", text: "text-purple-700", bar: "bg-purple-400" },
-  done: { label: "Done", bg: "bg-emerald-50", text: "text-emerald-700", bar: "bg-emerald-500" },
+  done: { label: "Done", bg: "bg-accent", text: "text-primary", bar: "bg-primary" },
   cancelled: { label: "Cancelled", bg: "bg-red-50", text: "text-red-600", bar: "bg-red-400" },
 };
 

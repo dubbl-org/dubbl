@@ -221,7 +221,7 @@ export default function RolesPage() {
             Build your own access levels by choosing exactly what each person can see and do.
           </p>
         </div>
-        <Button size="sm" onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
+        <Button size="sm" onClick={openCreate} className="bg-primary hover:bg-primary/90">
           <Plus className="mr-1.5 size-3.5" />
           Create Role
         </Button>
@@ -346,7 +346,7 @@ export default function RolesPage() {
             <Button
               onClick={save}
               disabled={!name || selectedPermissions.length === 0 || saving}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
               {editingRole ? "Update" : "Create"}

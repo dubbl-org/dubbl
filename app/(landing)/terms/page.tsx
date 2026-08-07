@@ -9,7 +9,7 @@ import {
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
-    "Terms governing your use of the dubbl hosted service, operated by Mindroot Ltd.",
+    "Terms governing your use of the PayrollPro hosted service, operated by Mindroot Ltd.",
 };
 
 const sections: LegalSection[] = [
@@ -19,7 +19,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          The dubbl hosted service at dubbl.dev is operated by:
+          The PayrollPro hosted service is operated by:
         </p>
         <p>
           <strong>Mindroot Ltd</strong>
@@ -43,8 +43,8 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          dubbl is a double-entry bookkeeping platform available as both a hosted
-          SaaS at dubbl.dev and an open-source project that can be self-hosted.
+          PayrollPro is a double-entry bookkeeping platform available as both a hosted
+          SaaS and an open-source project that can be self-hosted.
           These Terms govern your use of the <strong>hosted service</strong>{" "}
           only.
         </p>
@@ -84,7 +84,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          dubbl offers a free tier and paid subscription plans. Details of
+          PayrollPro offers a free tier and paid subscription plans. Details of
           current plans and pricing are available on our website.
         </p>
         <ul>
@@ -119,13 +119,13 @@ const sections: LegalSection[] = [
       <>
         <Callout icon={BookOpen} title="Open Source Distinction">
           <p>
-            The dubbl source code is licensed under the{" "}
+            The PayrollPro source code is licensed under the{" "}
             <strong>Apache License 2.0</strong>. You are free to self-host,
             modify, and distribute the code under that licence.
           </p>
           <p>
             These Terms of Service apply <strong>only</strong> to the hosted
-            service at dubbl.dev. Self-hosted instances are governed solely by
+            service. Self-hosted instances are governed solely by
             the Apache 2.0 licence.
           </p>
         </Callout>
@@ -202,11 +202,11 @@ const sections: LegalSection[] = [
       <>
         <ul>
           <li>
-            The dubbl <strong>source code</strong> is licensed under the Apache
+            The PayrollPro <strong>source code</strong> is licensed under the Apache
             License 2.0.
           </li>
           <li>
-            The dubbl <strong>brand</strong>, logos, service design, and hosted
+            The PayrollPro <strong>brand</strong>, logos, service design, and hosted
             infrastructure are owned by Mindroot Ltd and are not covered by the
             open-source licence.
           </li>
@@ -229,7 +229,7 @@ const sections: LegalSection[] = [
           <a href="/privacy">Privacy Policy</a>.
         </p>
         <p>
-          For bookkeeping data you enter into the service, dubbl acts as a{" "}
+          For bookkeeping data you enter into the service, PayrollPro acts as a{" "}
           <strong>data processor</strong> on your behalf. You remain the data
           controller for that data. If you require a formal Data Processing
           Agreement (DPA), please contact us at{" "}
@@ -410,7 +410,7 @@ export default function TermsPage() {
     <LegalPageLayout
       badge="Legal"
       title="Terms of Service"
-      subtitle="The terms governing your use of the dubbl hosted service."
+      subtitle="The terms governing your use of the PayrollPro hosted service."
       lastUpdated="2 March 2026"
       sections={sections}
     />

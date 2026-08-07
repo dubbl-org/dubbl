@@ -63,7 +63,7 @@ export function OrgSwitcher() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:border-sidebar-border hover:bg-muted data-[state=open]:border-sidebar-border data-[state=open]:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
-            <div className="flex size-6 items-center justify-center rounded-md bg-emerald-600 text-[10px] font-semibold text-white">
+            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-[10px] font-semibold text-white">
               {orgInitial}
             </div>
             <span className="flex-1 truncate text-[13px] font-medium text-sidebar-accent-foreground">
@@ -130,7 +130,7 @@ export function OrgSwitcher() {
                       {(org.name?.[0] || org.slug?.[0] || "?").toUpperCase()}
                     </div>
                     <span className="flex-1 truncate text-[13px]">{org.name || org.slug}</span>
-                    <Check className="size-3 shrink-0 opacity-0 text-emerald-600" />
+                    <Check className="size-3 shrink-0 opacity-0 text-primary" />
                   </DropdownMenuItem>
                 ))}
               </div>

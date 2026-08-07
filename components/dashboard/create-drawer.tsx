@@ -135,7 +135,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
 // ---------------------------------------------------------------------------
 function DrawerIcon({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
       {children}
     </div>
   );
@@ -166,7 +166,7 @@ function DrawerFooter({
       <Button
         type="submit"
         disabled={saving}
-        className="bg-emerald-600 hover:bg-emerald-700"
+        className="bg-primary hover:bg-primary/90"
       >
         {saving ? "Creating..." : label}
       </Button>
@@ -639,7 +639,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                   type="checkbox"
                   checked={isDepositRetainer}
                   onChange={(e) => setIsDepositRetainer(e.target.checked)}
-                  className="mt-0.5 size-4 accent-emerald-600"
+                  className="mt-0.5 size-4 accent-primary"
                 />
                 <span className="space-y-0.5">
                   <span className="block text-sm font-medium">This is a deposit / retainer invoice</span>
@@ -680,7 +680,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                   type="checkbox"
                   checked={forApproval}
                   onChange={(e) => setForApproval(e.target.checked)}
-                  className="mt-0.5 size-4 accent-emerald-600"
+                  className="mt-0.5 size-4 accent-primary"
                 />
                 <span className="space-y-0.5">
                   <span className="block text-sm font-medium">Submit for approval instead of sending</span>
@@ -850,7 +850,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   type="checkbox"
                   checked={forApproval}
                   onChange={(e) => setForApproval(e.target.checked)}
-                  className="mt-0.5 size-4 accent-emerald-600"
+                  className="mt-0.5 size-4 accent-primary"
                 />
                 <span className="space-y-0.5">
                   <span className="block text-sm font-medium">Submit for approval instead of posting</span>
@@ -1732,7 +1732,7 @@ function ExpenseDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                         type="checkbox"
                         checked={item.isMileage}
                         onChange={(e) => updateItem(index, { isMileage: e.target.checked })}
-                        className="size-4 accent-emerald-600"
+                        className="size-4 accent-primary"
                       />
                       <span className="text-sm font-medium">Mileage claim (work out the amount from distance)</span>
                     </label>
@@ -2769,7 +2769,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
                   type="checkbox"
                   checked={autoSend}
                   onChange={(e) => setAutoSend(e.target.checked)}
-                  className="mt-0.5 size-4 accent-emerald-600"
+                  className="mt-0.5 size-4 accent-primary"
                 />
                 <span className="space-y-0.5">
                   <span className="block text-sm font-medium">Email it automatically each time</span>
@@ -4576,7 +4576,7 @@ function OpeningBalanceDrawer({ open, onClose }: { open: boolean; onClose: () =>
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving || !isBalanced} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button type="submit" disabled={saving || !isBalanced} className="bg-primary hover:bg-primary/90">
               {saving ? "Saving..." : "Set opening balances"}
             </Button>
           </div>
@@ -5090,7 +5090,7 @@ function RecurringJournalDrawer({ open, onClose }: { open: boolean; onClose: () 
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving || !isBalanced} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button type="submit" disabled={saving || !isBalanced} className="bg-primary hover:bg-primary/90">
               {saving ? "Creating..." : "Create recurring journal"}
             </Button>
           </div>

@@ -353,7 +353,7 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
                 <Path d="M18 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10h-8V4z" fill="#d1d5db" />
                 <Path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#9ca3af" />
               </Svg>
-              <Text style={{ fontSize: 7, color: "#d1d5db", letterSpacing: 0.5 }}>dubbl</Text>
+              <Text style={{ fontSize: 7, color: "#d1d5db", letterSpacing: 0.5 }}>PayrollPro</Text>
             </View>
           </Link>
         </View>

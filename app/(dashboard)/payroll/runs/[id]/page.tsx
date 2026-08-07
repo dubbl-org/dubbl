@@ -52,6 +52,7 @@ interface PayrollRunDetail {
 
 interface PayrollItemRow {
   id: string;
+  employeeId: string;
   grossAmount: number;
   taxAmount: number;
   deductions: number;
@@ -75,7 +76,7 @@ interface Bonus {
 const statusColors: Record<string, string> = {
   draft: "",
   processing: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  completed: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
   pending_approval: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
 };
@@ -376,13 +377,13 @@ export default function PayrollRunDetailPage() {
           <div className={cn(
             "flex size-10 items-center justify-center rounded-xl",
             run.status === "completed"
-              ? "bg-emerald-50 dark:bg-emerald-950/40"
+              ? "bg-accent dark:bg-accent"
               : "bg-muted"
           )}>
             <FileText className={cn(
               "size-5",
               run.status === "completed"
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-primary dark:text-primary"
                 : "text-muted-foreground"
             )} />
           </div>
@@ -430,7 +431,7 @@ export default function PayrollRunDetailPage() {
                 size="sm"
                 onClick={handleProcess}
                 disabled={processing}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
                 title="Lock in the pay amounts and record the wages and taxes in your books"
               >
                 <Play className="mr-1.5 size-3.5" />
@@ -444,7 +445,7 @@ export default function PayrollRunDetailPage() {
                 size="sm"
                 onClick={handleApprove}
                 disabled={approving}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <CheckCircle2 className="mr-1.5 size-3.5" />
                 {approving ? "Approving..." : "Approve"}
@@ -475,7 +476,7 @@ export default function PayrollRunDetailPage() {
         </motion.div>
         <motion.div {...anim(0.09)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Take-home pay</p>
-          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{formatMoney(run.totalNet)}</p>
+          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate text-primary dark:text-primary">{formatMoney(run.totalNet)}</p>
         </motion.div>
       </div>
 
@@ -630,7 +631,7 @@ export default function PayrollRunDetailPage() {
                     <SelectContent>
                       {(run.items || []).map((item) =>
                         item.employee ? (
-                          <SelectItem key={item.id} value={item.id}>
+                          <SelectItem key={item.id} value={item.employeeId}>
                             {item.employee.name} ({item.employee.employeeNumber})
                           </SelectItem>
                         ) : null

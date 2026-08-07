@@ -49,7 +49,7 @@ const statusConfig: Record<string, { class: string }> = {
   pending_approval: { class: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300" },
   received: { class: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" },
   partial: { class: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300" },
-  paid: { class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
+  paid: { class: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary" },
   overdue: { class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300" },
   void: { class: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300" },
 };
@@ -267,7 +267,7 @@ export default function BillDetailPage() {
                   size="sm"
                   onClick={handleApprove}
                   loading={approving}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                   title="Approve this bill and add it to your books so it counts toward what you owe"
                 >
                   <ThumbsUp className="mr-2 size-3.5" />Approve
@@ -301,14 +301,14 @@ export default function BillDetailPage() {
               </>
             )}
             {b.status === "draft" && (
-              <Button size="sm" onClick={handleReceive} className="bg-emerald-600 hover:bg-emerald-700" title="Approve this bill and add it to your books so it counts toward what you owe">
+              <Button size="sm" onClick={handleReceive} className="bg-primary hover:bg-primary/90" title="Approve this bill and add it to your books so it counts toward what you owe">
                 <Check className="mr-2 size-3.5" />Add to my books
               </Button>
             )}
             {["received", "partial", "overdue"].includes(b.status) && (
               <Dialog open={payOpen} onOpenChange={setPayOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90">
                     <DollarSign className="mr-2 size-3.5" />Record Payment
                   </Button>
                 </DialogTrigger>
@@ -323,7 +323,7 @@ export default function BillDetailPage() {
                       <Label>Date</Label>
                       <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
                     </div>
-                    <Button onClick={handlePay} className="w-full bg-emerald-600 hover:bg-emerald-700">Record Payment</Button>
+                    <Button onClick={handlePay} className="w-full bg-primary hover:bg-primary/90">Record Payment</Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -457,7 +457,7 @@ export default function BillDetailPage() {
             </div>
             <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden mb-4">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
+                className="h-full rounded-full bg-primary transition-all"
                 style={{ width: `${b.total > 0 ? Math.round((b.amountPaid / b.total) * 100) : 0}%` }}
               />
             </div>
@@ -475,7 +475,7 @@ export default function BillDetailPage() {
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Paid</p>
-                <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 mt-0.5">{formatMoney(b.amountPaid, b.currencyCode)}</p>
+                <p className="text-sm font-mono font-semibold tabular-nums text-primary mt-0.5">{formatMoney(b.amountPaid, b.currencyCode)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Due</p>
@@ -545,7 +545,7 @@ export default function BillDetailPage() {
                     </p>
                   </div>
                   {line.goodsReceiptLineId ? (
-                    <Badge variant="outline" className="shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <Badge variant="outline" className="shrink-0 border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                       <PackageCheck className="mr-1 size-3" />Matched to delivery
                     </Badge>
                   ) : (

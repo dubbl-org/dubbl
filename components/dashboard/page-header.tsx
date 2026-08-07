@@ -18,7 +18,7 @@ export function PageHeader({ title, description, children }: PageHeaderProps) {
         </div>
         {children && <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>}
       </div>
-      <div className="h-px bg-gradient-to-r from-emerald-500/20 via-border to-transparent" />
+      <div className="h-px bg-gradient-to-r from-primary via-border to-transparent" />
     </div>
   );
 }

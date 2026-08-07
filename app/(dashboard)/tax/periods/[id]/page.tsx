@@ -61,7 +61,7 @@ interface TaxPeriodDetail {
 const STATUS_STYLES: Record<string, string> = {
   open: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
   filed:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   amended:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
 };
@@ -255,7 +255,7 @@ function SettleSheet({
           <Button
             type="submit"
             disabled={saving}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="w-full bg-primary hover:bg-primary/90"
           >
             {saving
               ? "Saving..."
@@ -376,8 +376,8 @@ export default function TaxPeriodDetailPage() {
       {/* Settle action */}
       {isFiled && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-            <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent dark:bg-primary">
+            <Banknote className="size-4 text-primary dark:text-primary" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Settle this return</p>
@@ -393,7 +393,7 @@ export default function TaxPeriodDetailPage() {
           </div>
           <Button
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
             onClick={() => setSettleOpen(true)}
           >
             <Banknote className="mr-1.5 size-3.5" />
@@ -457,7 +457,7 @@ export default function TaxPeriodDetailPage() {
           </div>
           {netAmount != null && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CheckCircle2 className="size-3.5 text-emerald-600" />
+              <CheckCircle2 className="size-3.5 text-primary" />
               {netAmount < 0
                 ? "Box 5 is negative — this is a refund due to you."
                 : "Box 5 is the net amount payable to the tax office."}

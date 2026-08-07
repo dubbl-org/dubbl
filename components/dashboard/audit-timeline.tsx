@@ -20,7 +20,7 @@ const ACTION_COLORS: Record<string, string> = {
   delete: "bg-red-500",
   post: "bg-purple-500",
   void: "bg-orange-500",
-  approve: "bg-emerald-500",
+  approve: "bg-primary",
 };
 
 const ACTION_BADGE_COLORS: Record<string, string> = {
@@ -29,7 +29,7 @@ const ACTION_BADGE_COLORS: Record<string, string> = {
   delete: "border-red-200 bg-red-50 text-red-700",
   post: "border-purple-200 bg-purple-50 text-purple-700",
   void: "border-orange-200 bg-orange-50 text-orange-700",
-  approve: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  approve: "border-primary/20 bg-accent text-primary",
 };
 
 export function AuditTimeline({ entries }: AuditTimelineProps) {

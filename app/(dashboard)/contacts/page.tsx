@@ -128,7 +128,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
       render: (r) => (
         <span className="text-sm tabular-nums">
           {r.owesYou && r.owesYou > 0 ? (
-            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="font-medium text-primary dark:text-primary">
               {formatMoney(r.owesYou, r.currencyCode || "USD")}
             </span>
           ) : (
@@ -178,7 +178,7 @@ function buildColumns(onDelete: (c: Contact) => void, onOpen: (c: Contact) => vo
           {r.isTaxExempt && (
             <Badge
               variant="outline"
-              className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+              className="border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
               title="You don't charge tax to this contact"
             >
               No tax
@@ -469,8 +469,8 @@ export default function ContactsPage() {
 
           {/* Top section */}
           <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:py-12 text-center">
-            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/50">
-              <Users className="size-6 sm:size-7 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex size-12 sm:size-14 items-center justify-center rounded-2xl bg-accent dark:bg-accent">
+              <Users className="size-6 sm:size-7 text-primary dark:text-primary" />
             </div>
             <h2 className="mt-4 sm:mt-5 text-lg sm:text-xl font-semibold tracking-tight">Manage your contacts</h2>
             <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
@@ -479,7 +479,7 @@ export default function ContactsPage() {
             <Button
               onClick={() => openDrawer("contact")}
               size="lg"
-              className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+              className="mt-6 bg-primary hover:bg-primary/90"
             >
               <UserPlus className="mr-2 size-4" />
               Add your first contact

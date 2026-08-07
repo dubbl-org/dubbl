@@ -43,7 +43,7 @@ const ACTIVITY_ICONS: Record<string, typeof MessageSquare> = {
 const ACTIVITY_COLORS: Record<string, string> = {
   note: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   email: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
-  call: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
+  call: "bg-accent text-primary dark:bg-primary dark:text-primary",
   meeting: "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400",
   task: "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400",
 };
@@ -266,11 +266,11 @@ export default function DealActivityPage() {
       <div className="space-y-4">
         {/* Won/Lost status */}
         {isWon && (
-          <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3">
-            <Trophy className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-accent dark:border-primary/20 dark:bg-accent px-4 py-3">
+            <Trophy className="size-4 text-primary dark:text-primary shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-emerald-700 dark:text-emerald-300">Deal won</p>
-              <p className="text-[11px] text-emerald-600/70 dark:text-emerald-400/60">
+              <p className="text-[13px] font-medium text-primary dark:text-primary">Deal won</p>
+              <p className="text-[11px] text-primary dark:text-primary">
                 Closed on {new Date(deal.wonAt!).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
                 {deal.valueCents > 0 && <> · {formatMoney(deal.valueCents, deal.currency)}</>}
               </p>
@@ -328,7 +328,7 @@ export default function DealActivityPage() {
             </p>
             <Button
               size="sm"
-              className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+              className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
               onClick={handleAddActivity}
               disabled={!activityContent.trim() || submitting}
             >

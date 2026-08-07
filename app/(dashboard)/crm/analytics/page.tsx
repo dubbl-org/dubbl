@@ -86,7 +86,7 @@ export default function CRMAnalyticsPage() {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Won</span>
-                <span className="font-medium text-emerald-600">{data.wonDeals}</span>
+                <span className="font-medium text-primary">{data.wonDeals}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Lost</span>

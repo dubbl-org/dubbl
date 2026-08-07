@@ -215,8 +215,8 @@ export default function SettingsPage() {
             { name: "enableNotes", label: "Notes", desc: "Project notes and comments", checked: proj.enableNotes },
             { name: "enableBilling", label: "Billing", desc: "Budget and invoice tracking", checked: proj.enableBilling },
           ].map((f) => (
-            <label key={f.name} className="flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50/50 transition-colors">
-              <input type="checkbox" name={f.name} defaultChecked={f.checked} className="accent-emerald-600" />
+            <label key={f.name} className="flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer has-[:checked]:border-primary/30 has-[:checked]:bg-accent transition-colors">
+              <input type="checkbox" name={f.name} defaultChecked={f.checked} className="accent-primary" />
               <div>
                 <p className="text-[13px] font-medium">{f.label}</p>
                 <p className="text-[10px] text-muted-foreground">{f.desc}</p>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={saving} size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+        <Button type="submit" disabled={saving} size="sm" className="bg-primary hover:bg-primary/90">
           {saving ? "Saving..." : "Save changes"}
         </Button>
       </div>

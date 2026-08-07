@@ -72,8 +72,8 @@ const ENTITY_ICONS: Record<string, LucideIcon> = {
 const ACTION_CONFIG: Record<string, { icon: LucideIcon; label: string; color: string; badgeClass: string }> = {
   create: {
     icon: Plus, label: "Created",
-    color: "text-emerald-600 dark:text-emerald-400",
-    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    color: "text-primary dark:text-primary",
+    badgeClass: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   },
   update: {
     icon: Pencil, label: "Updated",
@@ -97,8 +97,8 @@ const ACTION_CONFIG: Record<string, { icon: LucideIcon; label: string; color: st
   },
   approve: {
     icon: Check, label: "Approved",
-    color: "text-emerald-600 dark:text-emerald-400",
-    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    color: "text-primary dark:text-primary",
+    badgeClass: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   },
   send: {
     icon: Send, label: "Sent",
@@ -431,7 +431,7 @@ export default function AuditLogPage() {
                             <div className={cn(
                               "flex size-[26px] items-center justify-center rounded-md ring-2 ring-background",
                               actionConfig.badgeClass.includes("emerald")
-                                ? "bg-emerald-100 dark:bg-emerald-950/60"
+                                ? "bg-accent dark:bg-accent"
                                 : actionConfig.badgeClass.includes("blue")
                                   ? "bg-blue-100 dark:bg-blue-950/60"
                                   : actionConfig.badgeClass.includes("red")

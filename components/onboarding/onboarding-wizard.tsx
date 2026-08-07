@@ -216,7 +216,7 @@ export function OnboardingWizard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -357,7 +357,7 @@ export function OnboardingWizard() {
               <Button
                 onClick={goNext}
                 disabled={!canProceed()}
-                className="gap-1.5 bg-emerald-600 shadow-md shadow-emerald-600/15 hover:bg-emerald-500"
+                className="gap-1.5 bg-primary shadow-md shadow-primary hover:bg-primary/90"
               >
                 Next
                 <ArrowRight className="size-4" />
@@ -366,7 +366,7 @@ export function OnboardingWizard() {
               <Button
                 onClick={handleComplete}
                 disabled={submitting}
-                className="gap-1.5 bg-emerald-600 shadow-md shadow-emerald-600/15 hover:bg-emerald-500"
+                className="gap-1.5 bg-primary shadow-md shadow-primary hover:bg-primary/90"
               >
                 {submitting ? "Setting up..." : "Complete Setup"}
                 {!submitting && <Check className="size-4" />}
@@ -394,7 +394,7 @@ function StepOrgName({
         Name your organization
       </h2>
       <p className="mt-1.5 text-sm text-muted-foreground">
-        This is how your organization will appear across dubbl.
+        This is how your organization will appear across PayrollPro.
       </p>
       <div className="mt-6">
         <div className="space-y-2">
@@ -459,7 +459,7 @@ function StepCountry({
             onClick={() => onSelect(c.code)}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
               selected === c.code
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                ? "bg-primary text-primary dark:text-primary"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -513,7 +513,7 @@ function StepBusinessType({
             onClick={() => onSelect(t.code)}
             className={`flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition-colors ${
               selected === t.code
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                ? "bg-primary text-primary dark:text-primary"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -554,7 +554,7 @@ function StepIndustry({
             onClick={() => onSelect(selected === ind.code ? "" : ind.code)}
             className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
               selected === ind.code
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                ? "bg-primary text-primary dark:text-primary"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -594,7 +594,7 @@ function StepReferral({
             onClick={() => onSelect(selected === src.code ? "" : src.code)}
             className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
               selected === src.code
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                ? "bg-primary text-primary dark:text-primary"
                 : "hover:bg-muted/60"
             }`}
           >

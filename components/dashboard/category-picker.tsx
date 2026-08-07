@@ -375,7 +375,7 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
               <Button type="button" variant="outline" onClick={() => { setEditOpen(false); setEditCategory(null); }}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90">
                 {saving ? "Saving..." : "Update Category"}
               </Button>
             </div>

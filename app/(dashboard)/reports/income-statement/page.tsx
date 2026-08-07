@@ -141,12 +141,12 @@ export default function IncomeStatementPage() {
               </div>
             ))}
 
-            <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 sm:p-6">
+            <div className="rounded-lg border border-primary/20 dark:border-primary/20 bg-accent dark:bg-accent p-4 sm:p-6">
               <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                <span className="text-sm font-semibold text-foreground dark:text-primary">
                   Profit (money in minus money out)
                 </span>
-                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
+                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-primary dark:text-primary">
                   {formatMoney(Math.round(parseFloat(data.netIncome) * 100))}
                 </span>
               </div>
