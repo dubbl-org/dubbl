@@ -257,7 +257,7 @@ export default function ImportExportPage() {
         });
         if (!res.ok) throw new Error("Export failed");
         const blob = await res.blob();
-        downloadBlob(blob, "dubbl-export.zip");
+        downloadBlob(blob, "payrollpro-export.zip");
       } else {
         const key = entities[0];
         const params = new URLSearchParams();

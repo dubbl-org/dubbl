@@ -37,12 +37,12 @@ export function EmailLayout({ preview, children, unsubscribeUrl }: LayoutProps) 
                     src={`${APP_URL}/logo.png`}
                     width="32"
                     height="26"
-                    alt="dubbl"
+                    alt="PayrollPro"
                     style={{ display: "block" }}
                   />
                 </td>
                 <td style={{ verticalAlign: "middle" }}>
-                  <Text style={logoText}>dubbl</Text>
+                  <Text style={logoText}>PayrollPro</Text>
                 </td>
               </tr>
             </table>

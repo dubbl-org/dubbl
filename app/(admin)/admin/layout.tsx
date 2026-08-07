@@ -83,7 +83,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (!isSiteAdmin) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6">
-        <Logo className="h-8 w-auto opacity-20" />
+        <Logo className="opacity-20" />
         <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="text-lg font-semibold">Page not found</h1>
           <p className="text-sm text-muted-foreground max-w-xs">
@@ -109,8 +109,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       {!isDetailPage && (
         <aside className="hidden md:flex w-60 shrink-0 flex-col border-r bg-sidebar">
           <div className="flex h-14 items-center gap-2.5 px-5">
-            <Logo className="h-5 w-auto" />
-            <span className="text-[14px] font-semibold tracking-tight">dubbl</span>
+            <Logo className="h-6 w-6 rounded-md" />
+            <span className="text-[14px] font-semibold tracking-tight">PayrollPro</span>
             <span className="ml-auto rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-400">
               Admin
             </span>
@@ -171,7 +171,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </Button>
           ) : (
             <>
-              <Logo className="h-5 w-auto" />
+              <Logo className="h-6 w-6 rounded-md" />
               <span className="text-sm font-semibold">Admin</span>
             </>
           )}

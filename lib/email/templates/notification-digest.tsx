@@ -43,7 +43,7 @@ export function NotificationDigestEmail({
   const count = notifications.length;
   const shown = notifications.slice(0, MAX_SHOWN);
   const remaining = count - shown.length;
-  const preview = `You have ${count} new notification${count !== 1 ? "s" : ""} on dubbl`;
+  const preview = `You have ${count} new notification${count !== 1 ? "s" : ""} on PayrollPro`;
 
   return (
     <EmailLayout preview={preview} unsubscribeUrl={unsubscribeUrl}>

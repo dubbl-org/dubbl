@@ -305,8 +305,8 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
             </Button>
           )}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <Logo className="h-5 w-auto" />
-            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">dubbl</span>
+            <Logo className="h-6 w-6 rounded-md" />
+            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">PayrollPro</span>
           </Link>
           <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
           {parentLabel && effectiveSegments.length > 1 && (

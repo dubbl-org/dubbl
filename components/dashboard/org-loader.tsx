@@ -66,9 +66,9 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
           className={`org-loader-overlay ${state === "fading" ? "org-loader-fade-out" : ""}`}
         >
           <div className="flex flex-col items-center gap-4">
-            <Logo className="org-loader-logo h-10 w-auto" />
+            <Logo className="org-loader-logo h-10 w-10 rounded-lg" />
             <span className="text-sm font-medium tracking-tight text-muted-foreground/60">
-              dubbl
+              PayrollPro
             </span>
           </div>
         </div>

@@ -32,7 +32,7 @@ function APICodeCard() {
             <span className="text-white"> entries </span>
             <span className="text-white/40">=</span>
             <span className="text-primary"> await</span>
-            <span className="text-white">{" dubbl.entries."}</span>
+            <span className="text-white">{" payrollpro.entries."}</span>
             <span className="text-white">list</span>
             <span className="text-white/60">{"({"}</span>
           </p>
@@ -97,13 +97,13 @@ function DockerCard() {
             <span className="text-white/40">$</span> docker compose up -d
           </p>
           <p className="text-primary">
-            {"  ✓ Container dubbl-db    Started"}
+            {"  ✓ Container payrollpro-db    Started"}
           </p>
           <p className="text-primary">
-            {"  ✓ Container dubbl-app   Started"}
+            {"  ✓ Container payrollpro-app   Started"}
           </p>
           <p className="mt-2 text-white font-medium">
-            {"  dubbl running at localhost:3000"}
+            {"  PayrollPro running at localhost:3000"}
           </p>
         </motion.div>
       </div>
@@ -128,15 +128,15 @@ function SDKCard() {
           transition={{ duration: 0.5, delay: 0.4 }}
         >
           <p className="text-white/60">
-            <span className="text-white/40">$</span> npm install @dubbl/sdk
+            <span className="text-white/40">$</span> npm install @payrollpro/sdk
           </p>
           <p className="mt-3">
             <span className="text-primary">import</span>
             <span className="text-white/60">{" { "}</span>
-            <span className="text-white">Dubbl</span>
+            <span className="text-white">PayrollPro</span>
             <span className="text-white/60">{" } "}</span>
             <span className="text-primary">from</span>
-            <span className="text-amber-400">{' "@dubbl/sdk"'}</span>
+            <span className="text-amber-400">{' "@payrollpro/sdk"'}</span>
             <span className="text-white/40">;</span>
           </p>
           <p>
@@ -144,7 +144,7 @@ function SDKCard() {
             <span className="text-white"> client </span>
             <span className="text-white/40">=</span>
             <span className="text-primary"> new</span>
-            <span className="text-white">{" Dubbl"}</span>
+            <span className="text-white">{" PayrollPro"}</span>
             <span className="text-white/60">{"();"}</span>
           </p>
         </motion.div>

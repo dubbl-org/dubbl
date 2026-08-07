@@ -109,20 +109,6 @@ export default function SignUpPage() {
 
   return (
     <div>
-      <motion.div
-        className="mb-7"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <h1 className="text-[28px] font-extrabold tracking-tight text-foreground">
-          Create your account
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Get started with dubbl for free
-        </p>
-      </motion.div>
-
       {/* Registration mode notices */}
       {providers?.registrationMode === "invite_only" && (
         <motion.div
@@ -158,7 +144,7 @@ export default function SignUpPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 rounded-lg text-sm font-medium"
+                className="h-9 text-sm font-medium"
                 onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
               >
                 <GoogleIcon className="size-4" />
@@ -169,7 +155,7 @@ export default function SignUpPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 rounded-lg text-sm font-medium"
+                className="h-9 text-sm font-medium"
                 onClick={() => signIn("apple", { callbackUrl: "/dashboard" })}
               >
                 <AppleIcon className="size-4" />
@@ -212,7 +198,7 @@ export default function SignUpPage() {
             placeholder="Your name"
             required
             autoFocus
-            className="h-11 rounded-lg"
+            className="h-9 text-sm"
           />
         </div>
 
@@ -227,7 +213,7 @@ export default function SignUpPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             required
-            className="h-11 rounded-lg"
+            className="h-9 text-sm"
           />
         </div>
 
@@ -243,13 +229,13 @@ export default function SignUpPage() {
             placeholder="At least 8 characters"
             required
             minLength={8}
-            className="h-11 rounded-lg"
+            className="h-9 text-sm"
           />
         </div>
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-lg bg-primary shadow-md shadow-primary transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary active:scale-[0.98]"
+          className="w-full h-9 text-sm"
           disabled={loading}
         >
           {loading ? (

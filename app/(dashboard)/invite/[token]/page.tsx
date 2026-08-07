@@ -99,8 +99,8 @@ export default function InviteAcceptPage() {
         <div className="rounded-xl border bg-card p-8 shadow-sm">
           {/* Logo */}
           <div className="flex items-center gap-2.5 mb-8">
-            <Logo className="h-7 w-9" />
-            <span className="text-lg font-bold tracking-tight text-primary">dubbl</span>
+            <Logo />
+            <span className="text-lg font-bold tracking-tight text-primary">PayrollPro</span>
           </div>
 
           {state === "loading" && (

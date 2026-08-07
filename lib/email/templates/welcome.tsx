@@ -17,9 +17,9 @@ export function WelcomeEmail({
   loginUrl = toAppUrl("/sign-in"),
 }: WelcomeEmailProps) {
   return (
-    <EmailLayout preview="Welcome to dubbl">
+    <EmailLayout preview="Welcome to PayrollPro">
       <Section style={content}>
-        <Text style={heading}>Welcome to dubbl, {userName}</Text>
+        <Text style={heading}>Welcome to PayrollPro, {userName}</Text>
         <Text style={subtext}>
           You now have access to everything you need to manage your business
           finances. Invoicing, double-entry accounting, team management, and

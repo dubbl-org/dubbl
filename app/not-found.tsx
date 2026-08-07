@@ -11,9 +11,9 @@ export default function NotFound() {
       <div className="flex flex-col items-center px-6 text-center">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <Logo className="h-6 w-auto" />
+          <Logo />
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
-            dubbl
+            PayrollPro
           </span>
         </Link>
 

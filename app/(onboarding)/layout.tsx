@@ -15,9 +15,9 @@ export default function OnboardingLayout({
       <header className="relative z-20">
         <div className="flex items-center justify-center py-6">
           <Link href="/" className="inline-flex items-center gap-2">
-            <Logo className="h-6 w-auto" />
+            <Logo />
             <span className="text-sm font-bold tracking-tight text-foreground">
-              dubbl
+              PayrollPro
             </span>
           </Link>
         </div>

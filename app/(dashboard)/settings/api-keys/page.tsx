@@ -134,7 +134,7 @@ export default function ApiKeysPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">API Keys</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create and manage keys for programmatic access to the dubbl API
+            Create and manage keys for programmatic access to the PayrollPro API
             {keys.length > 0 && (
               <span className="ml-2 inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary dark:bg-accent dark:text-primary">
                 {keys.length}/{maxKeys}
@@ -165,7 +165,7 @@ export default function ApiKeysPage() {
         <EmptyState
           icon={Key}
           title="No API keys yet"
-          description="Create your first API key to start integrating with the dubbl API programmatically."
+          description="Create your first API key to start integrating with the PayrollPro API programmatically."
         >
           <Button
             size="sm"

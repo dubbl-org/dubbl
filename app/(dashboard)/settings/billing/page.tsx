@@ -497,7 +497,7 @@ export default function BillingPage() {
           <div className="max-w-lg">
             <h3 className="text-sm font-semibold">Open source, transparent pricing</h3>
             <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-              dubbl is open source. Our pricing is designed to be fair and sustainable. The free tier gives you everything you need to get started. Storage plans are organization-wide and cover all data, not just file uploads. Need more storage or have special requirements? We are happy to help.
+              PayrollPro is open source. Our pricing is designed to be fair and sustainable. The free tier gives you everything you need to get started. Storage plans are organization-wide and cover all data, not just file uploads. Need more storage or have special requirements? We are happy to help.
             </p>
           </div>
           <Button

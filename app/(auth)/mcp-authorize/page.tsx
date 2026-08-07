@@ -116,7 +116,7 @@ function McpAuthorizeContent() {
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{clientName}</span>{" "}
-          wants to access your dubbl data via MCP
+          wants to access your PayrollPro data via MCP
         </p>
       </motion.div>
 

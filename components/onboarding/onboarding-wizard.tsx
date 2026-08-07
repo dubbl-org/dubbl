@@ -394,7 +394,7 @@ function StepOrgName({
         Name your organization
       </h2>
       <p className="mt-1.5 text-sm text-muted-foreground">
-        This is how your organization will appear across dubbl.
+        This is how your organization will appear across PayrollPro.
       </p>
       <div className="mt-6">
         <div className="space-y-2">
