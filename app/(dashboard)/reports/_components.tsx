@@ -75,7 +75,7 @@ export function BasisToggle({
                   variant={basis === o.value ? "default" : "outline"}
                   size="sm"
                   onClick={() => onChange(o.value)}
-                  className={basis === o.value ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                  className={basis === o.value ? "bg-primary hover:bg-primary/90" : ""}
                 >
                   {o.label}
                 </Button>

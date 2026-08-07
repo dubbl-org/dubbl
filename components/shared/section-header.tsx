@@ -25,7 +25,7 @@ export function SectionHeader({
       {badge && (
         <Badge
           variant="secondary"
-          className="mb-4 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+          className="mb-4 border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
         >
           {badge}
         </Badge>

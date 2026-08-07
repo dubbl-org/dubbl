@@ -32,7 +32,7 @@ function Sparkline({ data }: { data: number[] }) {
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
-        className="text-emerald-500"
+        className="text-primary"
       />
     </svg>
   );
@@ -63,7 +63,7 @@ export function StatCard({
             <p
               className={cn(
                 "text-xs font-medium",
-                changeType === "positive" && "text-emerald-600 dark:text-emerald-400",
+                changeType === "positive" && "text-primary dark:text-primary",
                 changeType === "negative" && "text-red-600 dark:text-red-400",
                 changeType === "neutral" && "text-muted-foreground"
               )}

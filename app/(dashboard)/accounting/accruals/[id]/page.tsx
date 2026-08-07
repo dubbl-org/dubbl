@@ -34,7 +34,7 @@ interface AccrualScheduleDetail {
 
 const statusColors: Record<string, string> = {
   active: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  completed: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   cancelled: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -140,7 +140,7 @@ export default function AccrualDetailPage() {
             size="sm"
             onClick={handlePostNext}
             loading={posting}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
             title="Record the next month's share in your books"
           >
             <CalendarClock className="mr-2 size-4" />Record next month
@@ -173,7 +173,7 @@ export default function AccrualDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Recorded so far</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{postedCount} of {acc.periods}</p>
+          <p className="text-xl font-bold font-mono text-primary">{postedCount} of {acc.periods}</p>
         </div>
       </div>
 
@@ -189,7 +189,7 @@ export default function AccrualDetailPage() {
             <span className="text-right text-sm font-mono font-medium">{formatMoney(entry.amount)}</span>
             <span className="text-right">
               {entry.posted ? (
-                <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                <span className="inline-flex items-center gap-1 text-xs text-primary">
                   <Check className="size-3.5" />Recorded
                 </span>
               ) : (

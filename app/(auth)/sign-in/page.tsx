@@ -292,7 +292,7 @@ function SignInContent() {
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-lg bg-emerald-600 shadow-md shadow-emerald-600/15 transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
+          className="h-11 w-full rounded-lg bg-primary shadow-md shadow-primary transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary active:scale-[0.98]"
           disabled={loading}
         >
           {loading ? (
@@ -316,7 +316,7 @@ function SignInContent() {
           Don&apos;t have an account?{" "}
           <Link
             href="/sign-up"
-            className="font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+            className="font-medium text-primary transition-colors hover:text-primary dark:text-primary dark:hover:text-primary"
           >
             Sign up
           </Link>

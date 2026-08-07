@@ -223,7 +223,7 @@ export default function LandedCostsPage() {
         <Button
           size="sm"
           onClick={() => setSheetOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
         >
           <Plus className="mr-2 size-4" />
           New Allocation
@@ -281,7 +281,7 @@ export default function LandedCostsPage() {
                       }
                       className={
                         item.status === "allocated"
-                          ? "bg-emerald-600 hover:bg-emerald-700"
+                          ? "bg-primary hover:bg-primary/90"
                           : ""
                       }
                     >
@@ -487,7 +487,7 @@ export default function LandedCostsPage() {
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 {saving ? "Creating..." : "Create Allocation"}
               </Button>

@@ -132,7 +132,7 @@ export default function BalanceSheetPage() {
             variant={showCompare ? "default" : "outline"}
             size="sm"
             onClick={() => setShowCompare((v) => !v)}
-            className={showCompare ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+            className={showCompare ? "bg-primary hover:bg-primary/90" : ""}
           >
             {showCompare ? "Comparing to an earlier date" : "Compare to an earlier date"}
           </Button>
@@ -175,7 +175,7 @@ export default function BalanceSheetPage() {
                           <TableCell>
                             <Link
                               href={`/reports/general-ledger?${new URLSearchParams({ endDate: asAt }).toString()}#${a.accountId}`}
-                              className="hover:text-emerald-600 hover:underline"
+                              className="hover:text-primary hover:underline"
                             >
                               {a.name}
                             </Link>

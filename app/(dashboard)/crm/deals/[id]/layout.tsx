@@ -278,7 +278,7 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
             <div className="flex items-center gap-3">
               <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">{deal.title}</h1>
               {isWon && (
-                <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/60 dark:text-emerald-400 shrink-0">
+                <Badge className="bg-accent text-primary border-0 dark:bg-primary dark:text-primary shrink-0">
                   <Trophy className="size-3 mr-1" /> Won
                 </Badge>
               )}
@@ -318,7 +318,7 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
               <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={markLost}>
                 <XCircle className="size-3" /> Mark Lost
               </Button>
-              <Button size="sm" className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={markWon}>
+              <Button size="sm" className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90" onClick={markWon}>
                 <Trophy className="size-3" /> Mark Won
               </Button>
             </div>
@@ -386,7 +386,7 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
           </div>
         )}
 
-        <div className="h-px bg-gradient-to-r from-emerald-500/20 via-border to-transparent mb-2" />
+        <div className="h-px bg-gradient-to-r from-primary via-border to-transparent mb-2" />
 
         {/* Tabs */}
         <nav className="-mt-0 mb-8 flex items-center gap-1 overflow-x-auto border-b border-border">

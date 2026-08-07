@@ -484,7 +484,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
               <RefreshCcw className="mr-2 size-3.5" />
               Match statement to your books
             </Button>
-            <Button size="sm" onClick={() => setImportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button size="sm" onClick={() => setImportOpen(true)} className="bg-primary hover:bg-primary/90">
               <Upload className="mr-2 size-3.5" />
               Import
             </Button>
@@ -498,8 +498,8 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">{formatMoney(account.balance, cur)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowDownRight className="size-3 text-emerald-500" />Money In</p>
-            <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600">{formatMoney(summary.credits, cur)}</p>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowDownRight className="size-3 text-primary" />Money In</p>
+            <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-primary">{formatMoney(summary.credits, cur)}</p>
           </div>
           <div>
             <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowUpRight className="size-3 text-red-500" />Money Out</p>
@@ -509,7 +509,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             <p className="text-[11px] text-muted-foreground">Done</p>
             <div className="flex items-center gap-2 mt-1">
               <div className="h-2 flex-1 rounded-full bg-gray-200 dark:bg-muted overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${reconciledPct}%` }} />
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${reconciledPct}%` }} />
               </div>
               <span className="text-xs font-mono tabular-nums text-muted-foreground">{reconciledPct}%</span>
             </div>

@@ -170,7 +170,7 @@ export default function ContactPeoplePage() {
                     type="submit"
                     size="sm"
                     loading={addingPerson}
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-primary hover:bg-primary/90"
                   >
                     <UserPlus className="mr-2 size-3.5" />
                     Add
@@ -212,7 +212,7 @@ export default function ContactPeoplePage() {
                         {person.isPrimary && (
                           <Badge
                             variant="outline"
-                            className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[11px]"
+                            className="border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary text-[11px]"
                           >
                             <Star className="mr-1 size-3" />
                             Primary

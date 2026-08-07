@@ -29,7 +29,7 @@ interface Loan {
 }
 
 const statusColors: Record<string, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  active: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   paid_off: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   defaulted: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
@@ -222,7 +222,7 @@ export default function LoansPage() {
             </div>
             <Button
               onClick={() => openDrawer("loan")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               New loan
@@ -248,17 +248,17 @@ export default function LoansPage() {
                   </div>
                   <span className="font-mono text-sm font-medium">$10,000.00</span>
                 </div>
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-emerald-50/30 dark:bg-emerald-950/10">
+                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-accent dark:bg-accent">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/40">
-                      <Wallet className="size-3.5 text-emerald-500" />
+                    <div className="flex size-7 items-center justify-center rounded-md bg-accent dark:bg-accent">
+                      <Wallet className="size-3.5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Monthly payment</p>
+                      <p className="text-sm font-medium text-primary dark:text-primary">Monthly payment</p>
                       <p className="text-[11px] text-muted-foreground">Part loan, part interest</p>
                     </div>
                   </div>
-                  <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">-$880.00</span>
+                  <span className="font-mono text-sm font-medium text-primary dark:text-primary">-$880.00</span>
                 </div>
                 <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
                   <div className="flex items-center gap-3">
@@ -282,7 +282,7 @@ export default function LoansPage() {
                 {
                   title: "Equipment or vehicle finance",
                   desc: "Financed a big purchase? Track what you still owe and each payment.",
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "See the interest you pay",
@@ -333,7 +333,7 @@ export default function LoansPage() {
           <Button
             onClick={() => openDrawer("loan")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New loan

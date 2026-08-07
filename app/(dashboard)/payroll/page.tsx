@@ -36,7 +36,7 @@ interface PayrollRun {
 const statusColors: Record<string, string> = {
   draft: "",
   processing: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  completed: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -165,7 +165,7 @@ export default function PayrollPage() {
               className="mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-6"
             >
               <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
-                <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-xs font-bold text-emerald-700 dark:text-emerald-300">1</div>
+                <div className="flex size-6 items-center justify-center rounded-full bg-accent dark:bg-accent text-xs font-bold text-primary dark:text-primary">1</div>
                 <span className="text-sm font-medium">Add employees</span>
               </div>
               <div className="hidden sm:block h-px w-6 bg-muted-foreground/20" />
@@ -186,7 +186,7 @@ export default function PayrollPage() {
               <Button
                 onClick={() => openDrawer("employee")}
                 size="lg"
-                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+                className="bg-primary hover:bg-primary/90 shadow-md shadow-primary"
               >
                 <Plus className="mr-2 size-4" />
                 Add Your First Employee
@@ -254,7 +254,7 @@ export default function PayrollPage() {
             <CalendarDays className="size-4" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Paid this year</span>
           </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">
+          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate text-primary dark:text-primary">
             {formatMoney(ytdPaid)}
           </p>
         </motion.div>
@@ -345,7 +345,7 @@ export default function PayrollPage() {
                       initial={{ width: 0 }}
                       animate={{ width: `${netPct}%` }}
                       transition={{ duration: 0.6, delay: 0.35 }}
-                      className="h-full bg-emerald-500 dark:bg-emerald-400"
+                      className="h-full bg-primary dark:bg-primary"
                     />
                     <motion.div
                       initial={{ width: 0 }}
@@ -359,7 +359,7 @@ export default function PayrollPage() {
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="size-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                        <div className="size-2.5 rounded-full bg-primary dark:bg-primary" />
                         <span className="text-muted-foreground">Take-home pay</span>
                       </div>
                       <span className="font-mono tabular-nums font-medium">
@@ -400,7 +400,7 @@ export default function PayrollPage() {
             <h3 className="text-sm font-semibold">Quick Actions</h3>
             <div className="rounded-xl border bg-card p-4 flex flex-col gap-2">
               <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+                className="w-full bg-primary hover:bg-primary/90 shadow-sm"
                 onClick={() => router.push("/payroll/runs")}
               >
                 <Plus className="mr-2 size-4" />

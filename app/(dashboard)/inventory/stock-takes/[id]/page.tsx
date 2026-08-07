@@ -89,7 +89,7 @@ const STATUS_CONFIG: Record<
   completed: {
     label: "Completed",
     className:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+      "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   },
   cancelled: {
     label: "Cancelled",
@@ -143,7 +143,7 @@ function CounterCell({
         className={cn(
           "flex size-7 items-center justify-center rounded-l-md border border-r-0 transition-colors disabled:opacity-40 disabled:pointer-events-none",
           isUncounted
-            ? "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            ? "text-primary hover:bg-accent dark:text-primary dark:hover:bg-accent"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
         )}
         disabled={isSaving}
@@ -569,7 +569,7 @@ export default function StockTakeDetailPage() {
   function getRowVarianceClass(line: StockTakeLine) {
     if (line.countedQuantity === null) return "";
     const disc = line.discrepancy ?? line.countedQuantity - line.expectedQuantity;
-    if (disc === 0) return "bg-emerald-50/50 dark:bg-emerald-950/10";
+    if (disc === 0) return "bg-accent dark:bg-accent";
     if (Math.abs(disc) <= 5) return "bg-amber-50/50 dark:bg-amber-950/10";
     return "bg-red-50/50 dark:bg-red-950/10";
   }
@@ -637,7 +637,7 @@ export default function StockTakeDetailPage() {
                   size="sm"
                   onClick={handleStartCount}
                   disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {actionLoading ? (
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -672,7 +672,7 @@ export default function StockTakeDetailPage() {
                   size="sm"
                   onClick={handleApplyAdjustments}
                   disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {actionLoading ? (
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -712,7 +712,7 @@ export default function StockTakeDetailPage() {
               />
             </div>
             <div className="flex gap-4 text-xs text-muted-foreground pt-1">
-              <span>Matches: <span className="font-medium text-emerald-600">{matchCount}</span></span>
+              <span>Matches: <span className="font-medium text-primary">{matchCount}</span></span>
               <span>Discrepancies: <span className="font-medium text-red-600">{discrepancyCount}</span></span>
               <span>Uncounted: <span className="font-medium">{uncountedCount}</span></span>
             </div>
@@ -727,7 +727,7 @@ export default function StockTakeDetailPage() {
               <p className="text-[11px] text-muted-foreground">Total Items</p>
             </div>
             <div className="rounded-xl border bg-card p-3 text-center">
-              <p className="text-xl font-bold font-mono text-emerald-600">{matchCount}</p>
+              <p className="text-xl font-bold font-mono text-primary">{matchCount}</p>
               <p className="text-[11px] text-muted-foreground">Accurate</p>
             </div>
             <div className="rounded-xl border bg-card p-3 text-center">
@@ -966,7 +966,7 @@ export default function StockTakeDetailPage() {
                                 : disc === 0
                                   ? "text-muted-foreground"
                                   : disc > 0
-                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    ? "text-primary dark:text-primary"
                                     : "text-red-600 dark:text-red-400"
                             )}
                           >
@@ -991,7 +991,7 @@ export default function StockTakeDetailPage() {
                                 >
                                   <Badge
                                     variant="outline"
-                                    className="text-[10px] px-1.5 py-0 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    className="text-[10px] px-1.5 py-0 border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
                                   >
                                     Adj
                                   </Badge>

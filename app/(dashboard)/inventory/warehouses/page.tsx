@@ -294,7 +294,7 @@ export default function WarehousesPage() {
             </div>
             <Button
               onClick={() => openDrawer("warehouse")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               New Warehouse
@@ -311,14 +311,14 @@ export default function WarehousesPage() {
               </div>
               <div className="p-5 space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                    <Warehouse className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+                    <Warehouse className="size-5 text-primary dark:text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-medium">Main Warehouse</p>
                     <p className="text-xs text-muted-foreground font-mono">WH-001</p>
                   </div>
-                  <Badge variant="outline" className="ml-auto bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 text-[11px]">
+                  <Badge variant="outline" className="ml-auto bg-accent text-primary border-primary/20 dark:bg-accent dark:text-primary dark:border-primary/20 text-[11px]">
                     Default
                   </Badge>
                 </div>
@@ -352,7 +352,7 @@ export default function WarehousesPage() {
                   title: "Multi-location tracking",
                   desc: "Know exactly how much stock is in each warehouse at any time.",
                   icon: Building2,
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "Stock transfers",
@@ -416,7 +416,7 @@ export default function WarehousesPage() {
               <p className="text-xs text-muted-foreground mt-0.5">Total</p>
             </div>
             <div>
-              <p className="text-3xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{activeCount}</p>
+              <p className="text-3xl font-bold font-mono tabular-nums truncate text-primary dark:text-primary">{activeCount}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Active</p>
             </div>
             <div>
@@ -429,7 +429,7 @@ export default function WarehousesPage() {
             <div className="flex h-2 rounded-full overflow-hidden bg-muted">
               {activeCount > 0 && (
                 <div
-                  className="bg-emerald-500 transition-all duration-500"
+                  className="bg-primary transition-all duration-500"
                   style={{ width: `${(activeCount / totalWarehouses) * 100}%` }}
                 />
               )}
@@ -441,7 +441,7 @@ export default function WarehousesPage() {
               )}
             </div>
             <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" />Active ({activeCount})</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />Active ({activeCount})</span>
               <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />Inactive ({inactiveCount})</span>
               <span className="flex items-center gap-1.5"><MapPin className="size-2.5" />With address ({withAddress})</span>
             </div>
@@ -456,11 +456,11 @@ export default function WarehousesPage() {
             transition={{ duration: 0.3, delay: 0.05 }}
             className="rounded-xl border bg-card p-4 flex flex-col justify-between"
           >
-            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex size-8 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+              <CheckCircle2 className="size-4 text-primary dark:text-primary" />
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{activeCount}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate text-primary dark:text-primary">{activeCount}</p>
               <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">Active</p>
             </div>
           </motion.div>
@@ -485,10 +485,10 @@ export default function WarehousesPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.13 }}
-            className="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-4 flex items-center gap-3"
+            className="sm:col-span-2 rounded-xl border border-primary/20 bg-accent dark:border-primary/20 dark:bg-accent p-4 flex items-center gap-3"
           >
-            <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-              <Star className="size-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex size-9 items-center justify-center rounded-lg bg-accent dark:bg-primary">
+              <Star className="size-4 text-primary dark:text-primary" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Default Warehouse</p>
@@ -517,7 +517,7 @@ export default function WarehousesPage() {
 
           <Button
             size="sm"
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+            className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
             onClick={() => openDrawer("warehouse")}
           >
             <Plus className="size-3" />
@@ -604,7 +604,7 @@ export default function WarehousesPage() {
                         className={cn(
                           "flex size-9 shrink-0 items-center justify-center rounded-lg",
                           warehouse.isActive
-                            ? "bg-emerald-50 dark:bg-emerald-950/40"
+                            ? "bg-accent dark:bg-accent"
                             : "bg-muted"
                         )}
                       >
@@ -612,7 +612,7 @@ export default function WarehousesPage() {
                           className={cn(
                             "size-4",
                             warehouse.isActive
-                              ? "text-emerald-600 dark:text-emerald-400"
+                              ? "text-primary dark:text-primary"
                               : "text-muted-foreground"
                           )}
                         />
@@ -631,7 +631,7 @@ export default function WarehousesPage() {
                       {warehouse.isDefault && (
                         <Badge
                           variant="outline"
-                          className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 text-[11px]"
+                          className="bg-accent text-primary border-primary/20 dark:bg-accent dark:text-primary dark:border-primary/20 text-[11px]"
                         >
                           Default
                         </Badge>
@@ -748,7 +748,7 @@ export default function WarehousesPage() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving
                 ? "Saving..."

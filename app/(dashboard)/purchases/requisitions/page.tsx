@@ -63,7 +63,7 @@ const statusColors: Record<string, string> = {
   submitted:
     "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   approved:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   rejected:
     "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
   converted:
@@ -374,8 +374,8 @@ export default function RequisitionsPage() {
               {
                 label: "Approved",
                 desc: "Manager approves",
-                color: "bg-emerald-500",
-                bg: "bg-emerald-50 dark:bg-emerald-900/20",
+                color: "bg-primary",
+                bg: "bg-accent dark:bg-primary",
               },
               {
                 label: "Rejected",
@@ -438,7 +438,7 @@ export default function RequisitionsPage() {
                       i % 3 === 0
                         ? "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500"
                         : i % 3 === 1
-                          ? "bg-emerald-100 text-emerald-400 dark:bg-emerald-900/40 dark:text-emerald-500"
+                          ? "bg-accent text-primary dark:bg-primary dark:text-primary"
                           : "bg-purple-100 text-purple-400 dark:bg-purple-900/40 dark:text-purple-500"
                     }`}
                   >
@@ -470,7 +470,7 @@ export default function RequisitionsPage() {
               <Button
                 onClick={() => setSheetOpen(true)}
                 size="lg"
-                className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+                className="mt-6 bg-primary hover:bg-primary/90"
               >
                 <Plus className="mr-2 size-4" />
                 New Requisition
@@ -612,7 +612,7 @@ export default function RequisitionsPage() {
             <Button
               onClick={handleCreate}
               disabled={creating}
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               {creating ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />
@@ -638,7 +638,7 @@ export default function RequisitionsPage() {
           <Button
             size="sm"
             onClick={() => setSheetOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New Requisition

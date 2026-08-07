@@ -34,7 +34,7 @@ interface RevenueScheduleDetail {
 
 const statusColors: Record<string, string> = {
   active: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  completed: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   cancelled: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -147,7 +147,7 @@ export default function RevenueScheduleDetailPage() {
             size="sm"
             onClick={handleRecognize}
             loading={recognizing}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
             title="Count the next period's amount as income now"
           >
             <TrendingUp className="mr-2 size-4" />Count next period
@@ -176,7 +176,7 @@ export default function RevenueScheduleDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Counted so far</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(rs.recognizedAmount)}</p>
+          <p className="text-xl font-bold font-mono text-primary">{formatMoney(rs.recognizedAmount)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Left to count</p>
@@ -196,7 +196,7 @@ export default function RevenueScheduleDetailPage() {
             <span className="text-right text-sm font-mono font-medium">{formatMoney(entry.amount)}</span>
             <span className="text-right text-sm">
               {entry.recognized ? (
-                <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                <Badge variant="outline" className="border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                   <Check className="mr-1 size-3" />counted
                 </Badge>
               ) : (

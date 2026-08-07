@@ -195,7 +195,7 @@ export default function BudgetDetailLayout({ children }: { children: React.React
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <h1 className="text-base sm:text-lg font-semibold tracking-tight">{budget.name}</h1>
                 <Badge variant="outline" className={budget.isActive
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  ? "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
                   : "text-muted-foreground"
                 }>
                   {budget.isActive ? "Active" : "Inactive"}
@@ -229,14 +229,14 @@ export default function BudgetDetailLayout({ children }: { children: React.React
           <div>
             <p className="text-[11px] text-muted-foreground flex items-center gap-1">
               {totalVariance >= 0
-                ? <TrendingDown className="size-3 text-emerald-500" />
+                ? <TrendingDown className="size-3 text-primary" />
                 : <TrendingUp className="size-3 text-red-500" />
               }
               Variance
             </p>
             <p className={cn(
               "mt-0.5 font-mono text-lg font-semibold tabular-nums",
-              totalVariance >= 0 ? "text-emerald-600" : "text-red-600"
+              totalVariance >= 0 ? "text-primary" : "text-red-600"
             )}>
               {totalBudgeted > 0 ? formatMoney(Math.abs(totalVariance)) : "-"}
             </p>
@@ -270,7 +270,7 @@ export default function BudgetDetailLayout({ children }: { children: React.React
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
-                    overallPct > 100 ? "bg-red-500" : overallPct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                    overallPct > 100 ? "bg-red-500" : overallPct > 80 ? "bg-amber-500" : "bg-primary"
                   )}
                   style={{ width: `${Math.min(overallPct, 100)}%` }}
                 />

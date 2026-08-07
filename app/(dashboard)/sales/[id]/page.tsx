@@ -116,8 +116,8 @@ const statusConfig: Record<string, { class: string; bg: string }> = {
     bg: "bg-amber-500",
   },
   paid: {
-    class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-    bg: "bg-emerald-500",
+    class: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
+    bg: "bg-primary",
   },
   overdue: {
     class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
@@ -702,7 +702,7 @@ export default function InvoiceDetailPage() {
                   size="sm"
                   onClick={handleApprove}
                   loading={approving}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                   title="Approve this invoice so it can be sent to the customer"
                 >
                   <ThumbsUp className="mr-2 size-4" />Approve
@@ -747,14 +747,14 @@ export default function InvoiceDetailPage() {
               </Button>
             )}
             {inv.status === "draft" && (
-              <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-primary hover:bg-primary/90">
                 <Send className="mr-2 size-4" />Send
               </Button>
             )}
             {["sent", "partial", "overdue"].includes(inv.status) && (
               <Dialog open={payOpen} onOpenChange={setPayOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90">
                     <DollarSign className="mr-2 size-4" />Record Payment
                   </Button>
                 </DialogTrigger>
@@ -806,7 +806,7 @@ export default function InvoiceDetailPage() {
                         </Select>
                       </div>
                     )}
-                    <Button onClick={handlePay} loading={payLoading} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                    <Button onClick={handlePay} loading={payLoading} className="w-full bg-primary hover:bg-primary/90">
                       Record Payment
                     </Button>
                   </div>
@@ -852,7 +852,7 @@ export default function InvoiceDetailPage() {
                     <Button
                       onClick={handleChargeInterest}
                       loading={interestLoading}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      className="w-full bg-primary hover:bg-primary/90"
                     >
                       Add late fee
                     </Button>
@@ -1076,7 +1076,7 @@ export default function InvoiceDetailPage() {
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Paid</p>
-                <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 mt-0.5">{formatMoney(inv.amountPaid, inv.currencyCode)}</p>
+                <p className="text-sm font-mono font-semibold tabular-nums text-primary mt-0.5">{formatMoney(inv.amountPaid, inv.currencyCode)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Due</p>
@@ -1140,8 +1140,8 @@ export default function InvoiceDetailPage() {
                   return (
                     <div key={c.id} className="flex items-center justify-between px-5 py-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
-                          <Wallet className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-accent dark:bg-accent shrink-0">
+                          <Wallet className="size-4 text-primary dark:text-primary" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -1254,7 +1254,7 @@ export default function InvoiceDetailPage() {
               <Button
                 onClick={handleSaveSnapshot}
                 disabled={snapshotSaving || !senderName.trim()}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 {snapshotSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
                 Save
@@ -1274,8 +1274,8 @@ export default function InvoiceDetailPage() {
               {payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between px-5 py-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 shrink-0">
-                      <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    <div className="flex size-8 items-center justify-center rounded-lg bg-accent dark:bg-accent shrink-0">
+                      <Banknote className="size-4 text-primary dark:text-primary" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -1285,7 +1285,7 @@ export default function InvoiceDetailPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">{formatDate(p.date)}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-mono font-semibold text-emerald-600 shrink-0">{formatMoney(p.amount, inv.currencyCode)}</span>
+                  <span className="text-sm font-mono font-semibold text-primary shrink-0">{formatMoney(p.amount, inv.currencyCode)}</span>
                 </div>
               ))}
             </div>

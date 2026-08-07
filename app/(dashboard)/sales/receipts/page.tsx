@@ -39,7 +39,7 @@ interface SalesReceipt {
 
 const statusColors: Record<string, string> = {
   draft: "",
-  paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  paid: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -248,7 +248,7 @@ export default function SalesReceiptsPage() {
             </div>
             <Button
               onClick={() => openDrawer("salesReceipt")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               New cash sale
@@ -274,17 +274,17 @@ export default function SalesReceiptsPage() {
                   </div>
                   <span className="font-mono text-sm font-medium">$45.00</span>
                 </div>
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-emerald-50/30 dark:bg-emerald-950/10">
+                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-accent dark:bg-accent">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/40">
-                      <Banknote className="size-3.5 text-emerald-500" />
+                    <div className="flex size-7 items-center justify-center rounded-md bg-accent dark:bg-accent">
+                      <Banknote className="size-3.5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Paid into</p>
+                      <p className="text-sm font-medium text-primary dark:text-primary">Paid into</p>
                       <p className="text-[11px] text-muted-foreground">Cash drawer</p>
                     </div>
                   </div>
-                  <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">+$45.00</span>
+                  <span className="font-mono text-sm font-medium text-primary dark:text-primary">+$45.00</span>
                 </div>
                 <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
                   <div className="flex items-center gap-3">
@@ -303,7 +303,7 @@ export default function SalesReceiptsPage() {
                 {
                   title: "Counter or till sale",
                   desc: "A walk-in customer buys something and pays right away — cash or card.",
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "Market or pop-up stall",
@@ -358,7 +358,7 @@ export default function SalesReceiptsPage() {
           <Button
             onClick={() => openDrawer("salesReceipt")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New cash sale

@@ -182,7 +182,7 @@ export default function NotesPage() {
           <span className="text-[10px] text-muted-foreground">
             Ctrl+Enter to submit
           </span>
-          <Button size="sm" onClick={handleAdd} disabled={saving || !content.trim()} className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs">
+          <Button size="sm" onClick={handleAdd} disabled={saving || !content.trim()} className="bg-primary hover:bg-primary/90 h-7 text-xs">
             {saving ? "Adding..." : "Add Note"}
           </Button>
         </div>

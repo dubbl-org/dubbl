@@ -55,8 +55,8 @@ const STATUS_CONFIG: Record<
   completed: {
     label: "Completed",
     className:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-    dot: "bg-emerald-500",
+      "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
+    dot: "bg-primary",
   },
   cancelled: {
     label: "Cancelled",
@@ -121,7 +121,7 @@ export default function StockTakesPage() {
             {/* Left: text + CTA */}
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
-                <ClipboardList className="size-3.5 text-emerald-500" />
+                <ClipboardList className="size-3.5 text-primary" />
                 Physical Inventory Counts
               </div>
               <h2 className="mt-4 text-lg sm:text-2xl font-semibold tracking-tight">
@@ -136,7 +136,7 @@ export default function StockTakesPage() {
                 <Button
                   onClick={() => openDrawer("stockTake")}
                   size="lg"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   <Plus className="mr-2 size-4" />
                   New Stock Take
@@ -216,23 +216,23 @@ export default function StockTakesPage() {
                 </div>
 
                 {/* Step 3: Completed */}
-                <div className="rounded-xl border border-dashed border-emerald-200 dark:border-emerald-900/40 bg-card/60 p-4 opacity-60">
+                <div className="rounded-xl border border-dashed border-primary/20 dark:border-primary/20 bg-card/60 p-4 opacity-60">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex size-7 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/40">
-                        <CheckCircle2 className="size-3.5 text-emerald-500" />
+                      <div className="flex size-7 items-center justify-center rounded-md bg-accent dark:bg-accent">
+                        <CheckCircle2 className="size-3.5 text-primary" />
                       </div>
                       <div>
                         <p className="text-sm font-medium">Count complete</p>
                         <p className="text-[11px] text-muted-foreground">3 discrepancies found</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                    <Badge variant="outline" className="text-[10px] border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                       Completed
                     </Badge>
                   </div>
                   <div className="flex gap-2">
-                    <div className="h-1.5 flex-1 rounded-full bg-emerald-500" />
+                    <div className="h-1.5 flex-1 rounded-full bg-primary" />
                   </div>
                 </div>
               </div>
@@ -291,7 +291,7 @@ export default function StockTakesPage() {
             <div className="flex h-2 rounded-full overflow-hidden bg-muted">
               {completedCount > 0 && (
                 <div
-                  className="bg-emerald-500 transition-all duration-500"
+                  className="bg-primary transition-all duration-500"
                   style={{ width: `${(completedCount / stockTakes.length) * 100}%` }}
                 />
               )}
@@ -309,7 +309,7 @@ export default function StockTakesPage() {
               )}
             </div>
             <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" />Completed ({completedCount})</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />Completed ({completedCount})</span>
               <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-500" />In Progress ({inProgressCount})</span>
               <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />Draft ({draftCount})</span>
             </div>
@@ -321,7 +321,7 @@ export default function StockTakesPage() {
           {[
             { label: "Draft", value: draftCount, icon: FileText, color: "text-zinc-500", bg: "bg-zinc-100 dark:bg-zinc-800" },
             { label: "In Progress", value: inProgressCount, icon: Clock, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40" },
-            { label: "Completed", value: completedCount, icon: ClipboardCheck, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40" },
+            { label: "Completed", value: completedCount, icon: ClipboardCheck, color: "text-primary dark:text-primary", bg: "bg-accent dark:bg-accent" },
             { label: "Avg Items", value: stockTakes.length > 0 ? Math.round(totalItems / stockTakes.length) : 0, icon: BarChart3, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/40" },
           ].map((stat, i) => (
             <motion.div

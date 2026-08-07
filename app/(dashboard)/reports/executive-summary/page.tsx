@@ -121,8 +121,8 @@ export default function ExecutiveSummaryPage() {
                     {formatMoney(k.current)}
                   </p>
                   <div className="mt-2 flex items-center gap-1.5 text-xs">
-                    <Icon className={cn("size-3.5", up && "text-emerald-600", down && "text-red-600", !up && !down && "text-muted-foreground")} />
-                    <span className={cn("font-medium", up && "text-emerald-600", down && "text-red-600", !up && !down && "text-muted-foreground")}>
+                    <Icon className={cn("size-3.5", up && "text-primary", down && "text-red-600", !up && !down && "text-muted-foreground")} />
+                    <span className={cn("font-medium", up && "text-primary", down && "text-red-600", !up && !down && "text-muted-foreground")}>
                       {k.delta >= 0 ? "+" : "-"}{formatMoney(Math.abs(k.delta))}
                       {k.deltaPercent !== null && ` (${k.deltaPercent >= 0 ? "+" : ""}${k.deltaPercent}%)`}
                     </span>

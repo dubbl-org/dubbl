@@ -242,7 +242,7 @@ export const ACCOUNT_TYPE_LABELS: Record<BankAccountType, string> = {
 
 export const STATUS_STYLES: Record<Transaction["status"], string> = {
   unreconciled: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  reconciled: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  reconciled: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   excluded: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -393,10 +393,10 @@ export function TransactionRow({
       )}
       <div className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-lg",
-        isCredit ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"
+        isCredit ? "bg-accent dark:bg-accent" : "bg-red-50 dark:bg-red-950/40"
       )}>
         {isCredit
-          ? <ArrowDownRight className="size-4 text-emerald-600 dark:text-emerald-400" />
+          ? <ArrowDownRight className="size-4 text-primary dark:text-primary" />
           : <ArrowUpRight className="size-4 text-red-600 dark:text-red-400" />
         }
       </div>
@@ -541,7 +541,7 @@ export function TransactionRow({
         </div>
         <span className={cn(
           "font-mono text-sm font-medium tabular-nums w-24 text-right",
-          isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+          isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
         )}>
           {isCredit ? "+" : ""}{formatMoney(tx.amount, cur)}
         </span>
@@ -560,7 +560,7 @@ export function TransactionRow({
               <p className="font-medium">{tx.description}</p>
               <p className={cn(
                 "mt-1 font-mono text-xs tabular-nums",
-                isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
               )}>
                 {tx.date} · {isCredit ? "+" : ""}{formatMoney(tx.amount, cur)}
               </p>
@@ -577,7 +577,7 @@ export function TransactionRow({
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmClear(false)}>Cancel</Button>
             <Button
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
               onClick={() => { onReconcile(tx.id); setConfirmClear(false); }}
             >
               Mark as cleared
@@ -602,7 +602,7 @@ export function TransactionRow({
               )}
               <p className={cn(
                 "mt-1 font-mono text-xs tabular-nums",
-                isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
               )}>
                 {tx.date} · {isCredit ? "+" : ""}{formatMoney(tx.amount, cur)}
               </p>
@@ -700,7 +700,7 @@ export function ImportSheet({
       <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
               <Upload className="size-5" />
             </div>
             <div>
@@ -721,9 +721,9 @@ export function ImportSheet({
               className={cn(
                 "relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 sm:px-6 sm:py-10 text-center transition-all",
                 dragging
-                  ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
-                  : "border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/30",
-                selectedFile && "border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-950/10"
+                  ? "border-primary bg-accent dark:bg-accent"
+                  : "border-muted-foreground/25 hover:border-primary hover:bg-muted/30",
+                selectedFile && "border-primary bg-accent dark:bg-accent"
               )}
             >
               <input
@@ -735,7 +735,7 @@ export function ImportSheet({
               />
               {selectedFile ? (
                 <>
-                  <FileText className="size-8 text-emerald-600" />
+                  <FileText className="size-8 text-primary" />
                   <p className="mt-3 text-sm font-medium">{selectedFile.name}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{(selectedFile.size / 1024).toFixed(1)} KB</p>
                   <button
@@ -827,7 +827,7 @@ export function ImportSheet({
                       >
                         <span className="text-xs text-muted-foreground">{tx.date}</span>
                         <p className="text-xs font-medium truncate">{tx.description}</p>
-                        <span className={cn("text-right font-mono text-xs tabular-nums", tx.amount < 0 ? "text-red-600" : "text-emerald-600")}>
+                        <span className={cn("text-right font-mono text-xs tabular-nums", tx.amount < 0 ? "text-red-600" : "text-primary")}>
                           {formatMoney(tx.amount, currencyCode)}
                         </span>
                       </div>
@@ -844,7 +844,7 @@ export function ImportSheet({
           <Button variant="outline" disabled={!canPreview || previewing} onClick={onPreview}>
             {previewing ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Previewing...</> : "Preview"}
           </Button>
-          <Button onClick={onImport} disabled={!canPreview || importing} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={onImport} disabled={!canPreview || importing} className="bg-primary hover:bg-primary/90">
             {importing ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Importing...</> : "Import"}
           </Button>
         </div>
@@ -968,13 +968,13 @@ export function MatchToBillSheet({
                       onClick={() => { setSelectedBill(b.id); setPayAmount(centsToDecimal(Math.min(Math.abs(transaction?.amount || 0), b.amountDue))); }}
                       className={cn(
                         "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
-                        selectedBill === b.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
+                        selectedBill === b.id && "border-primary bg-accent dark:bg-accent"
                       )}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{b.billNumber}</span>
-                          <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          <Badge variant="outline" className="text-[10px] border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                             {s.confidence}% match
                           </Badge>
                         </div>
@@ -1019,8 +1019,8 @@ export function MatchToBillSheet({
                     onClick={() => { setSelectedBill(b.id); setPayAmount(centsToDecimal(Math.min(Math.abs(transaction?.amount || 0), b.amountDue))); }}
                     className={cn(
                       "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
-                      selectedBill === b.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20",
-                      suggestedBillIds.has(b.id) && selectedBill !== b.id && "border-emerald-200 dark:border-emerald-900"
+                      selectedBill === b.id && "border-primary bg-accent dark:bg-accent",
+                      suggestedBillIds.has(b.id) && selectedBill !== b.id && "border-primary/20 dark:border-primary/20"
                     )}
                   >
                     <div className="min-w-0">
@@ -1059,7 +1059,7 @@ export function MatchToBillSheet({
           <Button
             onClick={handleMatch}
             disabled={!selectedBill || saving}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Linking...</> : "Link & mark paid"}
           </Button>
@@ -1260,7 +1260,7 @@ export function CreateExpenseSheet({
           <Button
             onClick={handleCreate}
             disabled={saving || !title.trim() || !accountId}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Recording...</> : "Record expense"}
           </Button>
@@ -1533,7 +1533,7 @@ export function CategorizeSheet({
               <p className="text-sm font-medium">{transaction.description}</p>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                 <span>{transaction.date}</span>
-                <span className={cn("font-mono font-semibold", isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                <span className={cn("font-mono font-semibold", isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400")}>
                   {isCredit ? "+" : ""}{formatMoney(transaction.amount, currencyCode)}
                 </span>
               </div>
@@ -1552,7 +1552,7 @@ export function CategorizeSheet({
                     variant={choice === c.key ? "default" : "outline"}
                     className={cn(
                       "h-7 rounded-full px-3 text-xs font-normal",
-                      choice === c.key && "bg-emerald-600 hover:bg-emerald-700"
+                      choice === c.key && "bg-primary hover:bg-primary/90"
                     )}
                     onClick={c.onSelect}
                   >
@@ -1634,7 +1634,7 @@ export function CategorizeSheet({
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !accountId} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving || !accountId} className="bg-primary hover:bg-primary/90">
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Saving…</> : isEditing ? "Save changes" : "Assign to category"}
           </Button>
         </div>
@@ -1744,7 +1744,7 @@ export function MatchToInvoiceSheet({
               <p className="text-sm font-medium">{transaction.description}</p>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                 <span>{transaction.date}</span>
-                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono font-semibold text-primary dark:text-primary">
                   {formatMoney(transaction.amount, currencyCode)}
                 </span>
               </div>
@@ -1765,13 +1765,13 @@ export function MatchToInvoiceSheet({
                       onClick={() => { setSelectedInvoice(inv.id); setPayAmount(centsToDecimal(Math.min(Math.abs(transaction?.amount || 0), inv.amountDue))); }}
                       className={cn(
                         "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
-                        selectedInvoice === inv.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
+                        selectedInvoice === inv.id && "border-primary bg-accent dark:bg-accent"
                       )}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{inv.invoiceNumber}</span>
-                          <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          <Badge variant="outline" className="text-[10px] border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                             {s.confidence}% match
                           </Badge>
                         </div>
@@ -1816,8 +1816,8 @@ export function MatchToInvoiceSheet({
                     onClick={() => { setSelectedInvoice(inv.id); setPayAmount(centsToDecimal(Math.min(Math.abs(transaction?.amount || 0), inv.amountDue))); }}
                     className={cn(
                       "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
-                      selectedInvoice === inv.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20",
-                      suggestedIds.has(inv.id) && selectedInvoice !== inv.id && "border-emerald-200 dark:border-emerald-900"
+                      selectedInvoice === inv.id && "border-primary bg-accent dark:bg-accent",
+                      suggestedIds.has(inv.id) && selectedInvoice !== inv.id && "border-primary/20 dark:border-primary/20"
                     )}
                   >
                     <div className="min-w-0">
@@ -1852,7 +1852,7 @@ export function MatchToInvoiceSheet({
           <Button
             onClick={handleMatch}
             disabled={!selectedInvoice || saving}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Linking...</> : "Link & mark paid"}
           </Button>
@@ -1997,7 +1997,7 @@ export function MatchSheet({
               <p className="text-sm font-medium">{transaction.description}</p>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                 <span>{transaction.date}</span>
-                <span className={cn("font-mono font-semibold", isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                <span className={cn("font-mono font-semibold", isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400")}>
                   {isCredit ? "+" : ""}{formatMoney(transaction.amount, currencyCode)}
                 </span>
               </div>
@@ -2024,13 +2024,13 @@ export function MatchSheet({
                           onClick={() => setSelection({ kind: "existing", match: m })}
                           className={cn(
                             "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
-                            isSelected && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
+                            isSelected && "border-primary bg-accent dark:bg-accent"
                           )}
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className={cn("text-[10px]", meta.className)}>{meta.label}</Badge>
-                              <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              <Badge variant="outline" className="text-[10px] border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                                 {m.confidence}% match
                               </Badge>
                             </div>
@@ -2081,15 +2081,15 @@ export function MatchSheet({
                           }}
                           className={cn(
                             "w-full flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50",
-                            isSelected && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20",
-                            suggested && !isSelected && "border-emerald-200 dark:border-emerald-900"
+                            isSelected && "border-primary bg-accent dark:bg-accent",
+                            suggested && !isSelected && "border-primary/20 dark:border-primary/20"
                           )}
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium">{num}</span>
                               {suggested && (
-                                <Badge variant="outline" className="text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                <Badge variant="outline" className="text-[10px] border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                                   {suggested.confidence}% match
                                 </Badge>
                               )}
@@ -2119,7 +2119,7 @@ export function MatchSheet({
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleMatch} disabled={!selection || saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleMatch} disabled={!selection || saving} className="bg-primary hover:bg-primary/90">
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Linking…</> : "Link"}
           </Button>
         </div>
@@ -2229,7 +2229,7 @@ export function TransferSheet({
               <p className="text-sm font-medium">{transaction.description}</p>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                 <span>{transaction.date}</span>
-                <span className={cn("font-mono font-semibold", isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                <span className={cn("font-mono font-semibold", isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400")}>
                   {isCredit ? "+" : ""}{formatMoney(transaction.amount, currencyCode)}
                 </span>
               </div>
@@ -2281,7 +2281,7 @@ export function TransferSheet({
                       onClick={() => setCounterTx(counterTx === c.id ? null : c.id)}
                       className={cn(
                         "w-full flex items-center justify-between rounded-lg border p-2.5 text-left transition-colors hover:bg-muted/50",
-                        counterTx === c.id && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
+                        counterTx === c.id && "border-primary bg-accent dark:bg-accent"
                       )}
                     >
                       <div className="min-w-0">
@@ -2307,7 +2307,7 @@ export function TransferSheet({
           <Button
             onClick={handleTransfer}
             disabled={!targetId || saving || (selectedTarget && !selectedTarget.hasLedgerAccount)}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Recording…</> : "Record Transfer"}
           </Button>
@@ -2437,7 +2437,7 @@ export function SplitAccountSheet({
               <p className="text-sm font-medium">{transaction.description}</p>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                 <span>{transaction.date}</span>
-                <span className={cn("font-mono font-semibold", isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                <span className={cn("font-mono font-semibold", isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400")}>
                   {isCredit ? "+" : ""}{formatMoney(transaction.amount, currencyCode)}
                 </span>
               </div>
@@ -2496,7 +2496,7 @@ export function SplitAccountSheet({
 
           <div className={cn(
             "flex items-center justify-between rounded-lg border p-3 text-sm",
-            balanced ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20" : "border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20"
+            balanced ? "border-primary/20 bg-accent dark:border-primary/20 dark:bg-accent" : "border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20"
           )}>
             <div>
               <p className="text-xs text-muted-foreground">Allocated</p>
@@ -2504,7 +2504,7 @@ export function SplitAccountSheet({
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">{remainingCents >= 0 ? "Remaining" : "Over by"}</p>
-              <p className={cn("font-mono font-medium tabular-nums", balanced ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+              <p className={cn("font-mono font-medium tabular-nums", balanced ? "text-primary dark:text-primary" : "text-amber-600 dark:text-amber-400")}>
                 {formatMoney(Math.abs(remainingCents), currencyCode)}
               </p>
             </div>
@@ -2517,7 +2517,7 @@ export function SplitAccountSheet({
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !balanced} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving || !balanced} className="bg-primary hover:bg-primary/90">
             {saving ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Saving…</> : "Save split"}
           </Button>
         </div>
@@ -2638,7 +2638,7 @@ export function CashCodingGrid({
   if (codeable.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
-        <CheckCircle className="size-8 text-emerald-500" />
+        <CheckCircle className="size-8 text-primary" />
         <p className="text-sm text-muted-foreground">Nothing left to do — every line has a category.</p>
       </div>
     );
@@ -2649,7 +2649,7 @@ export function CashCodingGrid({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] text-muted-foreground">
           <span className="font-medium text-foreground tabular-nums">{codeable.length}</span> line{codeable.length !== 1 ? "s" : ""} to assign
-          {readyIds.length > 0 && <> · <span className="text-emerald-600 dark:text-emerald-400">{readyIds.length} ready</span></>}
+          {readyIds.length > 0 && <> · <span className="text-primary dark:text-primary">{readyIds.length} ready</span></>}
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={fillDown} title="Copy the first filled-in row's category, tax and contact to every blank row">
@@ -2659,7 +2659,7 @@ export function CashCodingGrid({
             size="sm"
             onClick={handleSave}
             disabled={saving || readyIds.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Saving…</> : <>Assign {readyIds.length || ""}</>}
           </Button>
@@ -2684,7 +2684,7 @@ export function CashCodingGrid({
                 </div>
                 <span className={cn(
                   "font-mono text-xs font-medium tabular-nums",
-                  isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                 )}>
                   {isCredit ? "+" : ""}{formatMoney(tx.amount, currencyCode)}
                 </span>
@@ -2804,7 +2804,7 @@ export function ReconciliationReport({
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Difference</p>
             <p className={cn(
               "mt-1 text-xl font-semibold font-mono tabular-nums",
-              diff == null ? "text-muted-foreground" : balanced ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              diff == null ? "text-muted-foreground" : balanced ? "text-primary dark:text-primary" : "text-amber-600 dark:text-amber-400"
             )}>
               {diff == null ? "—" : formatMoney(diff, currencyCode)}
             </p>
@@ -2812,12 +2812,12 @@ export function ReconciliationReport({
         </div>
         <div className={cn(
           "flex flex-wrap items-center gap-2 border-t px-4 py-2.5",
-          balanced ? "bg-emerald-50/50 dark:bg-emerald-950/20" : "bg-amber-50/50 dark:bg-amber-950/20"
+          balanced ? "bg-accent dark:bg-accent" : "bg-amber-50/50 dark:bg-amber-950/20"
         )}>
           {!data.hasLedgerAccount ? (
             <span className="text-xs text-muted-foreground">This bank account isn&apos;t set up for bookkeeping yet, so its balance in your books can&apos;t be worked out.</span>
           ) : balanced ? (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-primary dark:text-primary">
               <CheckCircle className="size-3.5" />Your books match the statement.
             </span>
           ) : (
@@ -2872,7 +2872,7 @@ export function ReconciliationReport({
                 <span className="text-xs text-muted-foreground">Adjustment amount</span>
                 <span className={cn(
                   "font-mono font-semibold tabular-nums",
-                  diff != null && diff > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  diff != null && diff > 0 ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                 )}>
                   {diff != null ? formatMoney(diff, currencyCode) : "—"}
                 </span>
@@ -2890,7 +2890,7 @@ export function ReconciliationReport({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
-            <Button onClick={postAdjustment} disabled={posting || diff == null || diff === 0} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={postAdjustment} disabled={posting || diff == null || diff === 0} className="bg-primary hover:bg-primary/90">
               {posting ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Saving…</> : "Write off the difference"}
             </Button>
           </DialogFooter>
@@ -2924,7 +2924,7 @@ function RecLineList({
             </div>
             <span className={cn(
               "font-mono text-xs font-medium tabular-nums shrink-0",
-              isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              isCredit ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
             )}>
               {isCredit ? "+" : ""}{formatMoney(tx.amount, currencyCode)}
             </span>

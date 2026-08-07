@@ -192,12 +192,12 @@ export default function InventoryValuationPage() {
   const stats = [
     { label: "Total Items", value: String(summary.totalItems), icon: Package },
     { label: "What it cost you", value: formatMoney(summary.totalCost), icon: DollarSign },
-    { label: "What it could sell for", value: formatMoney(summary.totalRetailValue), icon: BarChart3, color: "text-emerald-600 dark:text-emerald-400" },
+    { label: "What it could sell for", value: formatMoney(summary.totalRetailValue), icon: BarChart3, color: "text-primary dark:text-primary" },
     {
       label: "Avg profit margin",
       value: summary.totalMargin > 0 ? `${summary.totalMargin.toFixed(1)}%` : "-",
       icon: TrendingUp,
-      color: summary.totalMargin > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined,
+      color: summary.totalMargin > 0 ? "text-primary dark:text-primary" : undefined,
     },
   ];
 
@@ -252,7 +252,7 @@ export default function InventoryValuationPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">What it could sell for</p>
-              <p className="text-2xl font-bold font-mono tabular-nums truncate text-emerald-600 dark:text-emerald-400">{formatMoney(summary.totalRetailValue)}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate text-primary dark:text-primary">{formatMoney(summary.totalRetailValue)}</p>
             </div>
           </div>
           {/* Margin bar */}
@@ -260,19 +260,19 @@ export default function InventoryValuationPage() {
             <div className="space-y-1.5">
               <div className="flex h-2 rounded-full overflow-hidden bg-muted">
                 <div
-                  className="bg-emerald-500 transition-all duration-500"
+                  className="bg-primary transition-all duration-500"
                   style={{ width: `${Math.min((summary.totalCost / summary.totalRetailValue) * 100, 100)}%` }}
                 />
                 {profitAmount > 0 && (
                   <div
-                    className="bg-emerald-300 dark:bg-emerald-700 transition-all duration-500"
+                    className="bg-accent dark:bg-primary transition-all duration-500"
                     style={{ width: `${(profitAmount / summary.totalRetailValue) * 100}%` }}
                   />
                 )}
               </div>
               <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" />Cost ({formatMoney(summary.totalCost)})</span>
-                <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-300 dark:bg-emerald-700" />Profit ({formatMoney(profitAmount)})</span>
+                <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />Cost ({formatMoney(summary.totalCost)})</span>
+                <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-accent dark:bg-primary" />Profit ({formatMoney(profitAmount)})</span>
               </div>
             </div>
           )}
@@ -290,7 +290,7 @@ export default function InventoryValuationPage() {
             >
               <div className={cn(
                 "flex size-8 items-center justify-center rounded-lg",
-                stat.color ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-muted"
+                stat.color ? "bg-accent dark:bg-accent" : "bg-muted"
               )}>
                 <stat.icon className={cn("size-4", stat.color || "text-muted-foreground")} />
               </div>
@@ -315,7 +315,7 @@ export default function InventoryValuationPage() {
             <Button
               onClick={() => openDrawer("inventory")}
               size="sm"
-              className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
+              className="h-7 text-xs bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-1.5 size-3" />
               Add Item
@@ -417,7 +417,7 @@ export default function InventoryValuationPage() {
                   <td className="px-4 py-3 text-right font-mono tabular-nums">
                     {formatMoney(item.totalCost)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-primary dark:text-primary">
                     {formatMoney(item.salePrice)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums font-medium">
@@ -427,7 +427,7 @@ export default function InventoryValuationPage() {
                     className={cn(
                       "px-4 py-3 text-right font-mono tabular-nums",
                       item.marginPercent > 0
-                        ? "text-emerald-600 dark:text-emerald-400"
+                        ? "text-primary dark:text-primary"
                         : item.marginPercent < 0
                           ? "text-red-600 dark:text-red-400"
                           : "text-muted-foreground"

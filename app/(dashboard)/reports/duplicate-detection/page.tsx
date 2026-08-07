@@ -72,8 +72,8 @@ export default function DuplicateDetectionPage() {
         <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <div className="flex justify-center mb-3">
-              <div className="size-10 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-                <AlertTriangle className="size-5 text-emerald-600" />
+              <div className="size-10 rounded-full bg-accent dark:bg-accent flex items-center justify-center">
+                <AlertTriangle className="size-5 text-primary" />
               </div>
             </div>
             <p className="text-sm font-medium">No duplicates detected</p>
@@ -96,7 +96,7 @@ export default function DuplicateDetectionPage() {
               <div key={gi} className="rounded-lg border p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={group.type === "invoice" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-blue-200 bg-blue-50 text-blue-700"}>
+                    <Badge variant="outline" className={group.type === "invoice" ? "border-primary/20 bg-accent text-primary" : "border-blue-200 bg-blue-50 text-blue-700"}>
                       {group.type}
                     </Badge>
                     <span className="text-sm font-medium">{group.contactName}</span>

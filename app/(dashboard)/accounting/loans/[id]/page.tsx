@@ -35,7 +35,7 @@ interface ScheduleEntry {
 }
 
 const statusColors: Record<string, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  active: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   paid_off: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   defaulted: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
@@ -120,7 +120,7 @@ export default function LoanDetailPage() {
             size="sm"
             onClick={handlePostPayment}
             loading={posting}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
             title="Log the next scheduled monthly payment"
           >
             <Wallet className="mr-2 size-4" />Record this month&apos;s payment
@@ -152,7 +152,7 @@ export default function LoanDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Monthly payment</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(ln.monthlyPayment)}</p>
+          <p className="text-xl font-bold font-mono text-primary">{formatMoney(ln.monthlyPayment)}</p>
         </div>
       </div>
 
@@ -170,7 +170,7 @@ export default function LoanDetailPage() {
           <div
             key={entry.id}
             className={`grid min-w-[640px] grid-cols-[60px_110px_1fr_1fr_1fr_1fr_90px] gap-2 border-b px-4 py-2 last:border-b-0 ${
-              !entry.posted && entry.id === nextEntry?.id ? "bg-emerald-50/30 dark:bg-emerald-950/10" : ""
+              !entry.posted && entry.id === nextEntry?.id ? "bg-accent dark:bg-accent" : ""
             }`}
           >
             <span className="text-sm font-mono">{entry.periodNumber}</span>
@@ -181,7 +181,7 @@ export default function LoanDetailPage() {
             <span className="text-right text-sm font-mono">{formatMoney(entry.remainingBalance)}</span>
             <span className="text-right text-sm">
               {entry.posted ? (
-                <span className="inline-flex items-center gap-1 text-emerald-600">
+                <span className="inline-flex items-center gap-1 text-primary">
                   <CheckCircle2 className="size-3.5" />
                 </span>
               ) : (

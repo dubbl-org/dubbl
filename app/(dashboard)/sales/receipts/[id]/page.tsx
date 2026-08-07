@@ -35,7 +35,7 @@ interface SalesReceiptDetail {
 
 const statusColors: Record<string, string> = {
   draft: "",
-  paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  paid: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -102,7 +102,7 @@ export default function SalesReceiptDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <div className="flex items-center gap-2">
-            <Banknote className="size-3.5 text-emerald-600" />
+            <Banknote className="size-3.5 text-primary" />
             <p className="text-xs text-muted-foreground">Paid into</p>
           </div>
           <p className="text-sm font-medium mt-1 flex items-center gap-1.5">

@@ -36,12 +36,12 @@ const columns: Column<Comparison>[] = [
   { key: "budgeted", header: "Budgeted", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.budgeted)}</span> },
   { key: "actual", header: "Actual", className: "w-28 text-right", render: (r) => <span className="font-mono text-sm tabular-nums">{formatMoney(r.actual)}</span> },
   { key: "variance", header: "Variance", className: "w-28 text-right", render: (r) => (
-    <span className={`font-mono text-sm tabular-nums ${r.variance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+    <span className={`font-mono text-sm tabular-nums ${r.variance >= 0 ? "text-primary" : "text-red-600"}`}>
       {formatMoney(r.variance)}
     </span>
   )},
   { key: "pct", header: "%", className: "w-20 text-right", render: (r) => (
-    <span className={`text-sm tabular-nums ${r.variance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+    <span className={`text-sm tabular-nums ${r.variance >= 0 ? "text-primary" : "text-red-600"}`}>
       {r.variancePct}%
     </span>
   )},
@@ -188,7 +188,7 @@ export default function BudgetVsActualPage() {
 
           <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-muted/50 rounded-lg text-sm font-semibold mt-6">
             <span>Total Variance</span>
-            <span className={`font-mono tabular-nums ${totalVariance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            <span className={`font-mono tabular-nums ${totalVariance >= 0 ? "text-primary" : "text-red-600"}`}>
               {formatMoney(totalVariance)}
             </span>
           </div>

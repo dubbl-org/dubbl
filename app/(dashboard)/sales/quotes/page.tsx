@@ -28,7 +28,7 @@ interface Quote {
 const statusColors: Record<string, string> = {
   draft: "",
   sent: "border-blue-200 bg-blue-50 text-blue-700",
-  accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  accepted: "border-primary/20 bg-accent text-primary",
   declined: "border-red-200 bg-red-50 text-red-700",
   expired: "border-gray-200 bg-gray-50 text-gray-700",
   converted: "border-purple-200 bg-purple-50 text-purple-700",
@@ -149,7 +149,7 @@ export default function QuotesPage() {
                 <Button
                   onClick={() => openDrawer("quote")}
                   size="lg"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   <Plus className="mr-2 size-4" />
                   New Quote
@@ -243,7 +243,7 @@ export default function QuotesPage() {
             <Button
               onClick={() => openDrawer("quote")}
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New Quote

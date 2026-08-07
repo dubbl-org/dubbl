@@ -434,7 +434,7 @@ export default function MembersPage() {
           size="sm"
           onClick={() => setInviteOpen(true)}
           disabled={capacity ? !capacity.canInvite : false}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-primary hover:bg-primary/90 disabled:opacity-50"
         >
           <Plus className="mr-1.5 size-3.5" />
           Invite Member
@@ -647,7 +647,7 @@ export default function MembersPage() {
                         /invite/{link.token.slice(0, 8)}...
                       </code>
                       {isUsable ? (
-                        <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400">
+                        <Badge variant="outline" className="border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary">
                           <Check className="mr-1 size-3" />
                           Active
                         </Badge>
@@ -685,7 +685,7 @@ export default function MembersPage() {
                       {actionId === link.id ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : link.isActive ? (
-                        <ToggleRight className="size-3.5 text-emerald-600" />
+                        <ToggleRight className="size-3.5 text-primary" />
                       ) : (
                         <ToggleLeft className="size-3.5 text-muted-foreground" />
                       )}
@@ -822,7 +822,7 @@ export default function MembersPage() {
             <Button
               onClick={invite}
               disabled={!inviteEmail || saving}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving ? "Sending..." : "Send Invitation"}
             </Button>
@@ -886,7 +886,7 @@ export default function MembersPage() {
             <Button
               onClick={createInviteLink}
               disabled={creatingLink}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {creatingLink ? "Creating..." : "Create Link"}
             </Button>

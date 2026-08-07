@@ -32,7 +32,7 @@ const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
   sent: "bg-blue-100 text-blue-700",
   partial: "bg-amber-100 text-amber-700",
-  paid: "bg-emerald-100 text-emerald-700",
+  paid: "bg-accent text-primary",
   overdue: "bg-red-100 text-red-700",
   void: "bg-gray-100 text-gray-500",
 };

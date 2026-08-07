@@ -153,8 +153,8 @@ export default function BankingPage() {
                   label: "Sort your transactions",
                   sub: "Match them to invoices and bills, or assign a category",
                   icon: ChevronRight,
-                  color: "bg-emerald-500",
-                  ring: "ring-emerald-200 dark:ring-emerald-900",
+                  color: "bg-primary",
+                  ring: "ring-primary dark:ring-primary",
                 },
               ].map(({ step, label, sub, icon: Icon, color, ring }, i) => (
                 <div key={step} className="flex flex-col items-center text-center relative">
@@ -176,8 +176,8 @@ export default function BankingPage() {
 
           {/* CTA */}
           <div className="text-center space-y-4">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950/40">
-              <Landmark className="size-7 text-emerald-600 dark:text-emerald-400" />
+            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-accent dark:bg-accent">
+              <Landmark className="size-7 text-primary dark:text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-semibold tracking-tight">Connect your first account</h2>
@@ -188,7 +188,7 @@ export default function BankingPage() {
             <Button
               onClick={() => openDrawer("bankAccount")}
               size="lg"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New Bank Account
@@ -237,7 +237,7 @@ export default function BankingPage() {
           <p className={cn(
             "mt-0.5 font-mono text-lg font-semibold tabular-nums",
             totals.balance > 0
-              ? "text-emerald-600 dark:text-emerald-400"
+              ? "text-primary dark:text-primary"
               : totals.balance < 0
                 ? "text-red-600 dark:text-red-400"
                 : ""
@@ -247,10 +247,10 @@ export default function BankingPage() {
         </div>
         <div>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <ArrowDownLeft className="size-3 text-emerald-500" />
+            <ArrowDownLeft className="size-3 text-primary" />
             Money In
           </p>
-          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-primary dark:text-primary">
             {showBalances ? formatMoney(positiveBalance) : "********"}
           </p>
         </div>
@@ -268,7 +268,7 @@ export default function BankingPage() {
           <div className="flex items-baseline gap-2 mt-0.5">
             <p className="font-mono text-lg font-semibold tabular-nums">{accounts.length}</p>
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="size-1.5 rounded-full bg-primary animate-pulse" />
               {totals.active} active
             </span>
           </div>
@@ -310,7 +310,7 @@ export default function BankingPage() {
           <Button
             onClick={() => openDrawer("bankAccount")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New Account
@@ -417,7 +417,7 @@ export default function BankingPage() {
                           <p className={cn(
                             "font-mono text-sm font-semibold tabular-nums",
                             account.balance > 0
-                              ? "text-emerald-600 dark:text-emerald-400"
+                              ? "text-primary dark:text-primary"
                               : account.balance < 0
                                 ? "text-red-600 dark:text-red-400"
                                 : "text-muted-foreground"

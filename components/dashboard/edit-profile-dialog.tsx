@@ -219,7 +219,7 @@ export function AccountDialog({
               <div className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-3">
                 <Avatar className="size-9 sm:size-11 ring-1 ring-border">
                   <AvatarImage src={user?.image || undefined} />
-                  <AvatarFallback className="text-xs sm:text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                  <AvatarFallback className="text-xs sm:text-sm font-semibold bg-accent text-primary dark:bg-accent dark:text-primary">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -359,7 +359,7 @@ function ProfileTab({
         onClick={onSave}
         disabled={saving || !name}
         size="sm"
-        className="bg-emerald-600 hover:bg-emerald-700"
+        className="bg-primary hover:bg-primary/90"
       >
         {saving ? "Saving..." : "Save changes"}
       </Button>
@@ -410,7 +410,7 @@ function AccountsTab({
                   <p className="text-[11px] text-muted-foreground">{email}</p>
                 </div>
               </div>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+              <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-primary dark:bg-accent dark:text-primary">
                 Active
               </span>
             </div>

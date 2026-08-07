@@ -295,7 +295,7 @@ export function SendDocumentDialog({
       <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
               <Mail className="size-5" />
             </div>
             <div>
@@ -536,7 +536,7 @@ export function SendDocumentDialog({
             onClick={handleSendEmail}
             loading={sending}
             disabled={markingAsSent || !recipientEmail}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+            className="flex-1 bg-primary hover:bg-primary/90"
           >
             <Send className="mr-2 size-4" />
             Send Email

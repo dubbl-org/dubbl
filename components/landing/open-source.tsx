@@ -68,7 +68,7 @@ function TerminalBlock() {
             transition={{ duration: 0.3, delay: line.delay }}
             className={
               line.success
-                ? "text-emerald-400"
+                ? "text-primary"
                 : line.highlight
                   ? "text-white font-medium"
                   : "text-white/60"
@@ -79,7 +79,7 @@ function TerminalBlock() {
         ))}
         {/* Blinking cursor */}
         <motion.span
-          className="inline-block h-4 w-2 bg-emerald-400"
+          className="inline-block h-4 w-2 bg-primary"
           animate={{ opacity: [1, 1, 0, 0] }}
           transition={{ duration: 1, repeat: Infinity, times: [0, 0.5, 0.5, 1] }}
         />
@@ -156,7 +156,7 @@ export function OpenSource() {
               >
                 <Button
                   size="lg"
-                  className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                  className="bg-primary text-white hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90"
                   asChild
                 >
                   <a

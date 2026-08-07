@@ -42,7 +42,7 @@ interface CustomerCreditDetail {
 
 const statusColors: Record<string, string> = {
   open: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  applied: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  applied: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   refunded: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
@@ -166,7 +166,7 @@ export default function CustomerPrepaymentDetailPage() {
         {cc.status === "open" && cc.amountRemaining > 0 && (
           <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" title="Put this credit towards what a customer owes on an invoice">
+              <Button size="sm" className="bg-primary hover:bg-primary/90" title="Put this credit towards what a customer owes on an invoice">
                 <FileText className="mr-2 size-4" />Apply to an invoice
               </Button>
             </DialogTrigger>
@@ -211,7 +211,7 @@ export default function CustomerPrepaymentDetailPage() {
                   onClick={handleApply}
                   loading={applyLoading}
                   disabled={!applyInvoiceId}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-primary hover:bg-primary/90"
                 >
                   Put towards the invoice
                 </Button>
@@ -240,7 +240,7 @@ export default function CustomerPrepaymentDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Used so far</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(amountApplied, cc.currencyCode)}</p>
+          <p className="text-xl font-bold font-mono text-primary">{formatMoney(amountApplied, cc.currencyCode)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <div className="flex items-center gap-2">

@@ -170,7 +170,7 @@ export default function ProcurementSettingsPage() {
         {/* Rules */}
         <div className="rounded-lg border divide-y">
           <div className="flex items-center gap-4 px-4 py-3.5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg text-emerald-500 bg-emerald-500/10">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg text-primary bg-primary">
               <PackageCheck className="size-4" />
             </div>
             <div className="min-w-0 flex-1">

@@ -94,7 +94,7 @@ function formatFileSize(bytes: number) {
 
 function getFileIcon(mimeType: string) {
   if (mimeType.startsWith("image/")) return { icon: Image, color: "text-blue-500" };
-  if (mimeType.includes("spreadsheet") || mimeType.includes("csv")) return { icon: FileSpreadsheet, color: "text-emerald-600" };
+  if (mimeType.includes("spreadsheet") || mimeType.includes("csv")) return { icon: FileSpreadsheet, color: "text-primary" };
   if (mimeType.includes("pdf")) return { icon: FileText, color: "text-red-500" };
   return { icon: File, color: "text-muted-foreground" };
 }
@@ -508,7 +508,7 @@ export default function DocumentsPage() {
           <Button
             onClick={() => handleUpload(pendingFiles, uploadVisibility)}
             disabled={pendingFiles.length === 0 || uploading}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {uploading ? "Uploading..." : "Upload"}
           </Button>
@@ -554,7 +554,7 @@ export default function DocumentsPage() {
             </div>
             <Button
               onClick={() => setNewFolderOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <FolderPlus className="mr-2 size-4" />
               Create Folder
@@ -585,7 +585,7 @@ export default function DocumentsPage() {
                 {[
                   { name: "Q1-Report.pdf", size: "2.4 MB", icon: FileText, color: "text-red-500" },
                   { name: "Team-Photo.jpg", size: "1.8 MB", icon: Image, color: "text-blue-500" },
-                  { name: "Budget-2026.xlsx", size: "340 KB", icon: FileSpreadsheet, color: "text-emerald-600" },
+                  { name: "Budget-2026.xlsx", size: "340 KB", icon: FileSpreadsheet, color: "text-primary" },
                 ].map(({ name, size, icon: Icon, color }) => (
                   <div key={name} className="flex items-center gap-3 px-5 py-3">
                     <Icon className={`size-5 ${color} shrink-0`} />
@@ -626,7 +626,7 @@ export default function DocumentsPage() {
                   title: "Secure and scoped",
                   desc: "All files are encrypted and scoped to your organization. Only your team has access.",
                   icon: Lock,
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "Team-wide visibility",
@@ -696,7 +696,7 @@ export default function DocumentsPage() {
         </Button>
         <Button
           size="sm"
-          className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+          className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
           onClick={handleFileInput}
           disabled={uploading}
         >
@@ -1011,7 +1011,7 @@ export default function DocumentsPage() {
                           onClick={() => handleRename(selectedDoc, editName)}
                           disabled={savingName}
                         >
-                          <CheckIcon className="size-3.5 text-emerald-600" />
+                          <CheckIcon className="size-3.5 text-primary" />
                         </Button>
                         <Button
                           variant="outline"
@@ -1090,7 +1090,7 @@ export default function DocumentsPage() {
                     </Button>
                     <Button
                       size="sm"
-                      className="flex-1 gap-2 text-xs h-9 bg-emerald-600 hover:bg-emerald-700"
+                      className="flex-1 gap-2 text-xs h-9 bg-primary hover:bg-primary/90"
                       onClick={async () => {
                         if (previewUrl) {
                           window.open(previewUrl, "_blank");

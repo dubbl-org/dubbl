@@ -159,7 +159,7 @@ const columns: Column<Entry>[] = [
         variant="outline"
         className={
           r.status === "posted"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+            ? "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
             : r.status === "void"
             ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
             : ""
@@ -182,7 +182,7 @@ const columns: Column<Entry>[] = [
 ];
 
 const BUCKET_COLORS = [
-  "bg-emerald-500",
+  "bg-primary",
   "bg-amber-500",
   "bg-orange-500",
   "bg-red-400",
@@ -239,7 +239,7 @@ function KpiItem({ label, value, good }: { label: string; value: string; good: b
     <div className="text-center">
       <p className={cn(
         "text-lg font-bold font-mono tabular-nums",
-        good ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+        good ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
       )}>
         {value}
       </p>
@@ -486,17 +486,17 @@ export default function DashboardPage() {
                 speed={0.2}
               />
               <div className="relative p-5 sm:p-8">
-                <h2 className="text-xl sm:text-2xl font-bold text-emerald-950">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
                   {greeting}{firstName ? `, ${firstName}` : ""}
                 </h2>
-                <p className="mt-1 max-w-lg text-sm text-emerald-950/70">
+                <p className="mt-1 max-w-lg text-sm text-foreground">
                   Here is your financial overview. Jump into any section to get
                   started or continue where you left off.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button
                     size="sm"
-                    className="bg-emerald-950 text-white hover:bg-emerald-900"
+                    className="bg-accent text-white hover:bg-primary/90"
                     onClick={() => router.push("/accounting/accounts")}
                   >
                     <Landmark className="mr-1.5 size-3.5" />
@@ -504,7 +504,7 @@ export default function DashboardPage() {
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-emerald-950/10 text-emerald-950 hover:bg-emerald-950/20 border-0"
+                    className="bg-accent text-foreground hover:bg-accent border-0"
                     onClick={() => openDrawer("entry")}
                   >
                     <BookOpen className="mr-1.5 size-3.5" />
@@ -512,7 +512,7 @@ export default function DashboardPage() {
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-emerald-950/10 text-emerald-950 hover:bg-emerald-950/20 border-0"
+                    className="bg-accent text-foreground hover:bg-accent border-0"
                     onClick={() => openDrawer("invoice")}
                   >
                     <FileText className="mr-1.5 size-3.5" />
@@ -520,7 +520,7 @@ export default function DashboardPage() {
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-emerald-950/10 text-emerald-950 hover:bg-emerald-950/20 border-0"
+                    className="bg-accent text-foreground hover:bg-accent border-0"
                     onClick={() => router.push("/contacts")}
                   >
                     <Users className="mr-1.5 size-3.5" />
@@ -542,7 +542,7 @@ export default function DashboardPage() {
                   <X className="size-4" />
                 </button>
                 <div className="flex items-center gap-2">
-                  <Rocket className="size-4 text-emerald-600" />
+                  <Rocket className="size-4 text-primary" />
                   <h3 className="text-sm font-semibold">Getting started</h3>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -574,7 +574,7 @@ export default function DashboardPage() {
                     <button
                       key={step.href}
                       onClick={() => router.push(step.href)}
-                      className="flex items-start gap-3 rounded-lg border bg-background p-3 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                      className="flex items-start gap-3 rounded-lg border bg-background p-3 text-left transition-colors hover:border-primary hover:bg-accent dark:hover:bg-accent"
                     >
                       <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-muted-foreground/40" />
                       <div className="min-w-0 flex-1">
@@ -686,7 +686,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="h-2 rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-emerald-500 transition-all"
+                        className="h-full rounded-full bg-primary transition-all"
                         style={{ width: `${revenuePct}%` }}
                       />
                     </div>
@@ -713,7 +713,7 @@ export default function DashboardPage() {
                       className={cn(
                         "font-mono text-sm tabular-nums font-semibold",
                         pnl.netIncome >= 0
-                          ? "text-emerald-600 dark:text-emerald-400"
+                          ? "text-primary dark:text-primary"
                           : "text-red-600 dark:text-red-400"
                       )}
                     >

@@ -120,7 +120,7 @@ export default function AdvisorsPage() {
 
   const getStatusBadge = (advisor: Advisor) => {
     if (advisor.revokedAt) return <Badge variant="destructive" className="text-[10px]">Revoked</Badge>;
-    if (advisor.acceptedAt && advisor.isActive) return <Badge variant="default" className="text-[10px] bg-emerald-600">Active</Badge>;
+    if (advisor.acceptedAt && advisor.isActive) return <Badge variant="default" className="text-[10px] bg-primary">Active</Badge>;
     return <Badge variant="outline" className="text-[10px]">Pending</Badge>;
   };
 
@@ -257,7 +257,7 @@ export default function AdvisorsPage() {
             <Button
               onClick={handleInvite}
               disabled={saving || !email.trim()}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving ? "Inviting..." : "Send Invitation"}
             </Button>

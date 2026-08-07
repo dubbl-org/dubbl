@@ -60,7 +60,7 @@ export function LegalToc({ items }: { items: TocItem[] }) {
                   className={cn(
                     "block w-full border-l-2 py-1.5 pl-4 text-left text-[13px] leading-snug transition-colors",
                     activeId === item.id
-                      ? "border-emerald-500 font-medium text-foreground"
+                      ? "border-primary font-medium text-foreground"
                       : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                   )}
                 >
@@ -98,7 +98,7 @@ export function LegalToc({ items }: { items: TocItem[] }) {
                   className={cn(
                     "block w-full rounded-md px-3 py-2 text-left text-[13px] transition-colors",
                     activeId === item.id
-                      ? "bg-emerald-50 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+                      ? "bg-accent font-medium text-primary dark:bg-accent dark:text-primary"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >

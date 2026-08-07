@@ -47,7 +47,7 @@ const methodLabels: Record<string, string> = {
 
 const methodColors: Record<string, string> = {
   bank_transfer: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  cash: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  cash: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   check: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   card: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
   other: "",
@@ -96,7 +96,7 @@ function buildColumns(): Column<Payment>[] {
       sortKey: "amount",
       className: "w-28 text-right",
       render: (r) => (
-        <span className="font-mono text-sm tabular-nums font-medium text-emerald-600">
+        <span className="font-mono text-sm tabular-nums font-medium text-primary">
           {formatMoney(r.amount, r.currencyCode)}
         </span>
       ),

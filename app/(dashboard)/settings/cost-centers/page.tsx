@@ -256,7 +256,7 @@ export default function CostCentersPage() {
         </div>
         <Button
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-primary hover:bg-primary/90"
           onClick={openCreate}
         >
           <Plus className="mr-1.5 size-3.5" />
@@ -331,7 +331,7 @@ export default function CostCentersPage() {
                       variant={node.isActive ? "default" : "secondary"}
                       className={
                         node.isActive
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px]"
+                          ? "bg-accent text-primary border-primary/20 text-[11px]"
                           : "text-[11px]"
                       }
                     >
@@ -425,7 +425,7 @@ export default function CostCentersPage() {
             <Button
               onClick={handleSave}
               disabled={saving || !formCode.trim() || !formName.trim()}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving
                 ? editing

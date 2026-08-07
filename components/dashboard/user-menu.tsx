@@ -47,7 +47,7 @@ export function UserMenu() {
           >
             <Avatar className="size-7 ring-1 ring-border">
               <AvatarImage src={user?.image || undefined} />
-              <AvatarFallback className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+              <AvatarFallback className="text-[10px] font-semibold bg-accent text-primary dark:bg-accent dark:text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -72,7 +72,7 @@ export function UserMenu() {
             <div className="flex items-center gap-3">
               <Avatar className="size-10 ring-1 ring-border">
                 <AvatarImage src={user?.image || undefined} />
-                <AvatarFallback className="text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                <AvatarFallback className="text-xs font-semibold bg-accent text-primary dark:bg-accent dark:text-primary">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -97,7 +97,7 @@ export function UserMenu() {
               onClick={() => router.push("/settings/billing")}
               className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px]"
             >
-              <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <Sparkles className="size-4 text-primary dark:text-primary" />
               Upgrade to Pro
             </DropdownMenuItem>
           </div>

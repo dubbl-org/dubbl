@@ -160,7 +160,7 @@ export default function TaxSummaryPage() {
                         <td className="px-4 py-2.5 text-right font-mono tabular-nums text-orange-600">{formatMoney(r.inputTax)}</td>
                         <td className={cn(
                           "px-4 py-2.5 text-right font-mono tabular-nums font-medium",
-                          r.netTax >= 0 ? "text-red-600" : "text-emerald-600"
+                          r.netTax >= 0 ? "text-red-600" : "text-primary"
                         )}>
                           {formatMoney(Math.abs(r.netTax))}
                           {r.netTax < 0 ? " refund" : " due"}
@@ -176,7 +176,7 @@ export default function TaxSummaryPage() {
                       <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-orange-600">{formatMoney(totalInputTax)}</td>
                       <td className={cn(
                         "px-4 py-2.5 text-right font-mono tabular-nums font-semibold",
-                        netTaxPayable >= 0 ? "text-red-600" : "text-emerald-600"
+                        netTaxPayable >= 0 ? "text-red-600" : "text-primary"
                       )}>
                         {formatMoney(Math.abs(netTaxPayable))}
                         {netTaxPayable < 0 ? " refund" : " due"}

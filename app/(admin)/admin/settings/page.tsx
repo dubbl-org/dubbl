@@ -193,7 +193,7 @@ export default function AdminSettingsPage() {
                 variant="outline"
                 className={
                   stripeConfigured
-                    ? "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-400"
+                    ? "border-primary/30 text-primary dark:border-primary/20 dark:text-primary"
                     : "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400"
                 }
               >

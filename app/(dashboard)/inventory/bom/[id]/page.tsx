@@ -103,7 +103,7 @@ export default function BOMDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Total Cost</p>
-              <p className="text-sm font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(costBreakdown.totalCost)}</p>
+              <p className="text-sm font-mono font-semibold tabular-nums text-primary dark:text-primary">{formatMoney(costBreakdown.totalCost)}</p>
             </div>
           </div>
         </div>

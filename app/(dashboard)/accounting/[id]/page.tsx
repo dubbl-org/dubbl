@@ -83,9 +83,9 @@ const statusConfig: Record<string, { class: string; label: string; bg: string }>
     bg: "bg-gray-500",
   },
   posted: {
-    class: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    class: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
     label: "in your books",
-    bg: "bg-emerald-500",
+    bg: "bg-primary",
   },
   void: {
     class: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
@@ -302,7 +302,7 @@ export default function EntryDetailPage() {
                   size="sm"
                   onClick={postEntry}
                   disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                   title="Locks this entry and adds it to your books"
                 >
                   <Check className="mr-2 size-4" />
@@ -410,7 +410,7 @@ export default function EntryDetailPage() {
                 )}
                 {entry.postedAt && (
                   <div className="flex sm:justify-end items-center gap-2">
-                    <Check className="size-3.5 text-emerald-500" />
+                    <Check className="size-3.5 text-primary" />
                     <span className="text-xs text-muted-foreground">Finalized</span>
                     <span className="text-sm">{formatTimestamp(entry.postedAt)}</span>
                   </div>
@@ -518,7 +518,7 @@ export default function EntryDetailPage() {
                   <span className={cn(
                     "font-mono tabular-nums font-semibold",
                     isBalanced
-                      ? "text-emerald-600 dark:text-emerald-400"
+                      ? "text-primary dark:text-primary"
                       : "text-red-600 dark:text-red-400"
                   )}>
                     {isBalanced ? "$0.00" : formatMoney(Math.round(Math.abs(totalDebit - totalCredit) * 100))}
@@ -779,7 +779,7 @@ function EditEntrySheet({
             <div className="flex justify-between"><span className="text-muted-foreground">Total credits</span><span className="font-mono tabular-nums">{formatMoney(Math.round(totalCredit * 100))}</span></div>
             <div className="mt-1 flex justify-between border-t pt-1">
               <span className="text-muted-foreground">Difference</span>
-              <span className={cn("font-mono tabular-nums font-semibold", balanced ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+              <span className={cn("font-mono tabular-nums font-semibold", balanced ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400")}>
                 {formatMoney(Math.round(Math.abs(totalDebit - totalCredit) * 100))}
               </span>
             </div>
@@ -788,7 +788,7 @@ function EditEntrySheet({
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving || !balanced} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={save} disabled={saving || !balanced} className="bg-primary hover:bg-primary/90">
             {saving ? "Saving…" : "Save changes"}
           </Button>
         </div>

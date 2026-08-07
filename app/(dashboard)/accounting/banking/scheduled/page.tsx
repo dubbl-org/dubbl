@@ -315,7 +315,7 @@ export default function ScheduledPaymentsPage() {
           <Button
             size="sm"
             onClick={openScheduleDialog}
-            className="h-8 bg-emerald-600 hover:bg-emerald-700 text-xs"
+            className="h-8 bg-primary hover:bg-primary/90 text-xs"
           >
             <Plus className="mr-1.5 size-3.5" />
             Schedule Payment
@@ -338,7 +338,7 @@ export default function ScheduledPaymentsPage() {
           <Button
             size="sm"
             onClick={openScheduleDialog}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             Schedule Payment
@@ -385,7 +385,7 @@ export default function ScheduledPaymentsPage() {
                       item.status === "pending"
                         ? "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
                         : item.status === "completed"
-                          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          ? "bg-accent text-primary dark:bg-accent dark:text-primary"
                           : item.status === "failed"
                             ? "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
                             : "bg-muted text-muted-foreground"
@@ -512,7 +512,7 @@ export default function ScheduledPaymentsPage() {
             <Button
               onClick={handleSchedule}
               disabled={saving || !selectedBillId || !scheduledDate || !amount}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               Schedule

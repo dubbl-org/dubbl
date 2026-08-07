@@ -20,7 +20,7 @@ interface CalendarEvent {
 }
 
 const typeColors: Record<string, { bg: string; text: string; dot: string }> = {
-  invoice_due: { bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
+  invoice_due: { bg: "bg-accent dark:bg-accent", text: "text-primary dark:text-primary", dot: "bg-primary" },
   bill_due: { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-300", dot: "bg-red-500" },
   recurring_generation: { bg: "bg-blue-50 dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500" },
   budget_period_start: { bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500" },
@@ -142,12 +142,12 @@ export default function FinancialCalendarPage() {
                         className={cn(
                           "h-24 border-t border-r p-1 text-left transition-colors hover:bg-muted/50",
                           (startDay + i + 1) % 7 === 0 && "border-r-0",
-                          isSelected && "ring-2 ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20"
+                          isSelected && "ring-2 ring-primary bg-accent dark:bg-accent"
                         )}
                       >
                         <span className={cn(
                           "inline-flex size-5 items-center justify-center rounded-full text-[11px]",
-                          isToday && "bg-emerald-600 text-white font-medium"
+                          isToday && "bg-primary text-white font-medium"
                         )}>
                           {day}
                         </span>

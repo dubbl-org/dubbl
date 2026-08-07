@@ -7,12 +7,12 @@ import { Slot } from "radix-ui";
 import { cn } from "@/lib/utils";
 
 const button3dVariants = cva(
-  "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-all duration-200 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 focus-visible:ring-offset-2 cursor-pointer before:pointer-events-none before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-b before:from-white/[0.12] before:to-transparent",
+  "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-all duration-200 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer before:pointer-events-none before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-b before:from-white/[0.12] before:to-transparent",
   {
     variants: {
       variant: {
         primary: [
-          "bg-gradient-to-b from-emerald-500 via-emerald-600 to-emerald-700",
+          "bg-gradient-to-b from-primary via-primary to-primary",
           "text-white",
           "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15),0_1px_2px_0_rgba(0,0,0,0.05),0_2px_4px_0_rgba(5,150,105,0.15),0_4px_8px_-2px_rgba(5,150,105,0.2)]",
           "hover:translate-y-[-1px] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_2px_4px_0_rgba(0,0,0,0.05),0_4px_8px_0_rgba(5,150,105,0.2),0_8px_16px_-4px_rgba(5,150,105,0.25)]",

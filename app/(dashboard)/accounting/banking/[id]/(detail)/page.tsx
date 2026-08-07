@@ -37,7 +37,7 @@ export default function BankAccountOverviewPage() {
         <div className="flex items-center gap-6 text-[13px]">
           {[
             { label: "To do", count: summary.unreconciled, dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
-            { label: "Done", count: summary.reconciled, dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Done", count: summary.reconciled, dot: "bg-primary", text: "text-primary dark:text-primary" },
             { label: "Ignored", count: summary.excluded, dot: "bg-gray-400", text: "text-muted-foreground" },
           ].map(({ label, count, dot, text }) => (
             <div key={label} className="flex items-center gap-2">
@@ -50,7 +50,7 @@ export default function BankAccountOverviewPage() {
         {summary.total > 0 && (
           <div className="mt-3 h-2.5 w-full rounded-full overflow-hidden flex bg-gray-200 dark:bg-muted">
             {summary.reconciled > 0 && (
-              <div className="h-full bg-emerald-500" style={{ width: `${(summary.reconciled / summary.total) * 100}%` }} />
+              <div className="h-full bg-primary" style={{ width: `${(summary.reconciled / summary.total) * 100}%` }} />
             )}
             {summary.unreconciled > 0 && (
               <div className="h-full bg-amber-500" style={{ width: `${(summary.unreconciled / summary.total) * 100}%` }} />
@@ -74,7 +74,7 @@ export default function BankAccountOverviewPage() {
               <p className="text-sm font-medium">No transactions yet</p>
               <p className="text-xs text-muted-foreground mt-1">Import a statement to get started.</p>
             </div>
-            <Button size="sm" onClick={openImport} className="mt-2 bg-emerald-600 hover:bg-emerald-700">
+            <Button size="sm" onClick={openImport} className="mt-2 bg-primary hover:bg-primary/90">
               <Upload className="mr-2 size-3.5" />Import Statement
             </Button>
           </div>

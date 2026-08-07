@@ -60,7 +60,7 @@ interface CreditNoteDetail {
 const statusColors: Record<string, string> = {
   draft: "",
   sent: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  applied: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  applied: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
@@ -202,14 +202,14 @@ export default function CreditNoteDetailPage() {
           <Link href="/sales/credit-notes"><ArrowLeft className="mr-2 size-4" />Back</Link>
         </Button>
         {cn.status === "draft" && (
-          <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-primary hover:bg-primary/90">
             <Send className="mr-2 size-4" />Send
           </Button>
         )}
         {cn.status === "sent" && cn.amountRemaining > 0 && (
           <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" title="Use this credit to reduce what a customer owes on an invoice">
+              <Button size="sm" className="bg-primary hover:bg-primary/90" title="Use this credit to reduce what a customer owes on an invoice">
                 <FileText className="mr-2 size-4" />Use against an invoice
               </Button>
             </DialogTrigger>
@@ -254,7 +254,7 @@ export default function CreditNoteDetailPage() {
                   onClick={handleApply}
                   loading={applyLoading}
                   disabled={!applyInvoiceId}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-primary hover:bg-primary/90"
                 >
                   Reduce the invoice
                 </Button>
@@ -285,7 +285,7 @@ export default function CreditNoteDetailPage() {
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Applied</p>
-          <p className="text-xl font-bold font-mono text-emerald-600">{formatMoney(cn.amountApplied)}</p>
+          <p className="text-xl font-bold font-mono text-primary">{formatMoney(cn.amountApplied)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Remaining</p>

@@ -472,7 +472,7 @@ export default function TeamDetailPage() {
             <PopoverTrigger asChild>
               <Button
                 size="sm"
-                className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90"
               >
                 <UserPlus className="size-3" />
                 Add Member
@@ -670,7 +670,7 @@ export default function TeamDetailPage() {
             <Button
               onClick={handleEdit}
               disabled={editSaving || !editName.trim()}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {editSaving ? "Saving..." : "Save Changes"}
             </Button>

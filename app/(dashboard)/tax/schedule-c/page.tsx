@@ -113,16 +113,16 @@ export default function ScheduleCPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="size-3.5 text-emerald-500" />
+                    <TrendingUp className="size-3.5 text-primary" />
                     <span className="text-muted-foreground">Gross Income</span>
                   </div>
-                  <span className="font-mono text-sm tabular-nums font-medium text-emerald-600 dark:text-emerald-400">
+                  <span className="font-mono text-sm tabular-nums font-medium text-primary dark:text-primary">
                     {formatMoney(totalIncome)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    className="h-full rounded-full bg-primary transition-all"
                     style={{ width: `${incomePct}%` }}
                   />
                 </div>
@@ -151,7 +151,7 @@ export default function ScheduleCPage() {
                 </div>
                 <span className={cn(
                   "font-mono text-sm tabular-nums font-semibold",
-                  netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  netProfit >= 0 ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                 )}>
                   {formatMoney(netProfit)}
                 </span>
@@ -163,7 +163,7 @@ export default function ScheduleCPage() {
           <div className={cn(
             "rounded-xl border-2 p-5",
             netProfit >= 0
-              ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+              ? "border-primary/20 bg-accent dark:border-primary/20 dark:bg-accent"
               : "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
           )}>
             <div className="flex items-center justify-between">
@@ -173,7 +173,7 @@ export default function ScheduleCPage() {
                 </p>
                 <p className={cn(
                   "mt-1 text-2xl font-bold font-mono tabular-nums",
-                  netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  netProfit >= 0 ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                 )}>
                   {formatMoney(Math.abs(netProfit))}
                 </p>
@@ -181,12 +181,12 @@ export default function ScheduleCPage() {
               <div className={cn(
                 "flex size-12 items-center justify-center rounded-xl",
                 netProfit >= 0
-                  ? "bg-emerald-100 dark:bg-emerald-900/40"
+                  ? "bg-accent dark:bg-primary"
                   : "bg-red-100 dark:bg-red-900/40"
               )}>
                 <DollarSign className={cn(
                   "size-5",
-                  netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  netProfit >= 0 ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                 )} />
               </div>
             </div>
@@ -217,9 +217,9 @@ export default function ScheduleCPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-900/40 text-sm font-semibold">
+                <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-accent dark:bg-accent rounded-lg border border-primary/20 dark:border-primary/20 text-sm font-semibold">
                   <span>Gross Income</span>
-                  <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">{formatMoney(totalIncome)}</span>
+                  <span className="font-mono tabular-nums text-primary dark:text-primary">{formatMoney(totalIncome)}</span>
                 </div>
               </div>
             )}
@@ -284,7 +284,7 @@ export default function ScheduleCPage() {
                         <span className={cn(
                           "font-mono text-sm tabular-nums font-medium",
                           isNet && "text-base font-bold",
-                          isNet && (l.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
+                          isNet && (l.amount >= 0 ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400")
                         )}>
                           {formatMoney(l.amount)}
                         </span>

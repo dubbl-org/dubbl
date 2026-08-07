@@ -152,7 +152,7 @@ export default function CashFlowPage() {
               </div>
             ))}
 
-            <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg font-semibold text-sm sm:text-base">
+            <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-accent dark:bg-accent border border-primary/20 dark:border-primary/20 rounded-lg font-semibold text-sm sm:text-base">
               <span>Total change in cash this period</span>
               <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
             </div>

@@ -74,7 +74,7 @@ export function FAQ() {
                 href="https://github.com/dubbl-org/dubbl/discussions"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-emerald-600 underline underline-offset-4 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+                className="text-primary underline underline-offset-4 hover:text-primary dark:text-primary dark:hover:text-primary"
               >
                 GitHub Discussions
               </a>

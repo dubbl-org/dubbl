@@ -184,7 +184,7 @@ export default function ComparativeBalanceSheetPage() {
                               <td key={i} className="px-4 py-2 text-right font-mono tabular-nums">{formatMoney(v)}</td>
                             ))}
                             {periods.length >= 2 && (
-                              <td className={cn("px-4 py-2 text-right font-mono tabular-nums text-xs", change > 0 ? "text-emerald-600" : change < 0 ? "text-red-600" : "text-muted-foreground")}>
+                              <td className={cn("px-4 py-2 text-right font-mono tabular-nums text-xs", change > 0 ? "text-primary" : change < 0 ? "text-red-600" : "text-muted-foreground")}>
                                 {change !== 0 ? `${change > 0 ? "+" : ""}${formatMoney(change)}` : "-"}
                               </td>
                             )}

@@ -26,7 +26,7 @@ interface AssemblyOrder {
 const STATUS_BADGE: Record<string, string> = {
   draft: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300",
   in_progress: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  completed: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   cancelled: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
@@ -135,11 +135,11 @@ export default function AssemblyOrdersPage() {
                 </div>
                 <div className="flex justify-center"><ArrowRight className="size-3.5 text-muted-foreground/30 rotate-90" /></div>
                 {/* Completed */}
-                <div className="rounded-lg border border-dashed border-emerald-200 dark:border-emerald-900/40 p-3 opacity-60">
+                <div className="rounded-lg border border-dashed border-primary/20 dark:border-primary/20 p-3 opacity-60">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="flex size-6 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/40">
-                        <CheckCircle2 className="size-3 text-emerald-500" />
+                      <div className="flex size-6 items-center justify-center rounded-md bg-accent dark:bg-accent">
+                        <CheckCircle2 className="size-3 text-primary" />
                       </div>
                       <p className="text-sm font-medium">Complete</p>
                     </div>
@@ -172,7 +172,7 @@ export default function AssemblyOrdersPage() {
                   title: "Auto inventory updates",
                   desc: "Components are deducted and finished goods are added to stock when an order completes.",
                   icon: ArrowRightLeft,
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "Full audit trail",

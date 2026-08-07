@@ -348,7 +348,7 @@ export default function ConsolidationPage() {
                 className={cn(
                   "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
                   selectedGroupId === g.id
-                    ? "border-emerald-500/50 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    ? "border-primary bg-accent text-primary dark:bg-accent dark:text-primary"
                     : "border-border/50 hover:border-border"
                 )}
               >
@@ -542,7 +542,7 @@ export default function ConsolidationPage() {
                             <TableCell className="px-4 py-3 font-medium">{e.label}</TableCell>
                             <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.revenue)}</TableCell>
                             <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(e.expenses)}</TableCell>
-                            <TableCell className={cn("px-4 py-3 text-right font-mono tabular-nums", e.netIncome >= 0 ? "text-emerald-600" : "text-red-600")}>
+                            <TableCell className={cn("px-4 py-3 text-right font-mono tabular-nums", e.netIncome >= 0 ? "text-primary" : "text-red-600")}>
                               {formatMoney(e.netIncome)}
                             </TableCell>
                           </TableRow>
@@ -551,7 +551,7 @@ export default function ConsolidationPage() {
                           <TableCell className="px-4 py-3">Total</TableCell>
                           <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalRevenue)}</TableCell>
                           <TableCell className="px-4 py-3 text-right font-mono tabular-nums">{formatMoney(pnl.totalExpenses)}</TableCell>
-                          <TableCell className={cn("px-4 py-3 text-right font-mono tabular-nums", pnl.netIncome >= 0 ? "text-emerald-600" : "text-red-600")}>
+                          <TableCell className={cn("px-4 py-3 text-right font-mono tabular-nums", pnl.netIncome >= 0 ? "text-primary" : "text-red-600")}>
                             {formatMoney(pnl.netIncome)}
                           </TableCell>
                         </TableRow>

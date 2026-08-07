@@ -195,7 +195,7 @@ export default function ContactBookkeepingPage() {
             type="submit"
             loading={saving}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             Save changes
           </Button>

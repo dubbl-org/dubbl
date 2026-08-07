@@ -132,7 +132,7 @@ export function Footer() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5">
-            <ShieldCheck className="size-3.5 text-emerald-400" />
+            <ShieldCheck className="size-3.5 text-primary" />
             <span className="text-xs font-medium text-white/60">
               Open Source &middot; Self-Hostable
             </span>

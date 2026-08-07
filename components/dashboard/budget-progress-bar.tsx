@@ -24,7 +24,7 @@ export function BudgetProgressBar({ budgeted, actual, label }: BudgetProgressBar
         <div
           className={cn(
             "h-full rounded-full transition-all",
-            over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+            over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-primary"
           )}
           style={{ width: `${Math.min(pct, 100)}%` }}
         />

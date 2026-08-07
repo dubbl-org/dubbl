@@ -40,7 +40,7 @@ interface RecurringJournal {
 
 const statusColors: Record<string, string> = {
   active:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   paused:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   completed:
@@ -275,7 +275,7 @@ export default function RecurringJournalsPage() {
             </div>
             <Button
               onClick={() => openDrawer("recurringJournal")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               New recurring journal
@@ -336,7 +336,7 @@ export default function RecurringJournalsPage() {
                       <p className="text-sm font-medium">Monthly rent allocation</p>
                       <p className="text-xs text-muted-foreground">REF-RENT</p>
                     </div>
-                    <span className="rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">on</span>
+                    <span className="rounded-full border border-primary/20 dark:border-primary/20 bg-accent dark:bg-accent px-2 py-0.5 text-[10px] font-medium text-primary dark:text-primary">on</span>
                   </div>
                   <div className="h-px bg-border" />
                   <div className="grid grid-cols-2 gap-3 text-xs">
@@ -402,7 +402,7 @@ export default function RecurringJournalsPage() {
           <Button
             onClick={() => openDrawer("recurringJournal")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New recurring journal

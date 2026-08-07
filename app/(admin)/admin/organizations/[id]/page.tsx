@@ -111,7 +111,7 @@ const ROLE_ICONS: Record<string, typeof User> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  active: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/50",
+  active: "text-primary bg-accent dark:text-primary dark:bg-accent",
   trialing: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/50",
   past_due: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/50",
   canceled: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/50",
@@ -641,10 +641,10 @@ export default function AdminOrgDetailPage({
             <p className="font-medium">What happens:</p>
             <ul className="space-y-1 text-muted-foreground text-xs">
               {hasStripe && <li className="flex items-center gap-2"><AlertTriangle className="size-3 text-amber-500" /> Stripe subscription canceled</li>}
-              <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Plan set to Business tier</li>
-              <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Billing set to Manual</li>
-              <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> Custom name set to &quot;Enterprise&quot;</li>
-              <li className="flex items-center gap-2"><Check className="size-3 text-emerald-500" /> You can customize limits after</li>
+              <li className="flex items-center gap-2"><Check className="size-3 text-primary" /> Plan set to Business tier</li>
+              <li className="flex items-center gap-2"><Check className="size-3 text-primary" /> Billing set to Manual</li>
+              <li className="flex items-center gap-2"><Check className="size-3 text-primary" /> Custom name set to &quot;Enterprise&quot;</li>
+              <li className="flex items-center gap-2"><Check className="size-3 text-primary" /> You can customize limits after</li>
             </ul>
           </div>
           <DialogFooter>

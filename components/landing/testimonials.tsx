@@ -15,7 +15,7 @@ function APICodeCard() {
     <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#0a0a0a] dark:bg-black">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-white/[0.06] px-5 py-3">
-        <Code2 className="size-3.5 text-emerald-400" />
+        <Code2 className="size-3.5 text-primary" />
         <span className="font-mono text-[11px] text-white/40">index.ts</span>
       </div>
       {/* Code body */}
@@ -28,10 +28,10 @@ function APICodeCard() {
         >
           <p className="text-white/40">{"// Fetch recent transactions"}</p>
           <p>
-            <span className="text-emerald-400">const</span>
+            <span className="text-primary">const</span>
             <span className="text-white"> entries </span>
             <span className="text-white/40">=</span>
-            <span className="text-emerald-400"> await</span>
+            <span className="text-primary"> await</span>
             <span className="text-white">{" dubbl.entries."}</span>
             <span className="text-white">list</span>
             <span className="text-white/60">{"({"}</span>
@@ -50,7 +50,7 @@ function APICodeCard() {
             {"// Each entry is double-entry balanced"}
           </p>
           <p>
-            <span className="text-emerald-400">const</span>
+            <span className="text-primary">const</span>
             <span className="text-white"> total </span>
             <span className="text-white/40">=</span>
             <span className="text-white">{" entries."}</span>
@@ -82,7 +82,7 @@ function DockerCard() {
     <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#0a0a0a] dark:bg-black">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-white/[0.06] px-5 py-3">
-        <Terminal className="size-3.5 text-emerald-400" />
+        <Terminal className="size-3.5 text-primary" />
         <span className="font-mono text-[11px] text-white/40">self-host</span>
       </div>
       {/* Body */}
@@ -96,10 +96,10 @@ function DockerCard() {
           <p className="text-white/60">
             <span className="text-white/40">$</span> docker compose up -d
           </p>
-          <p className="text-emerald-400">
+          <p className="text-primary">
             {"  ✓ Container dubbl-db    Started"}
           </p>
-          <p className="text-emerald-400">
+          <p className="text-primary">
             {"  ✓ Container dubbl-app   Started"}
           </p>
           <p className="mt-2 text-white font-medium">
@@ -116,7 +116,7 @@ function SDKCard() {
     <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#0a0a0a] dark:bg-black">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-white/[0.06] px-5 py-3">
-        <Package className="size-3.5 text-emerald-400" />
+        <Package className="size-3.5 text-primary" />
         <span className="font-mono text-[11px] text-white/40">sdk</span>
       </div>
       {/* Body */}
@@ -131,19 +131,19 @@ function SDKCard() {
             <span className="text-white/40">$</span> npm install @dubbl/sdk
           </p>
           <p className="mt-3">
-            <span className="text-emerald-400">import</span>
+            <span className="text-primary">import</span>
             <span className="text-white/60">{" { "}</span>
             <span className="text-white">Dubbl</span>
             <span className="text-white/60">{" } "}</span>
-            <span className="text-emerald-400">from</span>
+            <span className="text-primary">from</span>
             <span className="text-amber-400">{' "@dubbl/sdk"'}</span>
             <span className="text-white/40">;</span>
           </p>
           <p>
-            <span className="text-emerald-400">const</span>
+            <span className="text-primary">const</span>
             <span className="text-white"> client </span>
             <span className="text-white/40">=</span>
-            <span className="text-emerald-400"> new</span>
+            <span className="text-primary"> new</span>
             <span className="text-white">{" Dubbl"}</span>
             <span className="text-white/60">{"();"}</span>
           </p>

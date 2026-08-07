@@ -407,7 +407,7 @@ export default function ImportExportPage() {
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             {job.status === "completed" ? (
-                              <CheckCircle2 className="size-3.5 text-emerald-500" />
+                              <CheckCircle2 className="size-3.5 text-primary" />
                             ) : job.status === "failed" ? (
                               <XCircle className="size-3.5 text-destructive" />
                             ) : (

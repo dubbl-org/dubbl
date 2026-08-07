@@ -442,13 +442,13 @@ export default function EmployeeDetailPage() {
           <div className={cn(
             "flex size-10 items-center justify-center rounded-xl",
             isActive
-              ? "bg-emerald-50 dark:bg-emerald-950/40"
+              ? "bg-accent dark:bg-accent"
               : "bg-muted"
           )}>
             <Users className={cn(
               "size-5",
               isActive
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-primary dark:text-primary"
                 : "text-muted-foreground"
             )} />
           </div>
@@ -457,7 +457,7 @@ export default function EmployeeDetailPage() {
               <h1 className="text-lg font-semibold">{emp.name}</h1>
               <Badge variant="outline" className={
                 isActive
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  ? "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
                   : ""
               }>
                 {isActive ? "Active" : "Inactive"}
@@ -702,7 +702,7 @@ export default function EmployeeDetailPage() {
                         className={cn(
                           "text-[11px]",
                           d.isActive
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            ? "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary"
                             : ""
                         )}
                       >
@@ -721,7 +721,7 @@ export default function EmployeeDetailPage() {
           <SheetContent className="sm:max-w-lg w-full p-0 flex flex-col">
             <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b space-y-3">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary dark:bg-accent dark:text-primary">
                   <DollarSign className="size-5" />
                 </div>
                 <div>
@@ -838,7 +838,7 @@ export default function EmployeeDetailPage() {
                 <Button
                   type="submit"
                   disabled={assigningDeduction}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {assigningDeduction ? "Assigning..." : "Assign"}
                 </Button>
@@ -906,7 +906,7 @@ export default function EmployeeDetailPage() {
                   size="sm"
                   onClick={handleSaveTaxConfig}
                   disabled={taxSaving}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   <Save className="mr-1.5 size-3.5" />
                   {taxSaving ? "Saving..." : "Save Tax Config"}
@@ -1001,7 +1001,7 @@ export default function EmployeeDetailPage() {
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted">
                       <div
-                        className="h-2 rounded-full bg-emerald-500 transition-all"
+                        className="h-2 rounded-full bg-primary transition-all"
                         style={{
                           width: `${Math.min(
                             100,
@@ -1032,7 +1032,7 @@ export default function EmployeeDetailPage() {
             size="sm"
             onClick={handleSave}
             disabled={saving}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Save className="mr-1.5 size-3.5" />
             {saving ? "Saving..." : "Save Changes"}

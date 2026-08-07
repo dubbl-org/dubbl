@@ -54,7 +54,7 @@ const statusColors: Record<string, string> = {
     "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   partial:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  paid: "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   overdue:
     "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
@@ -411,7 +411,7 @@ export default function BillsPage() {
                 <div className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium hidden sm:block ${
                   i % 4 === 0 ? "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500" :
                   i % 4 === 1 ? "bg-amber-100 text-amber-400 dark:bg-amber-900/40 dark:text-amber-500" :
-                  i % 4 === 2 ? "bg-emerald-100 text-emerald-400 dark:bg-emerald-900/40 dark:text-emerald-500" :
+                  i % 4 === 2 ? "bg-accent text-primary dark:bg-primary dark:text-primary" :
                   "bg-red-100 text-red-400 dark:bg-red-900/40 dark:text-red-500"
                 }`}>
                   {i % 4 === 0 ? "received" : i % 4 === 1 ? "partial" : i % 4 === 2 ? "paid" : "overdue"}
@@ -438,7 +438,7 @@ export default function BillsPage() {
             <Button
               onClick={() => openDrawer("bill")}
               size="lg"
-              className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+              className="mt-6 bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New Bill
@@ -467,8 +467,8 @@ export default function BillsPage() {
               icon: CheckCircle2,
               title: "Payment matching",
               desc: "Record payments against bills and track outstanding balances automatically.",
-              color: "text-emerald-600 dark:text-emerald-400",
-              bg: "bg-emerald-50 dark:bg-emerald-950/40",
+              color: "text-primary dark:text-primary",
+              bg: "bg-accent dark:bg-accent",
             },
           ].map(({ icon: Icon, title, desc, color, bg }) => (
             <div key={title} className="rounded-xl p-5">
@@ -520,9 +520,9 @@ export default function BillsPage() {
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />Paid
+                  <span className="size-1.5 rounded-full bg-primary" />Paid
                 </p>
-                <p className="mt-0.5 text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-primary dark:text-primary">
                   {statusCounts.paid || 0}
                 </p>
               </div>
@@ -536,7 +536,7 @@ export default function BillsPage() {
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-3">Aging</p>
             <div className="h-2.5 w-full rounded-full overflow-hidden flex mb-3">
               {([
-                { key: "current" as const, color: "bg-emerald-500" },
+                { key: "current" as const, color: "bg-primary" },
                 { key: "1-30" as const, color: "bg-amber-400" },
                 { key: "31-60" as const, color: "bg-orange-500" },
                 { key: "60+" as const, color: "bg-red-500" },
@@ -548,7 +548,7 @@ export default function BillsPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2">
               {([
-                { key: "current" as const, color: "bg-emerald-500", label: "Current" },
+                { key: "current" as const, color: "bg-primary", label: "Current" },
                 { key: "1-30" as const, color: "bg-amber-400", label: "1-30 days" },
                 { key: "31-60" as const, color: "bg-orange-500", label: "31-60 days" },
                 { key: "60+" as const, color: "bg-red-500", label: "60+ days" },
@@ -631,7 +631,7 @@ export default function BillsPage() {
             <Button
               onClick={() => openDrawer("bill")}
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 size-4" />
               New Bill

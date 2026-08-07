@@ -163,7 +163,7 @@ export default function SelfServicePage() {
             </div>
           </div>
           <div className="mt-3 flex justify-end">
-            <Button size="sm" onClick={handleSaveProfile} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button size="sm" onClick={handleSaveProfile} disabled={saving} className="bg-primary hover:bg-primary/90">
               <Save className="mr-1.5 size-3.5" /> {saving ? "Saving..." : "Save"}
             </Button>
           </div>

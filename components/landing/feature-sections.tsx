@@ -32,7 +32,7 @@ function BankTimelineMockup() {
   ];
 
   const statusStyles: Record<string, { dot: string; label: string }> = {
-    success: { dot: "bg-emerald-500", label: "Synced" },
+    success: { dot: "bg-primary", label: "Synced" },
     failed: { dot: "bg-red-500", label: "Failed" },
     delayed: { dot: "bg-amber-500", label: "Delayed" },
   };
@@ -60,7 +60,7 @@ function BankTimelineMockup() {
                 className={cn(
                   "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold",
                   ev.status === "success" &&
-                    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+                    "bg-accent text-primary dark:bg-accent dark:text-primary",
                   ev.status === "failed" &&
                     "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400",
                   ev.status === "delayed" &&
@@ -129,7 +129,7 @@ function MissingRecordsMockup() {
           </div>
           <div className="px-3 py-1.5">
             {row.status === "ok" ? (
-              <span className="text-emerald-600 dark:text-emerald-400">Complete</span>
+              <span className="text-primary dark:text-primary">Complete</span>
             ) : row.status === "missing" ? (
               <span className="inline-flex items-center gap-1 font-semibold text-red-600 dark:text-red-400">
                 <AlertTriangle className="size-2.5" />
@@ -586,7 +586,7 @@ function ReceiptView() {
           <div className="flex items-center justify-between">
             <span className={cn(
               "text-xs font-bold",
-              card.amount.startsWith("+") ? "text-emerald-200" : "text-white"
+              card.amount.startsWith("+") ? "text-primary" : "text-white"
             )}>
               {card.amount}
             </span>
@@ -649,7 +649,7 @@ function SolutionShowcase() {
       {/* Center logo badge — frosted glass with border */}
       <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
         <motion.div
-          className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/[0.1] px-5 py-4 shadow-xl shadow-emerald-900/20 ring-1 ring-white/[0.06] backdrop-blur-xl"
+          className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/[0.1] px-5 py-4 shadow-xl shadow-primary ring-1 ring-white/[0.06] backdrop-blur-xl"
           animate={{
             boxShadow: [
               "0 10px 40px -10px rgba(16, 185, 129, 0.15)",
@@ -738,7 +738,7 @@ function SolutionSection() {
       <Container>
         {/* Header band with green grain gradient */}
         <ScrollReveal>
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-400/30 p-8 dark:border-emerald-500/20 md:p-12">
+          <div className="relative overflow-hidden rounded-2xl border border-primary/60 p-8 dark:border-primary md:p-12">
             <GrainGradient
               className="pointer-events-none !absolute !inset-0 !rounded-none"
               width="100%"
@@ -754,18 +754,18 @@ function SolutionSection() {
             />
             <div className="relative">
               <div className="mb-5">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/60 bg-emerald-900/30 px-4 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
-                  <span className="inline-block size-1.5 rounded-full bg-emerald-300" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary px-4 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
+                  <span className="inline-block size-1.5 rounded-full bg-accent" />
                   The Solution
                 </span>
               </div>
               <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
                 One unified platform for{" "}
-                <span className="text-emerald-950">
+                <span className="text-foreground">
                   your entire business
                 </span>
               </h2>
-              <p className="mt-5 max-w-2xl text-lg leading-relaxed text-emerald-100">
+              <p className="mt-5 max-w-2xl text-lg leading-relaxed text-primary">
                 dubbl brings accounting, invoicing, inventory, project management,
                 payroll, and CRM into one place. AI-ready with built-in MCP
                 support.
@@ -781,10 +781,10 @@ function SolutionSection() {
               <motion.div
                 whileHover={{ y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                className="flex items-start gap-4 rounded-2xl border border-border bg-card p-6 transition-colors hover:border-emerald-300/50 dark:hover:border-emerald-700/50"
+                className="flex items-start gap-4 rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary dark:hover:border-primary"
               >
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/50">
-                  <cap.icon className="size-5 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent dark:bg-accent">
+                  <cap.icon className="size-5 text-primary dark:text-primary" />
                 </div>
                 <div>
                   <div className="text-lg font-semibold text-foreground">
@@ -803,7 +803,7 @@ function SolutionSection() {
         <ScrollReveal delay={0.2}>
           <div className="mt-8">
             <motion.div
-              className="relative overflow-hidden rounded-2xl border border-emerald-400/30 dark:border-emerald-500/20"
+              className="relative overflow-hidden rounded-2xl border border-primary/60 dark:border-primary"
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: false, margin: "-80px" }}
@@ -842,7 +842,7 @@ function SolutionSection() {
                 key={item}
                 className="flex items-center gap-2 text-sm text-muted-foreground"
               >
-                <Check className="size-4 text-emerald-500" />
+                <Check className="size-4 text-primary" />
                 {item}
               </div>
             ))}

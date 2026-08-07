@@ -165,7 +165,7 @@ function CreateTeamSheet({
           <Button
             onClick={onSave}
             disabled={saving || !name.trim()}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {saving ? "Creating..." : "Create Team"}
           </Button>
@@ -384,7 +384,7 @@ export default function TeamsPage() {
               className="mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-6"
             >
               <div className="flex items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
-                <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-xs font-bold text-emerald-700 dark:text-emerald-300">1</div>
+                <div className="flex size-6 items-center justify-center rounded-full bg-accent dark:bg-accent text-xs font-bold text-primary dark:text-primary">1</div>
                 <span className="text-sm font-medium">Create a team</span>
               </div>
               <div className="hidden sm:block h-px w-6 bg-muted-foreground/20" />
@@ -405,7 +405,7 @@ export default function TeamsPage() {
               <Button
                 onClick={openCreateSheet}
                 size="lg"
-                className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
+                className="bg-primary hover:bg-primary/90 shadow-md shadow-primary"
               >
                 <Plus className="mr-2 size-4" />
                 Create Your First Team

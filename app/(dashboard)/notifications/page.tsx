@@ -46,7 +46,7 @@ const TYPE_ICONS: Record<string, typeof Bell> = {
 
 const TYPE_COLORS: Record<string, string> = {
   invoice_overdue: "text-red-500 bg-red-500/10",
-  payment_received: "text-emerald-500 bg-emerald-500/10",
+  payment_received: "text-primary bg-primary",
   inventory_low: "text-amber-500 bg-amber-500/10",
   payroll_due: "text-blue-500 bg-blue-500/10",
   approval_needed: "text-purple-500 bg-purple-500/10",

@@ -78,7 +78,7 @@ function ConnectVisual() {
               className={cn(
                 "flex size-8 shrink-0 items-center justify-center rounded-lg",
                 item.status === "connected"
-                  ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+                  ? "bg-accent text-primary dark:bg-accent dark:text-primary"
                   : "bg-muted text-muted-foreground"
               )}
             >
@@ -97,7 +97,7 @@ function ConnectVisual() {
                 className={cn(
                   "text-[10px] font-medium",
                   item.status === "connected"
-                    ? "text-emerald-600 dark:text-emerald-400"
+                    ? "text-primary dark:text-primary"
                     : "text-amber-500 dark:text-amber-400"
                 )}
               >
@@ -108,7 +108,7 @@ function ConnectVisual() {
                 className={cn(
                   "relative h-4 w-7 rounded-full transition-colors",
                   item.status === "connected"
-                    ? "bg-emerald-500"
+                    ? "bg-primary"
                     : "bg-muted-foreground/20"
                 )}
               >
@@ -209,8 +209,8 @@ function CategorizeVisual() {
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
             Debit
           </label>
-          <div className="rounded-lg border border-emerald-300 bg-emerald-50/50 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-950/30">
-            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+          <div className="rounded-lg border border-primary/30 bg-accent px-3 py-2 dark:border-primary/20 dark:bg-accent">
+            <span className="text-xs font-semibold text-primary dark:text-primary">
               6200 &middot; Software
             </span>
           </div>
@@ -233,10 +233,10 @@ function CategorizeVisual() {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: false }}
         transition={{ delay: 0.75, duration: 0.35 }}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 py-1.5 dark:bg-emerald-950/40"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 dark:bg-accent"
       >
-        <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
-        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+        <Check className="size-3 text-primary dark:text-primary" />
+        <span className="text-[10px] font-semibold text-primary dark:text-primary">
           Balanced · $2,450.00
         </span>
       </motion.div>
@@ -322,7 +322,7 @@ function InsightsVisual() {
             </p>
             <div className="mt-1 flex items-center gap-0.5">
               {kpi.trend === "up" ? (
-                <TrendingUp className="size-2.5 text-emerald-500" />
+                <TrendingUp className="size-2.5 text-primary" />
               ) : (
                 <TrendingDown className="size-2.5 text-rose-500" />
               )}
@@ -330,7 +330,7 @@ function InsightsVisual() {
                 className={cn(
                   "text-[9px] font-semibold",
                   kpi.trend === "up"
-                    ? "text-emerald-600 dark:text-emerald-400"
+                    ? "text-primary dark:text-primary"
                     : "text-rose-500"
                 )}
               >
@@ -351,7 +351,7 @@ function InsightsVisual() {
       >
         <div className="mb-2 flex items-center gap-3">
           <div className="flex items-center gap-1">
-            <div className="size-1.5 rounded-full bg-emerald-500" />
+            <div className="size-1.5 rounded-full bg-primary" />
             <span className="text-[9px] text-muted-foreground">Revenue</span>
           </div>
           <div className="flex items-center gap-1">
@@ -375,7 +375,7 @@ function InsightsVisual() {
                     duration: 0.5,
                     ease: "easeOut",
                   }}
-                  className="w-[5px] rounded-t-sm bg-emerald-500"
+                  className="w-[5px] rounded-t-sm bg-primary"
                 />
                 {/* Expense bar */}
                 <motion.div
@@ -441,7 +441,7 @@ function DashedConnectors() {
           x2="83.333%"
           y2="0"
           stroke="currentColor"
-          className="text-emerald-300 dark:text-emerald-800"
+          className="text-primary dark:text-primary"
           strokeWidth="2"
           strokeDasharray="8 6"
         />
@@ -454,8 +454,8 @@ function DashedConnectors() {
           className="absolute top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
           style={{ left: `${pct}%` }}
         >
-          <div className="flex size-7 items-center justify-center rounded-full border-2 border-dashed border-emerald-300 bg-background dark:border-emerald-800">
-            <ArrowRight className="size-3 text-emerald-500 dark:text-emerald-400" />
+          <div className="flex size-7 items-center justify-center rounded-full border-2 border-dashed border-primary/30 bg-background dark:border-primary/20">
+            <ArrowRight className="size-3 text-primary dark:text-primary" />
           </div>
         </div>
       ))}
@@ -485,7 +485,7 @@ export function HowItWorks() {
               <motion.div
                 whileHover={{ y: -4 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
-                className="relative flex h-full flex-col rounded-2xl border border-border bg-card transition-colors hover:border-emerald-300/50 dark:hover:border-emerald-700/50"
+                className="relative flex h-full flex-col rounded-2xl border border-border bg-card transition-colors hover:border-primary dark:hover:border-primary"
               >
                 {/* Visual mockup area */}
                 <div className="relative overflow-hidden rounded-t-2xl p-4 pb-0">
@@ -509,7 +509,7 @@ export function HowItWorks() {
                 <div className="flex flex-1 flex-col p-5 pt-4">
                   {/* Step badge */}
                   <div className="mb-3 flex items-center gap-2">
-                    <div className="flex size-6 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
+                    <div className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
                       {item.step}
                     </div>
                     <div className="h-px flex-1 bg-border" />

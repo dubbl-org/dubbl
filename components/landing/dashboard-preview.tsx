@@ -24,7 +24,7 @@ function Sparkline({ trend }: { trend: "up" | "down" | "stable" }) {
         d={paths[trend]}
         className={cn(
           "fill-none stroke-2",
-          trend === "up" && "stroke-emerald-500",
+          trend === "up" && "stroke-primary",
           trend === "down" && "stroke-red-400",
           trend === "stable" && "stroke-muted-foreground/40"
         )}
@@ -65,7 +65,7 @@ const linePoints = [
 ] as const;
 
 const accountSegments = [
-  { label: "Assets", pct: 60, color: "bg-emerald-500" },
+  { label: "Assets", pct: 60, color: "bg-primary" },
   { label: "Liabilities", pct: 17, color: "bg-red-400" },
   { label: "Equity", pct: 23, color: "bg-blue-500" },
 ];
@@ -121,7 +121,7 @@ export function DashboardPreview() {
                     </p>
                     <div className="mt-1.5 flex items-center gap-1.5">
                       {kpi.up ? (
-                        <TrendingUp className="size-3 text-emerald-600 dark:text-emerald-400" />
+                        <TrendingUp className="size-3 text-primary dark:text-primary" />
                       ) : (
                         <TrendingDown className="size-3 text-red-500 dark:text-red-400" />
                       )}
@@ -129,7 +129,7 @@ export function DashboardPreview() {
                         className={cn(
                           "text-xs font-semibold",
                           kpi.up
-                            ? "text-emerald-600 dark:text-emerald-400"
+                            ? "text-primary dark:text-primary"
                             : "text-red-500 dark:text-red-400"
                         )}
                       >
@@ -167,12 +167,12 @@ export function DashboardPreview() {
                       <linearGradient id="dashAreaGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop
                           offset="0%"
-                          className="[stop-color:theme(colors.emerald.500)]"
+                          className="[stop-color:hsl(var(--primary))]"
                           stopOpacity="0.18"
                         />
                         <stop
                           offset="100%"
-                          className="[stop-color:theme(colors.emerald.500)]"
+                          className="[stop-color:hsl(var(--primary))]"
                           stopOpacity="0.01"
                         />
                       </linearGradient>
@@ -197,7 +197,7 @@ export function DashboardPreview() {
                     <motion.polyline
                       points={chartPolyline}
                       fill="none"
-                      className="stroke-emerald-500"
+                      className="stroke-primary"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -210,7 +210,7 @@ export function DashboardPreview() {
                       <motion.circle
                         key={i}
                         cx={x} cy={y} r="2.5"
-                        className="fill-emerald-500"
+                        className="fill-primary"
                         initial={{ opacity: 0, scale: 0 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         viewport={{ once: false }}
@@ -258,7 +258,7 @@ export function DashboardPreview() {
                           className={cn(
                             "text-sm font-semibold tabular-nums",
                             tx.type === "income"
-                              ? "text-emerald-600 dark:text-emerald-400"
+                              ? "text-primary dark:text-primary"
                               : "text-foreground"
                           )}
                         >

@@ -39,7 +39,7 @@ interface CustomerCredit {
 const statusColors: Record<string, string> = {
   open: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   applied:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   refunded:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
@@ -274,7 +274,7 @@ export default function CustomerPrepaymentsPage() {
             </div>
             <Button
               onClick={() => openDrawer("customerCredit")}
-              className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+              className="bg-primary hover:bg-primary/90 shrink-0"
             >
               <Plus className="mr-2 size-4" />
               New prepayment
@@ -290,15 +290,15 @@ export default function CustomerPrepaymentsPage() {
               <div className="divide-y">
                 <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-950/40">
-                      <Wallet className="size-3.5 text-emerald-500" />
+                    <div className="flex size-7 items-center justify-center rounded-md bg-accent dark:bg-accent">
+                      <Wallet className="size-3.5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Customer pays you early</p>
+                      <p className="text-sm font-medium text-primary dark:text-primary">Customer pays you early</p>
                       <p className="text-[11px] text-muted-foreground">Credit on account</p>
                     </div>
                   </div>
-                  <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">+$500.00</span>
+                  <span className="font-mono text-sm font-medium text-primary dark:text-primary">+$500.00</span>
                 </div>
                 <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-blue-50/30 dark:bg-blue-950/10">
                   <div className="flex items-center gap-3">
@@ -329,7 +329,7 @@ export default function CustomerPrepaymentsPage() {
                 {
                   title: "Deposit before work starts",
                   desc: "A customer pays up front to secure a booking or kick off a job.",
-                  color: "border-l-emerald-400",
+                  color: "border-l-primary",
                 },
                 {
                   title: "Customer paid too much",
@@ -385,7 +385,7 @@ export default function CustomerPrepaymentsPage() {
           <Button
             onClick={() => openDrawer("customerCredit")}
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New prepayment

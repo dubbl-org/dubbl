@@ -165,7 +165,7 @@ export default function ProjectOverviewPage() {
                   <>
                     <div className="h-px bg-border my-1" />
                     <Row label="Budget" value={<span className="font-mono tabular-nums">{formatMoney(proj.budget)}</span>} />
-                    <Row label="Remaining" value={<span className={cn("font-mono tabular-nums font-semibold", proj.budget - proj.totalBilled < 0 ? "text-red-600" : "text-emerald-600")}>{formatMoney(proj.budget - proj.totalBilled)}</span>} />
+                    <Row label="Remaining" value={<span className={cn("font-mono tabular-nums font-semibold", proj.budget - proj.totalBilled < 0 ? "text-red-600" : "text-primary")}>{formatMoney(proj.budget - proj.totalBilled)}</span>} />
                   </>
                 )}
                 {proj.enableTimeTracking && (
@@ -312,7 +312,7 @@ export default function ProjectOverviewPage() {
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Team</span>
                 <span className="text-[9px] font-mono tabular-nums text-muted-foreground/60">{proj.members.length}</span>
               </div>
-              <Link href={`/projects/${proj.id}/members`} className="text-[11px] text-emerald-600 hover:underline font-medium">Manage</Link>
+              <Link href={`/projects/${proj.id}/members`} className="text-[11px] text-primary hover:underline font-medium">Manage</Link>
             </div>
             <div className="divide-y">
               {proj.members.length > 0 ? proj.members.slice(0, 5).map((m) => (
@@ -434,7 +434,7 @@ function ListCard({ icon: Icon, label, href, count, children }: { icon: typeof Z
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
           {count !== undefined && <span className="text-[9px] font-mono tabular-nums text-muted-foreground/60">{count}</span>}
         </div>
-        <Link href={href} className="text-[11px] text-emerald-600 hover:underline font-medium flex items-center gap-0.5">
+        <Link href={href} className="text-[11px] text-primary hover:underline font-medium flex items-center gap-0.5">
           View all <ArrowUpRight className="size-3" />
         </Link>
       </div>
@@ -644,14 +644,14 @@ function MiniCalendar({ proj }: { proj: ProjectDetail }) {
               <span className={cn(
                 "size-8 flex items-center justify-center rounded-full text-[12px] tabular-nums transition-colors",
                 isToday && "bg-foreground text-background font-bold",
-                isStart && !isToday && "ring-2 ring-emerald-400 ring-offset-1",
+                isStart && !isToday && "ring-2 ring-primary ring-offset-1",
                 isEnd && !isToday && "ring-2 ring-red-400 ring-offset-1",
               )}>{day}</span>
               {ev ? (
                 <div className="flex items-center gap-0.5 mt-0.5 h-2">
                   {ev.tasks > 0 && <span className={cn("size-1.5 rounded-full", ev.overdue ? "bg-red-500" : "bg-blue-400")} />}
                   {ev.milestones > 0 && <span className="size-1.5 rounded-full bg-amber-400" />}
-                  {ev.time > 0 && <span className="size-1.5 rounded-full bg-emerald-400" />}
+                  {ev.time > 0 && <span className="size-1.5 rounded-full bg-primary" />}
                 </div>
               ) : <div className="h-2 mt-0.5" />}
             </div>
@@ -661,7 +661,7 @@ function MiniCalendar({ proj }: { proj: ProjectDetail }) {
       <div className="flex items-center gap-4 mt-3 pt-3 border-t flex-wrap">
         <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-400" /><span className="text-[10px] text-muted-foreground">Tasks</span></div>
         <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-400" /><span className="text-[10px] text-muted-foreground">Milestones</span></div>
-        <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-400" /><span className="text-[10px] text-muted-foreground">Time</span></div>
+        <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" /><span className="text-[10px] text-muted-foreground">Time</span></div>
         <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-red-500" /><span className="text-[10px] text-muted-foreground">Overdue</span></div>
       </div>
     </div>

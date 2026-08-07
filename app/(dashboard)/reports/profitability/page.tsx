@@ -135,17 +135,17 @@ export default function ProfitabilityPage() {
                 {entries.map((e) => (
                   <tr key={e.contactId} className="border-b last:border-b-0">
                     <td className="px-4 py-2.5 font-medium">{e.contactName}</td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-emerald-600">{formatMoney(e.revenue)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-primary">{formatMoney(e.revenue)}</td>
                     <td className="px-4 py-2.5 text-right font-mono tabular-nums text-red-600">{formatMoney(e.costs)}</td>
                     <td className={cn(
                       "px-4 py-2.5 text-right font-mono tabular-nums font-medium",
-                      e.profit >= 0 ? "text-emerald-600" : "text-red-600"
+                      e.profit >= 0 ? "text-primary" : "text-red-600"
                     )}>
                       {formatMoney(e.profit)}
                     </td>
                     <td className={cn(
                       "px-4 py-2.5 text-right font-mono tabular-nums",
-                      e.margin >= 0 ? "text-emerald-600" : "text-red-600"
+                      e.margin >= 0 ? "text-primary" : "text-red-600"
                     )}>
                       {e.margin}%
                     </td>
@@ -157,17 +157,17 @@ export default function ProfitabilityPage() {
               <tfoot>
                 <tr className="border-t bg-muted/30">
                   <td className="px-4 py-2.5 font-semibold">Total</td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-emerald-600">{formatMoney(totalRevenue)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-primary">{formatMoney(totalRevenue)}</td>
                   <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-red-600">{formatMoney(totalCosts)}</td>
                   <td className={cn(
                     "px-4 py-2.5 text-right font-mono tabular-nums font-semibold",
-                    totalProfit >= 0 ? "text-emerald-600" : "text-red-600"
+                    totalProfit >= 0 ? "text-primary" : "text-red-600"
                   )}>
                     {formatMoney(totalProfit)}
                   </td>
                   <td className={cn(
                     "px-4 py-2.5 text-right font-mono tabular-nums font-semibold",
-                    overallMargin >= 0 ? "text-emerald-600" : "text-red-600"
+                    overallMargin >= 0 ? "text-primary" : "text-red-600"
                   )}>
                     {overallMargin}%
                   </td>

@@ -41,7 +41,7 @@ const statusColors: Record<string, string> = {
   submitted:
     "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   approved:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   rejected:
     "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
   paid: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
@@ -260,7 +260,7 @@ export default function ExpensesPage() {
             {[
               { label: "Draft", desc: "Create expense claim", color: "bg-gray-400", bg: "bg-gray-50 dark:bg-gray-900/30" },
               { label: "Submitted", desc: "Submit for review", color: "bg-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-              { label: "Approved", desc: "Manager approves", color: "bg-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+              { label: "Approved", desc: "Manager approves", color: "bg-primary", bg: "bg-accent dark:bg-primary" },
               { label: "Paid", desc: "Reimbursement sent", color: "bg-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
             ].map(({ label, desc, color, bg }, i) => (
               <div key={label} className={`relative flex flex-col items-center py-6 px-3 text-center border-r last:border-r-0 ${bg}`}>
@@ -292,7 +292,7 @@ export default function ExpensesPage() {
                   <div className="h-2.5 w-20 rounded bg-muted/50 hidden sm:block" />
                   <div className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium hidden sm:block ${
                     i % 3 === 0 ? "bg-blue-100 text-blue-400 dark:bg-blue-900/40 dark:text-blue-500" :
-                    i % 3 === 1 ? "bg-emerald-100 text-emerald-400 dark:bg-emerald-900/40 dark:text-emerald-500" :
+                    i % 3 === 1 ? "bg-accent text-primary dark:bg-primary dark:text-primary" :
                     "bg-purple-100 text-purple-400 dark:bg-purple-900/40 dark:text-purple-500"
                   }`}>
                     {i % 3 === 0 ? "submitted" : i % 3 === 1 ? "approved" : "paid"}
@@ -316,7 +316,7 @@ export default function ExpensesPage() {
               <Button
                 onClick={() => openDrawer("expense")}
                 size="lg"
-                className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+                className="mt-6 bg-primary hover:bg-primary/90"
               >
                 <Plus className="mr-2 size-4" />
                 New Expense Claim
@@ -339,7 +339,7 @@ export default function ExpensesPage() {
           <Button
             size="sm"
             onClick={() => openDrawer("expense")}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 size-4" />
             New Expense
@@ -365,10 +365,10 @@ export default function ExpensesPage() {
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
+              <span className="size-1.5 rounded-full bg-primary" />
               Approved
             </p>
-            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
+            <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-primary dark:text-primary">
               {formatMoney(approvedAmount)}
             </p>
           </div>

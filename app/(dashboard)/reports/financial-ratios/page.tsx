@@ -170,7 +170,7 @@ export default function FinancialRatiosPage() {
                   </div>
                   <p className={cn(
                     "text-2xl font-bold font-mono tabular-nums truncate",
-                    good ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                    good ? "text-primary dark:text-primary" : "text-red-600 dark:text-red-400"
                   )}>
                     {info.format(value)}
                   </p>

@@ -211,7 +211,7 @@ export default function PnlComparisonPage() {
                     {periods.map((p) => (
                       <td key={p.label} className={cn(
                         "px-4 py-2.5 text-right font-mono tabular-nums font-semibold",
-                        p.netIncome >= 0 ? "text-emerald-600" : "text-red-600"
+                        p.netIncome >= 0 ? "text-primary" : "text-red-600"
                       )}>
                         {formatMoney(p.netIncome)}
                       </td>
@@ -241,7 +241,7 @@ export default function PnlComparisonPage() {
 
 function ChangeCell({ amount, pct, inverted }: { amount: number; pct: number; inverted?: boolean }) {
   const positive = inverted ? amount < 0 : amount > 0;
-  const color = amount === 0 ? "text-muted-foreground" : positive ? "text-emerald-600" : "text-red-600";
+  const color = amount === 0 ? "text-muted-foreground" : positive ? "text-primary" : "text-red-600";
 
   return (
     <div className={cn("text-xs font-mono tabular-nums", color)}>

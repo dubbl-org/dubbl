@@ -31,7 +31,7 @@ const ACTIVITY_ICONS: Record<string, typeof MessageSquare> = {
 const ACTIVITY_COLORS: Record<string, string> = {
   note: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   email: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
-  call: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
+  call: "bg-accent text-primary dark:bg-primary dark:text-primary",
   meeting: "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400",
   task: "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400",
 };
@@ -128,7 +128,7 @@ export default function DealOverviewPage() {
               <p className="text-xs text-muted-foreground">No activity yet</p>
               <button
                 onClick={() => router.push(`/crm/deals/${id}/activity`)}
-                className="text-xs text-emerald-600 hover:underline mt-1 font-medium"
+                className="text-xs text-primary hover:underline mt-1 font-medium"
               >
                 Log first activity
               </button>
@@ -167,8 +167,8 @@ export default function DealOverviewPage() {
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Key Metrics</h3>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                <DollarSign className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <div className="flex size-8 items-center justify-center rounded-lg bg-accent dark:bg-accent">
+                <DollarSign className="size-4 text-primary dark:text-primary" />
               </div>
               <div>
                 <p className="text-sm font-bold font-mono tabular-nums">{formatMoney(deal.valueCents, deal.currency)}</p>
@@ -254,7 +254,7 @@ export default function DealOverviewPage() {
             Created {new Date(deal.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
           </p>
           {deal.wonAt && (
-            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+            <p className="text-[11px] text-primary dark:text-primary mt-1">
               Won {new Date(deal.wonAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
             </p>
           )}

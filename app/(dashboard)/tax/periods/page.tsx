@@ -105,7 +105,7 @@ const FILING_BADGE_STYLES: Record<string, string> = {
   "due-soon":
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
   filed:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+    "border-primary/20 bg-accent text-primary dark:border-primary/20 dark:bg-accent dark:text-primary",
   open:
     "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
 };
@@ -169,7 +169,7 @@ function CreatePeriodSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+        <Button size="sm" className="bg-primary hover:bg-primary/90">
           <Plus className="mr-1.5 size-3.5" />
           New Tax Period
         </Button>
@@ -230,7 +230,7 @@ function CreatePeriodSheet({
           <Button
             type="submit"
             disabled={saving}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="w-full bg-primary hover:bg-primary/90"
           >
             {saving ? "Creating..." : "Create"}
           </Button>
@@ -310,7 +310,7 @@ function FileSheet({
           <Button
             type="submit"
             disabled={saving}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="w-full bg-primary hover:bg-primary/90"
           >
             {saving ? "Saving..." : "Mark as submitted"}
           </Button>
@@ -517,13 +517,13 @@ export default function TaxPeriodsPage() {
             </div>
 
             {/* Filed */}
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
-                <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-accent px-4 py-3 dark:border-primary/20 dark:bg-accent">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent dark:bg-primary">
+                <FileCheck className="size-4 text-primary dark:text-primary" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Submitted</p>
-                <p className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                <p className="text-lg font-semibold tabular-nums text-primary dark:text-primary">
                   {filedCount}
                 </p>
               </div>
@@ -539,7 +539,7 @@ export default function TaxPeriodsPage() {
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  className="h-full rounded-full bg-primary transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -593,7 +593,7 @@ export default function TaxPeriodsPage() {
                       )}
                     >
                       <td className="px-4 py-2.5 font-medium">
-                        <Link href={`/tax/periods/${p.id}`} className="hover:underline hover:text-emerald-700 dark:hover:text-emerald-400">
+                        <Link href={`/tax/periods/${p.id}`} className="hover:underline hover:text-primary dark:hover:text-primary">
                           {p.name}
                         </Link>
                       </td>
