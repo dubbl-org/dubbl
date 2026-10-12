@@ -32,7 +32,7 @@ export function Section({
 }) {
   return (
     <section id={id} className={cn("relative scroll-mt-16", rule && "border-t border-border")}>
-      <div className="relative mx-auto w-full max-w-[1400px]">
+      <div className="relative mx-auto w-full max-w-[1600px]">
         {rule && (
           <>
             <Crosshair className="-left-[5px] -top-[6px]" />
@@ -112,21 +112,7 @@ export function Shot({
         className
       )}
     >
-      {backdrop && (
-        // eslint-disable-next-line @next/next/no-img-element -- pre-optimised AVIF, served as-is
-        <img
-          src={`/landing/bg/${backdrop.name}-1200.avif`}
-          srcSet={`/landing/bg/${backdrop.name}-640.avif 640w, /landing/bg/${backdrop.name}-1200.avif 1200w`}
-          sizes="(min-width: 1024px) 60vw, 100vw"
-          alt=""
-          aria-hidden
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
-          decoding="async"
-          style={{ backgroundImage: `url(${backdrop.blur})` }}
-          className="absolute inset-0 -z-10 size-full bg-cover bg-center object-cover dark:brightness-[0.45]"
-        />
-      )}
+      {backdrop && <Painting backdrop={backdrop} priority={priority} />}
       <div
         className={cn(
           "overflow-hidden rounded-xl border border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_24px_48px_-24px_rgb(0_0_0/0.18)]",
@@ -137,5 +123,35 @@ export function Shot({
         <Image src={src} alt={alt} width={2400} height={1500} priority={priority} className="block h-auto w-full" />
       </div>
     </div>
+  );
+}
+
+/** A painted landscape filling its (relative, isolated) parent. */
+export function Painting({
+  backdrop,
+  priority,
+  sizes = "(min-width: 1024px) 60vw, 100vw",
+  className,
+}: {
+  backdrop: Backdrop;
+  priority?: boolean;
+  sizes?: string;
+  className?: string;
+}) {
+  const [small, large] = backdrop.widths ?? [640, 1200];
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- pre-optimised AVIF, served as-is
+    <img
+      src={`/landing/bg/${backdrop.name}-${large}.avif`}
+      srcSet={`/landing/bg/${backdrop.name}-${small}.avif ${small}w, /landing/bg/${backdrop.name}-${large}.avif ${large}w`}
+      sizes={sizes}
+      alt=""
+      aria-hidden
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
+      decoding="async"
+      style={{ backgroundImage: `url(${backdrop.blur})` }}
+      className={cn("absolute inset-0 -z-10 size-full bg-cover bg-center object-cover dark:brightness-[0.45]", className)}
+    />
   );
 }

@@ -24,7 +24,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto w-full max-w-[1400px] px-5 sm:px-8 lg:px-12">
+      <div className="mx-auto w-full max-w-[1600px] px-5 sm:px-8 lg:px-12">
         <nav className="flex h-14 items-center justify-between">
           <div className="flex items-center gap-10">
             <Link href="/" className="flex items-center gap-2" aria-label="dubbl home">

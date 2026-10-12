@@ -1,3 +1,4 @@
+import "./landing.css";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 
@@ -10,7 +11,7 @@ export default function LandingLayout({
     <>
       {/* Page rails — the vertical rules every section lines up with */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 flex justify-center">
-        <div className="relative h-full w-full max-w-[1400px] border-x border-border" />
+        <div className="relative h-full w-full max-w-[1600px] border-x border-border" />
       </div>
 
       <Navbar />

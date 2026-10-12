@@ -1,0 +1,153 @@
+/*
+ * Landing animations — quiet, looping product demos.
+ * Every animated element carries .lp-a; loops only run while their section is
+ * on screen ([data-live], set by <Live>) and are switched off for reduced
+ * motion, which leaves each element in its finished state.
+ *
+ * Sequenced effects share one timeline: step k switches on at 8% + 12%·k of
+ * the loop, everything resets together at 88–94%.
+ */
+.lp-a {
+  animation-duration: var(--lp-t, 12s);
+  animation-iteration-count: infinite;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+  animation-play-state: paused;
+}
+[data-live] .lp-a { animation-play-state: running; }
+.lp-once { animation-iteration-count: 1; }
+@keyframes lp-pop-0 { 0%, 8% { transform: scale(0); } 11% { transform: scale(1.12); } 13%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-0 { 0%, 8% { opacity: 0; transform: translateY(6px); } 13%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-0 { 0%, 8% { opacity: 0; } 13%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-0 { 0%, 8% { opacity: 1; } 12%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-0 { 0%, 8% { opacity: 1; } 13%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-0 { animation-name: lp-pop-0; }
+.lp-in-0 { animation-name: lp-in-0; }
+.lp-fade-0 { animation-name: lp-fade-0; }
+.lp-out-0 { animation-name: lp-out-0; }
+.lp-dim-0 { animation-name: lp-dim-0; }
+@keyframes lp-pop-1 { 0%, 20% { transform: scale(0); } 23% { transform: scale(1.12); } 25%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-1 { 0%, 20% { opacity: 0; transform: translateY(6px); } 25%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-1 { 0%, 20% { opacity: 0; } 25%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-1 { 0%, 20% { opacity: 1; } 24%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-1 { 0%, 20% { opacity: 1; } 25%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-1 { animation-name: lp-pop-1; }
+.lp-in-1 { animation-name: lp-in-1; }
+.lp-fade-1 { animation-name: lp-fade-1; }
+.lp-out-1 { animation-name: lp-out-1; }
+.lp-dim-1 { animation-name: lp-dim-1; }
+@keyframes lp-pop-2 { 0%, 32% { transform: scale(0); } 35% { transform: scale(1.12); } 37%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-2 { 0%, 32% { opacity: 0; transform: translateY(6px); } 37%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-2 { 0%, 32% { opacity: 0; } 37%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-2 { 0%, 32% { opacity: 1; } 36%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-2 { 0%, 32% { opacity: 1; } 37%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-2 { animation-name: lp-pop-2; }
+.lp-in-2 { animation-name: lp-in-2; }
+.lp-fade-2 { animation-name: lp-fade-2; }
+.lp-out-2 { animation-name: lp-out-2; }
+.lp-dim-2 { animation-name: lp-dim-2; }
+@keyframes lp-pop-3 { 0%, 44% { transform: scale(0); } 47% { transform: scale(1.12); } 49%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-3 { 0%, 44% { opacity: 0; transform: translateY(6px); } 49%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-3 { 0%, 44% { opacity: 0; } 49%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-3 { 0%, 44% { opacity: 1; } 48%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-3 { 0%, 44% { opacity: 1; } 49%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-3 { animation-name: lp-pop-3; }
+.lp-in-3 { animation-name: lp-in-3; }
+.lp-fade-3 { animation-name: lp-fade-3; }
+.lp-out-3 { animation-name: lp-out-3; }
+.lp-dim-3 { animation-name: lp-dim-3; }
+@keyframes lp-pop-4 { 0%, 56% { transform: scale(0); } 59% { transform: scale(1.12); } 61%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-4 { 0%, 56% { opacity: 0; transform: translateY(6px); } 61%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-4 { 0%, 56% { opacity: 0; } 61%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-4 { 0%, 56% { opacity: 1; } 60%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-4 { 0%, 56% { opacity: 1; } 61%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-4 { animation-name: lp-pop-4; }
+.lp-in-4 { animation-name: lp-in-4; }
+.lp-fade-4 { animation-name: lp-fade-4; }
+.lp-out-4 { animation-name: lp-out-4; }
+.lp-dim-4 { animation-name: lp-dim-4; }
+@keyframes lp-pop-5 { 0%, 68% { transform: scale(0); } 71% { transform: scale(1.12); } 73%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-5 { 0%, 68% { opacity: 0; transform: translateY(6px); } 73%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-5 { 0%, 68% { opacity: 0; } 73%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-5 { 0%, 68% { opacity: 1; } 72%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-5 { 0%, 68% { opacity: 1; } 73%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-5 { animation-name: lp-pop-5; }
+.lp-in-5 { animation-name: lp-in-5; }
+.lp-fade-5 { animation-name: lp-fade-5; }
+.lp-out-5 { animation-name: lp-out-5; }
+.lp-dim-5 { animation-name: lp-dim-5; }
+@keyframes lp-pop-6 { 0%, 80% { transform: scale(0); } 83% { transform: scale(1.12); } 85%, 88% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes lp-in-6 { 0%, 80% { opacity: 0; transform: translateY(6px); } 85%, 88% { opacity: 1; transform: none; } 94%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lp-fade-6 { 0%, 80% { opacity: 0; } 85%, 88% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes lp-out-6 { 0%, 80% { opacity: 1; } 84%, 88% { opacity: 0; } 94%, 100% { opacity: 1; } }
+@keyframes lp-dim-6 { 0%, 80% { opacity: 1; } 85%, 88% { opacity: 0.4; } 94%, 100% { opacity: 1; } }
+.lp-pop-6 { animation-name: lp-pop-6; }
+.lp-in-6 { animation-name: lp-in-6; }
+.lp-fade-6 { animation-name: lp-fade-6; }
+.lp-out-6 { animation-name: lp-out-6; }
+.lp-dim-6 { animation-name: lp-dim-6; }
+@keyframes lp-count { 0%, 8% { transform: translateY(0); } 11%, 20% { transform: translateY(-1.25em); } 23%, 32% { transform: translateY(-2.5em); } 35%, 44% { transform: translateY(-3.75em); } 47%, 56% { transform: translateY(-5.0em); } 59%, 88% { transform: translateY(-6.25em); } 94%, 100% { transform: translateY(0); } }
+.lp-count { animation-name: lp-count; }
+@keyframes lp-step6 { 0% { transform: translateY(0); } 2.0%, 15.2% { transform: translateY(0px); } 18.7%, 31.8% { transform: translateY(40px); } 35.3%, 48.5% { transform: translateY(80px); } 52.0%, 65.2% { transform: translateY(120px); } 68.7%, 81.8% { transform: translateY(160px); } 85.3%, 98.5% { transform: translateY(200px); } 100% { transform: translateY(0); } }
+.lp-step6 { animation-name: lp-step6; animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+
+/* Toasts taking turns in one slot (three, staggered by a third of the loop) */
+@keyframes lp-toast {
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+  4%, 29% { opacity: 1; transform: none; }
+  33%, 100% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+.lp-toast { animation-name: lp-toast; }
+
+/* A line drawing itself (pathLength="1") */
+@keyframes lp-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.lp-draw { stroke-dasharray: 1; animation-name: lp-draw; animation-duration: 2.6s; animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+
+/* Soft radar ping around a live marker */
+@keyframes lp-ping { 0% { transform: scale(1); opacity: 0.45; } 70%, 100% { transform: scale(3); opacity: 0; } }
+.lp-ping { animation-name: lp-ping; animation-duration: 2.4s; animation-timing-function: ease-out; transform-box: fill-box; transform-origin: center; }
+
+/* Bars growing from the left, then holding */
+@keyframes lp-grow { 0% { transform: scaleX(0); } 14%, 90% { transform: scaleX(1); } 97%, 100% { transform: scaleX(0); } }
+.lp-grow { animation-name: lp-grow; transform-origin: left; }
+
+/* A highlight sweeping down a table */
+@keyframes lp-scan { 0% { transform: translateY(-100%); opacity: 0; } 6% { opacity: 1; } 40% { transform: translateY(560%); opacity: 1; } 46%, 100% { transform: translateY(560%); opacity: 0; } }
+.lp-scan { animation-name: lp-scan; animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+
+/* Typing dots */
+@keyframes lp-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-2px); opacity: 1; } }
+.lp-dot { animation-name: lp-dot; animation-duration: 1s; }
+@keyframes lp-typing { 0%, 12% { opacity: 0; } 14%, 30% { opacity: 1; } 32%, 100% { opacity: 0; } }
+.lp-typing { animation-name: lp-typing; }
+
+/* Gentle drift for floating cards */
+@keyframes lp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.lp-float { animation-name: lp-float; animation-duration: 7s; animation-timing-function: ease-in-out; }
+
+/* Bars rising from the baseline, then holding */
+@keyframes lp-rise { 0% { transform: scaleY(0); } 14%, 90% { transform: scaleY(1); } 97%, 100% { transform: scaleY(0); } }
+.lp-rise { animation-name: lp-rise; transform-origin: bottom; }
+
+/* App screens settle in; the assistant dock slides in from the right */
+@keyframes lp-screen { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.lp-screen { animation: lp-screen 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes lp-dock { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+.lp-dock { animation: lp-dock 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+
+/* A ticker of postings drifting past (content is doubled; one loop = half) */
+@keyframes lp-marquee { to { transform: translateX(-50%); } }
+.lp-marquee { animation: lp-marquee 70s linear infinite; }
+.lp-marquee:hover { animation-play-state: paused; }
+
+/* A pulse travelling along a connector (pathLength="1") */
+@keyframes lp-packet { from { stroke-dashoffset: 1.14; } to { stroke-dashoffset: 0; } }
+.lp-packet { stroke-dasharray: 0.14 1; animation-name: lp-packet; animation-duration: 2.8s; animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-a, .lp-screen, .lp-dock, .lp-marquee { animation: none !important; }
+  .lp-draw { stroke-dasharray: none; }
+  .lp-toast ~ .lp-toast, .lp-typing, .lp-scan, .lp-ping, .lp-packet { display: none; }
+  [class*="lp-out-"] { opacity: 0; }
+  .lp-count { transform: translateY(-6.25em); }
+}
