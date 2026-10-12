@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { journalEntry, journalLine } from "@/lib/db/schema";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import { parsePagination } from "@/lib/api/pagination";
+import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { centsToDecimal } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
@@ -35,16 +37,22 @@ export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
     const url = new URL(request.url);
-    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const { page, limit, offset } = parsePagination(url);
+    const where = and(eq(journalEntry.organizationId, ctx.organizationId), notDeleted(journalEntry.deletedAt));
 
-    const entries = await db.query.journalEntry.findMany({
-      where: eq(journalEntry.organizationId, ctx.organizationId),
-      orderBy: desc(journalEntry.createdAt),
-      limit,
-      with: {
-        lines: true,
-      },
-    });
+    const [entries, [countResult]] = await Promise.all([
+      db.query.journalEntry.findMany({
+        where,
+        orderBy: desc(journalEntry.createdAt),
+        limit,
+        offset,
+        with: {
+          lines: true,
+        },
+      }),
+      db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(journalEntry).where(where),
+    ]);
+    const total = Number(countResult?.count || 0);
 
     const result = entries.map((e) => {
       const totalDebit = e.lines.reduce((sum, l) => sum + l.debitAmount, 0);
@@ -55,9 +63,11 @@ export async function GET(request: Request) {
       };
     });
 
+    // `entries`/`total` keep older callers working; `pagination` lets lists page through everything.
     return NextResponse.json({
       entries: result,
-      total: result.length,
+      total,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
     return handleError(err);

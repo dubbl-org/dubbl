@@ -369,6 +369,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
               reference: paymentNumber,
               amount: params.amount,
               date: params.date,
+              bankAccountId: created.bankAccountId,
               allocations: journalAllocations,
             },
             tx
@@ -626,6 +627,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
               reference: paymentNumber,
               amount: totalAmount,
               date: params.date,
+              bankAccountId: created.bankAccountId,
               allocations:
                 journalAllocations.length > 0 ? journalAllocations : undefined,
             },

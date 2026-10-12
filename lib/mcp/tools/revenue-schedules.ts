@@ -1,3 +1,4 @@
+import { accountCodeMatch, deferredRevenueCode } from "@/lib/api/account-roles";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -197,8 +198,8 @@ export function registerRevenueScheduleTools(server: McpServer, ctx: AuthContext
 
         // Determine revenue (credit) account: invoice line's account if set,
         // otherwise the default revenue account "4000".
-        let revenueAccountId: string | null = null;
-        if (schedule.invoiceLineId) {
+        let revenueAccountId: string | null = schedule.revenueAccountId ?? null;
+        if (!revenueAccountId && schedule.invoiceLineId) {
           const line = schedule.invoice?.lines?.find(
             (l) => l.id === schedule.invoiceLineId
           );
@@ -208,22 +209,26 @@ export function registerRevenueScheduleTools(server: McpServer, ctx: AuthContext
           const revenueAccount = await db.query.chartAccount.findFirst({
             where: and(
               eq(chartAccount.organizationId, ctx.organizationId),
-              eq(chartAccount.code, "4000")
+              accountCodeMatch("4000")
             ),
           });
           if (revenueAccount) revenueAccountId = revenueAccount.id;
         }
 
-        // Deferred revenue (debit) account "2300".
-        const deferredAccount = await db.query.chartAccount.findFirst({
-          where: and(
-            eq(chartAccount.organizationId, ctx.organizationId),
-            eq(chartAccount.code, "2300")
-          ),
-        });
+        // Deferred revenue (debit) account: the schedule's own, else the
+        // chart's default (2300 on legacy charts, income in advance otherwise).
+        const deferredCode = await deferredRevenueCode(ctx.organizationId);
+        const deferredAccount = schedule.deferredRevenueAccountId
+          ? { id: schedule.deferredRevenueAccountId }
+          : await db.query.chartAccount.findFirst({
+              where: and(
+                eq(chartAccount.organizationId, ctx.organizationId),
+                accountCodeMatch(deferredCode)
+              ),
+            });
         if (!deferredAccount)
           throw new Error(
-            "Deferred Revenue account (2300) not found. Please create it first."
+            `Deferred Revenue account (${deferredCode}) not found. Please create it first.`
           );
         if (!revenueAccountId)
           throw new Error("Revenue account (4000) not found. Please create it first.");

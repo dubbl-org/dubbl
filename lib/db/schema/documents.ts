@@ -4,6 +4,7 @@ import {
   uuid,
   timestamp,
   integer,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
@@ -15,6 +16,8 @@ export const documentFolder = pgTable("document_folder", {
     .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   parentId: uuid("parent_id"),
+  /** Optional label colour (hex) shown on the folder icon. */
+  color: text("color"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
@@ -36,6 +39,21 @@ export const document = pgTable("document", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
 });
+
+/** Files a member starred. Stars are personal: everyone keeps their own. */
+export const documentStar = pgTable(
+  "document_star",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => document.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.documentId] })]
+);
 
 // --- Relations ---
 

@@ -41,6 +41,8 @@ export async function GET(request: Request) {
     const contractors = await db.query.contractor.findMany({
       where: and(...conditions),
       orderBy: desc(contractor.createdAt),
+      // Lists never carry tax IDs or bank numbers; open a contractor to see them
+      columns: { taxId: false, bankAccountNumber: false },
       limit,
       offset,
     });

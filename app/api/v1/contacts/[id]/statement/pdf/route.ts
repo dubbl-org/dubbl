@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { renderContactStatementPdf } from "@/lib/api/contact-statement";
 import { db } from "@/lib/db";
 import {
   contact,
@@ -42,6 +43,23 @@ export async function GET(
     const orgIdParam = url.searchParams.get("orgId");
     const ctx = await getAuthContext(request, orgIdParam || undefined);
     const { id } = await params;
+
+    // ?download=1 returns a real PDF file; without it, a printable HTML page.
+    if (url.searchParams.get("download") === "1") {
+      const file = await renderContactStatementPdf(
+        ctx.organizationId,
+        id,
+        url.searchParams.get("startDate"),
+        url.searchParams.get("endDate")
+      );
+      if (!file) return notFound("Contact");
+      return new NextResponse(new Uint8Array(file.pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${file.filename}"`,
+        },
+      });
+    }
 
     // Fetch contact
     const contactRow = await db

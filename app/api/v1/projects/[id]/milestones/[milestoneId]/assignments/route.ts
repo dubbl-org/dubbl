@@ -50,7 +50,7 @@ export async function GET(
       where: eq(milestoneAssignment.milestoneId, milestoneId),
       with: {
         employee: true,
-        member: { with: { user: true } },
+        member: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } },
       },
     });
 

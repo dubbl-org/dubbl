@@ -52,18 +52,18 @@ export async function GET(
       with: {
         contact: true,
         timeEntries: {
-          with: { user: true, task: true },
+          with: { user: { columns: { id: true, name: true, email: true, image: true } }, task: true },
         },
         members: {
           with: {
             member: {
-              with: { user: true },
+              with: { user: { columns: { id: true, name: true, email: true, image: true } } },
             },
           },
         },
         tasks: {
           with: {
-            assignee: { with: { user: true } },
+            assignee: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } },
             team: true,
             createdBy: true,
             checklist: true,
@@ -74,7 +74,7 @@ export async function GET(
         teams: {
           with: {
             members: {
-              with: { member: { with: { user: true } } },
+              with: { member: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
             },
           },
         },

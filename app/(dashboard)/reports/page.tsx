@@ -104,6 +104,18 @@ const reportCategories = [
         icon: Users,
       },
       {
+        title: "Sales by customer",
+        description: "Who your money comes from, ranked by what you invoiced them.",
+        href: "/reports/sales-by-customer",
+        icon: Users,
+      },
+      {
+        title: "Sales by item",
+        description: "What you sell the most of: units sold and sales per product or service.",
+        href: "/reports/sales-by-item",
+        icon: Package2,
+      },
+      {
         title: "Who you spend the most with",
         description: "Your biggest suppliers ranked by total spend for the period.",
         href: "/reports/vendor-spend",

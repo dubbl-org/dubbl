@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import {
+  ArrowUpRight,
   Clock,
   CalendarDays,
   Plus,
@@ -739,7 +741,8 @@ export default function TimeLeavePage() {
 
       {/* View tabs */}
       <div className="space-y-4">
-        <div className="inline-flex h-10 items-center gap-1 rounded-lg bg-muted p-[3px]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex h-9 items-center gap-1 rounded-lg bg-foreground/[0.035] p-[3px]">
           {([
             { value: "timesheets" as const, icon: Clock, label: "Timesheets" },
             { value: "leave" as const, icon: CalendarDays, label: "Leave Requests" },
@@ -760,7 +763,7 @@ export default function TimeLeavePage() {
               {view === tab.value && (
                 <motion.div
                   layoutId="view-tab-bg"
-                  className="absolute inset-0 rounded-md bg-background shadow-sm dark:border dark:border-input dark:bg-input/30"
+                  className="absolute inset-0 rounded-md bg-foreground/[0.07]"
                   transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
                 />
               )}
@@ -770,6 +773,14 @@ export default function TimeLeavePage() {
               </span>
             </button>
           ))}
+        </div>
+          <Link
+            href={view === "leave" ? "/payroll/leave" : "/payroll/timesheets"}
+            className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {view === "leave" ? "Open leave on its own page" : "Open timesheets on their own page"}
+            <ArrowUpRight className="size-3" />
+          </Link>
         </div>
 
         <div className="overflow-hidden">

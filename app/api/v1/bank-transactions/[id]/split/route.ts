@@ -263,6 +263,7 @@ export async function POST(
           reference: paymentNumber,
           amount: totalAllocated,
           date: parsed.date,
+          bankAccountId: account.id,
           allocations: journalAllocations,
         },
         tx

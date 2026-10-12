@@ -50,7 +50,9 @@ export async function GET(request: Request) {
     const employees = await db.query.payrollEmployee.findMany({
       where: and(...conditions),
       orderBy: desc(payrollEmployee.createdAt),
-      with: { member: { with: { user: true } } },
+      // Lists never carry bank numbers; open an employee to see theirs
+      columns: { bankAccountNumber: false },
+      with: { member: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
       limit,
       offset,
     });

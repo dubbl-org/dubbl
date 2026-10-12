@@ -126,10 +126,10 @@ export async function POST(
         const cwipAccount = await ensureAccountByCode(
           ctx.organizationId,
           {
-            code: "1700",
+            code: "1660",
             name: "Assets Under Construction",
             type: "asset",
-            subType: "fixed_asset",
+            subType: "fixed",
           },
           baseCurrency,
           tx

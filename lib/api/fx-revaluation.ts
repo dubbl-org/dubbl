@@ -1,3 +1,4 @@
+import { ensureAccountForCode, findAccountForCode } from "@/lib/api/account-roles";
 import { sql, eq, and, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -52,31 +53,11 @@ type AccountDef = {
 };
 
 async function findAccount(orgId: string, code: string) {
-  return db.query.chartAccount.findFirst({
-    where: and(
-      eq(chartAccount.organizationId, orgId),
-      eq(chartAccount.code, code)
-    ),
-  });
+  return findAccountForCode(orgId, code);
 }
 
 async function ensureAccount(orgId: string, def: AccountDef, base: string) {
-  const existing = await findAccount(orgId, def.code);
-  if (existing) return existing;
-  await db
-    .insert(chartAccount)
-    .values({
-      organizationId: orgId,
-      code: def.code,
-      name: def.name,
-      type: def.type,
-      subType: def.subType,
-      currencyCode: base,
-    })
-    .onConflictDoNothing({
-      target: [chartAccount.organizationId, chartAccount.code],
-    });
-  return findAccount(orgId, def.code);
+  return ensureAccountForCode(orgId, def, base);
 }
 
 async function nextEntryNumber(orgId: string, exec: Exec = db) {

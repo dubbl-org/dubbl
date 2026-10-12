@@ -112,6 +112,9 @@ export default function ProfitAndLossPage() {
         <Button asChild variant="outline" size="sm">
           <a href="/reports/tracking">Split by team or project</a>
         </Button>
+        <Button asChild variant="outline" size="sm">
+          <a href="/reports/income-statement">One-page yearly summary</a>
+        </Button>
       </div>
 
       {loading ? (

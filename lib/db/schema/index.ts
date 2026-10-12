@@ -40,3 +40,4 @@ export * from "./login-history";
 export * from "./integrations";
 export * from "./backups";
 export * from "./site-settings";
+export * from "./assistant";

@@ -361,7 +361,7 @@ export async function GET(
           eq(timeEntry.isBillable, true),
           isNull(timeEntry.invoiceId)
         ),
-        with: { user: true, task: true },
+        with: { user: { columns: { id: true, name: true, email: true, image: true } }, task: true },
       });
 
       const totalAmount = entries.reduce((s, e) => {

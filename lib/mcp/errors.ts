@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AuthError } from "@/lib/api/auth-context";
 import type { AuthContext } from "@/lib/api/auth-context";
 import { LimitExceededError } from "@/lib/api/check-limit";
+import { safeStringify } from "@/lib/api/redact";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -14,7 +15,7 @@ export function wrapTool<T>(
 ): Promise<ToolResult> {
   return handler(ctx)
     .then((result) => ({
-      content: [{ type: "text" as const, text: JSON.stringify(result) }],
+      content: [{ type: "text" as const, text: safeStringify(result) }],
     }))
     .catch((err) => {
       if (err instanceof AuthError) {

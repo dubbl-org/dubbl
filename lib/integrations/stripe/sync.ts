@@ -1,3 +1,4 @@
+import { ensureAccountForCode } from "@/lib/api/account-roles";
 import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import {
@@ -14,6 +15,7 @@ import {
   chartAccount,
   creditNote,
   creditNoteLine,
+  organization,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -145,26 +147,18 @@ async function resolveOrCreateAccount(
   subType: string,
   code: string
 ): Promise<string> {
-  const existing = await db.query.chartAccount.findFirst({
-    where: and(
-      eq(chartAccount.organizationId, organizationId),
-      eq(chartAccount.code, code),
-      notDeleted(chartAccount.deletedAt)
-    ),
-  });
-  if (existing) return existing.id;
-
-  const [created] = await db
-    .insert(chartAccount)
-    .values({
-      organizationId,
-      code,
-      name,
-      type,
-      subType,
-    })
-    .returning();
-  return created.id;
+  const [org] = await db
+    .select({ defaultCurrency: organization.defaultCurrency })
+    .from(organization)
+    .where(eq(organization.id, organizationId))
+    .limit(1);
+  const account = await ensureAccountForCode(
+    organizationId,
+    { code, name, type, subType },
+    org?.defaultCurrency ?? "USD",
+  );
+  if (!account) throw new Error(`Could not resolve account ${code}`);
+  return account.id;
 }
 
 // ──────────────────────────────────────────────────

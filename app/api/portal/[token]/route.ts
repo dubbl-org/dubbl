@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { portalAccessToken } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { portalAccessToken, portalActivityLog } from "@/lib/db/schema";
+import { eq, and, isNull, gt } from "drizzle-orm";
 import { ok, notFound, error, handleError } from "@/lib/api/response";
 
 export async function GET(
@@ -21,6 +21,23 @@ export async function GET(
     if (!access) return notFound("Portal access");
     if (access.expiresAt && access.expiresAt < new Date()) {
       return error("Portal link has expired", 410);
+    }
+
+    // Record that the customer opened their portal, at most once per 10 minutes
+    // (the layout and the overview page both load this on a single visit).
+    const recent = await db.query.portalActivityLog.findFirst({
+      where: and(
+        eq(portalActivityLog.tokenId, access.id),
+        eq(portalActivityLog.action, "view_portal"),
+        gt(portalActivityLog.createdAt, new Date(Date.now() - 10 * 60 * 1000))
+      ),
+    });
+    if (!recent) {
+      await db.insert(portalActivityLog).values({
+        tokenId: access.id,
+        action: "view_portal",
+        ipAddress: request.headers.get("x-forwarded-for") || null,
+      });
     }
 
     return ok({

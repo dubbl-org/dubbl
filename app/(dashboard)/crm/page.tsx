@@ -1,670 +1,560 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { motion } from "motion/react";
 import {
-  Users,
-  Handshake,
-  BarChart3,
-  ArrowRight,
-  Plus,
-  DollarSign,
-  ArrowUpDown,
-  Calendar,
-  User,
-  Loader2,
-  Filter,
-  X,
-} from "lucide-react";
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { ArrowRight, BarChart3, Handshake, List, Loader2, Plus, Search, ThumbsDown, Trophy, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useRecords } from "@/components/dashboard/explorer/use-records";
+import { daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
+import { postJson } from "@/components/dashboard/explorer/action-button";
+import { DEFAULT_STAGES, openStages, usePipelines, type Pipeline, type PipelineStage } from "@/components/dashboard/crm/pipelines";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ErrorState } from "@/components/dashboard/error-state";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { SearchInput } from "@/components/ui/search-input";
-import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface Deal {
   id: string;
   title: string;
+  pipelineId: string;
   stageId: string;
   valueCents: number;
   currency: string;
   probability: number | null;
-  contact: { name: string } | null;
-  assignedUser: { name: string } | null;
   expectedCloseDate: string | null;
-  source: string | null;
-  createdAt: string;
-  wonAt: string | null;
-  lostAt: string | null;
+  contact: { name: string } | null;
+  assignedUser: { name: string | null; email: string } | null;
 }
 
-interface Pipeline {
-  id: string;
-  name: string;
-  stages: { id: string; name: string; color: string }[];
-  isDefault: boolean;
+const PIPELINE_KEY = "dubbl.crm.pipeline";
+const weighted = (d: Deal) => Math.round((d.valueCents * (d.probability ?? 0)) / 100);
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 }
 
-interface Summary {
-  activeCount: number;
-  activeValue: number;
-  wonCount: number;
-  wonValue: number;
-  totalDeals: number;
-  stageDistribution: Record<string, { count: number; value: number }>;
+export default function CRMPipelinePage() {
+  const { pipelines, loading: pipelinesLoading, reload: reloadPipelines } = usePipelines();
+  const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : localStorage.getItem(PIPELINE_KEY)));
+  useDocumentTitle("CRM · Pipeline");
+
+  const pipeline = pipelines.find((p) => p.id === chosen) ?? pipelines.find((p) => p.isDefault) ?? pipelines[0] ?? null;
+
+  if (pipelinesLoading) return <BrandLoader />;
+  if (!pipeline) return <PipelineSetup onCreated={reloadPipelines} />;
+
+  return (
+    <Board
+      key={pipeline.id}
+      pipeline={pipeline}
+      pipelines={pipelines}
+      onPick={(id) => {
+        setChosen(id);
+        localStorage.setItem(PIPELINE_KEY, id);
+      }}
+    />
+  );
 }
 
-type SortKey = "value" | "name" | "date" | "probability";
+/* ------------------------------------------------------------------ */
+/*  Board                                                              */
+/* ------------------------------------------------------------------ */
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "value", label: "Value" },
-  { value: "name", label: "Name" },
-  { value: "date", label: "Date" },
-  { value: "probability", label: "Probability" },
-];
-
-const SOURCE_OPTIONS = [
-  { value: "all", label: "All Sources" },
-  { value: "website", label: "Website" },
-  { value: "referral", label: "Referral" },
-  { value: "cold_outreach", label: "Cold Outreach" },
-  { value: "event", label: "Event" },
-  { value: "other", label: "Other" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "all", label: "All Status" },
-  { value: "active", label: "Active" },
-  { value: "won", label: "Won" },
-  { value: "lost", label: "Lost" },
-];
-
-const DEFAULT_STAGES = [
-  { id: "lead", name: "Lead", color: "#94a3b8" },
-  { id: "qualified", name: "Qualified", color: "#60a5fa" },
-  { id: "proposal", name: "Proposal", color: "#a78bfa" },
-  { id: "negotiation", name: "Negotiation", color: "#f59e0b" },
-  { id: "closed_won", name: "Won", color: "#10b981" },
-  { id: "closed_lost", name: "Lost", color: "#ef4444" },
-];
-
-const PAGE_SIZE = 24;
-
-export default function CRMPage() {
+function Board({ pipeline, pipelines, onPick }: { pipeline: Pipeline; pipelines: Pipeline[]; onPick: (id: string) => void }) {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const params = useMemo(() => ({ pipelineId: pipeline.id, status: "active", sortBy: "value", sortOrder: "desc" }), [pipeline.id]);
+  const { rows, loading, error, refresh } = useRecords<Deal>("/api/v1/crm/deals", params, undefined, refreshKey);
 
-  // Data
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [activePipeline, setActivePipeline] = useState<Pipeline | null>(null);
-
-  // Loading
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [filtering, setFiltering] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [setupLoading, setSetupLoading] = useState(false);
-
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [total, setTotal] = useState(0);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  // Filters
+  // Optimistic moves while the server catches up
+  const [moved, setMoved] = useState<Record<string, string>>({});
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [losing, setLosing] = useState<Deal | null>(null);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search);
-  const [stageFilter, setStageFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<SortKey>("value");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  useDocumentTitle("CRM · Deals");
+  const [outcomes, setOutcomes] = useState<{ won: number; wonValue: number; lost: number } | null>(null);
 
-  function getHeaders() {
-    const orgId = localStorage.getItem("activeOrgId") || "";
-    return { "x-organization-id": orgId, "Content-Type": "application/json" };
-  }
-
-  const buildParams = useCallback(
-    (p: number) => {
-      const params = new URLSearchParams();
-      params.set("page", String(p));
-      params.set("limit", String(PAGE_SIZE));
-      params.set("sortBy", sortBy === "date" ? "created" : sortBy);
-      params.set("sortOrder", sortOrder);
-      if (activePipeline) params.set("pipelineId", activePipeline.id);
-      if (stageFilter !== "all") params.set("stageId", stageFilter);
-      if (sourceFilter !== "all") params.set("source", sourceFilter);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      return params;
-    },
-    [activePipeline, stageFilter, sourceFilter, statusFilter, debouncedSearch, sortBy, sortOrder]
-  );
-
-  // Fetch pipelines on mount
   useEffect(() => {
-    fetch("/api/v1/crm/pipelines", { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => {
-        const pipes = data.pipelines || [];
-        setPipelines(pipes);
-        setActivePipeline(pipes.find((p: Pipeline) => p.isDefault) || pipes[0] || null);
-      })
-      .catch(() => setError("Failed to load pipelines"));
+    const bump = () => setRefreshKey((k) => k + 1);
+    window.addEventListener("deals-changed", bump);
+    return () => window.removeEventListener("deals-changed", bump);
   }, []);
 
-  // Fetch deals when filters change
-  const fetchDeals = useCallback(
-    async (pageNum: number, replace: boolean) => {
-      if (replace) setFiltering(true);
-      else setLoadingMore(true);
+  // Won and lost totals for the outcome columns
+  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    let cancelled = false;
+    const headers = { "x-organization-id": orgId };
+    Promise.all([
+      fetch(`/api/v1/crm/deals?pipelineId=${pipeline.id}&status=won&limit=1`, { headers }).then((r) => r.json()),
+      fetch(`/api/v1/crm/deals?pipelineId=${pipeline.id}&status=lost&limit=1`, { headers }).then((r) => r.json()),
+    ])
+      .then(([won, lost]) => {
+        if (cancelled) return;
+        setOutcomes({ won: won.summary?.wonCount ?? 0, wonValue: won.summary?.wonValue ?? 0, lost: lost.pagination?.total ?? 0 });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pipeline.id, refreshKey, closed]);
 
-      try {
-        const res = await fetch(`/api/v1/crm/deals?${buildParams(pageNum)}`, {
-          headers: getHeaders(),
-        });
-        const data = await res.json();
+  const stages = openStages(pipeline);
+  const q = search.trim().toLowerCase();
+  const deals = rows
+    .filter((d) => !closed.has(d.id))
+    .map((d) => (moved[d.id] ? { ...d, stageId: moved[d.id] } : d))
+    .filter((d) => !q || [d.title, d.contact?.name, d.assignedUser?.name].some((v) => v?.toLowerCase().includes(q)));
+  // Deals whose stage was removed from the pipeline still need a home: show them in the first column
+  const known = new Set(stages.map((s) => s.id));
+  const byStage = new Map<string, Deal[]>(stages.map((s) => [s.id, []]));
+  for (const d of deals) byStage.get(known.has(d.stageId) ? d.stageId : stages[0]?.id)?.push(d);
 
-        if (replace) {
-          setDeals(data.data || []);
-        } else {
-          setDeals((prev) => [...prev, ...(data.data || [])]);
-        }
+  const openValue = deals.reduce((s, d) => s + d.valueCents, 0);
+  const forecast = deals.reduce((s, d) => s + weighted(d), 0);
+  const active = activeId ? deals.find((d) => d.id === activeId) ?? null : null;
 
-        if (data.summary) setSummary(data.summary);
-        const t = data.pagination?.total ?? 0;
-        setTotal(t);
-        setHasMore(pageNum * PAGE_SIZE < t);
-        setError(null);
-      } catch {
-        if (replace) setError("Failed to load deals");
-      } finally {
-        setInitialLoading(false);
-        setFiltering(false);
-        setLoadingMore(false);
-      }
-    },
-    [buildParams]
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor)
   );
 
-  // Reset + fetch when filters change
-  useEffect(() => {
-    if (!activePipeline && pipelines.length > 0) return;
-    setPage(1);
-    setHasMore(true);
-    fetchDeals(1, true);
-  }, [fetchDeals, activePipeline, pipelines.length]);
-
-  // Re-fetch when a deal is created from the drawer
-  useEffect(() => {
-    const handler = () => {
-      setPage(1);
-      fetchDeals(1, true);
-    };
-    window.addEventListener("deals-changed", handler);
-    return () => window.removeEventListener("deals-changed", handler);
-  }, [fetchDeals]);
-
-  // Infinite scroll
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !filtering && !initialLoading) {
-          const nextPage = page + 1;
-          setPage(nextPage);
-          fetchDeals(nextPage, false);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, filtering, initialLoading, page, fetchDeals]);
-
-  const stages = activePipeline?.stages?.length
-    ? activePipeline.stages
-    : DEFAULT_STAGES;
-
-  // Stage distribution from API (full dataset, not paginated)
-  const stageDistribution = useMemo(() => {
-    if (!summary?.stageDistribution) return [];
-    return stages.map((stage) => {
-      const dist = summary.stageDistribution[stage.id];
-      return { ...stage, count: dist?.count ?? 0, value: dist?.value ?? 0 };
-    });
-  }, [stages, summary]);
-
-  function getStageInfo(stageId: string) {
-    return stages.find((s) => s.id === stageId) || { name: stageId, color: "#94a3b8" };
-  }
-
-  async function handleSetupPipeline() {
-    setSetupLoading(true);
-    try {
-      const res = await fetch("/api/v1/crm/pipelines", {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({
-          name: "Sales Pipeline",
-          stages: DEFAULT_STAGES.map((s) => ({ id: s.id, name: s.name, color: s.color })),
-          isDefault: true,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to create pipeline");
+  const markWon = useCallback(
+    async (deal: Deal) => {
+      setClosed((prev) => new Set(prev).add(deal.id));
+      try {
+        await postJson(`/api/v1/crm/deals/${deal.id}/won`);
+        toast.success(`${deal.title} marked as won`);
+      } catch (err) {
+        setClosed((prev) => {
+          const next = new Set(prev);
+          next.delete(deal.id);
+          return next;
+        });
+        toast.error(err instanceof Error ? err.message : "Couldn't mark the deal as won");
       }
-      window.location.reload();
-      toast.success("Pipeline created");
+    },
+    []
+  );
+
+  async function moveTo(deal: Deal, stageId: string) {
+    if (deal.stageId === stageId) return;
+    setMoved((prev) => ({ ...prev, [deal.id]: stageId }));
+    const orgId = localStorage.getItem("activeOrgId");
+    try {
+      const res = await fetch(`/api/v1/crm/deals/${deal.id}/stage`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...(orgId ? { "x-organization-id": orgId } : {}) },
+        body: JSON.stringify({ stageId }),
+      });
+      if (!res.ok) throw new Error("Couldn't move the deal");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to set up pipeline");
-    } finally {
-      setSetupLoading(false);
+      setMoved((prev) => {
+        const next = { ...prev };
+        delete next[deal.id];
+        return next;
+      });
+      toast.error(err instanceof Error ? err.message : "Couldn't move the deal");
     }
   }
 
-  const hasActiveFilters = stageFilter !== "all" || sourceFilter !== "all" || statusFilter !== "all" || debouncedSearch !== "";
-
-  function clearFilters() {
-    setStageFilter("all");
-    setSourceFilter("all");
-    setStatusFilter("all");
-    setSearch("");
+  function onDragStart(e: DragStartEvent) {
+    setActiveId(String(e.active.id));
   }
 
-  if (initialLoading) return <BrandLoader />;
-  if (error && deals.length === 0) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
-
-  if (pipelines.length === 0 && deals.length === 0) {
-    return (
-      <ContentReveal>
-        <div className="pt-12 pb-12 space-y-10">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Sales Pipeline</h2>
-              <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                Track every deal from first contact to closed won. Visualize your pipeline, forecast revenue, and never let an opportunity slip through.
-              </p>
-            </div>
-            <Button
-              onClick={handleSetupPipeline}
-              disabled={setupLoading}
-              className="bg-brand-600 hover:bg-brand-700 shrink-0"
-            >
-              <Plus className="mr-2 size-4" />
-              {setupLoading ? "Setting up..." : "Create Pipeline"}
-            </Button>
-          </div>
-
-          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
-            <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-              <div className="bg-muted/30 px-5 py-3 border-b">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Example pipeline
-                </p>
-              </div>
-              <div className="p-5">
-                <div className="flex items-center gap-2 mb-5 overflow-hidden">
-                  {DEFAULT_STAGES.slice(0, 5).map((stage, i) => (
-                    <div key={stage.id} className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="size-2 rounded-full" style={{ backgroundColor: stage.color, opacity: 0.7 }} />
-                        <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">{stage.name}</span>
-                      </div>
-                      {i < 4 && <ArrowRight className="size-3 text-muted-foreground/30 shrink-0" />}
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { title: "Acme Corp - Enterprise Plan", contact: "Sarah Johnson", value: "$48,000", prob: "75%", stage: DEFAULT_STAGES[2] },
-                    { title: "TechStart SaaS Migration", contact: "Mike Chen", value: "$24,500", prob: "60%", stage: DEFAULT_STAGES[1] },
-                    { title: "GlobalRetail POS System", contact: "Lisa Park", value: "$120,000", prob: "30%", stage: DEFAULT_STAGES[0] },
-                  ].map((deal) => (
-                    <div key={deal.title} className="flex items-center gap-3 rounded-lg border p-3">
-                      <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: deal.stage.color }} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{deal.title}</p>
-                        <p className="text-[11px] text-muted-foreground">{deal.contact}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-mono font-medium tabular-nums">{deal.value}</p>
-                        <p className="text-[10px] text-muted-foreground">{deal.prob}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 h-px bg-border" />
-                <div className="mt-3 flex items-center justify-between">
-                  <p className="text-[11px] text-muted-foreground font-mono tabular-nums">3 deals · $192,500 in pipeline</p>
-                  <Badge variant="outline" className="text-[10px] bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-950 dark:text-brand-300 dark:border-brand-800">
-                    55% avg. probability
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                What you can do
-              </p>
-              {[
-                { title: "Track deals through stages", desc: "Create deals, assign contacts, and drag them through your customizable pipeline stages.", icon: Handshake, color: "border-l-blue-400" },
-                { title: "Forecast revenue", desc: "Set deal values and win probabilities to project expected revenue across your pipeline.", icon: DollarSign, color: "border-l-brand-400" },
-                { title: "Log every interaction", desc: "Record calls, emails, meetings, and notes so you never lose context on a deal.", icon: Users, color: "border-l-orange-400" },
-                { title: "Analyze performance", desc: "Track conversion rates, deal velocity, and stage distribution at a glance.", icon: BarChart3, color: "border-l-violet-400" },
-              ].map(({ title, desc, icon: Icon, color }) => (
-                <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
-                  <div className="flex items-center gap-2">
-                    <Icon className="size-3.5 text-muted-foreground" />
-                    <p className="text-sm font-medium">{title}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 ml-[22px]">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </ContentReveal>
-    );
+  function onDragEnd(e: DragEndEvent) {
+    setActiveId(null);
+    const deal = deals.find((d) => d.id === e.active.id);
+    const target = e.over?.id ? String(e.over.id) : null;
+    if (!deal || !target) return;
+    if (target === "outcome:won") void markWon(deal);
+    else if (target === "outcome:lost") setLosing(deal);
+    else void moveTo(deal, target);
   }
+
+  if (error) return <ErrorState message={error} onRetry={refresh} />;
 
   return (
-    <ContentReveal className="space-y-6">
-      <PageHeader
-        title="Sales Pipeline"
-        description={
-          summary
-            ? `${summary.totalDeals} deal${summary.totalDeals !== 1 ? "s" : ""} · ${formatMoney(summary.activeValue)} in pipeline`
-            : undefined
-        }
-      >
-        <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => openDrawer("deal")}>
-          <Plus className="size-3" /> New Deal
-        </Button>
-      </PageHeader>
-
-      {/* Pipeline funnel bar */}
-      {summary && summary.activeCount > 0 && (
-        <div className="rounded-xl border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <BarChart3 className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Stage Distribution</span>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="font-mono tabular-nums">{summary.activeCount} active</span>
-              {summary.wonCount > 0 && (
-                <span className="font-mono tabular-nums text-brand-600 dark:text-brand-400">
-                  {summary.wonCount} won · {formatMoney(summary.wonValue)}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex h-3 rounded-full overflow-hidden bg-muted">
-            {stageDistribution.filter((s) => s.count > 0).map((stage) => (
-              <div
-                key={stage.id}
-                className="transition-all duration-500 first:rounded-l-full last:rounded-r-full"
-                style={{
-                  width: `${(stage.count / (summary.activeCount || 1)) * 100}%`,
-                  backgroundColor: stage.color,
-                  opacity: 0.8,
-                }}
-              />
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
-            {stageDistribution.filter((s) => s.count > 0).map((stage) => (
-              <button
-                key={stage.id}
-                onClick={() => setStageFilter(stageFilter === stage.id ? "all" : stage.id)}
-                className={cn(
-                  "flex items-center gap-1.5 text-[11px] transition-colors",
-                  stageFilter === stage.id ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
-                {stage.name} ({stage.count}) · {formatMoney(stage.value)}
-              </button>
-            ))}
-          </div>
+    <div className="@container space-y-4">
+      {/* Heading */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em]">Pipeline</h2>
+          <p className="mt-1 text-[13.5px] text-muted-foreground">
+            <span className="font-medium text-foreground tabular-nums">{deals.length}</span> open deal{deals.length === 1 ? "" : "s"} worth{" "}
+            <span className="font-medium text-foreground tabular-nums">{formatMoney(openValue)}</span>
+            <span className="mx-1.5 text-muted-foreground/40">·</span>
+            <span title="Each deal counted at its chance of closing">
+              weighted <span className="font-medium text-foreground tabular-nums">{formatMoney(forecast)}</span>
+            </span>
+          </p>
         </div>
-      )}
-
-      {/* Stage tabs */}
-      <div className="flex flex-col gap-3">
-        <div className="relative flex items-center gap-1 rounded-lg bg-muted p-1 w-fit overflow-x-auto">
-          {[{ id: "all", name: "All", color: "" }, ...stages.filter((s) => s.id !== "closed_lost")].map((s) => {
-            const isActive = stageFilter === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setStageFilter(s.id)}
-                className={cn(
-                  "relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
-                  isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
-                )}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="crm-tab-indicator"
-                    className="absolute inset-0 rounded-md bg-background shadow-sm"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                {s.color && (
-                  <span className="relative z-10 size-1.5 rounded-full" style={{ backgroundColor: s.color }} />
-                )}
-                <span className="relative z-10">{s.name}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search + filters */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Search deals, contacts..."
-            loading={search !== debouncedSearch}
-          />
-
-          <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
-              <Filter className="size-3 mr-1.5 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SOURCE_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+        <div className="flex flex-wrap items-center gap-2">
+          {pipelines.length > 1 && (
+            <div className="flex h-8 items-center gap-0.5 rounded-lg bg-foreground/[0.035] p-0.5">
+              {pipelines.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onPick(p.id)}
+                  className={cn(
+                    "h-7 rounded-md px-2.5 text-[12.5px] font-medium transition-colors",
+                    p.id === pipeline.id ? "bg-foreground/[0.07] text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {p.name}
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-            <SelectTrigger className="h-8 w-full sm:w-[120px] text-xs">
-              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-8 shrink-0"
-            onClick={() => setSortOrder((p) => (p === "asc" ? "desc" : "asc"))}
-          >
-            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
-          </Button>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={clearFilters}>
-              <X className="size-3" />
-              Clear
-            </Button>
+            </div>
           )}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && setSearch("")}
+              placeholder="Filter deals…"
+              className="h-8 w-48 rounded-lg bg-foreground/[0.04] pl-8 pr-7 text-[13px] outline-none placeholder:text-muted-foreground/70 focus:bg-background focus:ring-1 focus:ring-border"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch("")} aria-label="Clear filter" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <Link
+            href="/crm/deals"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/80 px-3 text-[13px] font-medium transition-colors hover:bg-foreground/[0.03]"
+          >
+            <List className="size-3.5" />
+            List
+          </Link>
+          <button
+            type="button"
+            onClick={() => openDrawer("deal", { pipelineId: pipeline.id })}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-3.5" />
+            New deal
+          </button>
         </div>
       </div>
 
-      {/* Results count */}
-      {!filtering && (
-        <p className="text-[11px] text-muted-foreground">
-          {total} deal{total !== 1 ? "s" : ""}
-          {hasActiveFilters && " matching filters"}
-        </p>
-      )}
-
-      {/* Deal list */}
-      {filtering ? (
-        <BrandLoader />
-      ) : deals.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-            <Handshake className="size-5 text-muted-foreground" />
-          </div>
-          <p className="text-sm font-medium">No deals found</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {hasActiveFilters ? "Try different filters" : "Create your first deal to get started"}
-          </p>
-          {hasActiveFilters && (
-            <Button variant="outline" size="sm" className="mt-3 h-7 text-xs" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          )}
+      {loading ? (
+        <div className="flex gap-3 overflow-hidden">
+          {stages.map((s) => (
+            <div key={s.id} className="h-[420px] w-[272px] shrink-0 animate-pulse rounded-xl bg-foreground/[0.025]" />
+          ))}
         </div>
       ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {deals.map((deal) => {
-              const stage = getStageInfo(deal.stageId);
-              const isWon = !!deal.wonAt;
-              const isLost = !!deal.lostAt;
-
-              return (
-                <button
-                  key={deal.id}
-                  onClick={() => router.push(`/crm/deals/${deal.id}`)}
-                  className="w-full rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/50 space-y-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{deal.title}</p>
-                      {deal.contact && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <User className="size-3 text-muted-foreground shrink-0" />
-                          <p className="text-[11px] text-muted-foreground truncate">{deal.contact.name}</p>
-                        </div>
-                      )}
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 text-[10px] gap-1"
-                      style={{
-                        borderColor: stage.color + "40",
-                        backgroundColor: stage.color + "10",
-                        color: stage.color,
-                      }}
-                    >
-                      <span className="size-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
-                      {isWon ? "Won" : isLost ? "Lost" : stage.name}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold font-mono tabular-nums tracking-tight">
-                      {formatMoney(deal.valueCents, deal.currency)}
-                    </span>
-                    {deal.probability !== null && (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${deal.probability}%`,
-                              backgroundColor:
-                                deal.probability >= 70 ? "var(--brand-600)" : deal.probability >= 40 ? "#f59e0b" : "#94a3b8",
-                            }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
-                          {deal.probability}%
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-2 border-t text-[11px] text-muted-foreground">
-                    {deal.expectedCloseDate && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="size-3" />
-                        {new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    )}
-                    {deal.source && <span className="capitalize">{deal.source.replace("_", " ")}</span>}
-                    {deal.assignedUser && (
-                      <span className="ml-auto truncate max-w-[100px]">{deal.assignedUser.name}</span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+        <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-3">
+            {stages.map((stage) => (
+              <StageColumn
+                key={stage.id}
+                stage={stage}
+                deals={byStage.get(stage.id) ?? []}
+                onAdd={() => openDrawer("deal", { pipelineId: pipeline.id, stageId: stage.id })}
+                onOpen={(d) => router.push(`/crm/deals/${d.id}`)}
+              />
+            ))}
+            <div className="flex w-[200px] shrink-0 flex-col gap-3">
+              <OutcomeZone
+                id="outcome:won"
+                label="Won"
+                icon={Trophy}
+                color="#10B981"
+                dragging={activeId != null}
+                summary={outcomes ? `${outcomes.won} won · ${formatMoney(outcomes.wonValue)}` : "…"}
+              />
+              <OutcomeZone
+                id="outcome:lost"
+                label="Lost"
+                icon={ThumbsDown}
+                color="#EF4444"
+                dragging={activeId != null}
+                summary={outcomes ? `${outcomes.lost} lost` : "…"}
+              />
+              <p className="px-1 text-[11.5px] leading-relaxed text-muted-foreground">
+                Drag a card here to close it. Closed deals live in the{" "}
+                <Link href="/crm/deals" className="underline-offset-2 hover:text-foreground hover:underline">deals list</Link>.
+              </p>
+            </div>
           </div>
-
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="flex items-center justify-center py-4">
-            {loadingMore && <Loader2 className="size-5 text-muted-foreground animate-spin" />}
-            {!hasMore && deals.length > 0 && (
-              <p className="text-xs text-muted-foreground/50">No more deals</p>
-            )}
-          </div>
-        </>
+          <DragOverlay dropAnimation={null}>{active && <DealCard deal={active} overlay />}</DragOverlay>
+        </DndContext>
       )}
-    </ContentReveal>
+
+      <LostDialog
+        deal={losing}
+        onClose={() => setLosing(null)}
+        onLost={(deal) => {
+          setClosed((prev) => new Set(prev).add(deal.id));
+          setLosing(null);
+        }}
+      />
+    </div>
+  );
+}
+
+function StageColumn({ stage, deals, onAdd, onOpen }: { stage: PipelineStage; deals: Deal[]; onAdd: () => void; onOpen: (d: Deal) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  const value = deals.reduce((s, d) => s + d.valueCents, 0);
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex max-h-[calc(100vh-15rem)] min-h-[320px] w-[272px] shrink-0 flex-col rounded-xl border border-border/80 bg-foreground/[0.015] transition-colors",
+        isOver && "bg-foreground/[0.055]"
+      )}
+    >
+      <div className="flex items-center gap-2 px-3 pb-2 pt-3">
+        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />
+        <span className="truncate text-[13px] font-medium">{stage.name}</span>
+        <span className="text-[12px] tabular-nums text-muted-foreground">{deals.length}</span>
+        <button
+          type="button"
+          onClick={onAdd}
+          aria-label={`Add a deal to ${stage.name}`}
+          className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+        >
+          <Plus className="size-3.5" />
+        </button>
+      </div>
+      <p className="px-3 pb-2 text-[12px] tabular-nums text-muted-foreground">{formatMoney(value)}</p>
+      <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+        {deals.map((d) => (
+          <DraggableDeal key={d.id} deal={d} onOpen={() => onOpen(d)} />
+        ))}
+        {deals.length === 0 && (
+          <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border/80 text-[12px] text-muted-foreground/70">
+            No deals here
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DraggableDeal({ deal, onOpen }: { deal: Deal; onOpen: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id });
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} onClick={onOpen} className={cn("touch-none", isDragging && "opacity-30")}>
+      <DealCard deal={deal} />
+    </div>
+  );
+}
+
+function DealCard({ deal, overlay }: { deal: Deal; overlay?: boolean }) {
+  const days = daysUntil(deal.expectedCloseDate);
+  const owner = deal.assignedUser?.name ?? deal.assignedUser?.email ?? null;
+  return (
+    <div
+      className={cn(
+        "cursor-grab rounded-lg border border-border/80 bg-card px-3 py-2.5 text-left transition-colors hover:bg-foreground/[0.02] active:cursor-grabbing",
+        overlay && "rotate-[1.5deg] shadow-lg"
+      )}
+    >
+      <p className="line-clamp-2 text-[13px] font-medium leading-snug">{deal.title}</p>
+      {deal.contact?.name && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{deal.contact.name}</p>}
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-[13px] font-semibold tabular-nums">{formatMoney(deal.valueCents, deal.currency)}</span>
+        {deal.probability != null && <span className="text-[11.5px] tabular-nums text-muted-foreground">{deal.probability}%</span>}
+        <span className="ml-auto flex items-center gap-1.5">
+          {deal.expectedCloseDate && (
+            <span
+              title={`Expected to close ${formatDay(deal.expectedCloseDate)}`}
+              className={cn(
+                "rounded px-1.5 py-px text-[11px] tabular-nums",
+                days != null && days < 0 ? "bg-red-500/10 text-red-600 dark:text-red-400" : days != null && days <= 7 ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : "text-muted-foreground"
+              )}
+            >
+              {days != null && days < 0 ? `${-days}d late` : formatDay(deal.expectedCloseDate).replace(/, \d{4}$/, "")}
+            </span>
+          )}
+          {owner && (
+            <span title={owner} className="flex size-5 items-center justify-center rounded-full bg-foreground/[0.07] text-[9.5px] font-semibold text-foreground/70">
+              {initials(owner)}
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function OutcomeZone({ id, label, icon: Icon, color, summary, dragging }: { id: string; label: string; icon: typeof Trophy; color: string; summary: string; dragging: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex h-[96px] flex-col justify-center rounded-xl border border-dashed px-3 transition-colors",
+        dragging ? "border-border" : "border-border/60",
+        isOver && "bg-foreground/[0.055]"
+      )}
+      style={isOver ? { borderColor: color } : undefined}
+    >
+      <span className="flex items-center gap-2 text-[13px] font-medium">
+        <Icon className="size-3.5" style={{ color }} />
+        {label}
+      </span>
+      <span className="mt-1 text-[12px] tabular-nums text-muted-foreground">{dragging ? `Drop to mark as ${label.toLowerCase()}` : summary}</span>
+    </div>
+  );
+}
+
+function LostDialog({ deal, onClose, onLost }: { deal: Deal | null; onClose: () => void; onLost: (deal: Deal) => void }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!deal) return;
+    setBusy(true);
+    try {
+      await postJson(`/api/v1/crm/deals/${deal.id}/lost`, { reason: reason.trim() || null });
+      toast.success(`${deal.title} marked as lost`);
+      setReason("");
+      onLost(deal);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't mark the deal as lost");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={deal != null} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Mark &ldquo;{deal?.title}&rdquo; as lost?</DialogTitle>
+          <DialogDescription>Saying why is optional, but it shows up in your analytics so you can spot patterns.</DialogDescription>
+        </DialogHeader>
+        <input
+          autoFocus
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="e.g. Went with a cheaper supplier"
+          className="h-9 w-full rounded-lg bg-foreground/[0.04] px-3 text-[13.5px] outline-none placeholder:text-muted-foreground/70 focus:bg-background focus:ring-1 focus:ring-border"
+        />
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Keep it open</Button>
+          <Button onClick={submit} disabled={busy}>
+            {busy && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
+            Mark lost
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  First run                                                          */
+/* ------------------------------------------------------------------ */
+
+function PipelineSetup({ onCreated }: { onCreated: () => void }) {
+  const [busy, setBusy] = useState(false);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await postJson("/api/v1/crm/pipelines", { name: "Sales pipeline", stages: DEFAULT_STAGES, isDefault: true });
+      toast.success("Pipeline created");
+      onCreated();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't set up the pipeline");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em]">Pipeline</h2>
+          <p className="mt-1 max-w-lg text-[13.5px] text-muted-foreground">
+            Track every sale from first chat to signed deal. Each deal sits in a stage; drag it along as it moves, and mark it won or lost when it&apos;s decided.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/crm/pipelines" className="inline-flex h-8 items-center rounded-lg border border-border/80 px-3 text-[13px] font-medium hover:bg-foreground/[0.03]">
+            Design my own stages
+          </Link>
+          <button
+            type="button"
+            onClick={create}
+            disabled={busy}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-[13px] font-medium text-background hover:opacity-90 disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+            Use the standard stages
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {DEFAULT_STAGES.filter((s) => !s.id.startsWith("closed_")).map((stage, i) => (
+          <div key={stage.id} className="w-[220px] shrink-0 rounded-xl border border-border/80 bg-foreground/[0.015] p-3">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full" style={{ backgroundColor: stage.color }} />
+              <span className="text-[13px] font-medium">{stage.name}</span>
+              {i < 3 && <ArrowRight className="ml-auto size-3.5 text-muted-foreground/40" />}
+            </div>
+            <div className="mt-3 space-y-2">
+              {Array.from({ length: 3 - Math.min(i, 2) }, (_, n) => (
+                <div key={n} className="rounded-lg border border-border/70 bg-card px-3 py-2.5">
+                  <div className="h-2 w-28 rounded bg-foreground/[0.07]" />
+                  <div className="mt-2 h-2 w-16 rounded bg-foreground/[0.05]" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-px overflow-hidden rounded-xl border border-border/80 bg-border/60 sm:grid-cols-3">
+        {[
+          { icon: Handshake, title: "Every deal in one place", desc: "Value, chance of closing, owner and expected close date on each card." },
+          { icon: Users, title: "Log the conversation", desc: "Calls, emails, meetings and follow-up tasks on each deal, plus one feed for all of them." },
+          { icon: BarChart3, title: "See what's working", desc: "Win rate, weighted forecast and where deals get stuck." },
+        ].map(({ icon: Icon, title, desc }) => (
+          <div key={title} className="bg-card px-4 py-3.5">
+            <span className="flex items-center gap-2 text-[13px] font-medium">
+              <Icon className="size-3.5 text-muted-foreground" />
+              {title}
+            </span>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

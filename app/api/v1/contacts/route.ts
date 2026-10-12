@@ -80,6 +80,7 @@ export async function GET(request: Request) {
       .where(and(...conditions));
 
     // Outstanding balance + overdue per contact (for the current page only, org-scoped).
+    // Overpaid documents carry a negative amountDue; that's credit, not debt, so clamp at 0.
     // Customer balance = unpaid invoices ("Owes you"); supplier balance = unpaid bills ("You owe").
     const contactIds = contacts.map((c) => c.id);
     const owedByCustomer = new Map<string, { outstanding: number; overdue: number }>();
@@ -90,8 +91,8 @@ export async function GET(request: Request) {
       const invoiceRows = await db
         .select({
           contactId: invoice.contactId,
-          outstanding: sql<number>`coalesce(sum(${invoice.amountDue}), 0)::int`,
-          overdue: sql<number>`coalesce(sum(case when ${invoice.dueDate} < current_date then ${invoice.amountDue} else 0 end), 0)::int`,
+          outstanding: sql<number>`coalesce(sum(greatest(${invoice.amountDue}, 0)), 0)::int`,
+          overdue: sql<number>`coalesce(sum(case when ${invoice.dueDate} < current_date then greatest(${invoice.amountDue}, 0) else 0 end), 0)::int`,
         })
         .from(invoice)
         .where(
@@ -111,8 +112,8 @@ export async function GET(request: Request) {
       const billRows = await db
         .select({
           contactId: bill.contactId,
-          outstanding: sql<number>`coalesce(sum(${bill.amountDue}), 0)::int`,
-          overdue: sql<number>`coalesce(sum(case when ${bill.dueDate} < current_date then ${bill.amountDue} else 0 end), 0)::int`,
+          outstanding: sql<number>`coalesce(sum(greatest(${bill.amountDue}, 0)), 0)::int`,
+          overdue: sql<number>`coalesce(sum(case when ${bill.dueDate} < current_date then greatest(${bill.amountDue}, 0) else 0 end), 0)::int`,
         })
         .from(bill)
         .where(

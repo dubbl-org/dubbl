@@ -1,13 +1,14 @@
 import { db } from "@/lib/db";
 import { document } from "@/lib/db/schema";
-import { eq, and, desc, or } from "drizzle-orm";
+import { eq, and, desc, or, isNull, isNotNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { ok, created, handleError } from "@/lib/api/response";
+import { ok, created, handleError, notFound } from "@/lib/api/response";
 import { getUploadUrl } from "@/lib/s3";
 import { checkStorageLimit } from "@/lib/api/check-limit";
 import { z } from "zod";
+import { describeRecords, LINKABLE, recordExists } from "@/lib/documents/records";
 
 export async function GET(request: Request) {
   try {
@@ -17,6 +18,9 @@ export async function GET(request: Request) {
     const folderId = url.searchParams.get("folderId");
     const entityType = url.searchParams.get("entityType");
     const entityId = url.searchParams.get("entityId");
+    // linked=none: files not attached to any record (e.g. uploaded to Tilly and never filed)
+    // linked=any:  files attached to a record; adds `record` { kind, label, href } to each
+    const linked = url.searchParams.get("linked");
 
     const conditions = [
       eq(document.organizationId, ctx.organizationId),
@@ -41,14 +45,24 @@ export async function GET(request: Request) {
       conditions.push(eq(document.entityId, entityId));
     }
 
+    if (linked === "none") conditions.push(isNull(document.entityType));
+    if (linked === "any") conditions.push(isNotNull(document.entityType));
+
     const all = await db.query.document.findMany({
       where: and(...conditions),
       orderBy: desc(document.createdAt),
-      with: { folder: true },
+      with: { folder: true, uploader: { columns: { id: true, name: true, email: true } } },
     });
 
     const total = all.length;
     const data = all.slice(offset, offset + limit);
+
+    if (linked === "any") {
+      const refs = data.filter((d) => d.entityType && d.entityId).map((d) => ({ type: d.entityType!, id: d.entityId! }));
+      const records = await describeRecords(ctx.organizationId, refs);
+      const withRecords = data.map((d) => ({ ...d, record: d.entityType && d.entityId ? records.get(`${d.entityType}:${d.entityId}`) ?? null : null }));
+      return ok(paginatedResponse(withRecords, total, page, limit));
+    }
 
     return ok(paginatedResponse(data, total, page, limit));
   } catch (err) {
@@ -73,6 +87,13 @@ export async function POST(request: Request) {
     const parsed = uploadSchema.parse(body);
 
     await checkStorageLimit(ctx.organizationId, parsed.fileSize);
+
+    // Attaching on upload: a known record kind must be a real record in this workspace
+    if (parsed.entityType && parsed.entityId && (LINKABLE as readonly string[]).includes(parsed.entityType)) {
+      if (!(await recordExists(ctx.organizationId, parsed.entityType as (typeof LINKABLE)[number], parsed.entityId))) {
+        return notFound(parsed.entityType.replace(/_/g, " "));
+      }
+    }
 
     const fileKey = `documents/${ctx.organizationId}/${Date.now()}-${parsed.fileName}`;
 

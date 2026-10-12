@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bankAccount, bankTransaction } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { attachmentCounts } from "@/lib/documents/attachment-counts";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -54,10 +55,20 @@ export async function GET(
 
     // Flatten the linked account into accountCode/accountName while keeping the
     // existing fields (accountId, journalEntryId, reconciliationId are columns).
+    // How many files (receipts, invoices…) are attached to each line, counting
+    // only the ones this user can see.
+    const counts = await attachmentCounts(
+      ctx.organizationId,
+      ctx.userId,
+      "bank_transaction",
+      rows.map((r) => r.id),
+    );
+
     const transactions = rows.map(({ account, ...tx }) => ({
       ...tx,
       accountCode: account?.code ?? null,
       accountName: account?.name ?? null,
+      attachmentCount: counts.get(tx.id) ?? 0,
     }));
 
     const [countResult] = await db

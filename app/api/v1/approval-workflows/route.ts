@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       with: {
         steps: {
           orderBy: asc(approvalWorkflowStep.stepOrder),
-          with: { approver: { with: { user: true } } },
+          with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
         },
       },
     });
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
       with: {
         steps: {
           orderBy: asc(approvalWorkflowStep.stepOrder),
-          with: { approver: { with: { user: true } } },
+          with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
         },
       },
     });

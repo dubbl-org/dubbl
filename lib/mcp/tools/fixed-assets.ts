@@ -948,7 +948,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
                 ));
               const retainedEarnings = await ensureAccountByCode(
                 ctx.organizationId,
-                { code: "3100", name: "Retained Earnings", type: "equity", subType: "retained_earnings" },
+                { code: "3100", name: "Retained Earnings", type: "equity", subType: "retained" },
                 baseCurrency,
                 tx
               );
@@ -1063,7 +1063,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
             asset.assetAccountId ??
             (await ensureAccountByCode(
               ctx.organizationId,
-              { code: "1500", name: "Property, Plant & Equipment", type: "asset", subType: "fixed_asset" },
+              { code: "1600", name: "Equipment", type: "asset", subType: "fixed" },
               baseCurrency,
               tx
             ))?.id ??
@@ -1284,7 +1284,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
             asset.assetAccountId ??
             (await ensureAccountByCode(
               ctx.organizationId,
-              { code: "1500", name: "Property, Plant & Equipment", type: "asset", subType: "fixed_asset" },
+              { code: "1600", name: "Equipment", type: "asset", subType: "fixed" },
               baseCurrency,
               tx
             ))?.id ??
@@ -1460,7 +1460,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
             asset.assetAccountId ??
             (await ensureAccountByCode(
               ctx.organizationId,
-              { code: "1500", name: "Property, Plant & Equipment", type: "asset", subType: "fixed_asset" },
+              { code: "1600", name: "Equipment", type: "asset", subType: "fixed" },
               baseCurrency,
               tx
             ))?.id ??
@@ -1471,7 +1471,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
             asset.cwipAccountId ??
             (await ensureAccountByCode(
               ctx.organizationId,
-              { code: "1600", name: "Capital Work in Progress", type: "asset", subType: "fixed_asset" },
+              { code: "1660", name: "Assets Under Construction", type: "asset", subType: "fixed" },
               baseCurrency,
               tx
             ))?.id ??

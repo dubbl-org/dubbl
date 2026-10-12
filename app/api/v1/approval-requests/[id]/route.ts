@@ -23,14 +23,14 @@ export async function GET(
           with: {
             steps: {
               orderBy: asc(approvalWorkflowStep.stepOrder),
-              with: { approver: { with: { user: true } } },
+              with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
             },
           },
         },
-        requestedBy: { with: { user: true } },
+        requestedBy: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } },
         actions: {
           orderBy: asc(approvalAction.createdAt),
-          with: { user: { with: { user: true } }, step: true },
+          with: { user: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } }, step: true },
         },
       },
     });

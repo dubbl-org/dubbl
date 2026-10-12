@@ -53,10 +53,10 @@ export async function GET(request: Request) {
         with: {
           workflow: {
             with: {
-              steps: { with: { approver: { with: { user: true } } } },
+              steps: { with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } } },
             },
           },
-          requestedBy: { with: { user: true } },
+          requestedBy: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } },
         },
       });
 
@@ -78,10 +78,10 @@ export async function GET(request: Request) {
         with: {
           workflow: {
             with: {
-              steps: { with: { approver: { with: { user: true } } } },
+              steps: { with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } } },
             },
           },
-          requestedBy: { with: { user: true } },
+          requestedBy: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } },
         },
       });
 

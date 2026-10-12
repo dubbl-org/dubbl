@@ -43,7 +43,7 @@ export async function GET(
       ),
       orderBy: desc(auditLog.createdAt),
       with: {
-        user: true,
+        user: { columns: { id: true, name: true, email: true, image: true } },
       },
     });
 

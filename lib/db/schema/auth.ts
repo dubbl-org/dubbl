@@ -155,6 +155,10 @@ export const organization = pgTable("organization", {
   vatScheme: text("vat_scheme").notNull().default("accrual"),
   // Tax regime that drives the country tax profile: vat | gst | us_sales_tax | none.
   taxRegime: text("tax_regime"),
+  // Which default chart of accounts the org was set up with (e.g. "xero-uk",
+  // "xero-global", "fr"). Null = the legacy country template, kept as-is so
+  // existing books never gain a second set of codes. Set once, at onboarding.
+  chartTemplate: text("chart_template"),
   // Duplicate supplier-invoice handling: 'off' | 'warn' | 'block' | 'hold'.
   duplicateBillStrategy: text("duplicate_bill_strategy").notNull().default("warn"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

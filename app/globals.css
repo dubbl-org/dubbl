@@ -12,6 +12,14 @@
   --font-display: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-content-bg: var(--content-bg);
+  --color-shell: var(--shell);
+  --color-tilly-50: #FFF6F0;
+  --color-tilly-100: #FFE9DC;
+  --color-tilly-200: #FFD0B8;
+  --color-tilly-400: #FF9A6E;
+  --color-tilly-500: #F97F52;
+  --color-tilly-600: #E8653C;
+  --color-tilly-700: #C24E2C;
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -116,7 +124,8 @@
   --chart-3: #737373;
   --chart-4: #a3a3a3;
   --chart-5: #d4d4d4;
-  --content-bg: #F7F7F5;
+  --content-bg: #FFFFFF;
+  --shell: #F5F5F3;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #6B7280;
   --sidebar-primary: #171717;
@@ -143,6 +152,162 @@
     font-weight: 500;
     letter-spacing: 0.02em;
   }
+}
+
+/* Tilly, the assistant: a warm apricot-to-coral blob that slowly changes
+   shape, swirls faster while thinking, hops when it needs an approval, turns
+   green after a job well done and wobbles when poked. */
+@property --tilly-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --t-a { syntax: "<color>"; inherits: true; initial-value: #FFDDB8; }
+@property --t-b { syntax: "<color>"; inherits: true; initial-value: #FF9A6E; }
+@property --t-c { syntax: "<color>"; inherits: true; initial-value: #E8653C; }
+@property --tilly-sx { syntax: "<percentage>"; inherits: true; initial-value: 32%; }
+@property --tilly-sy { syntax: "<percentage>"; inherits: true; initial-value: 28%; }
+
+.tilly-mark {
+  --t-a: #FFDDB8;
+  --t-b: #FF9A6E;
+  --t-c: #E8653C;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: --t-a 0.6s ease, --t-b 0.6s ease, --t-c 0.6s ease, --tilly-sx 0.35s ease-out, --tilly-sy 0.35s ease-out,
+    scale 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+  animation: tilly-breathe 4.5s ease-in-out infinite;
+}
+
+.tilly-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 42% 58% 55% 45% / 48% 44% 56% 52%;
+  background: conic-gradient(from var(--tilly-angle), var(--t-a), var(--t-b), var(--t-c), var(--t-b), var(--t-a));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28), 0 1px 2px color-mix(in srgb, var(--t-c) 35%, transparent);
+  animation: tilly-blob 7s ease-in-out infinite, tilly-swirl 9s linear infinite;
+}
+
+.tilly-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--tilly-sx) var(--tilly-sy), rgb(255 255 255 / 0.8), transparent 48%);
+}
+
+.tilly-mark[data-state="thinking"] { animation: tilly-breathe 1.3s ease-in-out infinite; }
+.tilly-mark[data-state="thinking"] .tilly-body { animation: tilly-blob 2.4s ease-in-out infinite, tilly-swirl 1.2s linear infinite; }
+
+.tilly-mark[data-state="attention"] {
+  --t-a: #FDE68A;
+  --t-b: #F59E0B;
+  --t-c: #EA580C;
+  animation: tilly-hop 1s ease-in-out infinite;
+}
+
+.tilly-mark[data-state="happy"] {
+  --t-a: #BBF7D0;
+  --t-b: #34D399;
+  --t-c: #059669;
+  animation: tilly-happy 0.7s ease-in-out 2;
+}
+
+.tilly-mark[data-state="muted"] {
+  --t-a: #E4E4E7;
+  --t-b: #A1A1AA;
+  --t-c: #71717A;
+  animation: none;
+}
+.tilly-mark[data-state="muted"] .tilly-body { animation: tilly-swirl 20s linear infinite; }
+
+.tilly-mark.tilly-jelly { animation: tilly-jelly 0.6s ease-out; }
+.tilly-mark.tilly-boop { animation: tilly-boop-k 0.32s ease-out; }
+.tilly-hover:hover .tilly-mark { scale: 1.1; }
+.tilly-hover:active .tilly-mark { scale: 0.9; }
+
+@keyframes tilly-swirl { to { --tilly-angle: 360deg; } }
+
+@keyframes tilly-blob {
+  0%, 100% { border-radius: 42% 58% 55% 45% / 48% 44% 56% 52%; }
+  33% { border-radius: 55% 45% 40% 60% / 58% 52% 48% 42%; }
+  66% { border-radius: 48% 52% 60% 40% / 42% 60% 40% 58%; }
+}
+
+@keyframes tilly-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.93); }
+}
+
+@keyframes tilly-hop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-14%) scale(1.03, 0.97); }
+  60% { transform: translateY(0) scale(1.06, 0.92); }
+}
+
+@keyframes tilly-happy {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  30% { transform: translateY(-16%) rotate(-8deg); }
+  60% { transform: translateY(0) rotate(6deg) scale(1.05, 0.95); }
+}
+
+@keyframes tilly-jelly {
+  0% { transform: scale(1, 1); }
+  25% { transform: scale(1.18, 0.84); }
+  45% { transform: scale(0.88, 1.12); }
+  65% { transform: scale(1.06, 0.95); }
+  85% { transform: scale(0.98, 1.02); }
+  100% { transform: scale(1, 1); }
+}
+
+@keyframes tilly-boop-k {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14, 0.9); }
+  100% { transform: scale(1); }
+}
+
+.tilly-spark {
+  display: inline-grid;
+  flex-shrink: 0;
+  grid-template: repeat(3, 3px) / repeat(3, 3px);
+  gap: 1.5px;
+}
+.tilly-spark > span {
+  border-radius: 1px;
+  background: var(--color-tilly-500);
+  opacity: 0.16;
+  animation: tilly-chase 0.81s ease-in-out infinite;
+}
+@keyframes tilly-chase {
+  0%, 100% { opacity: 0.16; }
+  18% { opacity: 1; }
+  45% { opacity: 0.34; }
+}
+
+.tilly-shimmer {
+  background: linear-gradient(90deg, currentColor 0%, var(--color-tilly-500) 45%, currentColor 90%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tilly-shimmer 1.6s linear infinite;
+}
+@keyframes tilly-shimmer { to { background-position: -200% 0; } }
+
+.tilly-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.18em;
+  border-radius: 1px;
+  background: var(--color-tilly-500);
+  animation: tilly-caret 1s steps(1) infinite;
+}
+@keyframes tilly-caret { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tilly-mark, .tilly-body, .tilly-shimmer, .tilly-spark > span, .tilly-caret { animation: none !important; }
 }
 
 /* Animation keyframes */
@@ -622,6 +787,7 @@
   --chart-4: #737373;
   --chart-5: #525252;
   --content-bg: #0a0a0a;
+  --shell: #050505;
   --sidebar: #0f0f0f;
   --sidebar-foreground: rgba(255,255,255,0.7);
   --sidebar-primary: #fafafa;

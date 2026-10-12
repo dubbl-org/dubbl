@@ -52,6 +52,8 @@ const ACCOUNT_DEFS = {
   [PENSION_BENEFITS_PAYABLE_CODE]: { name: "Pension & Benefits Payable", type: "liability" as const, subType: "current" },
   [OTHER_STATUTORY_PAYABLE_CODE]: { name: "Other Statutory Deductions Payable", type: "liability" as const, subType: "current" },
   [WAGES_PAYABLE_CODE]: { name: "Wages Payable", type: "liability" as const, subType: "current" },
+  // Without this a missing bank fallback was created as a *liability*.
+  [BANK_FALLBACK_CODE]: { name: "Checking Account", type: "asset" as const, subType: "bank" },
 } as const;
 
 /**

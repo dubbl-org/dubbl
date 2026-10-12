@@ -105,6 +105,7 @@ export async function POST(
           reference: paymentNumber,
           amount: parsed.amount,
           date: parsed.date,
+          bankAccountId: created.bankAccountId,
           allocations: [
             {
               amount: parsed.amount,

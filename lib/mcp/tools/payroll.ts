@@ -23,7 +23,7 @@ import {
   member,
   auditLog,
 } from "@/lib/db/schema";
-import { eq, and, desc, sql, gte, lte, lt } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, lt, ne } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
@@ -127,6 +127,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
             endDate: e.endDate,
             ptoBalanceHours: e.ptoBalanceHours,
             isActive: e.isActive,
+            memberId: e.memberId,
           })),
           total: Number(countResult?.count ?? 0),
           page: params.page,
@@ -1108,6 +1109,62 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { payment: result.payment, journalEntryId: result.journalEntryId };
+      })
+  );
+
+  server.tool(
+    "list_workspace_members",
+    "List the people who can log in to this workspace: member id, name, email and role (no passwords or other account data). Use a member id with link_employee_to_member.",
+    {},
+    () =>
+      wrapTool(ctx, async () => {
+        const rows = await db.query.member.findMany({
+          where: eq(member.organizationId, ctx.organizationId),
+          columns: { id: true, role: true },
+          with: { user: { columns: { name: true, email: true } } },
+        });
+        return { members: rows.map((m) => ({ id: m.id, name: m.user?.name ?? null, email: m.user?.email ?? null, role: m.role })) };
+      })
+  );
+
+  server.tool(
+    "link_employee_to_member",
+    "Link a payroll employee to the workspace member (login) who is that person, so they can use Employee self-service to see their payslips, leave and timesheets. Pass memberId null to unlink. A member can be linked to only one employee. Use list_workspace_members to find memberId. Requires manage:payroll. Returns the employee's id, name and memberId.",
+    {
+      employeeId: z.string().uuid().describe("UUID of the payroll employee"),
+      memberId: z.string().uuid().nullable().describe("UUID of the workspace member to link, or null to unlink"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:payroll");
+        const emp = await db.query.payrollEmployee.findFirst({
+          where: and(eq(payrollEmployee.id, params.employeeId), eq(payrollEmployee.organizationId, ctx.organizationId), notDeleted(payrollEmployee.deletedAt)),
+          columns: { id: true },
+        });
+        if (!emp) throw new Error("Employee not found");
+        if (params.memberId) {
+          const m = await db.query.member.findFirst({
+            where: and(eq(member.id, params.memberId), eq(member.organizationId, ctx.organizationId)),
+            columns: { id: true },
+          });
+          if (!m) throw new Error("That person isn't a member of this workspace");
+          const taken = await db.query.payrollEmployee.findFirst({
+            where: and(
+              eq(payrollEmployee.organizationId, ctx.organizationId),
+              eq(payrollEmployee.memberId, params.memberId),
+              ne(payrollEmployee.id, emp.id),
+              notDeleted(payrollEmployee.deletedAt)
+            ),
+            columns: { name: true },
+          });
+          if (taken) throw new Error(`That member is already linked to ${taken.name}`);
+        }
+        const [updated] = await db
+          .update(payrollEmployee)
+          .set({ memberId: params.memberId, updatedAt: new Date() })
+          .where(eq(payrollEmployee.id, emp.id))
+          .returning({ id: payrollEmployee.id, name: payrollEmployee.name, memberId: payrollEmployee.memberId });
+        return { employee: updated };
       })
   );
 }

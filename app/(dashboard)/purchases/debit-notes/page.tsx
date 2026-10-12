@@ -1,489 +1,262 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, CreditCard, ReceiptText, X, Search, Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { StatCard } from "@/components/dashboard/stat-card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatMoney } from "@/lib/money";
-import { devDelay } from "@/lib/dev-delay";
+import { Plus, CreditCard, ReceiptText, FileText, Send, ArrowDownRight } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { Button } from "@/components/ui/button";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { formatMoney } from "@/lib/money";
+import { Explorer } from "@/components/dashboard/explorer/explorer";
+import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
+import { ActionButton } from "@/components/dashboard/explorer/action-button";
+import { DateCell, MoneyCell, MutedCell, NumberCell, PartyCell, StatusPill, formatDay } from "@/components/dashboard/explorer/cells";
+import type { ExplorerConfig, ExplorerStatus } from "@/components/dashboard/explorer/types";
 
 interface DebitNote {
   id: string;
   debitNoteNumber: string;
+  billId: string | null;
   issueDate: string;
   status: string;
+  reference: string | null;
   subtotal: number;
   taxTotal: number;
   total: number;
   amountApplied: number;
   amountRemaining: number;
   currencyCode: string;
-  contact: { name: string } | null;
+  sentAt: string | null;
+  voidedAt: string | null;
+  createdAt: string;
+  contact: { name: string; email: string | null } | null;
 }
 
-const statusColors: Record<string, string> = {
-  draft: "",
-  sent: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  applied:
-    "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300",
-  void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
-};
+const STATUSES: ExplorerStatus[] = [
+  { value: "draft", label: "Draft", color: "#A1A1AA", hint: "Not recorded with the supplier yet, so it can't be used" },
+  { value: "sent", label: "Available", color: "#0EA5E9", hint: "Recorded and still has credit you can use against a bill" },
+  { value: "applied", label: "Used", color: "#8B5CF6", hint: "All of the credit has been used against bills" },
+  { value: "void", label: "Cancelled", color: "#D4D4D8", hint: "Cancelled, so it no longer counts" },
+];
 
-// Plain-language status labels (end users aren't accountants).
-const statusLabels: Record<string, string> = {
-  draft: "draft",
-  sent: "sent",
-  applied: "used",
-  void: "cancelled",
-};
-
-function buildColumns(): Column<DebitNote>[] {
-  return [
-    {
-      key: "number",
-      header: "Number",
-      sortKey: "number",
-      className: "w-32",
-      render: (r) => (
-        <span className="font-mono text-sm">{r.debitNoteNumber}</span>
-      ),
-    },
-    {
-      key: "contact",
-      header: "Supplier",
-      render: (r) => (
-        <span className="text-sm font-medium">{r.contact?.name || "-"}</span>
-      ),
-    },
-    {
-      key: "date",
-      header: "Date",
-      sortKey: "date",
-      className: "w-28",
-      render: (r) => <span className="text-sm">{r.issueDate}</span>,
-    },
-    {
-      key: "status",
-      header: "Status",
-      className: "w-24",
-      render: (r) => (
-        <Badge variant="outline" className={statusColors[r.status] || ""}>
-          {statusLabels[r.status] || r.status}
-        </Badge>
-      ),
-    },
-    {
-      key: "total",
-      header: "Total",
-      sortKey: "total",
-      className: "w-28 text-right",
-      render: (r) => (
-        <span className="font-mono text-sm tabular-nums">
-          {formatMoney(r.total, r.currencyCode)}
-        </span>
-      ),
-    },
-    {
-      key: "remaining",
-      header: "Remaining",
-      sortKey: "remaining",
-      className: "w-28 text-right",
-      render: (r) => (
-        <span className="font-mono text-sm tabular-nums">
-          {formatMoney(r.amountRemaining, r.currencyCode)}
-        </span>
-      ),
-    },
-  ];
-}
+const live = (d: DebitNote) => d.status !== "void";
+const usable = (d: DebitNote) => d.status === "sent" && d.amountRemaining > 0;
 
 export default function DebitNotesPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [debitNotes, setDebitNotes] = useState<DebitNote[]>([]);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [refetching, setRefetching] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [fetchKey, setFetchKey] = useState(0);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("created");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search);
-
   useDocumentTitle("Purchases · Supplier Credits");
 
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  const PAGE_SIZE = 50;
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  const columns = useMemo(() => buildColumns(), []);
-
-  const buildParams = useCallback((p: number) => {
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    if (sortBy !== "created") params.set("sortBy", sortBy);
-    if (sortOrder !== "desc") params.set("sortOrder", sortOrder);
-    if (dateFrom) params.set("from", dateFrom);
-    if (dateTo) params.set("to", dateTo);
-    params.set("page", String(p));
-    params.set("limit", String(PAGE_SIZE));
-    return params;
-  }, [statusFilter, sortBy, sortOrder, dateFrom, dateTo]);
-
-  // Fetch first page when filters change
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRefetching(true);
-    setPage(1);
-
-    fetch(`/api/v1/debit-notes?${buildParams(1)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setDebitNotes(data.data || []);
-        setTotalCount(data.pagination?.total || 0);
-      })
-      .then(() => devDelay())
-      .finally(() => { if (!cancelled) { setInitialLoad(false); setRefetching(false); setFetchKey((k) => k + 1); } });
-
-    return () => { cancelled = true; };
-  }, [orgId, buildParams]);
-
-  // Load more
-  const loadMore = useCallback(() => {
-    if (!orgId || loadingMore) return;
-    const nextPage = page + 1;
-    setLoadingMore(true);
-
-    fetch(`/api/v1/debit-notes?${buildParams(nextPage)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setDebitNotes((prev) => [...prev, ...data.data]);
-          setPage(nextPage);
-        }
-      })
-      .finally(() => setLoadingMore(false));
-  }, [orgId, page, buildParams, loadingMore]);
-
-  const hasMore = debitNotes.length < totalCount;
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  // Infinite scroll
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !refetching) loadMore();
+  const config = useMemo<ExplorerConfig<DebitNote>>(
+    () => ({
+      id: "debit-notes",
+      endpoint: "/api/v1/debit-notes",
+      noun: { one: "Supplier credit", many: "Supplier credits" },
+      getId: (d) => d.id,
+      href: (d) => `/purchases/debit-notes/${d.id}`,
+      status: { get: (d) => d.status, options: STATUSES },
+      date: { get: (d) => d.issueDate, label: "Credit date" },
+      party: { get: (d) => d.contact?.name, label: "Supplier", many: "Suppliers" },
+      amount: (d) => d.total,
+      amountLabel: "Credited",
+      currency: (d) => d.currencyCode,
+      search: (d) => [d.debitNoteNumber, d.contact?.name, d.contact?.email, d.reference],
+      defaultSort: { key: "issued", dir: "desc" },
+      facets: [
+        { key: "source", label: "Source", value: (d) => (d.billId ? "From a bill" : "Standalone") },
+        { key: "currency", label: "Currency", value: (d) => d.currencyCode },
+      ],
+      columns: [
+        { key: "number", label: "Number", className: "w-32", value: (d) => d.debitNoteNumber, render: (d) => <NumberCell value={d.debitNoteNumber} /> },
+        { key: "supplier", label: "Supplier", value: (d) => d.contact?.name, render: (d) => <PartyCell name={d.contact?.name} /> },
+        { key: "issued", label: "Credit date", className: "w-32", value: (d) => d.issueDate, render: (d) => <DateCell value={d.issueDate} /> },
+        { key: "status", label: "Status", className: "w-32", value: (d) => d.status, render: (d) => <StatusPill value={d.status} options={STATUSES} /> },
+        { key: "reference", label: "Reference", hint: "Usually the bill this credit came from", value: (d) => d.reference, render: (d) => <MutedCell value={d.reference} /> },
+        { key: "subtotal", label: "Before tax", align: "right", className: "w-32", money: true, hidden: true, value: (d) => d.subtotal },
+        { key: "tax", label: "Tax", align: "right", className: "w-28", money: true, hidden: true, value: (d) => d.taxTotal },
+        { key: "total", label: "Total", align: "right", className: "w-32", money: true, value: (d) => d.total, render: (d) => <MoneyCell cents={d.total} currency={d.currencyCode} /> },
+        {
+          key: "used",
+          label: "Used",
+          align: "right",
+          className: "w-32",
+          money: true,
+          hint: "How much has already come off your bills",
+          value: (d) => (live(d) ? d.amountApplied : 0),
+          render: (d) => <MoneyCell cents={live(d) ? d.amountApplied : 0} currency={d.currencyCode} />,
+        },
+        {
+          key: "remaining",
+          label: "Left to use",
+          align: "right",
+          className: "w-32",
+          money: true,
+          hint: "Credit you can still take off a bill from this supplier",
+          value: (d) => (live(d) ? d.amountRemaining : 0),
+          render: (d) => (
+            <MoneyCell cents={live(d) ? d.amountRemaining : 0} currency={d.currencyCode} className={usable(d) ? "font-semibold text-emerald-600 dark:text-emerald-400" : undefined} />
+          ),
+        },
+        { key: "linked", label: "From a bill", className: "w-28", hidden: true, value: (d) => (d.billId ? "Yes" : "No") },
+        { key: "sent", label: "Recorded on", className: "w-32", hidden: true, value: (d) => d.sentAt, render: (d) => <DateCell value={d.sentAt} /> },
+        { key: "voided", label: "Cancelled on", className: "w-32", hidden: true, value: (d) => d.voidedAt, render: (d) => <DateCell value={d.voidedAt} /> },
+        { key: "currency", label: "Currency", className: "w-24", hidden: true, value: (d) => d.currencyCode },
+        { key: "created", label: "Created", className: "w-32", hidden: true, value: (d) => d.createdAt, render: (d) => <DateCell value={d.createdAt} /> },
+      ],
+      metrics: (rows) => {
+        const valid = rows.filter(live);
+        const issued = valid.reduce((s, d) => s + d.total, 0);
+        const used = valid.reduce((s, d) => s + d.amountApplied, 0);
+        const available = rows.filter(usable);
+        const suppliers = new Set(available.map((d) => d.contact?.name).filter(Boolean)).size;
+        const drafts = rows.filter((d) => d.status === "draft");
+        const usedUp = rows.filter((d) => d.status === "applied");
+        return [
+          { key: "available", label: "Credit to use", color: "#10B981", status: "sent", value: formatMoney(available.reduce((s, d) => s + d.amountRemaining, 0)), note: available.length ? `${available.length} credit${available.length === 1 ? "" : "s"} from ${suppliers} supplier${suppliers === 1 ? "" : "s"}` : "Nothing waiting to be used", hint: "Money suppliers owe you back. Take it off their next bill instead of paying in full." },
+          { key: "used", label: "Already used", color: "#8B5CF6", value: formatMoney(used), note: issued ? `${Math.round((used / issued) * 100)}% of all credit` : "No credit yet", hint: "Credit that has already come off your bills." },
+          { key: "issued", label: "Total credited", color: "#0EA5E9", value: formatMoney(issued), note: `${valid.length} credit${valid.length === 1 ? "" : "s"}, not counting cancelled`, hint: "Everything suppliers have credited you, used or not." },
+          { key: "usedUp", label: "Fully used", color: "#6366F1", status: "applied", value: usedUp.length.toString(), note: formatMoney(usedUp.reduce((s, d) => s + d.total, 0)), hint: "Credits with nothing left on them." },
+          { key: "drafts", label: "Drafts", color: "#A1A1AA", status: "draft", value: drafts.length.toString(), note: formatMoney(drafts.reduce((s, d) => s + d.total, 0)), hint: "Credits you started but haven't recorded yet, so they can't be used." },
+        ];
       },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore, refetching]);
-
-  const handleSort = useCallback((key: string) => {
-    setSortBy((prev) => {
-      if (prev === key) {
-        setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
-        return key;
-      }
-      setSortOrder("desc");
-      return key;
-    });
-  }, []);
-
-  const hasFilters = search || dateFrom || dateTo;
-  const pendingSearch = search !== debouncedSearch;
-
-  const [searchKey, setSearchKey] = useState(0);
-  const filteredDebitNotes = useMemo(() => {
-    if (!debouncedSearch) return debitNotes;
-    const q = debouncedSearch.toLowerCase();
-    return debitNotes.filter(
-      (dn) =>
-        dn.debitNoteNumber.toLowerCase().includes(q) ||
-        (dn.contact?.name || "").toLowerCase().includes(q)
-    );
-  }, [debitNotes, debouncedSearch]);
-
-  // Bump searchKey when debounced search changes to trigger ContentReveal
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSearchKey((k) => k + 1);
-  }, [debouncedSearch]);
-
-  const totalIssued = useMemo(
-    () => debitNotes.reduce((sum, dn) => sum + (dn.status !== "void" ? dn.total : 0), 0),
-    [debitNotes]
+      preview: (d) => (
+        <DocumentPreview
+          url={`/api/v1/debit-notes/${d.id}`}
+          pick={(json) => {
+            const doc = json.debitNote as (DebitNote & { lines?: never[]; notes?: string | null }) | undefined;
+            return {
+              lines: doc?.lines,
+              notes: doc?.notes,
+              totals: [
+                { label: "Before tax", cents: doc?.subtotal },
+                { label: "Tax", cents: doc?.taxTotal },
+                { label: "Total credit", cents: doc?.total, strong: true },
+                { label: "Used", cents: doc?.amountApplied, tone: "#7C3AED" },
+                { label: "Left to use", cents: doc?.status === "void" ? 0 : doc?.amountRemaining, strong: true },
+              ],
+            };
+          }}
+          number={d.debitNoteNumber}
+          status={d.status}
+          statusOptions={STATUSES}
+          party={d.contact?.name}
+          partySub={d.contact?.email}
+          amount={usable(d) ? d.amountRemaining : d.total}
+          amountLabel={usable(d) ? "left to use" : "total"}
+          currency={d.currencyCode}
+          facts={[
+            { label: "Credit date", value: formatDay(d.issueDate) },
+            { label: "Recorded on", value: formatDay(d.sentAt) },
+            { label: "Total credit", value: formatMoney(d.total, d.currencyCode) },
+            { label: "Used so far", value: formatMoney(d.amountApplied, d.currencyCode) },
+            { label: "Reference", value: d.reference || "—" },
+            { label: "Currency", value: d.currencyCode },
+          ]}
+          actions={
+            <>
+              {d.status === "draft" && (
+                <ActionButton primary icon={<Send className="size-3.5" />} run={async () => router.push(`/purchases/debit-notes/${d.id}`)}>
+                  Review and send
+                </ActionButton>
+              )}
+              {usable(d) && (
+                <ActionButton primary icon={<ArrowDownRight className="size-3.5" />} run={async () => router.push(`/purchases/debit-notes/${d.id}`)}>
+                  Use against a bill
+                </ActionButton>
+              )}
+              {d.billId && (
+                <ActionButton icon={<FileText className="size-3.5" />} run={async () => router.push(`/purchases/${d.billId}`)}>
+                  View original bill
+                </ActionButton>
+              )}
+            </>
+          }
+        />
+      ),
+      empty: <DebitNotesEmpty onCreate={() => openDrawer("debitNote")} />,
+    }),
+    [openDrawer, router]
   );
-  const totalApplied = useMemo(
-    () => debitNotes.reduce((sum, dn) => sum + (dn.status !== "void" ? dn.amountApplied : 0), 0),
-    [debitNotes]
-  );
-  const totalRemaining = useMemo(
-    () => debitNotes.reduce((sum, dn) => sum + (dn.status !== "void" ? dn.amountRemaining : 0), 0),
-    [debitNotes]
-  );
 
-  if (initialLoad) return <BrandLoader />;
+  return <Explorer config={config} />;
+}
 
-  if (!initialLoad && !refetching && debitNotes.length === 0 && statusFilter === "all" && !hasFilters) {
-    return (
-      <ContentReveal>
-        <div className="pt-12 pb-12 space-y-10">
-          {/* Top: title + CTA */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Supplier Credits</h2>
-              <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                A supplier credit is money a supplier owes you back — a reduction on what you owe them. Use it against a bill instead of paying full price.
-              </p>
-            </div>
-            <Button
-              onClick={() => openDrawer("debitNote")}
-              className="bg-brand-600 hover:bg-brand-700 shrink-0"
-            >
-              <Plus className="mr-2 size-4" />
-              New supplier credit
-            </Button>
-          </div>
-
-          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
-            {/* Left: Ledger-style calculation */}
-            <div className="rounded-xl border bg-card overflow-hidden">
-              <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">How a supplier credit works</p>
-              </div>
-              <div className="divide-y">
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40">
-                      <ReceiptText className="size-3.5 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Bill total</p>
-                      <p className="text-[11px] text-muted-foreground">BILL-0042</p>
-                    </div>
-                  </div>
-                  <span className="font-mono text-sm font-medium">$1,200.00</span>
-                </div>
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-brand-50/30 dark:bg-brand-950/10">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-brand-50 dark:bg-brand-950/40">
-                      <CreditCard className="size-3.5 text-brand-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-brand-700 dark:text-brand-300">Credit applied</p>
-                      <p className="text-[11px] text-muted-foreground">DN-0001</p>
-                    </div>
-                  </div>
-                  <span className="font-mono text-sm font-medium text-brand-600 dark:text-brand-400">-$200.00</span>
-                </div>
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="size-7" />
-                    <p className="text-sm font-semibold">Now owed to supplier</p>
-                  </div>
-                  <span className="font-mono text-sm font-bold">$1,000.00</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Use cases */}
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">When to use</p>
-              {[
-                {
-                  title: "Supplier overcharged you",
-                  desc: "Billed too much by a supplier? Record a credit to get the amount back.",
-                  color: "border-l-blue-400",
-                },
-                {
-                  title: "You returned goods",
-                  desc: "Sent stock back to a supplier? Record the credit and use it against a bill.",
-                  color: "border-l-amber-400",
-                },
-                {
-                  title: "Service not delivered",
-                  desc: "Paid for work that wasn't done? Record a partial or full credit from the supplier.",
-                  color: "border-l-brand-400",
-                },
-                {
-                  title: "Agreed discount",
-                  desc: "Supplier gave you a retroactive discount? Apply it against what you owe.",
-                  color: "border-l-purple-400",
-                },
-              ].map(({ title, desc, color }) => (
-                <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
-                  <p className="text-sm font-medium">{title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </ContentReveal>
-    );
-  }
-
+function DebitNotesEmpty({ onCreate }: { onCreate: () => void }) {
   return (
-    <ContentReveal className="space-y-6">
-      {/* Top: Stats */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard title="Total Credits" value={formatMoney(totalIssued)} icon={CreditCard} />
-        <StatCard title="Used" value={formatMoney(totalApplied)} icon={CreditCard} />
-        <StatCard title="Remaining" value={formatMoney(totalRemaining)} icon={CreditCard} />
-      </div>
-
-      <div className="h-px bg-border" />
-
-      {/* Debit note table */}
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList className="overflow-x-auto">
-              <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
-              <TabsTrigger value="draft" className="whitespace-nowrap">Draft</TabsTrigger>
-              <TabsTrigger value="sent" className="whitespace-nowrap">Sent</TabsTrigger>
-              <TabsTrigger value="applied" className="whitespace-nowrap" title="Credits you've used against a bill">Used</TabsTrigger>
-              <TabsTrigger value="void" className="whitespace-nowrap">Cancelled</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Button
-            onClick={() => openDrawer("debitNote")}
-            size="sm"
-            className="bg-brand-600 hover:bg-brand-700"
-          >
+    <ContentReveal>
+      <div className="pt-12 pb-12 space-y-10">
+        {/* Top: title + CTA */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Supplier Credits</h2>
+            <p className="mt-1 text-sm text-muted-foreground max-w-md">
+              A supplier credit is money a supplier owes you back — a reduction on what you owe them. Use it against a bill instead of paying full price.
+            </p>
+          </div>
+          <Button onClick={onCreate} className="bg-brand-600 hover:bg-brand-700 shrink-0">
             <Plus className="mr-2 size-4" />
             New supplier credit
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search supplier credits..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-56 pl-8 text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">From</span>
-            <DatePicker
-              value={dateFrom}
-              onChange={(v) => setDateFrom(v)}
-              placeholder="Start date"
-              className="h-8 w-40 text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">To</span>
-            <DatePicker
-              value={dateTo}
-              onChange={(v) => setDateTo(v)}
-              placeholder="End date"
-              className="h-8 w-40 text-xs"
-            />
-          </div>
-          <Select
-            value={`${sortBy}:${sortOrder}`}
-            onValueChange={(v) => {
-              const [key, order] = v.split(":");
-              setSortBy(key);
-              setSortOrder(order as "asc" | "desc");
-            }}
-          >
-            <SelectTrigger className="h-8 w-44 text-xs">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created:desc">Newest first</SelectItem>
-              <SelectItem value="created:asc">Oldest first</SelectItem>
-              <SelectItem value="total:desc">Highest amount</SelectItem>
-              <SelectItem value="total:asc">Lowest amount</SelectItem>
-              <SelectItem value="number:desc">Number (desc)</SelectItem>
-              <SelectItem value="number:asc">Number (asc)</SelectItem>
-            </SelectContent>
-          </Select>
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-muted-foreground"
-              onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); }}
-            >
-              <X className="mr-1 size-3" />
-              Clear filters
-            </Button>
-          )}
-        </div>
-
-        {refetching || pendingSearch ? (
-          <BrandLoader className="h-48" />
-        ) : (
-          <ContentReveal key={`${fetchKey}-${searchKey}`}>
-            <DataTable
-              columns={columns}
-              data={filteredDebitNotes}
-              loading={false}
-              emptyMessage="No supplier credits match your filters."
-              onRowClick={(r) => router.push(`/purchases/debit-notes/${r.id}`)}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSort={handleSort}
-            />
-          </ContentReveal>
-        )}
-
-        {/* Infinite scroll sentinel & count */}
-        {!refetching && !pendingSearch && filteredDebitNotes.length > 0 && (
-          <>
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-muted-foreground">
-                Showing {debitNotes.length} of {totalCount} supplier credit{totalCount !== 1 ? "s" : ""}
-              </p>
+        <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
+          {/* Left: Ledger-style calculation */}
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">How a supplier credit works</p>
             </div>
-            {hasMore && (
-              <div ref={sentinelRef} className="flex justify-center py-4">
-                {loadingMore && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+            <div className="divide-y">
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40">
+                    <ReceiptText className="size-3.5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Bill total</p>
+                    <p className="text-[11px] text-muted-foreground">BILL-0042</p>
+                  </div>
+                </div>
+                <span className="font-mono text-sm font-medium">$1,200.00</span>
               </div>
-            )}
-          </>
-        )}
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-brand-50/30 dark:bg-brand-950/10">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-md bg-brand-50 dark:bg-brand-950/40">
+                    <CreditCard className="size-3.5 text-brand-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-brand-700 dark:text-brand-300">Credit applied</p>
+                    <p className="text-[11px] text-muted-foreground">DN-0001</p>
+                  </div>
+                </div>
+                <span className="font-mono text-sm font-medium text-brand-600 dark:text-brand-400">-$200.00</span>
+              </div>
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="size-7" />
+                  <p className="text-sm font-semibold">Now owed to supplier</p>
+                </div>
+                <span className="font-mono text-sm font-bold">$1,000.00</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Use cases */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">When to use</p>
+            {[
+              { title: "Supplier overcharged you", desc: "Billed too much by a supplier? Record a credit to get the amount back.", color: "border-l-blue-400" },
+              { title: "You returned goods", desc: "Sent stock back to a supplier? Record the credit and use it against a bill.", color: "border-l-amber-400" },
+              { title: "Service not delivered", desc: "Paid for work that wasn't done? Record a partial or full credit from the supplier.", color: "border-l-brand-400" },
+              { title: "Agreed discount", desc: "Supplier gave you a retroactive discount? Apply it against what you owe.", color: "border-l-purple-400" },
+            ].map(({ title, desc, color }) => (
+              <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
+                <p className="text-sm font-medium">{title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </ContentReveal>
   );

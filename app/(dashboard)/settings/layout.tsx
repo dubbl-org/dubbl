@@ -4,11 +4,12 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Settings, Users, CreditCard, Key, ScrollText, Target,
+  Settings, Users, CreditCard, Key, ScrollText,
   Bell, BellRing, GitBranch, Tags, Shield, ShieldCheck,
   ListFilter, Webhook, CheckCircle2, Zap, PaintbrushVertical, ArrowLeftRight,
-  Trash2, Database, PackageCheck,
+  Trash2, Database, PackageCheck, Mail,
 } from "lucide-react";
+import { useShellSubnav } from "@/components/dashboard/shell/shell-context";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +43,6 @@ const GROUPS: NavGroup[] = [
   {
     label: "Automation",
     items: [
-      { href: "/settings/pipelines", label: "Pipelines", icon: Target },
       { href: "/settings/bank-rules", label: "Bank Rules", icon: ListFilter },
       { href: "/settings/approval-workflows", label: "Approvals", icon: CheckCircle2 },
       { href: "/settings/procurement", label: "Bill Matching", icon: PackageCheck },
@@ -53,6 +53,7 @@ const GROUPS: NavGroup[] = [
     label: "Integrations",
     items: [
       { href: "/settings/integrations/stripe", label: "Stripe", icon: Zap },
+      { href: "/settings/email", label: "Email sending", icon: Mail },
     ],
   },
   {
@@ -81,6 +82,12 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  useShellSubnav(
+    GROUPS.map((g) => ({
+      label: g.label,
+      items: g.items.map(({ href, label, exact }) => ({ href, label, exact })),
+    }))
+  );
 
   const isDetailPage =
     !ALL_ITEMS.some((t) => (t.exact ? pathname === t.href : pathname === t.href)) &&
@@ -98,7 +105,7 @@ export default function SettingsLayout({
   return (
     <div className="flex gap-8">
       {!isDetailPage && (
-        <nav className="hidden md:flex w-52 shrink-0 flex-col gap-6 -mt-1">
+        <nav className="hidden md:flex lg:hidden w-52 shrink-0 flex-col gap-6 -mt-1">
           {GROUPS.map((group) => (
             <div key={group.label}>
               <p className="mb-1.5 pl-0 pr-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">

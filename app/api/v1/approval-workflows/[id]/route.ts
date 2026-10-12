@@ -52,7 +52,7 @@ export async function GET(
       with: {
         steps: {
           orderBy: asc(approvalWorkflowStep.stepOrder),
-          with: { approver: { with: { user: true } } },
+          with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
         },
       },
     });
@@ -115,7 +115,7 @@ export async function PATCH(
       with: {
         steps: {
           orderBy: asc(approvalWorkflowStep.stepOrder),
-          with: { approver: { with: { user: true } } },
+          with: { approver: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
         },
       },
     });

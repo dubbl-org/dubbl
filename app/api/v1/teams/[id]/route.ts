@@ -30,7 +30,7 @@ export async function GET(
         members: {
           with: {
             member: {
-              with: { user: true },
+              with: { user: { columns: { id: true, name: true, email: true, image: true } } },
             },
           },
         },

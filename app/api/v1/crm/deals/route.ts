@@ -51,7 +51,11 @@ export async function GET(request: Request) {
 
     const all = await db.query.deal.findMany({
       where: and(...conditions),
-      with: { contact: true, assignedUser: true },
+      with: {
+        contact: { columns: { id: true, name: true, email: true } },
+        assignedUser: { columns: { id: true, name: true, email: true, image: true } },
+        pipeline: { columns: { id: true, name: true } },
+      },
       orderBy: orderFn(orderCol),
     });
 
@@ -97,7 +101,7 @@ const createSchema = z.object({
   title: z.string().min(1),
   valueCents: z.number().int().min(0).optional(),
   currency: currencyCodeSchema.optional(),
-  probability: z.number().int().min(0).max(100).optional(),
+  probability: z.number().int().min(0).max(100).nullable().optional(),
   expectedCloseDate: z.string().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   source: z.enum(["website", "referral", "cold_outreach", "event", "other"]).nullable().optional(),

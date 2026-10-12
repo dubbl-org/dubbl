@@ -41,7 +41,7 @@ export async function GET(
         eq(timeEntry.id, entryId),
         eq(timeEntry.projectId, id)
       ),
-      with: { user: true },
+      with: { user: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     if (!entry) return notFound("Time entry");

@@ -14,8 +14,10 @@ import type { taxRate as taxRateTable } from "@/lib/db/schema";
  *
  * All rates are in BASIS POINTS (2000 = 20.00%); recoverablePercent is also in
  * basis points (10000 = 100%). The `kind`/`type` mirror the taxRate schema
- * (lib/db/schema/bookkeeping.ts). Control-account codes match the system
- * control accounts created on demand by lib/api/journal-automation.ts:
+ * (lib/db/schema/bookkeeping.ts). Control-account codes are the canonical
+ * role codes of the system control accounts (lib/api/journal-automation.ts);
+ * on a role-mapped chart they resolve to the chart's own accounts, e.g. 820
+ * VAT / 821 VAT on Purchases in the Xero-style UK chart (lib/api/account-roles.ts):
  *   • outputVat 2200 — output VAT/GST collected on sales (liability)
  *   • inputVat  1500 — input VAT/GST reclaimable on purchases (asset)
  *   • salesTaxPayable 2230 — US sales tax collected (liability)
@@ -102,9 +104,106 @@ const US_SALES_CONTROL: ProfileControlAccounts = {
   output: "2230",
 };
 
+// ── Additional countries ────────────────────────────────────────────────────
+// Built from each country's standard / reduced rates so every onboarding
+// country starts with real rates, the way Xero seeds them. Rates in basis
+// points; re-check against the tax authority when rates change.
+
+type RateSpec = [name: string, rate: number];
+
+function vatProfile(
+  country: string,
+  countryName: string,
+  taxName: string,
+  standard: number,
+  reduced: RateSpec[],
+  opts: { regime?: "vat" | "gst"; reverseCharge?: boolean; zeroName?: string; exemptName?: string; noTaxName?: string } = {},
+): CountryTaxProfile {
+  const regime = opts.regime ?? "vat";
+  const pct = (bp: number) => `${(bp / 100).toString()}%`;
+  const rates: ProfileRate[] = [
+    { name: `${taxName} ${pct(standard)}`, rate: standard, type: "both", kind: "standard", recoverablePercent: 10000, isDefault: true },
+    ...reduced.map(([name, rate]): ProfileRate => ({ name, rate, type: "both", kind: "standard", recoverablePercent: 10000 })),
+    { name: opts.zeroName ?? "Zero Rated", rate: 0, type: "both", kind: "standard", recoverablePercent: 10000 },
+    { name: opts.exemptName ?? "Exempt", rate: 0, type: "both", kind: "exempt", recoverablePercent: 0 },
+    ...(opts.reverseCharge
+      ? [{ name: `Reverse Charge (${pct(standard)})`, rate: standard, type: "purchase", kind: "reverse_charge", recoverablePercent: 10000 } as ProfileRate]
+      : []),
+    { name: opts.noTaxName ?? `No ${taxName}`, rate: 0, type: "both", kind: "no_vat", recoverablePercent: 0 },
+  ];
+  return {
+    country,
+    countryName,
+    regime,
+    taxName,
+    rates,
+    returnBoxes: [
+      { box: "output", label: `${taxName} on sales` },
+      { box: "input", label: `${taxName} on purchases` },
+      { box: "net", label: `Net ${taxName} payable / refundable` },
+    ],
+    controlAccounts: regime === "gst" ? GST_CONTROL : VAT_CONTROL,
+  };
+}
+
+const EU = { reverseCharge: true };
+
+const ADDITIONAL_PROFILES: Record<string, CountryTaxProfile> = {
+  NZ: {
+    country: "NZ",
+    countryName: "New Zealand",
+    regime: "gst",
+    taxName: "GST",
+    rates: [
+      { name: "GST (15%)", rate: 1500, type: "both", kind: "standard", recoverablePercent: 10000, isDefault: true },
+      { name: "Zero Rated", rate: 0, type: "both", kind: "standard", recoverablePercent: 10000 },
+      { name: "Exempt", rate: 0, type: "both", kind: "exempt", recoverablePercent: 0 },
+      { name: "GST on Imports", rate: 1500, type: "purchase", kind: "standard", recoverablePercent: 10000 },
+      { name: "No GST", rate: 0, type: "both", kind: "no_vat", recoverablePercent: 0 },
+    ],
+    returnBoxes: [
+      { box: "5", label: "Total sales and income (including GST)" },
+      { box: "8", label: "GST collected on sales and income" },
+      { box: "11", label: "Total purchases and expenses (including GST)" },
+      { box: "12", label: "GST credit on purchases and expenses" },
+      { box: "15", label: "GST to pay / refund" },
+    ],
+    controlAccounts: GST_CONTROL,
+  },
+  SG: vatProfile("SG", "Singapore", "GST", 900, [], { regime: "gst", zeroName: "Zero-Rated Supplies", exemptName: "Exempt Supplies", noTaxName: "Out of Scope" }),
+  DE: vatProfile("DE", "Germany", "USt", 1900, [["USt 7%", 700]], EU),
+  AT: vatProfile("AT", "Austria", "USt", 2000, [["USt 13%", 1300], ["USt 10%", 1000]], EU),
+  FR: vatProfile("FR", "France", "TVA", 2000, [["TVA 10%", 1000], ["TVA 5.5%", 550], ["TVA 2.1%", 210]], EU),
+  BE: vatProfile("BE", "Belgium", "TVA", 2100, [["TVA 12%", 1200], ["TVA 6%", 600]], EU),
+  ES: vatProfile("ES", "Spain", "IVA", 2100, [["IVA 10%", 1000], ["IVA 4%", 400]], EU),
+  PT: vatProfile("PT", "Portugal", "IVA", 2300, [["IVA 13%", 1300], ["IVA 6%", 600]], EU),
+  IT: vatProfile("IT", "Italy", "IVA", 2200, [["IVA 10%", 1000], ["IVA 5%", 500], ["IVA 4%", 400]], EU),
+  SE: vatProfile("SE", "Sweden", "Moms", 2500, [["Moms 12%", 1200], ["Moms 6%", 600]], EU),
+  DK: vatProfile("DK", "Denmark", "Moms", 2500, [], EU),
+  FI: vatProfile("FI", "Finland", "ALV", 2550, [["ALV 13.5%", 1350], ["ALV 10%", 1000]], EU),
+  PL: vatProfile("PL", "Poland", "VAT", 2300, [["VAT 8%", 800], ["VAT 5%", 500]], EU),
+  CZ: vatProfile("CZ", "Czech Republic", "DPH", 2100, [["DPH 12%", 1200]], EU),
+  NO: vatProfile("NO", "Norway", "MVA", 2500, [["MVA 15%", 1500], ["MVA 12%", 1200]]),
+  CH: vatProfile("CH", "Switzerland", "MWST", 810, [["MWST 3.8%", 380], ["MWST 2.6%", 260]]),
+  MX: vatProfile("MX", "Mexico", "IVA", 1600, [["IVA 8% (border region)", 800]]),
+  JP: vatProfile("JP", "Japan", "Consumption Tax", 1000, [["Consumption Tax 8% (reduced)", 800]], { zeroName: "Export (0%)", noTaxName: "Not Taxable" }),
+  KR: vatProfile("KR", "South Korea", "VAT", 1000, []),
+  CN: vatProfile("CN", "China", "VAT", 1300, [["VAT 9%", 900], ["VAT 6%", 600]]),
+  TW: vatProfile("TW", "Taiwan", "Business Tax", 500, []),
+  TH: vatProfile("TH", "Thailand", "VAT", 700, []),
+  ID: vatProfile("ID", "Indonesia", "PPN", 1200, [["PPN 11% (effective rate)", 1100]]),
+  PH: vatProfile("PH", "Philippines", "VAT", 1200, []),
+  VN: vatProfile("VN", "Vietnam", "VAT", 1000, [["VAT 8% (temporary reduction)", 800], ["VAT 5%", 500]]),
+  AE: vatProfile("AE", "United Arab Emirates", "VAT", 500, [], { reverseCharge: true }),
+  SA: vatProfile("SA", "Saudi Arabia", "VAT", 1500, [], { reverseCharge: true }),
+  IL: vatProfile("IL", "Israel", "VAT", 1800, []),
+  NG: vatProfile("NG", "Nigeria", "VAT", 750, []),
+  KE: vatProfile("KE", "Kenya", "VAT", 1600, [["VAT 8% (petroleum products)", 800]]),
+};
+
 /**
  * The country tax profiles, keyed by uppercase ISO country code.
- * Covers: US, GB, ZA, AU, CA, IE, IN, NL.
+ * Covers: US, GB, ZA, AU, CA, IE, IN, NL, plus ADDITIONAL_PROFILES above.
  */
 export const COUNTRY_TAX_PROFILES: Record<string, CountryTaxProfile> = {
   US: {
@@ -275,6 +374,7 @@ export const COUNTRY_TAX_PROFILES: Record<string, CountryTaxProfile> = {
     ],
     controlAccounts: VAT_CONTROL,
   },
+  ...ADDITIONAL_PROFILES,
 };
 
 /** Map an organization.taxRegime value to the default country profile code. */
@@ -348,7 +448,8 @@ export interface ApplyProfileResult {
  */
 export async function applyTaxProfile(
   organizationId: string,
-  profile: CountryTaxProfile
+  profile: CountryTaxProfile,
+  opts: { registered?: boolean } = {}
 ): Promise<ApplyProfileResult> {
   const existing = await db.query.taxRate.findMany({
     where: and(
@@ -366,6 +467,12 @@ export async function applyTaxProfile(
   const created: (typeof taxRateTable.$inferSelect)[] = [];
   const skipped: { name: string; rate: number; reason: string }[] = [];
 
+  // Not registered for VAT/GST yet: keep the rates (ready for when they are)
+  // but default to "No VAT", like Xero does for an unregistered business.
+  const defaultName = opts.registered === false
+    ? profile.rates.find((r) => r.kind === "no_vat")?.name
+    : profile.rates.find((r) => r.isDefault)?.name;
+
   for (const r of profile.rates) {
     if (existingKeys.has(key(r))) {
       skipped.push({ name: r.name, rate: r.rate, reason: "already exists" });
@@ -373,7 +480,7 @@ export async function applyTaxProfile(
     }
     // Only seed the default flag when the org currently has no default rate, so
     // applying a profile never silently changes an org's chosen default.
-    const isDefault = !!r.isDefault && !orgHasDefault;
+    const isDefault = r.name === defaultName && !orgHasDefault;
     const [row] = await db
       .insert(taxRate)
       .values({
@@ -409,11 +516,12 @@ export async function applyTaxProfile(
  */
 export async function ensureTaxRatesSeeded(
   organizationId: string,
-  country?: string | null
+  country?: string | null,
+  opts: { registered?: boolean } = {}
 ): Promise<ApplyProfileResult | null> {
   const profile = await resolveProfileForOrg(organizationId, country);
   if (!profile) return null;
-  return applyTaxProfile(organizationId, profile);
+  return applyTaxProfile(organizationId, profile, opts);
 }
 
 /**

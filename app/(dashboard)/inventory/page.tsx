@@ -1,301 +1,238 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence, MotionConfig } from "motion/react";
-import {
-  Package,
-  AlertTriangle,
-  Search,
-  ChevronRight,
-  DollarSign,
-  TrendingUp,
-  X,
-  Archive,
-  ArrowUpDown,
-  Download,
-  Upload,
-  Trash2,
-  Power,
-  PowerOff,
-  Tag,
-  Loader2,
-} from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+import { Package, Upload, ArrowUpDown, Trash2, Power, PowerOff, Tag, AlertTriangle, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
-import { formatMoney } from "@/lib/money";
-
-import { useCreateDrawer } from "@/components/dashboard/create-drawer";
-import { CategoryPicker } from "@/components/dashboard/category-picker";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ContentReveal } from "@/components/ui/content-reveal";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
-import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { Explorer } from "@/components/dashboard/explorer/explorer";
+import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
+import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
+import { DateCell, MoneyCell, MutedCell, NumberCell, StatusPill, formatDay, toDayKey } from "@/components/dashboard/explorer/cells";
+import type { ExplorerConfig, ExplorerHelpers, ExplorerStatus } from "@/components/dashboard/explorer/types";
 
 interface InventoryItem {
   id: string;
   code: string;
   name: string;
+  description: string | null;
   category: string | null;
   sku: string | null;
+  /** Cents per unit. */
   purchasePrice: number;
+  /** Cents per unit. */
   salePrice: number;
+  /** Moving average cost, cents per unit. */
+  averageCost: number;
+  /** Book value of what's on hand, cents. */
+  totalValue: number;
+  unitOfMeasure: string | null;
+  /** Whole units. */
   quantityOnHand: number;
   reorderPoint: number;
+  trackingMethod: string;
+  costMethod: string;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-type FilterTab = "all" | "low_stock" | "active" | "inactive";
-type SortKey = "name" | "code" | "quantity" | "salePrice" | "purchasePrice" | "createdAt";
+interface Movement {
+  id: string;
+  type: string;
+  quantity: number;
+  newQuantity: number;
+  reason: string | null;
+  createdAt: string;
+}
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "createdAt", label: "Newest" },
-  { value: "name", label: "Name" },
-  { value: "code", label: "Code" },
-  { value: "quantity", label: "Quantity" },
-  { value: "salePrice", label: "Sale Price" },
-  { value: "purchasePrice", label: "Cost" },
+const STATUSES: ExplorerStatus[] = [
+  { value: "in_stock", label: "In stock", color: "#10B981", hint: "More on hand than your reorder level" },
+  { value: "low", label: "Running low", color: "#F59E0B", hint: "At or below your reorder level. Time to order more" },
+  { value: "out", label: "Out of stock", color: "#EF4444", hint: "None left, so you can't sell it right now" },
+  { value: "hidden", label: "Hidden", color: "#D4D4D8", hint: "Hidden from lists and pickers" },
 ];
 
-const PAGE_SIZE = 30;
+const TRACKING: Record<string, string> = { none: "Not tracked", serial: "Serial numbers", lot: "Lots", batch: "Batches" };
+const COST_METHODS: Record<string, string> = { average: "Average cost", fifo: "First in, first out", standard: "Standard cost" };
+const MOVEMENTS: Record<string, string> = {
+  adjustment: "Count changed",
+  transfer_in: "Moved in",
+  transfer_out: "Moved out",
+  stock_take: "Stock take",
+  purchase: "Bought",
+  sale: "Sold",
+  initial: "Opening stock",
+};
+
+function stockStatus(i: InventoryItem) {
+  if (!i.isActive) return "hidden";
+  if (i.quantityOnHand <= 0) return "out";
+  if (i.quantityOnHand <= i.reorderPoint) return "low";
+  return "in_stock";
+}
+
+const stockValue = (i: InventoryItem) => i.quantityOnHand * i.purchasePrice;
+const salesValue = (i: InventoryItem) => i.quantityOnHand * i.salePrice;
+/** Same formula as the old summary: how much more you sell for than you pay. */
+const markup = (i: InventoryItem) => (i.purchasePrice > 0 ? ((i.salePrice - i.purchasePrice) / i.purchasePrice) * 100 : null);
+const dollars = (cents: number) => (cents / 100).toFixed(2);
+
+function plural(n: number, word: string) {
+  return `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+}
+
+async function bulkAction(action: string, ids: string[], helpers: ExplorerHelpers, extra?: Record<string, unknown>) {
+  if (ids.length === 0) return;
+  const data = await postJson<{ affected?: number }>("/api/v1/inventory/bulk", { action, ids, ...extra });
+  const n = data.affected ?? ids.length;
+  toast.success(`${n} item${n !== 1 ? "s" : ""} updated`);
+  helpers.clearSelection();
+  helpers.refresh();
+}
+
+function StockCell({ item }: { item: InventoryItem }) {
+  const s = stockStatus(item);
+  const percent = item.reorderPoint > 0 ? Math.min((item.quantityOnHand / (item.reorderPoint * 3)) * 100, 100) : item.quantityOnHand > 0 ? 100 : 0;
+  const color = STATUSES.find((o) => o.value === s)?.color ?? "#A1A1AA";
+  return (
+    <span className="inline-flex items-center justify-end gap-2.5">
+      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-foreground/[0.07]">
+        <span className="block h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
+      </span>
+      <span className={cn("w-12 text-right tabular-nums font-medium", s === "out" && "text-red-600 dark:text-red-400", s === "low" && "text-amber-600 dark:text-amber-400")}>
+        {item.quantityOnHand.toLocaleString()}
+      </span>
+    </span>
+  );
+}
+
+function RecentMovements({ itemId }: { itemId: string }) {
+  const [state, setState] = useState<{ id: string; rows: Movement[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const orgId = localStorage.getItem("activeOrgId");
+    fetch(`/api/v1/inventory/${itemId}/movements?limit=8`, { headers: orgId ? { "x-organization-id": orgId } : {} })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((json) => !cancelled && setState({ id: itemId, rows: json.data ?? [] }))
+      .catch(() => !cancelled && setState({ id: itemId, rows: [] }));
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId]);
+
+  const rows = state?.id === itemId ? state.rows : null;
+  return (
+    <div className="mt-6">
+      <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">Recent stock changes</p>
+      {!rows ? (
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-[12.5px] text-muted-foreground">No stock changes yet</p>
+      ) : (
+        <div className="divide-y divide-border/60 rounded-xl border border-border/80">
+          {rows.map((m) => (
+            <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+              <span className={cn("flex size-7 items-center justify-center rounded-lg", m.quantity >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600")}>
+                {m.quantity >= 0 ? <ArrowDownLeft className="size-3.5" /> : <ArrowUpRight className="size-3.5" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{MOVEMENTS[m.type] ?? m.type}</span>
+                <span className="block truncate text-[12px] text-muted-foreground">
+                  {formatDay(toDayKey(new Date(m.createdAt)))}
+                  {m.reason ? ` · ${m.reason}` : ""}
+                </span>
+              </span>
+              <span className="text-right">
+                <span className={cn("block font-medium tabular-nums", m.quantity >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                  {m.quantity > 0 ? "+" : ""}
+                  {m.quantity.toLocaleString()}
+                </span>
+                <span className="block text-[11.5px] tabular-nums text-muted-foreground">now {m.newQuantity.toLocaleString()}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function InventoryPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refetching, setRefetching] = useState(false);
-  const [fetchKey, setFetchKey] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
-  const [summary, setSummary] = useState({ totalItems: 0, totalValue: 0, lowStockCount: 0, avgMargin: 0 });
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<FilterTab>("all");
-  const [sortBy, setSortBy] = useState<SortKey>("createdAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  useDocumentTitle("Inventory · Products");
+  const [version, setVersion] = useState(0);
+
+  // Bulk sheets: the rows they act on and the explorer to refresh afterwards
+  const [target, setTarget] = useState<{ mode: "category" | "adjust"; ids: string[]; helpers: ExplorerHelpers } | null>(null);
   const [bulkCategory, setBulkCategory] = useState("");
-  const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
   const [bulkAdjustment, setBulkAdjustment] = useState("");
   const [bulkAdjustReason, setBulkAdjustReason] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [chartData, setChartData] = useState<{ date: string; in: number; out: number; net: number }[]>([]);
-  const [chartPeriod, setChartPeriod] = useState("30d");
-  const [, setChartLoading] = useState(false);
+
+  // Import
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<{ created: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
-  const debouncedSearch = useDebounce(search);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const pageRef = useRef(1);
-  useDocumentTitle("Inventory · Products");
 
-  // Keyboard shortcuts
+  // Movement chart
+  const [chartData, setChartData] = useState<{ date: string; in: number; out: number; net: number }[]>([]);
+  const [chartPeriod, setChartPeriod] = useState("30d");
+
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-
-      if (e.key === "/" && !isInput) {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-      if (e.key === "Escape") {
-        if (selectMode) {
-          setSelectMode(false);
-          setSelected(new Set());
-        } else if (document.activeElement === searchRef.current) {
-          searchRef.current?.blur();
-          if (search) setSearch("");
-        }
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectMode, search]);
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  const buildUrl = useCallback((page: number) => {
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("limit", String(PAGE_SIZE));
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    if (tab === "low_stock") params.set("status", "low_stock");
-    else if (tab === "active") params.set("status", "active");
-    else if (tab === "inactive") params.set("status", "inactive");
-    if (categoryFilter) params.set("categoryId", categoryFilter);
-    params.set("sortBy", sortBy);
-    params.set("sortOrder", sortOrder);
-    return `/api/v1/inventory?${params}`;
-  }, [debouncedSearch, tab, categoryFilter, sortBy, sortOrder]);
-
-  // Fetch movement chart data
-  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     let cancelled = false;
-    setChartLoading(true);
-    fetch(`/api/v1/inventory/movements/chart?period=${chartPeriod}`, {
-      headers: { "x-organization-id": orgId },
-    })
+    fetch(`/api/v1/inventory/movements/chart?period=${chartPeriod}`, { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setChartData(data.data || []);
       })
-      .finally(() => { if (!cancelled) setChartLoading(false); });
-    return () => { cancelled = true; };
-  }, [orgId, chartPeriod]);
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [chartPeriod, version]);
 
-  // Initial + filter change fetch
+  // Category suggestions for the bulk category sheet
   useEffect(() => {
+    if (target?.mode !== "category") return;
+    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-    let cancelled = false;
-    const isRefetch = !loading;
-    if (isRefetch) setRefetching(true);
-    pageRef.current = 1;
-
-    fetch(buildUrl(1), { headers: { "x-organization-id": orgId } })
+    fetch("/api/v1/inventory?limit=1", { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.data) {
-          setItems(data.data);
-          setTotalCount(data.pagination?.total || 0);
-          setHasMore((data.pagination?.page || 1) < (data.pagination?.totalPages || 1));
-        }
-        if (data.categories) setCategories(data.categories);
-        if (data.summary) setSummary(data.summary);
-      })
-      .finally(() => { if (!cancelled) { setLoading(false); setRefetching(false); setFetchKey((k) => k + 1); } });
+      .then((data) => setCategories(data.categories || []))
+      .catch(() => {});
+  }, [target?.mode]);
 
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, debouncedSearch, tab, categoryFilter, sortBy, sortOrder, buildUrl]);
-
-  // Load more (infinite scroll)
-  const loadMore = useCallback(() => {
-    if (!orgId || loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    const nextPage = pageRef.current + 1;
-
-    fetch(buildUrl(nextPage), { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setItems((prev) => [...prev, ...data.data]);
-          pageRef.current = nextPage;
-          setHasMore(nextPage < (data.pagination?.totalPages || 1));
-        }
-      })
-      .finally(() => setLoadingMore(false));
-  }, [orgId, loadingMore, hasMore, buildUrl]);
-
-  // Intersection observer for infinite scroll
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !refetching) loadMore();
-      },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore, refetching]);
-
-  // Stats from API summary (real DB aggregates, not just loaded items)
-
-  // Selection helpers
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selected.size === items.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(items.map((i) => i.id)));
-    }
-  };
-
-  const selectionCount = selected.size;
-  const isAllSelected = items.length > 0 && selected.size === totalCount;
-  const isPartialSelected = selected.size > 0 && selected.size < totalCount;
-
-  // Bulk actions
-  async function bulkAction(action: string, extra?: Record<string, unknown>) {
-    if (!orgId || selectionCount === 0) return;
+  async function submitSheet(action: "set_category" | "adjust_stock", extra: Record<string, unknown>) {
+    if (!target) return;
     setBulkLoading(true);
     try {
-      const res = await fetch("/api/v1/inventory/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ action, ids: Array.from(selected), ...extra }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed");
-      }
-      const data = await res.json();
-      toast.success(`${data.affected} item${data.affected !== 1 ? "s" : ""} updated`);
-      setSelected(new Set());
-      // Refresh
-      pageRef.current = 1;
-      const refreshRes = await fetch(buildUrl(1), { headers: { "x-organization-id": orgId } });
-      const refreshData = await refreshRes.json();
-      if (refreshData.data) {
-        setItems(refreshData.data);
-        setTotalCount(refreshData.pagination?.total || 0);
-        setHasMore((refreshData.pagination?.page || 1) < (refreshData.pagination?.totalPages || 1));
-      }
-      if (refreshData.categories) setCategories(refreshData.categories);
-      if (refreshData.summary) setSummary(refreshData.summary);
+      await bulkAction(action, target.ids, target.helpers, extra);
+      setTarget(null);
+      setBulkCategory("");
+      setBulkAdjustment("");
+      setBulkAdjustReason("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Bulk action failed");
     } finally {
@@ -303,41 +240,8 @@ export default function InventoryPage() {
     }
   }
 
-  async function handleBulkDelete() {
-    const confirmed = await confirm({
-      title: `Delete ${selectionCount} item${selectionCount !== 1 ? "s" : ""}?`,
-      description: "This action cannot be undone.",
-      confirmLabel: "Delete",
-      destructive: true,
-    });
-    if (confirmed) await bulkAction("delete");
-  }
-
-  function exportCsv() {
-    const headers = ["Code", "Name", "Category", "SKU", "Quantity", "Reorder Point", "Purchase Price", "Sale Price", "Status"];
-    const rows = items.map((i) => [
-      i.code,
-      i.name,
-      i.category || "",
-      i.sku || "",
-      i.quantityOnHand,
-      i.reorderPoint,
-      (i.purchasePrice / 100).toFixed(2),
-      (i.salePrice / 100).toFixed(2),
-      i.isActive ? "Active" : "Inactive",
-    ]);
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `inventory-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV exported");
-  }
-
   async function handleImport() {
+    const orgId = localStorage.getItem("activeOrgId");
     if (!orgId || !importFile) return;
     setImportLoading(true);
     setImportResult(null);
@@ -353,17 +257,7 @@ export default function InventoryPage() {
       if (!res.ok) throw new Error(data.error || "Import failed");
       setImportResult(data);
       toast.success(`Imported: ${data.created} created, ${data.updated} updated`);
-      // Refresh the list
-      pageRef.current = 1;
-      const refreshRes = await fetch(buildUrl(1), { headers: { "x-organization-id": orgId } });
-      const refreshData = await refreshRes.json();
-      if (refreshData.data) {
-        setItems(refreshData.data);
-        setTotalCount(refreshData.pagination?.total || 0);
-        setHasMore((refreshData.pagination?.page || 1) < (refreshData.pagination?.totalPages || 1));
-      }
-      if (refreshData.categories) setCategories(refreshData.categories);
-      if (refreshData.summary) setSummary(refreshData.summary);
+      setVersion((v) => v + 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -371,84 +265,198 @@ export default function InventoryPage() {
     }
   }
 
-  function toggleSortOrder() {
-    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-  }
-
-  if (loading) return <BrandLoader />;
-
-  const pendingSearch = search !== debouncedSearch;
-
-  if (!refetching && !pendingSearch && items.length === 0 && !debouncedSearch && tab === "all" && !categoryFilter) {
-    return (
-      <ContentReveal>
-        <EmptyState
-          icon={Package}
-          title="No inventory items yet"
-          description="Add your first product or item to start tracking inventory."
-        >
-          <Button onClick={() => openDrawer("inventory")} className="bg-brand-600 hover:bg-brand-700">
-            New Item
-          </Button>
-        </EmptyState>
-      </ContentReveal>
-    );
-  }
+  const config = useMemo<ExplorerConfig<InventoryItem>>(
+    () => ({
+      id: "inventory-items",
+      endpoint: "/api/v1/inventory",
+      noun: { one: "Item", many: "Items" },
+      getId: (i) => i.id,
+      href: (i) => `/inventory/${i.id}`,
+      status: { get: stockStatus, options: STATUSES },
+      amount: stockValue,
+      amountLabel: "Stock value",
+      search: (i) => [i.name, i.code, i.sku, i.category, i.description],
+      defaultSort: { key: "added", dir: "desc" },
+      facets: [
+        { key: "category", label: "Category", value: (i) => i.category || "No category" },
+        { key: "visibility", label: "Visibility", value: (i) => (i.isActive ? "Shown" : "Hidden") },
+        { key: "tracking", label: "Tracking", value: (i) => TRACKING[i.trackingMethod] ?? i.trackingMethod },
+      ],
+      columns: [
+        { key: "code", label: "Code", className: "w-28", value: (i) => i.code, render: (i) => <NumberCell value={i.code} /> },
+        { key: "name", label: "Item", value: (i) => i.name, render: (i) => <span className="truncate font-medium">{i.name}</span> },
+        { key: "category", label: "Category", className: "w-36", value: (i) => i.category, render: (i) => <MutedCell value={i.category} /> },
+        { key: "status", label: "Stock", className: "w-36", value: stockStatus, render: (i) => <StatusPill value={stockStatus(i)} options={STATUSES} /> },
+        {
+          key: "onHand",
+          label: "On hand",
+          align: "right",
+          className: "w-36",
+          hint: "Units you have right now. The bar fills up at three times your reorder level",
+          value: (i) => i.quantityOnHand,
+          render: (i) => <StockCell item={i} />,
+        },
+        { key: "reorder", label: "Reorder at", align: "right", className: "w-24", hint: "When on-hand drops to this, it counts as running low", value: (i) => i.reorderPoint, render: (i) => <span className="tabular-nums text-foreground/70">{i.reorderPoint.toLocaleString()}</span> },
+        { key: "cost", label: "Cost", align: "right", className: "w-28", hint: "What you pay for one", value: (i) => i.purchasePrice, csv: (i) => dollars(i.purchasePrice), render: (i) => <MoneyCell cents={i.purchasePrice} className="text-foreground/80" /> },
+        { key: "price", label: "Sells for", align: "right", className: "w-28", hint: "What you charge for one", value: (i) => i.salePrice, csv: (i) => dollars(i.salePrice), render: (i) => <MoneyCell cents={i.salePrice} /> },
+        {
+          key: "markup",
+          label: "Markup",
+          align: "right",
+          className: "w-24",
+          hint: "How much more you sell it for than you pay",
+          value: (i) => markup(i),
+          csv: (i) => (markup(i) == null ? "" : markup(i)!.toFixed(1)),
+          render: (i) => {
+            const m = markup(i);
+            return m == null ? <span className="text-muted-foreground/50">—</span> : <span className={cn("tabular-nums", m < 0 && "text-red-600 dark:text-red-400")}>{m.toFixed(1)}%</span>;
+          },
+        },
+        { key: "value", label: "Stock value", align: "right", className: "w-32", money: true, hint: "On hand times cost", value: stockValue, render: (i) => <MoneyCell cents={stockValue(i)} className="font-medium" /> },
+        { key: "salesValue", label: "Could sell for", align: "right", className: "w-32", money: true, hidden: true, hint: "On hand times sale price", value: salesValue },
+        { key: "bookValue", label: "Book value", align: "right", className: "w-32", money: true, hidden: true, hint: "What your books say the stock is worth, using its real purchase history", value: (i) => i.totalValue },
+        { key: "avgCost", label: "Average cost", align: "right", className: "w-28", hidden: true, value: (i) => i.averageCost, csv: (i) => dollars(i.averageCost), render: (i) => <MoneyCell cents={i.averageCost} /> },
+        { key: "sku", label: "SKU", className: "w-32", hidden: true, value: (i) => i.sku, render: (i) => <NumberCell value={i.sku} /> },
+        { key: "unit", label: "Unit", className: "w-20", hidden: true, value: (i) => i.unitOfMeasure },
+        { key: "tracking", label: "Tracking", className: "w-32", hidden: true, value: (i) => TRACKING[i.trackingMethod] ?? i.trackingMethod },
+        { key: "costMethod", label: "Costing", className: "w-36", hidden: true, value: (i) => COST_METHODS[i.costMethod] ?? i.costMethod },
+        { key: "added", label: "Added", className: "w-32", hidden: true, value: (i) => i.createdAt, render: (i) => <DateCell value={toDayKey(new Date(i.createdAt))} /> },
+        { key: "updated", label: "Last changed", className: "w-32", hidden: true, value: (i) => i.updatedAt, render: (i) => <DateCell value={toDayKey(new Date(i.updatedAt))} /> },
+      ],
+      metrics: (rows) => {
+        const value = rows.reduce((s, i) => s + stockValue(i), 0);
+        const retail = rows.reduce((s, i) => s + salesValue(i), 0);
+        const units = rows.reduce((s, i) => s + Math.max(0, i.quantityOnHand), 0);
+        const low = rows.filter((i) => stockStatus(i) === "low");
+        const out = rows.filter((i) => stockStatus(i) === "out");
+        const refill = [...low, ...out].reduce((s, i) => s + Math.max(0, i.reorderPoint * 2 - i.quantityOnHand) * i.purchasePrice, 0);
+        const priced = rows.map(markup).filter((m): m is number => m != null);
+        const avgMarkup = priced.length ? priced.reduce((a, b) => a + b, 0) / priced.length : null;
+        const byCategory = new Map<string, number>();
+        for (const i of rows) byCategory.set(i.category || "No category", (byCategory.get(i.category || "No category") ?? 0) + stockValue(i));
+        const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
+        return [
+          { key: "value", label: "Stock value", color: "#14B8A6", value: formatMoney(value), note: `${plural(units, "unit")} on hand`, hint: "What everything on your shelves cost you: units on hand times cost." },
+          { key: "retail", label: "Could sell for", color: "#8B5CF6", value: formatMoney(retail), note: retail > value ? `${formatMoney(retail - value)} profit if it all sells` : "At today's prices", hint: "What you'd take in if you sold everything on hand at its sale price." },
+          { key: "low", label: "Running low", color: "#F59E0B", status: "low", value: low.length.toString(), note: low.length ? "at or below the reorder level" : "Nothing is running low", hint: "Items at or below their reorder level. Order more before they run out." },
+          { key: "out", label: "Out of stock", color: "#EF4444", status: "out", value: out.length.toString(), note: out.length || low.length ? `~${formatMoney(refill)} to restock` : "Everything is available", hint: "Items with none left. The restock figure is roughly what it costs to bring low and empty items back to twice their reorder level." },
+          { key: "markup", label: "Average markup", color: "#0EA5E9", value: avgMarkup == null ? "—" : `${avgMarkup.toFixed(1)}%`, note: priced.length ? `across ${plural(priced.length, "priced item")}` : "Add costs to see this", hint: "On average, how much more you sell items for than you pay for them." },
+          { key: "top", label: "Biggest category", color: "#EC4899", value: top ? top[0] : "—", note: top && value ? `${formatMoney(top[1])} · ${Math.round((top[1] / value) * 100)}% of stock value` : "No stock yet", hint: "The category with the most money tied up in stock." },
+        ];
+      },
+      bulkActions: (selected, helpers) => {
+        const ids = selected.map((i) => i.id);
+        const run = (action: string) => async () => {
+          try {
+            await bulkAction(action, ids, helpers);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Bulk action failed");
+          }
+        };
+        return (
+          <>
+            <ActionButton icon={<Power className="size-3.5" />} run={run("set_active")}>
+              Show
+            </ActionButton>
+            <ActionButton icon={<PowerOff className="size-3.5" />} run={run("set_inactive")}>
+              Hide
+            </ActionButton>
+            <ActionButton icon={<Tag className="size-3.5" />} run={async () => setTarget({ mode: "category", ids, helpers })}>
+              Category
+            </ActionButton>
+            <ActionButton icon={<ArrowUpDown className="size-3.5" />} run={async () => setTarget({ mode: "adjust", ids, helpers })}>
+              Change count
+            </ActionButton>
+            <ActionButton
+              icon={<Trash2 className="size-3.5" />}
+              className="text-red-600"
+              run={async () => {
+                const ok = await confirm({
+                  title: `Delete ${ids.length} item${ids.length !== 1 ? "s" : ""}?`,
+                  description: "This action cannot be undone.",
+                  confirmLabel: "Delete",
+                  destructive: true,
+                });
+                if (ok) await run("delete")();
+              }}
+            >
+              Delete
+            </ActionButton>
+          </>
+        );
+      },
+      preview: (i, helpers) => {
+        const s = stockStatus(i);
+        const m = markup(i);
+        return (
+          <DocumentPreview
+            number={i.code}
+            status={s}
+            statusOptions={STATUSES}
+            party={i.name}
+            partySub={[i.category, i.sku].filter(Boolean).join(" · ") || null}
+            amount={stockValue(i)}
+            amountLabel="stock value"
+            facts={[
+              { label: "On hand", value: `${i.quantityOnHand.toLocaleString()}${i.unitOfMeasure ? ` ${i.unitOfMeasure}` : ""}` },
+              { label: "Reorder at", value: i.reorderPoint.toLocaleString() },
+              { label: "Cost", value: formatMoney(i.purchasePrice) },
+              { label: "Sells for", value: formatMoney(i.salePrice) },
+              { label: "Markup", value: m == null ? "—" : `${m.toFixed(1)}%` },
+              { label: "Could sell for", value: formatMoney(salesValue(i)) },
+              { label: "Book value", value: formatMoney(i.totalValue) },
+              { label: "Average cost", value: formatMoney(i.averageCost) },
+              { label: "Tracking", value: TRACKING[i.trackingMethod] ?? i.trackingMethod },
+              { label: "Costing", value: COST_METHODS[i.costMethod] ?? i.costMethod },
+            ]}
+            actions={
+              <>
+                <ActionButton primary icon={<ArrowUpDown className="size-3.5" />} run={async () => setTarget({ mode: "adjust", ids: [i.id], helpers })}>
+                  Change count
+                </ActionButton>
+                {(s === "low" || s === "out") && (
+                  <ActionButton icon={<AlertTriangle className="size-3.5" />} run={async () => router.push("/inventory/alerts")}>
+                    Reorder suggestions
+                  </ActionButton>
+                )}
+                <ActionButton
+                  icon={i.isActive ? <PowerOff className="size-3.5" /> : <Power className="size-3.5" />}
+                  run={() => bulkAction(i.isActive ? "set_inactive" : "set_active", [i.id], helpers)}
+                >
+                  {i.isActive ? "Hide" : "Show"}
+                </ActionButton>
+              </>
+            }
+          >
+            {i.description && (
+              <div className="mt-5">
+                <p className="mb-1.5 text-[12.5px] font-medium text-muted-foreground">Description</p>
+                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/85">{i.description}</p>
+              </div>
+            )}
+            <RecentMovements itemId={i.id} />
+          </DocumentPreview>
+        );
+      },
+      create: { label: "Import items", onClick: () => setImportOpen(true) },
+      empty: <InventoryEmpty onCreate={() => openDrawer("inventory")} onImport={() => setImportOpen(true)} />,
+    }),
+    [confirm, openDrawer, router]
+  );
 
   return (
-    <ContentReveal className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Package className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Total Items</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">{summary.totalItems}</p>
-        </div>
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <DollarSign className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Value of stock</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(summary.totalValue)}</p>
-        </div>
-        <div
-          className="rounded-xl border bg-card p-4 cursor-pointer hover:bg-muted/40 transition-colors"
-          onClick={() => router.push("/inventory/alerts")}
-        >
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <AlertTriangle className={cn("size-3.5", summary.lowStockCount > 0 && "text-amber-500")} />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Running low</span>
-          </div>
-          <p className={cn(
-            "mt-2 text-2xl font-bold font-mono tabular-nums truncate",
-            summary.lowStockCount > 0 && "text-amber-600 dark:text-amber-400"
-          )}>
-            {summary.lowStockCount}
-          </p>
-        </div>
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <TrendingUp className="size-3.5" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Avg. profit margin</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold font-mono tabular-nums truncate">
-            {summary.avgMargin > 0 ? `${summary.avgMargin.toFixed(1)}%` : "-"}
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <Explorer key={version} config={config} />
 
-      {/* Movement Chart */}
+      {/* Movement chart */}
       {chartData.length > 0 && (
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium">Stock Movements</p>
-            <select
-              value={chartPeriod}
-              onChange={(e) => setChartPeriod(e.target.value)}
-              className="rounded-md border bg-background px-2 py-1 text-xs"
-            >
+        <div className="rounded-xl border border-border/80 bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-[13.5px] font-medium">Stock movements</p>
+              <p className="text-[12px] text-muted-foreground">Units coming in and going out across all items</p>
+            </div>
+            <select value={chartPeriod} onChange={(e) => setChartPeriod(e.target.value)} className="h-8 rounded-lg border border-border/80 bg-background px-2 text-[12.5px]">
               <option value="30d">30 days</option>
               <option value="90d">90 days</option>
               <option value="12m">12 months</option>
@@ -478,321 +486,27 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Toolbar - top row swaps between tabs and select actions, search/filters always visible */}
-      <div className="flex flex-col gap-3">
-        {/* Top row: tabs+buttons or select actions */}
-        <AnimatePresence initial={false} mode="popLayout">
-          {selectMode ? (
-            <motion.div
-              key="select-bar"
-              initial={{ opacity: 0, filter: "blur(4px)" }}
-              animate={{ opacity: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, filter: "blur(4px)" }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className="flex items-center gap-2 flex-wrap"
-            >
-              <div className="flex items-center gap-2 mr-auto">
-                <Checkbox
-                  checked={isAllSelected ? true : isPartialSelected ? "indeterminate" : false}
-                  onCheckedChange={toggleSelectAll}
-                />
-                <span className="text-sm font-medium">
-                  {selectionCount > 0 ? `${selectionCount} selected` : "Select items"}
-                </span>
-              </div>
-
-              <AnimatePresence>
-                {selectionCount > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, filter: "blur(4px)" }}
-                    animate={{ opacity: 1, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, filter: "blur(4px)" }}
-                    transition={{ duration: 0.2 }}
-                    className="flex items-center gap-2 flex-wrap"
-                  >
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_active")} disabled={bulkLoading} title="Show these items in lists and pickers">
-                      <Power className="size-3 mr-1.5" />Show
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkAction("set_inactive")} disabled={bulkLoading} title="Hide these items from lists and pickers">
-                      <PowerOff className="size-3 mr-1.5" />Hide
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkCategoryOpen(true)} disabled={bulkLoading}>
-                      <Tag className="size-3 mr-1.5" />Category
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBulkAdjustOpen(true)} disabled={bulkLoading} title="Add or remove units for the selected items">
-                      <ArrowUpDown className="size-3 mr-1.5" />Change count
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={handleBulkDelete} disabled={bulkLoading}>
-                      <Trash2 className="size-3 mr-1.5" />Delete
-                    </Button>
-                    {bulkLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => { setSelectMode(false); setSelected(new Set()); }}
-              >
-                Done
-              </Button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="tabs-bar"
-              initial={{ opacity: 0, filter: "blur(4px)" }}
-              animate={{ opacity: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, filter: "blur(4px)" }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="low_stock">Running low</TabsTrigger>
-                  <TabsTrigger value="active">Shown</TabsTrigger>
-                  <TabsTrigger value="inactive">Hidden</TabsTrigger>
-                </TabsList>
-              </Tabs>
-
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSelectMode(true)}>
-                  Select
-                </Button>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setImportOpen(true)}>
-                  <Upload className="size-3" />
-                  <span className="hidden sm:inline">Import</span>
-                </Button>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
-                  <Download className="size-3" />
-                  <span className="hidden sm:inline">Export</span>
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Search, filters, sort - always visible */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              ref={searchRef}
-              placeholder="Search by name, code, or SKU..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-8 h-8 text-sm"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="w-full sm:w-[180px]">
-            <CategoryPicker
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              placeholder="All Categories"
-              triggerClassName="h-8 text-xs"
-            />
-          </div>
-
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-            <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
-              <ArrowUpDown className="size-3 mr-1.5 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={toggleSortOrder}>
-            <ArrowUpDown className={cn("size-3.5 transition-transform", sortOrder === "asc" && "rotate-180")} />
-          </Button>
-        </div>
-      </div>
-
-      {/* Item list */}
-      {refetching || pendingSearch ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="brand-loader" aria-label="Loading">
-            <div className="brand-loader-circle brand-loader-circle-1" />
-            <div className="brand-loader-circle brand-loader-circle-2" />
-          </div>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
-            {tab === "low_stock" ? <AlertTriangle className="size-5 text-muted-foreground" /> : <Archive className="size-5 text-muted-foreground" />}
-          </div>
-          <p className="text-sm font-medium text-muted-foreground">
-            {debouncedSearch ? `No items match "${debouncedSearch}"` : "No items found"}
-          </p>
-        </div>
-      ) : (
-        <MotionConfig reducedMotion="never">
-        <motion.div
-          key={fetchKey}
-          initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-          style={{ willChange: "opacity, transform, filter" }}
-        >
-        <div className="rounded-xl border bg-card divide-y">
-          {items.map((item) => {
-            const isLow = item.quantityOnHand <= item.reorderPoint && item.isActive;
-            const isSelected = selected.has(item.id);
-            const stockPercent = item.reorderPoint > 0
-              ? Math.min((item.quantityOnHand / (item.reorderPoint * 3)) * 100, 100)
-              : 100;
-
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  "group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-200",
-                  "hover:bg-muted/40",
-                  isSelected && "bg-primary/5"
-                )}
-                onClick={() => {
-                  if (selectMode) toggleSelect(item.id);
-                  else router.push(`/inventory/${item.id}`);
-                }}
-              >
-                {/* Checkbox - slides in during select mode */}
-                <div
-                  className={cn(
-                    "shrink-0 overflow-hidden transition-all duration-200 ease-out",
-                    selectMode ? "w-5 opacity-100" : "w-0 opacity-0"
-                  )}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => toggleSelect(item.id)}
-                  />
-                </div>
-
-                {/* Icon + info */}
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-200",
-                    isLow ? "bg-amber-50 dark:bg-amber-950/40" : item.isActive ? "bg-brand-50 dark:bg-brand-950/40" : "bg-muted"
-                  )}>
-                    <Package className={cn(
-                      "size-4",
-                      isLow ? "text-amber-600 dark:text-amber-400" : item.isActive ? "text-brand-600 dark:text-brand-400" : "text-muted-foreground"
-                    )} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      {isLow && (
-                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-1.5 py-0" title="At or below your reorder level">Running low</Badge>
-                      )}
-                      {!item.isActive && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0" title="Hidden from lists and pickers">Hidden</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {item.code}
-                      {item.sku ? ` · ${item.sku}` : ""}
-                      {item.category ? ` · ${item.category}` : ""}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Stock bar */}
-                <div className="hidden sm:flex flex-col items-end gap-1 w-24">
-                  <span className={cn("text-xs font-mono tabular-nums font-medium", isLow ? "text-amber-600 dark:text-amber-400" : "")}>
-                    {item.quantityOnHand}
-                  </span>
-                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                    <motion.div
-                      className={cn("h-full rounded-full", isLow ? "bg-amber-500" : "bg-brand-500")}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${stockPercent}%` }}
-                      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-                    />
-                  </div>
-                </div>
-
-                {/* Prices */}
-                <div className="hidden md:flex flex-col items-end gap-0.5 w-24">
-                  <span className="text-xs font-mono tabular-nums text-brand-600 dark:text-brand-400">{formatMoney(item.salePrice)}</span>
-                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">Cost {formatMoney(item.purchasePrice)}</span>
-                </div>
-
-                {/* Value */}
-                <div className="hidden lg:block text-right w-24">
-                  <p className="text-xs font-mono tabular-nums font-medium">{formatMoney(item.quantityOnHand * item.purchasePrice)}</p>
-                  <p className="text-[11px] text-muted-foreground">value</p>
-                </div>
-
-                <div className={cn(
-                  "shrink-0 overflow-hidden transition-all duration-200 ease-out",
-                  selectMode ? "w-0 opacity-0" : "w-4 opacity-100"
-                )}>
-                  <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                </div>
-              </div>
-            );
-          })}
-
-          {!hasMore && items.length > 0 && (
-            <div className="py-3 text-center">
-              <span className="text-[11px] text-muted-foreground">
-                Showing all {items.length} item{items.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
-        </div>
-        </motion.div>
-        </MotionConfig>
-      )}
-
-      {/* Infinite scroll sentinel */}
-      {hasMore && !refetching && (
-        <div ref={sentinelRef} className="flex items-center justify-center py-6">
-          {loadingMore && (
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          )}
-        </div>
-      )}
-
       {/* Bulk set category sheet */}
-      <Sheet open={bulkCategoryOpen} onOpenChange={setBulkCategoryOpen}>
+      <Sheet open={target?.mode === "category"} onOpenChange={(open) => !open && setTarget(null)}>
         <SheetContent>
-          <SheetHeader><SheetTitle>Set Category</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>Set Category</SheetTitle>
+          </SheetHeader>
           <div className="space-y-4 px-4">
-            <p className="text-sm text-muted-foreground">Set category for {selectionCount} selected item{selectionCount !== 1 ? "s" : ""}.</p>
+            <p className="text-sm text-muted-foreground">
+              Set category for {target?.ids.length ?? 0} selected item{target?.ids.length !== 1 ? "s" : ""}.
+            </p>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Input
-                value={bulkCategory}
-                onChange={(e) => setBulkCategory(e.target.value)}
-                placeholder="e.g. Electronics, Office"
-              />
+              <Input value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} placeholder="e.g. Electronics, Office" />
               {categories.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {categories.map((c) => (
                     <button
                       key={c}
+                      type="button"
                       onClick={() => setBulkCategory(c)}
-                      className={cn(
-                        "rounded-md border px-2 py-1 text-xs transition-colors",
-                        bulkCategory === c ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300" : "hover:bg-muted"
-                      )}
+                      className={cn("rounded-md px-2 py-1 text-xs transition-colors", bulkCategory === c ? "bg-foreground/[0.055] font-medium" : "border border-border/80 hover:bg-foreground/[0.03]")}
                     >
                       {c}
                     </button>
@@ -802,16 +516,10 @@ export default function InventoryPage() {
             </div>
           </div>
           <SheetFooter>
-            <Button variant="outline" onClick={() => setBulkCategoryOpen(false)}>Cancel</Button>
-            <Button
-              onClick={async () => {
-                await bulkAction("set_category", { category: bulkCategory });
-                setBulkCategoryOpen(false);
-                setBulkCategory("");
-              }}
-              disabled={bulkLoading}
-              className="bg-brand-600 hover:bg-brand-700"
-            >
+            <Button variant="outline" onClick={() => setTarget(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => submitSheet("set_category", { category: bulkCategory })} disabled={bulkLoading} className="bg-brand-600 hover:bg-brand-700">
               {bulkLoading ? "Saving..." : "Apply"}
             </Button>
           </SheetFooter>
@@ -819,39 +527,38 @@ export default function InventoryPage() {
       </Sheet>
 
       {/* Bulk adjust stock sheet */}
-      <Sheet open={bulkAdjustOpen} onOpenChange={setBulkAdjustOpen}>
+      <Sheet open={target?.mode === "adjust"} onOpenChange={(open) => !open && setTarget(null)}>
         <SheetContent>
-          <SheetHeader><SheetTitle>Change the count</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>Change the count</SheetTitle>
+          </SheetHeader>
           <div className="space-y-4 px-4">
-            <p className="text-sm text-muted-foreground">Add or remove the same number of units for {selectionCount} selected item{selectionCount !== 1 ? "s" : ""}.</p>
+            <p className="text-sm text-muted-foreground">
+              {target?.ids.length === 1
+                ? "Add or remove units for this item."
+                : `Add or remove the same number of units for ${target?.ids.length ?? 0} selected items.`}
+            </p>
             <div className="space-y-2">
               <Label>Add or remove units</Label>
-              <Input
-                type="number"
-                value={bulkAdjustment}
-                onChange={(e) => setBulkAdjustment(e.target.value)}
-                placeholder="e.g. 10 to add, -5 to remove"
-              />
+              <Input type="number" value={bulkAdjustment} onChange={(e) => setBulkAdjustment(e.target.value)} placeholder="e.g. 10 to add, -5 to remove" />
             </div>
             <div className="space-y-2">
               <Label>Reason</Label>
-              <Input
-                value={bulkAdjustReason}
-                onChange={(e) => setBulkAdjustReason(e.target.value)}
-                placeholder="e.g. Stock count, breakage, found extra"
-              />
+              <Input value={bulkAdjustReason} onChange={(e) => setBulkAdjustReason(e.target.value)} placeholder="e.g. Stock count, breakage, found extra" />
             </div>
           </div>
           <SheetFooter>
-            <Button variant="outline" onClick={() => setBulkAdjustOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setTarget(null)}>
+              Cancel
+            </Button>
             <Button
-              onClick={async () => {
+              onClick={() => {
                 const adj = parseInt(bulkAdjustment);
-                if (!adj) { toast.error("Enter how many units to add or remove"); return; }
-                await bulkAction("adjust_stock", { adjustment: adj, reason: bulkAdjustReason });
-                setBulkAdjustOpen(false);
-                setBulkAdjustment("");
-                setBulkAdjustReason("");
+                if (!adj) {
+                  toast.error("Enter how many units to add or remove");
+                  return;
+                }
+                submitSheet("adjust_stock", { adjustment: adj, reason: bulkAdjustReason });
               }}
               disabled={bulkLoading}
               className="bg-brand-600 hover:bg-brand-700"
@@ -865,7 +572,9 @@ export default function InventoryPage() {
       {/* Import CSV sheet */}
       <Sheet open={importOpen} onOpenChange={setImportOpen}>
         <SheetContent>
-          <SheetHeader><SheetTitle>Import Inventory</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>Import Inventory</SheetTitle>
+          </SheetHeader>
           <div className="space-y-4 px-4">
             <p className="text-sm text-muted-foreground">
               Upload a CSV file with columns: code, name, description, category, sku, purchasePrice, salePrice, quantityOnHand, reorderPoint
@@ -887,14 +596,14 @@ export default function InventoryPage() {
                 <div className="flex gap-4 text-sm">
                   <span className="text-brand-600">{importResult.created} created</span>
                   <span className="text-blue-600">{importResult.updated} updated</span>
-                  {importResult.errors.length > 0 && (
-                    <span className="text-red-600">{importResult.errors.length} errors</span>
-                  )}
+                  {importResult.errors.length > 0 && <span className="text-red-600">{importResult.errors.length} errors</span>}
                 </div>
                 {importResult.errors.length > 0 && (
                   <div className="max-h-32 overflow-y-auto text-xs space-y-1">
                     {importResult.errors.map((err, i) => (
-                      <p key={i} className="text-red-600">Row {err.row}: {err.message}</p>
+                      <p key={i} className="text-red-600">
+                        Row {err.row}: {err.message}
+                      </p>
                     ))}
                   </div>
                 )}
@@ -902,12 +611,10 @@ export default function InventoryPage() {
             )}
           </div>
           <SheetFooter>
-            <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleImport}
-              disabled={!importFile || importLoading}
-              className="bg-brand-600 hover:bg-brand-700"
-            >
+            <Button variant="outline" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={!importFile || importLoading} className="bg-brand-600 hover:bg-brand-700">
               {importLoading ? "Importing..." : "Import"}
             </Button>
           </SheetFooter>
@@ -915,6 +622,24 @@ export default function InventoryPage() {
       </Sheet>
 
       {confirmDialog}
+    </div>
+  );
+}
+
+function InventoryEmpty({ onCreate, onImport }: { onCreate: () => void; onImport: () => void }) {
+  return (
+    <ContentReveal>
+      <EmptyState icon={Package} title="No inventory items yet" description="Add your first product or item to start tracking inventory.">
+        <div className="flex items-center gap-2">
+          <Button onClick={onCreate} className="bg-brand-600 hover:bg-brand-700">
+            New Item
+          </Button>
+          <Button variant="outline" onClick={onImport}>
+            <Upload className="mr-2 size-4" />
+            Import from CSV
+          </Button>
+        </div>
+      </EmptyState>
     </ContentReveal>
   );
 }

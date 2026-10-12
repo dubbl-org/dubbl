@@ -4,6 +4,9 @@ import { registerOrganizationTools } from "./organization";
 import { registerAccountTools } from "./accounts";
 import { registerEntryTools } from "./entries";
 import { registerContactTools } from "./contacts";
+import { registerContactPeopleTools } from "./contact-people";
+import { registerContactInsightTools } from "./contact-insights";
+import { registerPortalTools } from "./portal";
 import { registerInvoiceTools } from "./invoices";
 import { registerBillTools } from "./bills";
 import { registerReportTools } from "./reports";
@@ -16,6 +19,8 @@ import { registerApprovalTools } from "./approvals";
 import { registerBankRuleTools } from "./bank-rules";
 import { registerBankTransactionTools } from "./bank-transactions";
 import { registerDocumentTools } from "./documents";
+import { registerSearchTools } from "./search";
+import { registerAssistantTools } from "./assistant";
 import { registerIntegrationTools } from "./integrations";
 import { registerEmailTools } from "./email";
 import { registerPeriodCloseTools } from "./period-close";
@@ -33,6 +38,7 @@ import { registerPurchasingTools } from "./purchasing";
 import { registerSalesReceiptTools } from "./sales-receipts";
 import { registerQuoteTools } from "./quotes";
 import { registerTaxProfileTools } from "./tax-profiles";
+import { registerChartTemplateTools } from "./chart-templates";
 import { registerRecurringJournalTools } from "./recurring-journals";
 import { registerProjectTools } from "./projects";
 import { registerDebitNoteTools } from "./debit-notes";
@@ -53,6 +59,7 @@ import { registerTagTools } from "./tags";
 import { registerTaxPeriodTools } from "./tax-periods";
 import { registerReminderTools } from "./reminders";
 import { registerCrmTools } from "./crm";
+import { registerLeaveTools } from "./leave";
 import { registerWarehouseTools } from "./warehouses";
 
 export function registerAllTools(server: McpServer, ctx: AuthContext) {
@@ -60,6 +67,9 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerAccountTools(server, ctx);
   registerEntryTools(server, ctx);
   registerContactTools(server, ctx);
+  registerContactPeopleTools(server, ctx);
+  registerContactInsightTools(server, ctx);
+  registerPortalTools(server, ctx);
   registerInvoiceTools(server, ctx);
   registerBillTools(server, ctx);
   registerReportTools(server, ctx);
@@ -72,6 +82,8 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerBankRuleTools(server, ctx);
   registerBankTransactionTools(server, ctx);
   registerDocumentTools(server, ctx);
+  registerSearchTools(server, ctx);
+  registerAssistantTools(server, ctx);
   registerIntegrationTools(server, ctx);
   registerEmailTools(server, ctx);
   registerPeriodCloseTools(server, ctx);
@@ -89,6 +101,7 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerSalesReceiptTools(server, ctx);
   registerQuoteTools(server, ctx);
   registerTaxProfileTools(server, ctx);
+  registerChartTemplateTools(server, ctx);
   registerRecurringJournalTools(server, ctx);
   registerProjectTools(server, ctx);
   registerDebitNoteTools(server, ctx);
@@ -109,5 +122,6 @@ export function registerAllTools(server: McpServer, ctx: AuthContext) {
   registerTaxPeriodTools(server, ctx);
   registerReminderTools(server, ctx);
   registerCrmTools(server, ctx);
+  registerLeaveTools(server, ctx);
   registerWarehouseTools(server, ctx);
 }

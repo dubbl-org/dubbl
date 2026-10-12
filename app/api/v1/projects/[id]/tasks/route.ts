@@ -45,7 +45,7 @@ export async function GET(
       orderBy: asc(projectTask.sortOrder),
       with: {
         assignee: {
-          with: { user: true },
+          with: { user: { columns: { id: true, name: true, email: true, image: true } } },
         },
       },
     });

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { notificationPreference } from "@/lib/db/schema";
+import { notificationPreference, notificationTypeEnum } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { ok, handleError } from "@/lib/api/response";
@@ -25,15 +25,7 @@ export async function GET(request: Request) {
 const updateSchema = z.object({
   preferences: z.array(
     z.object({
-      type: z.enum([
-        "invoice_overdue",
-        "payment_received",
-        "inventory_low",
-        "payroll_due",
-        "approval_needed",
-        "system_alert",
-        "task_assigned",
-      ]),
+      type: z.enum(notificationTypeEnum.enumValues),
       channel: z.enum(["in_app", "email"]).default("in_app"),
       enabled: z.boolean(),
       digestIntervalMinutes: z.number().int().min(0).optional(),

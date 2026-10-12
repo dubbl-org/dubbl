@@ -566,7 +566,8 @@ export default function BillDetailPage() {
             orgId={orgId}
             entityType="bill"
             entityId={b.id}
-            label="Attach the supplier's invoice or receipt (optional)"
+            label="Supplier invoices & receipts"
+            hint="The supplier's PDF, receipts, delivery notes"
           />
         </div>
       </div>

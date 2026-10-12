@@ -1,29 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Banknote, Search, X } from "lucide-react";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { StatCard } from "@/components/dashboard/stat-card";
-import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRightLeft, Banknote, FileText, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { EmptyState } from "@/components/dashboard/empty-state";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { EmptyState } from "@/components/dashboard/empty-state";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
-import { devDelay } from "@/lib/dev-delay";
+import { Explorer } from "@/components/dashboard/explorer/explorer";
+import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
+import { ActionButton } from "@/components/dashboard/explorer/action-button";
+import { DateCell, MoneyCell, MutedCell, NumberCell, PartyCell, StatusPill, formatDay, toDayKey } from "@/components/dashboard/explorer/cells";
+import type { ExplorerConfig, ExplorerStatus } from "@/components/dashboard/explorer/types";
+
+interface Allocation {
+  id: string;
+  documentType: string;
+  documentId: string;
+  amount: number;
+}
 
 interface Payment {
   id: string;
@@ -33,322 +31,319 @@ interface Payment {
   currencyCode: string;
   method: string;
   reference: string | null;
-  contact: { name: string } | null;
-  allocations: { documentType: string; documentId: string; amount: number }[];
+  notes: string | null;
+  bankAccountId: string | null;
+  stripePaymentIntentId: string | null;
+  createdAt: string;
+  contact: { name: string; email: string | null } | null;
+  allocations: Allocation[];
 }
 
-const methodLabels: Record<string, string> = {
-  bank_transfer: "Bank Transfer",
+const METHODS: Record<string, string> = {
+  bank_transfer: "Bank transfer",
   cash: "Cash",
   check: "Check",
   card: "Card",
   other: "Other",
 };
 
-const methodColors: Record<string, string> = {
-  bank_transfer: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  cash: "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300",
-  check: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  card: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
-  other: "",
-};
+const STATUSES: ExplorerStatus[] = [
+  { value: "matched", label: "Matched", color: "#10B981", hint: "The whole payment has been put toward invoices" },
+  { value: "partial", label: "Part matched", color: "#F59E0B", hint: "Some of the payment is still not put toward any invoice" },
+  { value: "unmatched", label: "Not matched", color: "#EC4899", hint: "None of this payment has been put toward an invoice yet" },
+];
 
-function buildColumns(): Column<Payment>[] {
-  return [
-    {
-      key: "number",
-      header: "Number",
-      sortKey: "number",
-      className: "w-32",
-      render: (r) => <span className="font-mono text-sm">{r.paymentNumber}</span>,
-    },
-    {
-      key: "contact",
-      header: "Customer",
-      render: (r) => <span className="text-sm font-medium">{r.contact?.name || "-"}</span>,
-    },
-    {
-      key: "date",
-      header: "Date",
-      sortKey: "date",
-      className: "w-28",
-      render: (r) => <span className="text-sm">{r.date}</span>,
-    },
-    {
-      key: "method",
-      header: "Method",
-      className: "w-32",
-      render: (r) => (
-        <Badge variant="outline" className={methodColors[r.method] || ""}>
-          {methodLabels[r.method] || r.method}
-        </Badge>
-      ),
-    },
-    {
-      key: "reference",
-      header: "Reference",
-      className: "w-32",
-      render: (r) => <span className="text-sm text-muted-foreground">{r.reference || "-"}</span>,
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      sortKey: "amount",
-      className: "w-28 text-right",
-      render: (r) => (
-        <span className="font-mono text-sm tabular-nums font-medium text-brand-600">
-          {formatMoney(r.amount, r.currencyCode)}
-        </span>
-      ),
-    },
-    {
-      key: "allocations",
-      header: "Allocations",
-      className: "w-28",
-      render: (r) => {
-        const count = r.allocations?.length || 0;
-        return (
-          <span className="text-sm text-muted-foreground">
-            {count === 0 ? "-" : `${count} invoice${count !== 1 ? "s" : ""}`}
-          </span>
-        );
-      },
-    },
-  ];
+const allocated = (p: Payment) => (p.allocations ?? []).reduce((s, a) => s + a.amount, 0);
+const leftover = (p: Payment) => Math.max(0, p.amount - allocated(p));
+
+function statusOf(p: Payment) {
+  const used = allocated(p);
+  if (used <= 0) return "unmatched";
+  return used >= p.amount ? "matched" : "partial";
+}
+
+function monthKeys() {
+  const now = new Date();
+  return {
+    thisMonth: toDayKey(now).slice(0, 7),
+    lastMonth: toDayKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)).slice(0, 7),
+  };
+}
+
+function sum(rows: Payment[]) {
+  return rows.reduce((s, p) => s + p.amount, 0);
+}
+
+function change(now: number, before: number) {
+  if (!before) return now ? "Nothing last month" : "Same as last month";
+  const pct = Math.round(((now - before) / before) * 100);
+  return pct === 0 ? "Same as last month" : `${pct > 0 ? "+" : ""}${pct}% vs last month`;
 }
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search);
-
   useDocumentTitle("Sales · Payments");
 
-  const [methodFilter, setMethodFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState("date");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const config = useMemo<ExplorerConfig<Payment>>(
+    () => ({
+      id: "payments-received",
+      endpoint: "/api/v1/payments",
+      params: { type: "received" },
+      noun: { one: "Payment", many: "Payments" },
+      getId: (p) => p.id,
+      href: (p) => `/sales/payments/${p.id}`,
+      status: { get: statusOf, options: STATUSES },
+      date: { get: (p) => p.date, label: "Payment date" },
+      party: { get: (p) => p.contact?.name, label: "Customer", many: "Customers" },
+      amount: (p) => p.amount,
+      amountLabel: "Received",
+      currency: (p) => p.currencyCode,
+      search: (p) => [p.paymentNumber, p.contact?.name, p.contact?.email, p.reference, p.notes, METHODS[p.method]],
+      defaultSort: { key: "date", dir: "desc" },
+      facets: [
+        { key: "method", label: "Method", value: (p) => METHODS[p.method] ?? p.method },
+        { key: "source", label: "Came in via", value: (p) => (p.stripePaymentIntentId ? "Online (Stripe)" : "Recorded by hand") },
+        { key: "currency", label: "Currency", value: (p) => p.currencyCode },
+      ],
+      columns: [
+        { key: "number", label: "Number", className: "w-32", value: (p) => p.paymentNumber, render: (p) => <NumberCell value={p.paymentNumber} /> },
+        { key: "customer", label: "Customer", value: (p) => p.contact?.name, render: (p) => <PartyCell name={p.contact?.name} /> },
+        { key: "date", label: "Date", className: "w-32", value: (p) => p.date, render: (p) => <DateCell value={p.date} /> },
+        { key: "method", label: "Method", className: "w-32", value: (p) => METHODS[p.method] ?? p.method, render: (p) => <MutedCell value={METHODS[p.method] ?? p.method} /> },
+        { key: "status", label: "Matched", className: "w-36", hint: "Whether the payment has been put toward invoices", value: statusOf, render: (p) => <StatusPill value={statusOf(p)} options={STATUSES} /> },
+        { key: "reference", label: "Reference", className: "w-36", value: (p) => p.reference, render: (p) => <MutedCell value={p.reference} /> },
+        {
+          key: "invoices",
+          label: "Invoices",
+          align: "right",
+          className: "w-24",
+          hint: "How many invoices this payment was split across",
+          value: (p) => p.allocations?.length ?? 0,
+          render: (p) => {
+            const n = p.allocations?.length ?? 0;
+            return n ? <span className="tabular-nums text-foreground/80">{n}</span> : <span className="text-muted-foreground/50">—</span>;
+          },
+        },
+        {
+          key: "amount",
+          label: "Amount",
+          align: "right",
+          className: "w-32",
+          money: true,
+          value: (p) => p.amount,
+          render: (p) => <MoneyCell cents={p.amount} currency={p.currencyCode} className="font-medium text-emerald-600 dark:text-emerald-400" />,
+        },
+        {
+          key: "allocated",
+          label: "Put toward invoices",
+          align: "right",
+          className: "w-36",
+          money: true,
+          hidden: true,
+          value: allocated,
+          render: (p) => <MoneyCell cents={allocated(p)} currency={p.currencyCode} />,
+        },
+        {
+          key: "leftover",
+          label: "Leftover",
+          align: "right",
+          className: "w-32",
+          money: true,
+          hint: "Money from this payment that isn't put toward any invoice yet",
+          value: leftover,
+          render: (p) => <MoneyCell cents={leftover(p)} currency={p.currencyCode} className={leftover(p) > 0 ? "font-medium text-amber-600 dark:text-amber-400" : undefined} />,
+        },
+        { key: "source", label: "Came in via", className: "w-36", hidden: true, value: (p) => (p.stripePaymentIntentId ? "Online (Stripe)" : "Recorded by hand") },
+        { key: "notes", label: "Notes", hidden: true, value: (p) => p.notes, render: (p) => <MutedCell value={p.notes} /> },
+        { key: "currency", label: "Currency", className: "w-24", hidden: true, value: (p) => p.currencyCode },
+        { key: "created", label: "Recorded", className: "w-32", hidden: true, value: (p) => p.createdAt, render: (p) => <DateCell value={p.createdAt} /> },
+      ],
+      metrics: (rows) => {
+        const { thisMonth, lastMonth } = monthKeys();
+        const now = rows.filter((p) => p.date.slice(0, 7) === thisMonth);
+        const before = rows.filter((p) => p.date.slice(0, 7) === lastMonth);
+        const total = sum(rows);
+        const byMethod = new Map<string, number>();
+        for (const p of rows) byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amount);
+        const top = [...byMethod.entries()].sort((a, b) => b[1] - a[1])[0];
+        const open = rows.filter((p) => leftover(p) > 0);
+        const loose = open.reduce((s, p) => s + leftover(p), 0);
+        return [
+          { key: "month", label: "Received this month", color: "#10B981", value: formatMoney(sum(now)), note: change(sum(now), sum(before)), hint: "Customer payments dated this calendar month." },
+          { key: "last", label: "Last month", color: "#0EA5E9", value: formatMoney(sum(before)), note: `${before.length} payment${before.length === 1 ? "" : "s"}`, hint: "Customer payments dated last calendar month." },
+          { key: "avg", label: "Average payment", color: "#8B5CF6", value: rows.length ? formatMoney(Math.round(total / rows.length)) : "—", note: `${rows.length} payment${rows.length === 1 ? "" : "s"} · ${formatMoney(total)} in all`, hint: "What a typical customer payment is worth." },
+          {
+            key: "method",
+            label: "Most used method",
+            color: "#14B8A6",
+            value: top ? METHODS[top[0]] ?? top[0] : "—",
+            note: top && total ? `${Math.round((top[1] / total) * 100)}% of the money` : "No payments yet",
+            hint: "How most of your money arrives, by amount.",
+          },
+          {
+            key: "leftover",
+            label: "Not matched yet",
+            color: "#F59E0B",
+            status: "unmatched",
+            value: formatMoney(loose),
+            note: open.length ? `${open.length} payment${open.length === 1 ? "" : "s"} with money left over` : "Everything is matched",
+            hint: "Money customers paid that isn't put toward any invoice yet. Match it so their balance is right.",
+          },
+        ];
+      },
+      preview: (p) => (
+        <DocumentPreview
+          number={p.paymentNumber}
+          status={statusOf(p)}
+          statusOptions={STATUSES}
+          party={p.contact?.name}
+          partySub={p.contact?.email}
+          amount={p.amount}
+          amountLabel="received"
+          currency={p.currencyCode}
+          facts={[
+            { label: "Date", value: formatDay(p.date) },
+            { label: "Method", value: METHODS[p.method] ?? p.method },
+            { label: "Put toward invoices", value: formatMoney(allocated(p), p.currencyCode) },
+            { label: "Leftover", value: formatMoney(leftover(p), p.currencyCode) },
+            { label: "Reference", value: p.reference || "—" },
+            { label: "Came in via", value: p.stripePaymentIntentId ? "Online (Stripe)" : "Recorded by hand" },
+          ]}
+          actions={
+            leftover(p) > 0 ? (
+              <ActionButton primary icon={<ArrowRightLeft className="size-3.5" />} run={async () => router.push(`/sales/payments/${p.id}`)}>
+                Match leftover to an invoice
+              </ActionButton>
+            ) : undefined
+          }
+        >
+          <PaymentDetails payment={p} />
+        </DocumentPreview>
+      ),
+      empty: <PaymentsEmpty />,
+    }),
+    [router]
+  );
 
-  const columns = useMemo(() => buildColumns(), []);
+  return <Explorer config={config} />;
+}
+
+/** Where the money landed and which invoices it paid, resolved from the payment and invoice APIs. */
+function PaymentDetails({ payment }: { payment: Payment }) {
+  const [state, setState] = useState<{ id: string; bank: string | null; numbers: Record<string, string> } | null>(null);
+  const loading = state?.id !== payment.id;
 
   useEffect(() => {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-
-    fetch(`/api/v1/payments?type=received`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setPayments(data.data);
-      })
-      .then(() => devDelay())
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleSort = useCallback((key: string) => {
-    setSortBy((prev) => {
-      if (prev === key) {
-        setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
-        return key;
-      }
-      setSortOrder("desc");
-      return key;
+    let cancelled = false;
+    const headers = { "x-organization-id": orgId };
+    const get = (url: string) => fetch(url, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const allocations = payment.allocations ?? [];
+    Promise.all([
+      get(`/api/v1/payments/${payment.id}`),
+      ...allocations.map((a) =>
+        a.documentType === "invoice"
+          ? get(`/api/v1/invoices/${a.documentId}`).then((j) => [a.documentId, j?.invoice?.invoiceNumber as string | undefined] as const)
+          : a.documentType === "credit_note"
+            ? get(`/api/v1/credit-notes/${a.documentId}`).then((j) => [a.documentId, j?.creditNote?.creditNoteNumber as string | undefined] as const)
+            : Promise.resolve([a.documentId, undefined] as const)
+      ),
+    ]).then(([detail, ...pairs]) => {
+      if (cancelled) return;
+      const bank = (detail as { payment?: { bankAccount?: { accountName: string; bankName: string | null } | null } } | null)?.payment?.bankAccount;
+      const numbers: Record<string, string> = {};
+      for (const pair of pairs as (readonly [string, string | undefined])[]) if (pair[1]) numbers[pair[0]] = pair[1];
+      setState({ id: payment.id, bank: bank ? [bank.accountName, bank.bankName].filter(Boolean).join(" · ") : null, numbers });
     });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [payment.id, payment.allocations]);
 
-  const pendingSearch = search !== debouncedSearch;
-
-  const [filterKey, setFilterKey] = useState(0);
-
-  const filtered = useMemo(() => {
-    let result = payments;
-
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.paymentNumber.toLowerCase().includes(q) ||
-          (p.contact?.name || "").toLowerCase().includes(q) ||
-          (p.reference || "").toLowerCase().includes(q)
-      );
-    }
-
-    if (methodFilter !== "all") {
-      result = result.filter((p) => p.method === methodFilter);
-    }
-
-    if (dateFrom) {
-      result = result.filter((p) => p.date >= dateFrom);
-    }
-    if (dateTo) {
-      result = result.filter((p) => p.date <= dateTo);
-    }
-
-    result = [...result].sort((a, b) => {
-      let cmp = 0;
-      if (sortBy === "date") cmp = a.date.localeCompare(b.date);
-      else if (sortBy === "amount") cmp = a.amount - b.amount;
-      else if (sortBy === "number") cmp = a.paymentNumber.localeCompare(b.paymentNumber);
-      return sortOrder === "desc" ? -cmp : cmp;
-    });
-
-    return result;
-  }, [payments, debouncedSearch, methodFilter, dateFrom, dateTo, sortBy, sortOrder]);
-
-  // Bump filterKey when filters change to trigger ContentReveal
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFilterKey((k) => k + 1);
-  }, [debouncedSearch, methodFilter, dateFrom, dateTo]);
-
-  const totalAmount = filtered.reduce((sum, p) => sum + p.amount, 0);
-  const hasFilters = search || methodFilter !== "all" || dateFrom || dateTo;
-
-  if (loading) return <BrandLoader />;
-
-  if (!loading && payments.length === 0) {
-    return (
-      <ContentReveal className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="size-8" asChild>
-            <Link href="/sales"><ArrowLeft className="size-4" /></Link>
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Payments</h1>
-            <p className="text-sm text-muted-foreground">Payments received against your invoices.</p>
-          </div>
-        </div>
-        <EmptyState
-          icon={Banknote}
-          title="No payments recorded"
-          description="Payments will appear here when you record them against invoices."
-        />
-      </ContentReveal>
-    );
-  }
+  const money = (c: number) => formatMoney(c, payment.currencyCode);
+  const allocations = payment.allocations ?? [];
+  const rest = leftover(payment);
 
   return (
-    <ContentReveal className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="size-8" asChild>
-            <Link href="/sales"><ArrowLeft className="size-4" /></Link>
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Payments</h1>
-            <p className="text-sm text-muted-foreground">Payments received against your invoices.</p>
-          </div>
+    <>
+      <div className="mt-6">
+        <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">Paid into</p>
+        <div className="flex items-center gap-3 rounded-xl border border-border/80 px-3 py-2.5 text-[13px]">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-foreground/[0.05] text-foreground/70">
+            <Landmark className="size-3.5" />
+          </span>
+          {loading ? <Skeleton className="h-4 w-40" /> : <span className="min-w-0 flex-1 truncate font-medium">{state?.bank ?? "No bank account chosen"}</span>}
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard title="Total Received" value={formatMoney(totalAmount)} icon={Banknote} changeType="positive" />
-        <StatCard title="Payments" value={filtered.length.toString()} icon={Banknote} />
-        <StatCard
-          title="Avg Payment"
-          value={filtered.length > 0 ? formatMoney(Math.round(totalAmount / filtered.length)) : "$0.00"}
-          icon={Banknote}
-        />
+      <div className="mt-6">
+        <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">What it paid</p>
+        <div className="divide-y divide-border/60 rounded-xl border border-border/80">
+          {allocations.map((a) => {
+            const isInvoice = a.documentType === "invoice";
+            const href = isInvoice ? `/sales/${a.documentId}` : a.documentType === "credit_note" ? `/sales/credit-notes/${a.documentId}` : null;
+            const label = state?.numbers[a.documentId] ?? (isInvoice ? "Invoice" : a.documentType === "credit_note" ? "Credit note" : a.documentType);
+            const row = (
+              <>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                  <FileText className="size-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  {loading ? <Skeleton className="h-4 w-24" /> : <span className="block truncate font-mono text-[12.5px] font-medium">{label}</span>}
+                </span>
+                <span className="font-medium tabular-nums">{money(a.amount)}</span>
+              </>
+            );
+            return href ? (
+              <Link key={a.id} href={href} className="flex items-center gap-3 px-3 py-2.5 text-[13px] transition-colors hover:bg-foreground/[0.025]">
+                {row}
+              </Link>
+            ) : (
+              <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+                {row}
+              </div>
+            );
+          })}
+          {rest > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                <Banknote className="size-3.5" />
+              </span>
+              <span className="min-w-0 flex-1 text-muted-foreground">Not put toward anything yet</span>
+              <span className="font-medium tabular-nums text-amber-600 dark:text-amber-400">{money(rest)}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search payments..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-56 pl-8 text-xs"
-          />
+      {payment.notes && (
+        <div className="mt-5">
+          <p className="mb-1.5 text-[12.5px] font-medium text-muted-foreground">Notes</p>
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/85">{payment.notes}</p>
         </div>
-        <Select value={methodFilter} onValueChange={setMethodFilter}>
-          <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue placeholder="Method" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All methods</SelectItem>
-            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-            <SelectItem value="cash">Cash</SelectItem>
-            <SelectItem value="check">Check</SelectItem>
-            <SelectItem value="card">Card</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground shrink-0">From</span>
-          <DatePicker
-            value={dateFrom}
-            onChange={(v) => setDateFrom(v)}
-            placeholder="Start date"
-            className="h-8 w-40 text-xs"
-          />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground shrink-0">To</span>
-          <DatePicker
-            value={dateTo}
-            onChange={(v) => setDateTo(v)}
-            placeholder="End date"
-            className="h-8 w-40 text-xs"
-          />
-        </div>
-        <Select
-          value={`${sortBy}:${sortOrder}`}
-          onValueChange={(v) => {
-            const [key, order] = v.split(":");
-            setSortBy(key);
-            setSortOrder(order as "asc" | "desc");
-          }}
-        >
-          <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue placeholder="Sort by..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="date:desc">Newest first</SelectItem>
-            <SelectItem value="date:asc">Oldest first</SelectItem>
-            <SelectItem value="amount:desc">Highest amount</SelectItem>
-            <SelectItem value="amount:asc">Lowest amount</SelectItem>
-            <SelectItem value="number:desc">Number (desc)</SelectItem>
-            <SelectItem value="number:asc">Number (asc)</SelectItem>
-          </SelectContent>
-        </Select>
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs text-muted-foreground"
-            onClick={() => { setSearch(""); setMethodFilter("all"); setDateFrom(""); setDateTo(""); }}
-          >
-            <X className="mr-1 size-3" />
-            Clear filters
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      {pendingSearch ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal key={filterKey}>
-          <DataTable
-            columns={columns}
-            data={filtered}
-            loading={false}
-            emptyMessage="No payments match your filters."
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSort={handleSort}
-            onRowClick={(r) => router.push(`/sales/payments/${r.id}`)}
-          />
-        </ContentReveal>
       )}
+    </>
+  );
+}
+
+function PaymentsEmpty() {
+  return (
+    <ContentReveal className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="size-8" asChild>
+          <Link href="/sales"><ArrowLeft className="size-4" /></Link>
+        </Button>
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Payments</h1>
+          <p className="text-sm text-muted-foreground">Payments received against your invoices.</p>
+        </div>
+      </div>
+      <EmptyState
+        icon={Banknote}
+        title="No payments recorded"
+        description="Payments will appear here when you record them against invoices."
+      />
     </ContentReveal>
   );
 }

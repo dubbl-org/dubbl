@@ -1,9 +1,11 @@
 import { db } from "./index";
 import { chartAccount, organization } from "./schema";
 import { eq, and, inArray, isNotNull } from "drizzle-orm";
-import { getAccountsForCountry } from "./chart-templates";
-import type { AccountTemplate } from "./chart-templates";
+import { getAccountsForCountry, getChartTemplate, seededAccountsFor } from "./chart-templates";
+import type { AccountTemplate, ChartTemplate } from "./chart-templates";
 import { UNIVERSAL_ACCOUNTS, nextFreeCode } from "./chart-templates/universal";
+
+type SyncResult = { added: number; revived: number; locked: number };
 
 /**
  * Continuously syncs the code-owned default category catalog into an org.
@@ -25,23 +27,25 @@ import { UNIVERSAL_ACCOUNTS, nextFreeCode } from "./chart-templates/universal";
 export async function syncSystemAccounts(
   orgId: string,
   opts?: { currencyCode?: string; countryCode?: string },
-): Promise<{ added: number; revived: number; locked: number }> {
-  // Resolve the org's currency + country (only hit the org row if the caller
-  // didn't already have these from the request that triggered the sync).
-  let currencyCode = opts?.currencyCode;
-  let countryCode = opts?.countryCode;
-  if (currencyCode === undefined || countryCode === undefined) {
-    const [org] = await db
-      .select({
-        defaultCurrency: organization.defaultCurrency,
-        countryCode: organization.countryCode,
-      })
-      .from(organization)
-      .where(eq(organization.id, orgId))
-      .limit(1);
-    currencyCode = currencyCode ?? org?.defaultCurrency ?? "USD";
-    countryCode = countryCode ?? org?.countryCode ?? undefined;
-  }
+): Promise<SyncResult> {
+  // Resolve the org's currency + country + chart template (only hit the org
+  // row if the caller didn't already have them).
+  const [org] = await db
+    .select({
+      defaultCurrency: organization.defaultCurrency,
+      countryCode: organization.countryCode,
+      chartTemplate: organization.chartTemplate,
+    })
+    .from(organization)
+    .where(eq(organization.id, orgId))
+    .limit(1);
+  const currencyCode = opts?.currencyCode ?? org?.defaultCurrency ?? "USD";
+  const countryCode = opts?.countryCode ?? org?.countryCode ?? undefined;
+
+  // Orgs set up with a role-mapped chart (Xero-style, or a national chart with
+  // roles) sync against it; legacy orgs keep their country list below.
+  const chart = getChartTemplate(org?.chartTemplate);
+  if (chart) return syncRoleMappedChart(orgId, chart, currencyCode);
 
   const template = getAccountsForCountry(countryCode || "");
   const templateCodes = new Set(template.map((a) => a.code));
@@ -134,6 +138,80 @@ export async function syncSystemAccounts(
           inArray(chartAccount.code, toLock),
         ),
       );
+  }
+
+  return { added: missing.length, revived: toRevive.length, locked: toLock.length };
+}
+
+/**
+ * Same contract as the legacy sync (add missing, revive archived, lock), for a
+ * role-mapped chart. Every template account is stored with its roles array —
+ * empty when it plays no engine role — which is what tells the role lookup the
+ * account belongs to the chart (see lib/api/account-roles.ts).
+ */
+async function syncRoleMappedChart(orgId: string, chart: ChartTemplate, currencyCode: string): Promise<SyncResult> {
+  const template = seededAccountsFor(chart);
+  const byCode = new Map(template.map((a) => [a.code, a]));
+
+  const existing = await db
+    .select({
+      code: chartAccount.code,
+      isSystem: chartAccount.isSystem,
+      roles: chartAccount.roles,
+      deletedAt: chartAccount.deletedAt,
+    })
+    .from(chartAccount)
+    .where(eq(chartAccount.organizationId, orgId));
+  const existingCodes = new Set(existing.map((e) => e.code));
+  const filledRoles = new Set(existing.flatMap((e) => e.roles ?? []));
+
+  // A role already filled elsewhere (e.g. created on demand at a bumped code)
+  // isn't added twice.
+  const missing = template.filter(
+    (a) => !existingCodes.has(a.code) && !(a.roles?.length && a.roles.every((r) => filledRoles.has(r))),
+  );
+  if (missing.length) {
+    await db
+      .insert(chartAccount)
+      .values(
+        missing.map((a) => ({
+          organizationId: orgId,
+          code: a.code,
+          name: a.name,
+          type: a.type,
+          subType: a.subType,
+          currencyCode,
+          roles: a.roles ?? [],
+          isSystem: true,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
+  const toRevive = existing.filter((e) => e.deletedAt !== null && byCode.has(e.code)).map((e) => e.code);
+  if (toRevive.length) {
+    await db
+      .update(chartAccount)
+      .set({ deletedAt: null, isSystem: true })
+      .where(
+        and(
+          eq(chartAccount.organizationId, orgId),
+          inArray(chartAccount.code, toRevive),
+          isNotNull(chartAccount.deletedAt),
+        ),
+      );
+  }
+
+  // Lock template accounts and give any role-less one its roles (e.g. a row
+  // that predates the template's role map).
+  const toLock = existing.filter(
+    (e) => e.deletedAt === null && byCode.has(e.code) && (!e.isSystem || e.roles == null),
+  );
+  for (const e of toLock) {
+    await db
+      .update(chartAccount)
+      .set({ isSystem: true, roles: e.roles ?? byCode.get(e.code)!.roles ?? [] })
+      .where(and(eq(chartAccount.organizationId, orgId), eq(chartAccount.code, e.code)));
   }
 
   return { added: missing.length, revived: toRevive.length, locked: toLock.length };

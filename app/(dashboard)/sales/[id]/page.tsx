@@ -1043,7 +1043,8 @@ export default function InvoiceDetailPage() {
             orgId={orgId}
             entityType="invoice"
             entityId={id}
-            label="Add a file (purchase order, signed copy, etc.)"
+            label="Files"
+            hint="Purchase orders, signed copies, timesheets"
           />
         </div>
 

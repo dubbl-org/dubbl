@@ -27,10 +27,14 @@ export async function getUploadUrl(key: string, contentType: string) {
   return getSignedUrl(s3, command, { expiresIn: 3600 });
 }
 
-export async function getDownloadUrl(key: string, expiresIn = 300) {
+/** Short-lived read link. Pass `saveAs` to make browsers download it under that name. */
+export async function getDownloadUrl(key: string, expiresIn = 300, saveAs?: string) {
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key,
+    ...(saveAs
+      ? { ResponseContentDisposition: `attachment; filename="${saveAs.replace(/["\\\r\n]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(saveAs)}` }
+      : {}),
   });
   return getSignedUrl(s3, command, { expiresIn });
 }
@@ -41,4 +45,26 @@ export async function deleteObject(key: string) {
     Key: key,
   });
   return s3.send(command);
+}
+
+/** Upload bytes straight from the server (used when the browser never sees a presigned URL). */
+export async function putObject(key: string, body: Uint8Array, contentType: string) {
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  });
+  return s3.send(command);
+}
+
+/** Read an object's bytes on the server. */
+export async function getObjectBytes(key: string) {
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+  const res = await s3.send(command);
+  if (!res.Body) throw new Error("Empty object");
+  return res.Body.transformToByteArray();
 }

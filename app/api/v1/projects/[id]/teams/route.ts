@@ -36,7 +36,7 @@ export async function GET(
       where: eq(projectTeam.projectId, id),
       with: {
         members: {
-          with: { member: { with: { user: true } } },
+          with: { member: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
         },
       },
     });

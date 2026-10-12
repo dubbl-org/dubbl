@@ -21,6 +21,7 @@
  *     keeps the computation a single SQL pass while matching how cash actually
  *     moves through the books (payments + bank-feed categorisations).
  */
+import { accountCodeMatch } from "@/lib/api/account-roles";
 import { db } from "@/lib/db";
 import {
   chartAccount,
@@ -93,7 +94,7 @@ export async function getControlAccountId(
   const account = await db.query.chartAccount.findFirst({
     where: and(
       eq(chartAccount.organizationId, organizationId),
-      eq(chartAccount.code, accountCode),
+      accountCodeMatch(accountCode),
       isNull(chartAccount.deletedAt)
     ),
     columns: { id: true },

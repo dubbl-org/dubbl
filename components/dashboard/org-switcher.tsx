@@ -56,25 +56,16 @@ export function OrgSwitcher() {
 
   const otherOrgs = orgs.filter((o) => o.id !== activeOrg?.id);
   const orgDisplayName = activeOrg?.name || activeOrg?.slug || "";
-  const orgInitial = (activeOrg?.name?.[0] || activeOrg?.slug?.[0] || "D").toUpperCase();
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:border-sidebar-border hover:bg-muted data-[state=open]:border-sidebar-border data-[state=open]:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
-            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-[10px] font-semibold text-primary-foreground">
-              {orgInitial}
-            </div>
-            <span className="flex-1 truncate text-[13px] font-medium text-sidebar-accent-foreground">
+          <button className="flex w-full min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-foreground/[0.035] data-[state=open]:bg-foreground/[0.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="truncate text-[14px] font-semibold tracking-[-0.01em] text-foreground">
               {orgDisplayName}
             </span>
-            {activeOrg && (
-              <span className="rounded bg-sidebar-accent px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {ROLE_LABELS[activeOrg.role] || activeOrg.role}
-              </span>
-            )}
-            <ChevronDown className="size-3 text-sidebar-foreground/40" />
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground/70" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

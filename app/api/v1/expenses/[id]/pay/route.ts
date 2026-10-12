@@ -1,3 +1,4 @@
+import { accountCodeMatch } from "@/lib/api/account-roles";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { expenseClaim, chartAccount } from "@/lib/db/schema";
@@ -53,7 +54,7 @@ export async function POST(
     const bankAccount = await db.query.chartAccount.findFirst({
       where: and(
         eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, parsed.bankAccountCode)
+        accountCodeMatch(parsed.bankAccountCode)
       ),
     });
 

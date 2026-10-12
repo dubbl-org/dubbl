@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
+import { attachmentCounts } from "@/lib/documents/attachment-counts";
 import {
   bankTransaction,
   bankAccount,
@@ -194,7 +195,7 @@ function scoreExisting(
 export function registerBankTransactionTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "list_bank_transactions",
-    "List bank transactions for a bank account, optionally filtered by status. Use to find lines that still need to be categorized/matched ('for review'). Amounts are in integer cents (negative = money out, positive = money in).",
+    "List bank transactions for a bank account, optionally filtered by status. Use to find lines that still need to be categorized/matched ('for review'). Each line includes attachmentCount (receipts/files attached; list them with list_entity_files entityType='bank_transaction', upload more with attach_file_to_entity or link an existing upload with link_document_to_record). Amounts are in integer cents (negative = money out, positive = money in).",
     {
       bankAccountId: z.string().describe("UUID of the bank account to list transactions for"),
       status: z
@@ -231,6 +232,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           .select({ count: sql<number>`count(*)`.mapWith(Number) })
           .from(bankTransaction)
           .where(and(...conditions));
+        const attached = await attachmentCounts(ctx.organizationId, ctx.userId, "bank_transaction", rows.map((t) => t.id));
 
         return {
           transactions: rows.map((t) => ({
@@ -245,6 +247,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
             accountName: t.account?.name ?? null,
             journalEntryId: t.journalEntryId,
             reconciliationId: t.reconciliationId,
+            attachmentCount: attached.get(t.id) ?? 0,
           })),
           total: Number(countResult?.count ?? 0),
           page: params.page,
@@ -710,6 +713,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               reference: paymentNumber,
               amount: params.amount,
               date: paymentDate,
+              bankAccountId: account.id,
               allocations: [
                 { amount: params.amount, currencyCode: found.currencyCode, issueDate: found.issueDate },
               ],
@@ -838,6 +842,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               reference: paymentNumber,
               amount: params.amount,
               date: paymentDate,
+              bankAccountId: account.id,
               allocations: [
                 { amount: params.amount, currencyCode: found.currencyCode, issueDate: found.issueDate },
               ],

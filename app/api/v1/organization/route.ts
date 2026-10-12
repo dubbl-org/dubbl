@@ -16,8 +16,9 @@ import { render } from "@react-email/render";
 import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
-import { seedDefaultAccounts } from "@/lib/db/default-accounts";
-import { ensureTaxRatesSeeded } from "@/lib/api/tax-profiles";
+import { setUpOrganization } from "@/lib/api/org-setup";
+import { getChartTemplate } from "@/lib/db/chart-templates";
+import { getCountrySetup } from "@/lib/country-setup";
 import { toAppUrl } from "@/lib/public-url";
 
 const updateSchema = z
@@ -43,6 +44,12 @@ const updateSchema = z
     defaultPaymentTerms: z.string().nullable().optional(),
     industrySector: z.string().nullable().optional(),
     referralSource: z.string().nullable().optional(),
+    // Set-up choices (first country save): which default chart to use — omit
+    // for the country's default — and whether the business is registered for
+    // VAT/GST/sales tax (false = rates seeded, but defaulting to "No VAT").
+    chartTemplate: z.string().optional(),
+    registeredForTax: z.boolean().optional(),
+    vatScheme: z.enum(["accrual", "cash"]).optional(),
     // Getting-started checklist: client sends true to mark onboarding done
     // (stored as now()), or null to re-open it. Coerced to a Date below.
     onboardingCompleted: z.boolean().optional(),
@@ -264,7 +271,15 @@ export async function PATCH(request: Request) {
 
     // Map the client-friendly `onboardingCompleted` flag onto the real
     // `onboardingCompletedAt` timestamp column (now() to complete, null to re-open).
-    const { onboardingCompleted, ...rest } = parsed;
+    const { onboardingCompleted, chartTemplate, registeredForTax, ...rest } = parsed;
+    if (chartTemplate !== undefined && !getChartTemplate(chartTemplate)) {
+      return NextResponse.json({ error: `Unknown chart template "${chartTemplate}"` }, { status: 400 });
+    }
+    // The tax regime follows the country unless the business isn't registered.
+    const regimePatch =
+      registeredForTax === undefined
+        ? {}
+        : { taxRegime: registeredForTax ? getCountrySetup(rest.countryCode ?? existing?.countryCode).regime : "none" };
     const onboardingPatch =
       onboardingCompleted === undefined
         ? {}
@@ -272,26 +287,26 @@ export async function PATCH(request: Request) {
 
     const [updated] = await db
       .update(organization)
-      .set({ ...rest, ...onboardingPatch, updatedAt: new Date() })
+      .set({ ...rest, ...regimePatch, ...onboardingPatch, updatedAt: new Date() })
       .where(eq(organization.id, ctx.organizationId))
       .returning();
 
-    // Seed the default chart of accounts AND the country's standard tax rates on
-    // first-time country set (onboarding completion), so a new org can pick a
-    // real VAT/GST rate immediately instead of only "No tax". Both are
-    // idempotent; tax seeding is best-effort so it never blocks onboarding.
+    // First-time country set (onboarding completion): set the org up the way
+    // Xero does — the country's default chart (Xero-style codes or the national
+    // chart), its standard tax rates and each account's default tax rate — so
+    // the first invoice can pick a real VAT/GST rate immediately.
+    let setup = null;
     if (existing?.country === null && updated.country !== null) {
-      await seedDefaultAccounts(ctx.organizationId, updated.defaultCurrency || "USD", updated.countryCode || undefined);
-      try {
-        await ensureTaxRatesSeeded(ctx.organizationId, updated.countryCode || updated.country || undefined);
-      } catch {
-        // non-fatal: rates also self-heal lazily on the tax-rates endpoint
-      }
+      setup = await setUpOrganization(ctx.organizationId, {
+        countryCode: updated.countryCode || null,
+        chartTemplate: chartTemplate ?? null,
+        registeredForTax,
+      });
     }
 
     logAudit({ ctx, action: "update", entityType: "organization", entityId: ctx.organizationId, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
-    return NextResponse.json({ organization: updated });
+    return NextResponse.json({ organization: updated, ...(setup ? { setup } : {}) });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

@@ -1,3 +1,4 @@
+import { accountCodeMatch, deferredRevenueCode } from "@/lib/api/account-roles";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -66,9 +67,9 @@ export async function POST(
 
     // Determine revenue account
     // If schedule has an invoiceLineId, use the line's accountId; otherwise default "4000"
-    let revenueAccountId: string | null = null;
+    let revenueAccountId: string | null = schedule.revenueAccountId ?? null;
 
-    if (schedule.invoiceLineId) {
+    if (!revenueAccountId && schedule.invoiceLineId) {
       const line = schedule.invoice?.lines?.find(
         (l) => l.id === schedule.invoiceLineId
       );
@@ -82,7 +83,7 @@ export async function POST(
       const revenueAccount = await db.query.chartAccount.findFirst({
         where: and(
           eq(chartAccount.organizationId, ctx.organizationId),
-          eq(chartAccount.code, "4000")
+          accountCodeMatch("4000")
         ),
       });
       if (revenueAccount) {
@@ -90,17 +91,21 @@ export async function POST(
       }
     }
 
-    // Look up deferred revenue account "2300"
-    const deferredAccount = await db.query.chartAccount.findFirst({
-      where: and(
-        eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "2300")
-      ),
-    });
+    // Deferred revenue account: the schedule's own, else the chart's default
+    // (2300 on legacy charts, income in advance on role-mapped ones).
+    const deferredCode = await deferredRevenueCode(ctx.organizationId);
+    const deferredAccount = schedule.deferredRevenueAccountId
+      ? { id: schedule.deferredRevenueAccountId }
+      : await db.query.chartAccount.findFirst({
+          where: and(
+            eq(chartAccount.organizationId, ctx.organizationId),
+            accountCodeMatch(deferredCode)
+          ),
+        });
 
     if (!deferredAccount) {
       return validationError(
-        "Deferred Revenue account (2300) not found. Please create it first."
+        `Deferred Revenue account (${deferredCode}) not found. Please create it first.`
       );
     }
 

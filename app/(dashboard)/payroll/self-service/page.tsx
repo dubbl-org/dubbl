@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { User, FileText, CalendarDays, Clock, Send, Save } from "lucide-react";
+import { User, Send, Save } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ interface Payslip {
 
 interface LeaveBalance {
   id: string;
+  policyId: string;
   balance: number;
   usedHours: number;
   policy: { name: string; leaveType: string } | null;
@@ -63,6 +65,8 @@ export default function SelfServicePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [leaveForm, setLeaveForm] = useState({ policyId: "", startDate: "", endDate: "", hours: "", reason: "" });
+  const [requesting, setRequesting] = useState(false);
   const [email, setEmail] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   useDocumentTitle("Payroll · Self Service");
@@ -73,23 +77,26 @@ export default function SelfServicePage() {
     if (!orgId) return;
     const headers = { "x-organization-id": orgId };
 
-    Promise.all([
-      fetch("/api/v1/payroll/self-service/profile", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/self-service/payslips", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/self-service/leave-balance", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/self-service/timesheets", { headers }).then((r) => r.json()),
-    ])
-      .then(([profileData, payslipData, leaveData, tsData]) => {
-        if (profileData.employee) {
-          const emp = profileData.employee;
-          setProfile(emp);
-          setEmail(emp.email || "");
-          setBankAccount(emp.bankAccountNumber || "");
-        }
+    // The profile decides everything else: when the login isn't linked to an
+    // employee there is nothing more to load.
+    fetch("/api/v1/payroll/self-service/profile", { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (profileData) => {
+        if (!profileData?.employee) return;
+        const emp = profileData.employee;
+        setProfile(emp);
+        setEmail(emp.email || "");
+        setBankAccount(emp.bankAccountNumber || "");
+        const [payslipData, leaveData, tsData] = await Promise.all([
+          fetch("/api/v1/payroll/self-service/payslips", { headers }).then((r) => r.json()),
+          fetch("/api/v1/payroll/self-service/leave-balance", { headers }).then((r) => r.json()),
+          fetch("/api/v1/payroll/self-service/timesheets", { headers }).then((r) => r.json()),
+        ]);
         if (payslipData.data) setPayslips(payslipData.data);
         if (leaveData.data) setLeaveBalances(leaveData.data);
         if (tsData.data) setTimesheets(tsData.data);
       })
+      .catch(() => toast.error("Couldn't load your details"))
       .finally(() => setLoading(false));
   }, [orgId]);
 
@@ -111,6 +118,40 @@ export default function SelfServicePage() {
     }
   }
 
+  async function handleRequestLeave() {
+    if (!orgId) return;
+    const policyId = leaveForm.policyId || leaveBalances[0]?.policyId;
+    const hours = parseFloat(leaveForm.hours);
+    if (!policyId || !leaveForm.startDate || !leaveForm.endDate || !(hours > 0)) {
+      toast.error("Pick the type of leave, the dates and how many hours");
+      return;
+    }
+    setRequesting(true);
+    try {
+      const res = await fetch("/api/v1/payroll/self-service/leave-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          policyId,
+          startDate: leaveForm.startDate,
+          endDate: leaveForm.endDate,
+          hours,
+          reason: leaveForm.reason.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data.error === "string" ? data.error : "Couldn't send the request");
+      }
+      toast.success("Time off requested. Your manager will see it under Time & leave");
+      setLeaveForm({ policyId: "", startDate: "", endDate: "", hours: "", reason: "" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't send the request");
+    } finally {
+      setRequesting(false);
+    }
+  }
+
   if (loading) return <BrandLoader />;
 
   if (!profile) {
@@ -120,8 +161,13 @@ export default function SelfServicePage() {
           <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted mb-3">
             <User className="size-5 text-muted-foreground" />
           </div>
-          <p className="text-sm font-medium">No employee profile found</p>
-          <p className="text-xs text-muted-foreground mt-1">Your account is not linked to a payroll employee record</p>
+          <p className="text-sm font-medium">Your login isn&apos;t linked to an employee yet</p>
+          <p className="mt-1 max-w-md text-[13px] text-muted-foreground">
+            This page shows an employee their own payslips, leave and timesheets. Someone who manages payroll links it up by opening the employee and choosing your login under <span className="text-foreground">Self-service login</span>.
+          </p>
+          <Link href="/payroll/employees" className="mt-4 inline-flex h-8 items-center rounded-lg border border-border/80 px-3 text-[13px] font-medium hover:bg-foreground/[0.03]">
+            Go to employees
+          </Link>
         </div>
       </ContentReveal>
     );
@@ -198,7 +244,7 @@ export default function SelfServicePage() {
         {/* Leave Balances */}
         <Section title="Leave Balances" description="Your current PTO and leave balances.">
           {leaveBalances.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No leave balances found</p>
+            <p className="py-4 text-center text-[13px] text-muted-foreground">No leave policies assigned to you yet. Once payroll assigns one, you can request time off here.</p>
           ) : (
             <div className="rounded-lg border divide-y">
               {leaveBalances.map((lb) => (
@@ -213,6 +259,55 @@ export default function SelfServicePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {leaveBalances.length > 0 && (
+            <div className="mt-4 rounded-lg border border-border/80 p-4">
+              <p className="text-[13px] font-medium">Request time off</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Type of leave</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {leaveBalances.map((lb) => {
+                      const active = (leaveForm.policyId || leaveBalances[0]?.policyId) === lb.policyId;
+                      return (
+                        <button
+                          key={lb.id}
+                          type="button"
+                          onClick={() => setLeaveForm((f) => ({ ...f, policyId: lb.policyId }))}
+                          className={cn(
+                            "h-7 rounded-md px-2.5 text-[12.5px] font-medium transition-colors",
+                            active ? "bg-foreground/[0.07] text-foreground" : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {lb.policy?.name ?? "Leave"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">First day</Label>
+                  <Input type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm((f) => ({ ...f, startDate: e.target.value, endDate: f.endDate || e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Last day</Label>
+                  <Input type="date" value={leaveForm.endDate} min={leaveForm.startDate || undefined} onChange={(e) => setLeaveForm((f) => ({ ...f, endDate: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Hours off in total</Label>
+                  <Input type="number" min="0" step="0.5" placeholder="e.g. 16" value={leaveForm.hours} onChange={(e) => setLeaveForm((f) => ({ ...f, hours: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Note for your manager (optional)</Label>
+                  <Input value={leaveForm.reason} onChange={(e) => setLeaveForm((f) => ({ ...f, reason: e.target.value }))} />
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" onClick={handleRequestLeave} disabled={requesting}>
+                  <Send className="mr-1.5 size-3.5" /> {requesting ? "Sending..." : "Send request"}
+                </Button>
+              </div>
             </div>
           )}
         </Section>

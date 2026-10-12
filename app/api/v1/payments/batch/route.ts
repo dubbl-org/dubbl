@@ -211,6 +211,7 @@ export async function POST(request: Request) {
           reference: paymentNumber,
           amount: totalAmount,
           date: parsed.date,
+          bankAccountId: created.bankAccountId,
           allocations: journalAllocations.length > 0 ? journalAllocations : undefined,
         },
         tx

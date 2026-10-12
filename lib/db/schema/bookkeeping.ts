@@ -104,6 +104,12 @@ export const chartAccount = pgTable(
     // System control accounts (AR/AP/bank/tax/retained earnings) must not be
     // retyped or deleted.
     isSystem: boolean("is_system").notNull().default(false),
+    // The posting-engine roles this account fills, as canonical generic codes
+    // (e.g. ["1200"] = accounts receivable). Lets a localized chart — Xero-style
+    // "610 Accounts Receivable" or SKR03 "1400 Forderungen" — answer the engine's
+    // lookups for "1200" (see lib/api/account-roles.ts). Null on legacy charts,
+    // which are matched by code alone.
+    roles: text("roles").array(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { mode: "date" }),
   },

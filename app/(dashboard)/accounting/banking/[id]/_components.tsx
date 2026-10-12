@@ -64,7 +64,7 @@ import { formatMoney, centsToDecimal } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
-import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
+import { AttachmentsButton, ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
 import { TrackingPicker } from "@/components/dashboard/tracking-picker";
 import {
   resolveSpecialAccount,
@@ -178,6 +178,8 @@ export interface Transaction {
   journalEntryId?: string | null;
   reconciliationId?: string | null;
   transferTransactionId?: string | null;
+  // Files (receipts, invoices…) attached to the line.
+  attachmentCount?: number;
 }
 
 export interface OpenBill {
@@ -376,12 +378,34 @@ export function TransactionRow({
     !!tx.accountId &&
     !tx.transferTransactionId &&
     !tx.reconciliationId;
+  // Drop receipts straight onto a line to attach them (as in Xero)
+  const [dropping, setDropping] = useState(false);
+  const [dropped, setDropped] = useState<File[] | null>(null);
+  const isFileDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
   return (
     <div
       className={cn(
         "group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/30",
-        !isLast && "border-b"
+        !isLast && "border-b",
+        dropping && "bg-foreground/[0.055] outline-1 -outline-offset-1 outline-dashed outline-foreground/30"
       )}
+      onDragOver={(e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (!dropping) setDropping(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+      }}
+      onDrop={(e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        setDropping(false);
+        const files = [...e.dataTransfer.files];
+        if (files.length) setDropped(files);
+      }}
+      title={dropping ? "Drop to attach to this transaction" : undefined}
     >
       {selectable && (
         <Checkbox
@@ -539,6 +563,12 @@ export function TransactionRow({
             </>
           )}
         </div>
+        <AttachmentsButton
+          entityType="bank_transaction"
+          entityId={tx.id}
+          count={tx.attachmentCount ?? 0}
+          dropped={dropped}
+        />
         <span className={cn(
           "font-mono text-sm font-medium tabular-nums w-24 text-right",
           isCredit ? "text-brand-600 dark:text-brand-400" : "text-red-600 dark:text-red-400"
@@ -1052,6 +1082,8 @@ export function MatchToBillSheet({
               />
             </div>
           )}
+
+          <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
@@ -1315,6 +1347,48 @@ function splitTaxPreview(
   return { net, tax, recoverable, absorbed: tax - recoverable };
 }
 
+/**
+ * Where the director's / owner's loan stands, before and after this line.
+ * Money in from the director grows what the business owes them; money out to
+ * them (or personal spending) shrinks it, and past zero the loan is overdrawn.
+ */
+function DirectorLoanBalance({
+  balance,
+  type,
+  change,
+  alreadyPosted,
+  currencyCode,
+}: {
+  balance: number;
+  type: string;
+  change: number;
+  alreadyPosted: boolean;
+  currencyCode: string;
+}) {
+  // Positive = the business owes the director, whichever side the chart keeps it on
+  const owed = type === "asset" ? -balance : balance;
+  const before = alreadyPosted ? owed - change : owed;
+  const after = before + change;
+  const describe = (v: number) =>
+    v > 0 ? `The business owes you ${formatMoney(v, currencyCode)}` : v < 0 ? `You owe the business ${formatMoney(-v, currencyCode)}` : "Nothing owed either way";
+  return (
+    <div className={cn(
+      "rounded-lg border p-2.5 text-[11px]",
+      after < 0
+        ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+        : "bg-muted/20 text-muted-foreground"
+    )}>
+      <div className="flex justify-between gap-3"><span>Loan now</span><span className="text-right">{describe(before)}</span></div>
+      <div className="mt-0.5 flex justify-between gap-3 font-medium text-foreground/80"><span>After this</span><span className="text-right">{describe(after)}</span></div>
+      {after < 0 && (
+        <p className="mt-1.5">
+          The loan account is overdrawn. A director&apos;s loan left overdrawn after the year end can mean extra tax for the company or the director — worth checking with your accountant.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Categorize Sheet — code a transaction to ANY ledger account: income,
 // expense, a loan received/repaid, owner contribution/drawings, a transfer, etc.
@@ -1348,8 +1422,11 @@ export function CategorizeSheet({
   const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
   // Quick-choice ("what was this?") state.
-  const [accounts, setAccounts] = useState<SpecialResolvableAccount[]>([]);
+  const [accounts, setAccounts] = useState<(SpecialResolvableAccount & { defaultTaxRateId?: string | null })[]>([]);
   const [isCompany, setIsCompany] = useState(false);
+  // Running balance of the director's / owner's loan, so the user can see where
+  // it stands before and after this line (null = not loaded / no such account).
+  const [loanBalance, setLoanBalance] = useState<{ accountId: string; balance: number; type: string } | null>(null);
   const [choice, setChoice] = useState<string>("");
   const [pickerType, setPickerType] = useState<string[] | undefined>(undefined);
   const [choiceHint, setChoiceHint] = useState<string>("");
@@ -1401,6 +1478,31 @@ export function CategorizeSheet({
       .catch(() => {});
   }, [transaction, orgId, taxRates.length]);
 
+  // As in Xero, choosing an account brings in its default tax rate; balance-
+  // sheet movements (loans, drawings, capital, tax payments) carry no tax.
+  function pickAccount(id: string) {
+    setAccountId(id);
+    const a = accounts.find((x) => x.id === id);
+    if (!a) return;
+    if (a.defaultTaxRateId && taxRates.some((t) => t.id === a.defaultTaxRateId)) setTaxRateId(a.defaultTaxRateId);
+    else if (a.type === "asset" || a.type === "liability" || a.type === "equity") setTaxRateId("none");
+  }
+
+  const ownerLoanAccount = useMemo(() => resolveSpecialAccount("owner_director_loan", accounts), [accounts]);
+  useEffect(() => {
+    if (!transaction || !orgId || !ownerLoanAccount) return;
+    let live = true;
+    fetch(`/api/v1/accounts/${ownerLoanAccount.id}?limit=1`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (live && data.account) {
+          setLoanBalance({ accountId: ownerLoanAccount.id, balance: Number(data.account.balance) || 0, type: data.account.type });
+        }
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [transaction, orgId, ownerLoanAccount]);
+
   const selectedTax = taxRates.find((t) => t.id === taxRateId) || null;
   const taxPreview = useMemo(
     () => (selectedTax && transaction ? splitTaxPreview(Math.abs(transaction.amount), selectedTax, isCredit) : null),
@@ -1431,7 +1533,7 @@ export function CategorizeSheet({
             key,
             label,
             onSelect: () => {
-              setAccountId(account.id);
+              pickAccount(account.id);
               setChoice(key);
               setPickerType(undefined);
               setChoiceHint(opts?.hint ?? `Goes to "${account.code} — ${account.name}".`);
@@ -1485,7 +1587,8 @@ export function CategorizeSheet({
       ...handoff("loan_split", "Loan repayment (split interest)", onSwitchToSplit),
       ...handoff("transfer", "Moved between my accounts", onSwitchToTransfer),
     ];
-  }, [accounts, isCredit, isCompany, transaction, onSwitchToTransfer, onSwitchToSplit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pickAccount only reads accounts / taxRates
+  }, [accounts, taxRates, isCredit, isCompany, transaction, onSwitchToTransfer, onSwitchToSplit]);
 
   async function handleSave() {
     if (!orgId || !transaction) return;
@@ -1569,13 +1672,22 @@ export function CategorizeSheet({
               <Label className="text-xs">Category</Label>
               <AccountPicker
                 value={accountId}
-                onChange={(v) => { setAccountId(v); setChoice(""); }}
+                onChange={(v) => { pickAccount(v); setChoice(""); }}
                 typeFilter={pickerType}
                 placeholder="Search every category…"
                 allowCreate
               />
               {choiceHint && (
                 <p className="text-[11px] text-muted-foreground">{choiceHint}</p>
+              )}
+              {transaction && loanBalance && accountId === loanBalance.accountId && (
+                <DirectorLoanBalance
+                  balance={loanBalance.balance}
+                  type={loanBalance.type}
+                  change={transaction.amount}
+                  alreadyPosted={isEditing && transaction.accountId === loanBalance.accountId}
+                  currencyCode={currencyCode}
+                />
               )}
             </div>
           </div>
@@ -1845,6 +1957,8 @@ export function MatchToInvoiceSheet({
               <CurrencyInput prefix="$" value={payAmount} onChange={setPayAmount} />
             </div>
           )}
+
+          <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
@@ -2115,6 +2229,8 @@ export function MatchSheet({
               )}
             </>
           )}
+
+          <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">
@@ -2300,6 +2416,8 @@ export function TransferSheet({
               )}
             </div>
           )}
+
+          <ReceiptAttachments orgId={orgId} entityType="bank_transaction" entityId={transaction?.id ?? null} />
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-background/80 px-4 py-3 sm:px-6 backdrop-blur-sm shrink-0">

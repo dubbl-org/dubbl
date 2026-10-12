@@ -94,6 +94,22 @@ export async function checkMonthlyLimit(
   }
 }
 
+/** Bytes stored by the workspace (documents and journal attachments) and its plan's allowance. */
+export async function storageUsage(orgId: string) {
+  const { sub } = await getOrgPlanLimits(orgId);
+  const storagePlan = (sub?.storagePlan ?? "free") as StoragePlanName;
+  const maxBytes = STORAGE_PLANS[storagePlan].filesMb * 1024 * 1024;
+  const [docResult] = await db
+    .select({ total: sql<number>`coalesce(sum(${document.fileSize}), 0)` })
+    .from(document)
+    .where(and(eq(document.organizationId, orgId), isNull(document.deletedAt)));
+  const [attResult] = await db
+    .select({ total: sql<number>`coalesce(sum(${attachment.fileSize}), 0)` })
+    .from(attachment)
+    .where(eq(attachment.organizationId, orgId));
+  return { usedBytes: Number(docResult?.total ?? 0) + Number(attResult?.total ?? 0), maxBytes, plan: storagePlan };
+}
+
 export async function checkStorageLimit(orgId: string, additionalBytes: number = 0) {
   const { sub } = await getOrgPlanLimits(orgId);
   const storagePlan = (sub?.storagePlan ?? "free") as StoragePlanName;

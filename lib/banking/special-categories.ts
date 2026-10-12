@@ -4,11 +4,14 @@
  * so both the categorize UI (client) and the MCP tools (server) resolve a
  * behavior to the SAME account.
  *
- * Resolution is by stable account name first (the universal owner/director
- * categories carry the same English name in every country template — see
- * lib/db/chart-templates/universal.ts), then by code, then by sub-type. This
- * keeps it correct even when a localized template gives the account a different
- * code (e.g. Swedish BAS bumps the director loan off its 2510 "Tax Liabilities").
+ * Resolution is by role first (role-mapped charts tag e.g. Xero's "835
+ * Directors' Loan Account" with the generic code 2510 — see
+ * lib/api/account-roles.ts), then by stable account name (the universal
+ * owner/director categories carry the same English name in every legacy
+ * template — see lib/db/chart-templates/universal.ts), then by code, then by
+ * sub-type. This keeps it correct even when a localized template gives the
+ * account a different code (e.g. Swedish BAS bumps the director loan off its
+ * 2510 "Tax Liabilities").
  *
  * None of this enforces country-specific tax law — it only records the money on
  * the right account. Interest on a loan is always a separate, optional line, so
@@ -89,6 +92,8 @@ export interface ResolvableAccount {
   name: string;
   type: string;
   subType?: string | null;
+  /** Canonical codes this account stands in for (role-mapped charts). */
+  roles?: string[] | null;
 }
 
 /**
@@ -101,12 +106,18 @@ export function resolveSpecialAccount<T extends ResolvableAccount>(
   accounts: T[],
 ): T | null {
   const r = SPECIAL_CATEGORY_RESOLUTION[role];
+  for (const code of r.codes) {
+    const hit = accounts.find((a) => a.roles?.includes(code));
+    if (hit) return hit;
+  }
   for (const name of r.names) {
     const hit = accounts.find((a) => a.name === name);
     if (hit) return hit;
   }
   for (const code of r.codes) {
-    const hit = accounts.find((a) => a.code === code);
+    // A same-coded account inside a role-mapped chart means something else
+    // (SKR03 2200 is income tax expense), so only roles-less accounts qualify.
+    const hit = accounts.find((a) => a.code === code && a.roles == null);
     if (hit) return hit;
   }
   for (const sub of r.subTypes ?? []) {

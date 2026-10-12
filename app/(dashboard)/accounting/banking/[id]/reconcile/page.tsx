@@ -32,6 +32,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { ReconciliationReport, type ReconciliationData } from "../_components";
+import { AttachmentsButton } from "@/components/dashboard/receipt-attachments";
 
 interface BankAccountDetail {
   id: string;
@@ -53,6 +54,7 @@ interface Transaction {
   accountName?: string | null;
   journalEntryId?: string | null;
   reconciliationId?: string | null;
+  attachmentCount?: number;
 }
 
 // A statement line should be categorized/matched (its journal entry recorded)
@@ -90,6 +92,9 @@ export default function ReconcilePage() {
   });
   const [savingRec, setSavingRec] = useState(false);
   const [acting, setActing] = useState(false);
+  // Receipts dropped onto a statement line attach to it
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [dropped, setDropped] = useState<{ id: string; files: File[] } | null>(null);
 
   const orgId =
     typeof window !== "undefined"
@@ -97,6 +102,7 @@ export default function ReconcilePage() {
       : null;
 
   useDocumentTitle("Accounting \u00B7 Match statement to your books");
+  const cur = account?.currencyCode ?? "USD";
 
   const fetchData = useCallback(() => {
     if (!orgId) return;
@@ -338,7 +344,7 @@ export default function ReconcilePage() {
           <div className="p-4">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Account balance</p>
             <p className="mt-1 text-xl font-semibold font-mono tabular-nums">
-              {formatMoney(account?.balance || 0)}
+              {formatMoney(account?.balance || 0, cur)}
             </p>
           </div>
           <div className="p-4">
@@ -346,7 +352,7 @@ export default function ReconcilePage() {
             <p className="mt-1 text-xl font-semibold font-mono tabular-nums">
               {transactions.length}
               <span className="text-sm font-normal text-muted-foreground ml-1.5">
-                ({formatMoney(unreconciledTotal)})
+                ({formatMoney(unreconciledTotal, cur)})
               </span>
             </p>
           </div>
@@ -358,7 +364,7 @@ export default function ReconcilePage() {
                 ? selectedTotal < 0 ? "text-red-600" : "text-brand-600"
                 : "text-muted-foreground/30"
             )}>
-              {selectedIds.size > 0 ? formatMoney(selectedTotal) : "-"}
+              {selectedIds.size > 0 ? formatMoney(selectedTotal, cur) : "-"}
               {selectedIds.size > 0 && (
                 <span className="text-sm font-normal text-muted-foreground ml-1.5">
                   ({selectedIds.size} items)
@@ -462,18 +468,41 @@ export default function ReconcilePage() {
               const isIncome = tx.amount >= 0;
               const categorized = isCategorized(tx);
               return (
-                <button
+                <div
                   key={tx.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggleSelect(tx)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                    e.preventDefault();
+                    toggleSelect(tx);
+                  }}
+                  onDragOver={(e) => {
+                    if (!e.dataTransfer.types.includes("Files")) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "copy";
+                    if (dropTarget !== tx.id) setDropTarget(tx.id);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!e.dataTransfer.types.includes("Files")) return;
+                    e.preventDefault();
+                    setDropTarget(null);
+                    const files = [...e.dataTransfer.files];
+                    if (files.length) setDropped({ id: tx.id, files });
+                  }}
                   aria-disabled={!categorized}
                   className={cn(
-                    "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+                    "group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors outline-none focus-visible:bg-muted/40",
                     !categorized
                       ? "cursor-not-allowed opacity-60 hover:bg-muted/20"
                       : selected
                         ? "bg-brand-50/50 dark:bg-brand-950/20"
-                        : "hover:bg-muted/40"
+                        : "cursor-pointer hover:bg-muted/40",
+                    dropTarget === tx.id && "bg-foreground/[0.055] opacity-100 outline-1 -outline-offset-1 outline-dashed outline-foreground/30"
                   )}
                 >
                   <div
@@ -526,13 +555,21 @@ export default function ReconcilePage() {
                     </div>
                   </div>
 
+                  <AttachmentsButton
+                    orgId={orgId}
+                    entityType="bank_transaction"
+                    entityId={tx.id}
+                    count={tx.attachmentCount ?? 0}
+                    dropped={dropped?.id === tx.id ? dropped.files : null}
+                  />
+
                   <p className={cn(
                     "font-mono text-sm font-medium tabular-nums shrink-0",
                     isIncome ? "text-brand-600 dark:text-brand-400" : "text-red-600 dark:text-red-400"
                   )}>
-                    {isIncome ? "+" : ""}{formatMoney(tx.amount)}
+                    {isIncome ? "+" : ""}{formatMoney(tx.amount, cur)}
                   </p>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -552,7 +589,7 @@ export default function ReconcilePage() {
                     {rec.startDate} to {rec.endDate}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatMoney(rec.startBalance)} to {formatMoney(rec.endBalance)}
+                    {formatMoney(rec.startBalance, cur)} to {formatMoney(rec.endBalance, cur)}
                   </p>
                 </div>
                 <Badge

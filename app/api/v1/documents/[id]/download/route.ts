@@ -25,7 +25,9 @@ export async function GET(
     if (!doc) return notFound("Document");
     if (doc.visibility === "private" && doc.uploadedBy !== ctx.userId) return notFound("Document");
 
-    const downloadUrl = await getDownloadUrl(doc.fileKey);
+    // ?download=1 saves the file under its name instead of opening it in the browser
+    const save = new URL(request.url).searchParams.get("download") === "1";
+    const downloadUrl = await getDownloadUrl(doc.fileKey, 300, save ? doc.fileName : undefined);
     return ok({ downloadUrl, fileName: doc.fileName, mimeType: doc.mimeType });
   } catch (err) {
     return handleError(err);

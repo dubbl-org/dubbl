@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Banknote, Landmark } from "lucide-react";
+import { ArrowLeft, Banknote, Landmark, CheckCircle2, Ban } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import Link from "next/link";
+import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 
 interface SalesReceiptDetail {
   id: string;
@@ -53,11 +55,12 @@ export default function SalesReceiptDetailPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
+  const { confirm, dialog } = useConfirm();
   useEntityTitle(sr?.receiptNumber);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!orgId) return;
-    fetch(`/api/v1/sales-receipts/${id}`, {
+    return fetch(`/api/v1/sales-receipts/${id}`, {
       headers: { "x-organization-id": orgId },
     })
       .then((r) => r.json())
@@ -66,6 +69,10 @@ export default function SalesReceiptDetailPage() {
       })
       .finally(() => setLoading(false));
   }, [id, orgId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
   if (!sr) return <div className="space-y-6"><PageHeader title="Cash sale not found" /></div>;
@@ -76,6 +83,39 @@ export default function SalesReceiptDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={sr.receiptNumber} description={`Sold to: ${sr.contact?.name || "Unknown"}`}>
+        {sr.status === "draft" && (
+          <ActionButton
+            primary
+            icon={<CheckCircle2 className="size-3.5" />}
+            success="Sale recorded in your books"
+            run={async () => {
+              await postJson(`/api/v1/sales-receipts/${sr.id}/post`);
+              await load();
+            }}
+          >
+            Record sale
+          </ActionButton>
+        )}
+        {sr.status !== "void" && (
+          <ActionButton
+            icon={<Ban className="size-3.5" />}
+            success="Sale cancelled"
+            run={async () => {
+              const ok = await confirm({
+                title: `Cancel ${sr.receiptNumber}?`,
+                description: sr.status === "paid" ? "The sale stops counting and its entries are reversed in your books." : "The draft is kept for your records but won't count.",
+                confirmLabel: "Cancel sale",
+                cancelLabel: "Keep it",
+                destructive: true,
+              });
+              if (!ok) return false;
+              await postJson(`/api/v1/sales-receipts/${sr.id}/void`);
+              await load();
+            }}
+          >
+            Cancel sale
+          </ActionButton>
+        )}
         <Button variant="outline" size="sm" asChild>
           <Link href="/sales/receipts"><ArrowLeft className="mr-2 size-4" />Back</Link>
         </Button>
@@ -148,6 +188,7 @@ export default function SalesReceiptDetailPage() {
           <p className="text-sm">{sr.notes}</p>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

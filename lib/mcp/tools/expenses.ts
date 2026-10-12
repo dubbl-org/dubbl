@@ -1,3 +1,4 @@
+import { accountCodeMatch } from "@/lib/api/account-roles";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -382,7 +383,7 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
         const bankAccount = await db.query.chartAccount.findFirst({
           where: and(
             eq(chartAccount.organizationId, ctx.organizationId),
-            eq(chartAccount.code, params.bankAccountCode)
+            accountCodeMatch(params.bankAccountCode)
           ),
         });
         if (!bankAccount) throw new Error("Bank account not found");

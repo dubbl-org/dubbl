@@ -34,7 +34,8 @@ export async function GET(request: Request) {
     const requests = await db.query.leaveRequest.findMany({
       where: and(...conditions),
       orderBy: desc(leaveRequest.createdAt),
-      with: { employee: true, policy: true },
+      // Only what the list shows: no pay or bank details in a list response
+      with: { employee: { columns: { id: true, name: true, employeeNumber: true, department: true, position: true } }, policy: true },
       limit,
       offset,
     });

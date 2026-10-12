@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         members: {
           with: {
             member: {
-              with: { user: true },
+              with: { user: { columns: { id: true, name: true, email: true, image: true } } },
             },
           },
         },

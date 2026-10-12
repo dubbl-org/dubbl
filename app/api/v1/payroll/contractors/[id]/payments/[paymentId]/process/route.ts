@@ -1,3 +1,4 @@
+import { accountCodeMatch } from "@/lib/api/account-roles";
 import { db } from "@/lib/db";
 import { contractorPayment, journalEntry, journalLine, chartAccount, organization } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -41,7 +42,7 @@ export async function POST(
     const bankAccount = await db.query.chartAccount.findFirst({
       where: and(
         eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "1100")
+        accountCodeMatch("1100")
       ),
     });
 

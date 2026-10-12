@@ -1,9 +1,8 @@
-import { db } from "@/lib/db";
-import { portalAccessToken } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { ok, notFound, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
+import { revokePortalAccess } from "@/lib/api/portal-access";
 
 export async function DELETE(
   request: Request,
@@ -14,18 +13,11 @@ export async function DELETE(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:contacts");
 
-    const [revoked] = await db
-      .update(portalAccessToken)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(portalAccessToken.id, id),
-          eq(portalAccessToken.organizationId, ctx.organizationId)
-        )
-      )
-      .returning();
-
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return notFound("Portal access");
+    const revoked = await revokePortalAccess(ctx.organizationId, id);
     if (!revoked) return notFound("Portal access");
+
+    logAudit({ ctx, action: "delete", entityType: "portal_access", entityId: id, request });
     return ok({ success: true });
   } catch (err) {
     return handleError(err);

@@ -1,433 +1,394 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, CalendarClock, TrendingUp, X, Search, Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
-import { StatCard } from "@/components/dashboard/stat-card";
-import { Badge } from "@/components/ui/badge";
+import { Plus, CalendarClock, TrendingUp, Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatMoney } from "@/lib/money";
-import { devDelay } from "@/lib/dev-delay";
+import { ContentReveal } from "@/components/ui/content-reveal";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { formatMoney } from "@/lib/money";
+import { cn } from "@/lib/utils";
+import { Explorer } from "@/components/dashboard/explorer/explorer";
+import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
+import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
+import { DateCell, DueCell, MoneyCell, MutedCell, StatusPill, daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
+import type { ExplorerConfig, ExplorerStatus } from "@/components/dashboard/explorer/types";
 
-interface RevenueScheduleEntry {
+interface RevenueEntry {
   id: string;
+  periodDate: string;
+  amount: number;
   recognized: boolean;
+  sortOrder: number;
 }
 
 interface RevenueSchedule {
   id: string;
+  invoiceId: string;
+  invoiceLineId: string | null;
   totalAmount: number;
   recognizedAmount: number;
   startDate: string;
   endDate: string;
   method: string;
   status: string;
-  entries?: RevenueScheduleEntry[];
+  createdAt: string;
+  entries?: RevenueEntry[];
 }
 
-const statusColors: Record<string, string> = {
-  active: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  completed:
-    "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300",
-  cancelled: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
-};
-
-// Plain-language status labels (end users aren't accountants).
-const statusLabels: Record<string, string> = {
-  active: "in progress",
-  completed: "finished",
-  cancelled: "cancelled",
-};
+const STATUSES: ExplorerStatus[] = [
+  { value: "active", label: "In progress", color: "#0EA5E9", hint: "Still counting income over time" },
+  { value: "completed", label: "Finished", color: "#10B981", hint: "All the income has been counted" },
+  { value: "cancelled", label: "Cancelled", color: "#D4D4D8", hint: "Stopped, so no more income will be counted" },
+];
 
 // Plain-language method labels (end users aren't accountants).
-const methodLabels: Record<string, string> = {
-  straight_line: "evenly over time",
-  milestone: "by milestone",
-  on_completion: "when finished",
+const METHODS: Record<string, string> = {
+  straight_line: "Evenly over time",
+  milestone: "By milestone",
+  on_completion: "When finished",
 };
 
-function buildColumns(): Column<RevenueSchedule>[] {
-  return [
-    {
-      key: "period",
-      header: "Period",
-      render: (r) => (
-        <span className="text-sm">
-          {r.startDate} &ndash; {r.endDate}
-        </span>
-      ),
-    },
-    {
-      key: "method",
-      header: "How it's spread",
-      className: "w-40",
-      render: (r) => (
-        <span className="text-sm text-muted-foreground">
-          {methodLabels[r.method] || r.method}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      className: "w-28",
-      render: (r) => (
-        <Badge variant="outline" className={statusColors[r.status] || ""}>
-          {statusLabels[r.status] || r.status}
-        </Badge>
-      ),
-    },
-    {
-      key: "total",
-      header: "Total",
-      className: "w-28 text-right",
-      render: (r) => (
-        <span className="font-mono text-sm tabular-nums">
-          {formatMoney(r.totalAmount)}
-        </span>
-      ),
-    },
-    {
-      key: "recognized",
-      header: "Counted so far",
-      className: "w-32 text-right",
-      render: (r) => (
-        <span className="font-mono text-sm tabular-nums text-brand-600">
-          {formatMoney(r.recognizedAmount)}
-        </span>
-      ),
-    },
-    {
-      key: "remaining",
-      header: "Left to count",
-      className: "w-32 text-right",
-      render: (r) => (
-        <span className="font-mono text-sm tabular-nums text-amber-600">
-          {formatMoney(r.totalAmount - r.recognizedAmount)}
-        </span>
-      ),
-    },
-  ];
+const methodOf = (s: RevenueSchedule) => METHODS[s.method] ?? s.method;
+const leftOf = (s: RevenueSchedule) => (s.status === "cancelled" ? 0 : Math.max(0, s.totalAmount - s.recognizedAmount));
+const pctOf = (s: RevenueSchedule) => (s.totalAmount > 0 ? Math.round((s.recognizedAmount / s.totalAmount) * 100) : 0);
+
+function sortedEntries(s: RevenueSchedule) {
+  return [...(s.entries ?? [])].sort((a, b) => a.periodDate.localeCompare(b.periodDate) || a.sortOrder - b.sortOrder);
+}
+
+const nextEntry = (s: RevenueSchedule) => (s.status === "active" ? sortedEntries(s).find((e) => !e.recognized) : undefined);
+
+/** Periods whose date has passed but haven't been counted as income yet. */
+function behind(s: RevenueSchedule) {
+  if (s.status !== "active") return [];
+  return (s.entries ?? []).filter((e) => !e.recognized && (daysUntil(e.periodDate) ?? 1) <= 0);
+}
+
+function periodLabel(s: RevenueSchedule) {
+  return `${formatDay(s.startDate)} – ${formatDay(s.endDate)}`;
+}
+
+function Progress({ pct }: { pct: number }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-foreground/[0.07]">
+        <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, pct)}%` }} />
+      </span>
+      <span className="w-9 text-right tabular-nums text-[12px] text-muted-foreground">{pct}%</span>
+    </span>
+  );
 }
 
 export default function RevenueSchedulesPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [schedules, setSchedules] = useState<RevenueSchedule[]>([]);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [refetching, setRefetching] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [fetchKey, setFetchKey] = useState(0);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search);
-
   useDocumentTitle("Sales · Revenue Schedules");
 
-  const PAGE_SIZE = 50;
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  const columns = useMemo(() => buildColumns(), []);
-
-  const buildParams = useCallback((p: number) => {
-    const params = new URLSearchParams();
-    params.set("page", String(p));
-    params.set("limit", String(PAGE_SIZE));
-    return params;
-  }, []);
-
-  // Fetch first page when filters change
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRefetching(true);
-    setPage(1);
-
-    fetch(`/api/v1/revenue-schedules?${buildParams(1)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setSchedules(data.data || []);
-        setTotalCount(data.pagination?.total || 0);
-      })
-      .then(() => devDelay())
-      .finally(() => { if (!cancelled) { setInitialLoad(false); setRefetching(false); setFetchKey((k) => k + 1); } });
-
-    return () => { cancelled = true; };
-  }, [orgId, buildParams]);
-
-  // Load more
-  const loadMore = useCallback(() => {
-    if (!orgId || loadingMore) return;
-    const nextPage = page + 1;
-    setLoadingMore(true);
-
-    fetch(`/api/v1/revenue-schedules?${buildParams(nextPage)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setSchedules((prev) => [...prev, ...data.data]);
-          setPage(nextPage);
-        }
-      })
-      .finally(() => setLoadingMore(false));
-  }, [orgId, page, buildParams, loadingMore]);
-
-  const hasMore = schedules.length < totalCount;
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  // Infinite scroll
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !refetching) loadMore();
+  const config = useMemo<ExplorerConfig<RevenueSchedule>>(
+    () => ({
+      id: "revenue-schedules",
+      endpoint: "/api/v1/revenue-schedules",
+      noun: { one: "Revenue schedule", many: "Revenue schedules" },
+      getId: (s) => s.id,
+      href: (s) => `/sales/revenue-schedules/${s.id}`,
+      status: { get: (s) => s.status, options: STATUSES },
+      date: { get: (s) => s.startDate, label: "Start date" },
+      amount: (s) => s.totalAmount,
+      amountLabel: "Scheduled",
+      search: (s) => [methodOf(s), s.startDate, s.endDate, periodLabel(s), STATUSES.find((o) => o.value === s.status)?.label],
+      defaultSort: { key: "start", dir: "desc" },
+      facets: [{ key: "method", label: "How it's spread", value: methodOf }],
+      columns: [
+        {
+          key: "period",
+          label: "Period",
+          value: (s) => s.startDate,
+          render: (s) => {
+            const n = s.entries?.length ?? 0;
+            return (
+              <span className="min-w-0">
+                <span className="block truncate font-medium tabular-nums">{periodLabel(s)}</span>
+                <span className="block truncate text-[11.5px] text-muted-foreground">{n} period{n === 1 ? "" : "s"}</span>
+              </span>
+            );
+          },
+          csv: periodLabel,
+        },
+        { key: "method", label: "How it's spread", className: "w-36", value: methodOf, render: (s) => <MutedCell value={methodOf(s)} /> },
+        { key: "status", label: "Status", className: "w-32", value: (s) => s.status, render: (s) => <StatusPill value={s.status} options={STATUSES} /> },
+        {
+          key: "next",
+          label: "Next to count",
+          className: "w-44",
+          hint: "The next period that will be counted as income",
+          value: (s) => nextEntry(s)?.periodDate,
+          render: (s) => {
+            const e = nextEntry(s);
+            return e ? <DueCell value={e.periodDate} open lateWord="behind" /> : <span className="text-muted-foreground/50">—</span>;
+          },
+        },
+        {
+          key: "progress",
+          label: "Progress",
+          className: "w-32",
+          hint: "How much of the total has been counted as income so far",
+          value: pctOf,
+          render: (s) => <Progress pct={pctOf(s)} />,
+          csv: (s) => `${pctOf(s)}%`,
+        },
+        {
+          key: "periods",
+          label: "Periods done",
+          align: "right",
+          className: "w-28",
+          hidden: true,
+          value: (s) => (s.entries ?? []).filter((e) => e.recognized).length,
+          render: (s) => (
+            <span className="tabular-nums text-foreground/80">
+              {(s.entries ?? []).filter((e) => e.recognized).length} / {s.entries?.length ?? 0}
+            </span>
+          ),
+        },
+        { key: "total", label: "Total", align: "right", className: "w-32", money: true, value: (s) => s.totalAmount, render: (s) => <MoneyCell cents={s.totalAmount} className="font-medium" /> },
+        {
+          key: "counted",
+          label: "Counted so far",
+          align: "right",
+          className: "w-32",
+          money: true,
+          hint: "Income already moved into your revenue",
+          value: (s) => s.recognizedAmount,
+          render: (s) => <MoneyCell cents={s.recognizedAmount} className={s.recognizedAmount > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined} />,
+        },
+        {
+          key: "left",
+          label: "Left to count",
+          align: "right",
+          className: "w-32",
+          money: true,
+          hint: "Money you've been paid but haven't earned yet",
+          value: leftOf,
+          render: (s) => <MoneyCell cents={leftOf(s)} className={leftOf(s) > 0 ? "text-amber-600 dark:text-amber-400" : undefined} />,
+        },
+        { key: "start", label: "Starts", className: "w-32", hidden: true, value: (s) => s.startDate, render: (s) => <DateCell value={s.startDate} /> },
+        { key: "end", label: "Ends", className: "w-32", hidden: true, value: (s) => s.endDate, render: (s) => <DateCell value={s.endDate} /> },
+        { key: "created", label: "Created", className: "w-32", hidden: true, value: (s) => s.createdAt, render: (s) => <DateCell value={s.createdAt} /> },
+      ],
+      metrics: (rows) => {
+        const live = rows.filter((s) => s.status !== "cancelled");
+        const active = rows.filter((s) => s.status === "active");
+        const scheduled = live.reduce((t, s) => t + s.totalAmount, 0);
+        const counted = live.reduce((t, s) => t + s.recognizedAmount, 0);
+        const left = live.reduce((t, s) => t + leftOf(s), 0);
+        const late = active.flatMap(behind);
+        const soon = active.flatMap((s) =>
+          (s.entries ?? []).filter((e) => {
+            const d = daysUntil(e.periodDate);
+            return !e.recognized && d != null && d > 0 && d <= 30;
+          })
+        );
+        return [
+          {
+            key: "left",
+            label: "Left to count",
+            color: "#F59E0B",
+            status: "active",
+            value: formatMoney(left),
+            note: `${active.length} schedule${active.length === 1 ? "" : "s"} in progress`,
+            hint: "Money you've been paid but haven't earned yet. It moves into income as each period passes.",
+          },
+          {
+            key: "counted",
+            label: "Counted so far",
+            color: "#10B981",
+            value: formatMoney(counted),
+            note: scheduled ? `${Math.round((counted / scheduled) * 100)}% of everything scheduled` : "Nothing scheduled yet",
+            hint: "Income already moved into your revenue from these schedules.",
+          },
+          {
+            key: "behind",
+            label: "Ready to count",
+            color: "#EF4444",
+            status: "active",
+            value: formatMoney(late.reduce((t, e) => t + e.amount, 0)),
+            note: late.length ? `${late.length} period${late.length === 1 ? "" : "s"} already passed` : "All caught up",
+            hint: "Periods whose date has passed but haven't been counted as income yet. Count them so your profit is right.",
+          },
+          {
+            key: "soon",
+            label: "Next 30 days",
+            color: "#0EA5E9",
+            value: formatMoney(soon.reduce((t, e) => t + e.amount, 0)),
+            note: `${soon.length} period${soon.length === 1 ? "" : "s"} coming up`,
+            hint: "Income that will be counted over the next month.",
+          },
+          {
+            key: "scheduled",
+            label: "Total scheduled",
+            color: "#8B5CF6",
+            value: formatMoney(scheduled),
+            note: `${live.length} schedule${live.length === 1 ? "" : "s"}, not counting cancelled`,
+            hint: "Everything set up to be counted over time.",
+          },
+        ];
       },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore, refetching]);
-
-  const hasFilters = !!search;
-  const pendingSearch = search !== debouncedSearch;
-
-  const [searchKey, setSearchKey] = useState(0);
-  const filteredSchedules = useMemo(() => {
-    let list = schedules;
-    if (statusFilter !== "all") {
-      list = list.filter((s) => s.status === statusFilter);
-    }
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.startDate.toLowerCase().includes(q) ||
-          s.endDate.toLowerCase().includes(q) ||
-          (methodLabels[s.method] || s.method).toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [schedules, statusFilter, debouncedSearch]);
-
-  // Bump searchKey when debounced search or status filter changes to trigger ContentReveal
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSearchKey((k) => k + 1);
-  }, [debouncedSearch, statusFilter]);
-
-  const totalScheduled = useMemo(
-    () => schedules.reduce((sum, s) => sum + (s.status !== "cancelled" ? s.totalAmount : 0), 0),
-    [schedules]
-  );
-  const totalRecognized = useMemo(
-    () => schedules.reduce((sum, s) => sum + (s.status !== "cancelled" ? s.recognizedAmount : 0), 0),
-    [schedules]
-  );
-  const totalRemaining = totalScheduled - totalRecognized;
-
-  if (initialLoad) return <BrandLoader />;
-
-  if (!initialLoad && !refetching && schedules.length === 0 && statusFilter === "all" && !hasFilters) {
-    return (
-      <ContentReveal>
-        <div className="pt-12 pb-12 space-y-10">
-          {/* Top: title + CTA */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Revenue Schedules</h2>
-              <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                Count income from an invoice gradually over time instead of all at once — useful for upfront payments you earn month by month.
-              </p>
-            </div>
-            <Button
-              onClick={() => openDrawer("revenueSchedule")}
-              className="bg-brand-600 hover:bg-brand-700 shrink-0"
-            >
-              <Plus className="mr-2 size-4" />
-              New schedule
-            </Button>
-          </div>
-
-          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
-            {/* Left: how it works */}
-            <div className="rounded-xl border bg-card overflow-hidden">
-              <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">How a schedule works</p>
-              </div>
-              <div className="divide-y">
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40">
-                      <CalendarClock className="size-3.5 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Paid upfront</p>
-                      <p className="text-[11px] text-muted-foreground">INV-0042 · 12 months</p>
-                    </div>
-                  </div>
-                  <span className="font-mono text-sm font-medium">$1,200.00</span>
-                </div>
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-brand-50/30 dark:bg-brand-950/10">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-7 items-center justify-center rounded-md bg-brand-50 dark:bg-brand-950/40">
-                      <TrendingUp className="size-3.5 text-brand-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-brand-700 dark:text-brand-300">Counted each month</p>
-                      <p className="text-[11px] text-muted-foreground">Spread evenly</p>
-                    </div>
-                  </div>
-                  <span className="font-mono text-sm font-medium text-brand-600 dark:text-brand-400">+$100.00</span>
-                </div>
-                <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="size-7" />
-                    <p className="text-sm font-semibold">After 12 months</p>
-                  </div>
-                  <span className="font-mono text-sm font-bold">$1,200.00</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Use cases */}
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">When to use</p>
-              {[
-                {
-                  title: "Annual subscription paid upfront",
-                  desc: "Customer pays for a full year at once? Count the income one month at a time.",
-                  color: "border-l-blue-400",
-                },
-                {
-                  title: "Prepaid retainer or support plan",
-                  desc: "Got paid in advance for ongoing work? Spread the income across the term.",
-                  color: "border-l-amber-400",
-                },
-                {
-                  title: "Deposits for future delivery",
-                  desc: "Took a payment before the work is done? Recognise it as you deliver.",
-                  color: "border-l-brand-400",
-                },
-                {
-                  title: "Multi-month projects",
-                  desc: "Billed once for a long project? Recognise the income as you progress.",
-                  color: "border-l-purple-400",
-                },
-              ].map(({ title, desc, color }) => (
-                <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
-                  <p className="text-sm font-medium">{title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </ContentReveal>
-    );
-  }
-
-  return (
-    <ContentReveal className="space-y-6">
-      {/* Top: Stats */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard title="Total scheduled" value={formatMoney(totalScheduled)} icon={CalendarClock} />
-        <StatCard title="Counted so far" value={formatMoney(totalRecognized)} icon={TrendingUp} />
-        <StatCard title="Left to count" value={formatMoney(totalRemaining)} icon={CalendarClock} />
-      </div>
-
-      <div className="h-px bg-border" />
-
-      {/* Revenue schedule table */}
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList className="overflow-x-auto">
-              <TabsTrigger value="all" className="whitespace-nowrap">All</TabsTrigger>
-              <TabsTrigger value="active" className="whitespace-nowrap" title="Schedules still counting income over time">In progress</TabsTrigger>
-              <TabsTrigger value="completed" className="whitespace-nowrap" title="Schedules where all the income has been counted">Finished</TabsTrigger>
-              <TabsTrigger value="cancelled" className="whitespace-nowrap">Cancelled</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Button
-            onClick={() => openDrawer("revenueSchedule")}
-            size="sm"
-            className="bg-brand-600 hover:bg-brand-700"
+      preview: (s, helpers) => {
+        const next = nextEntry(s);
+        const entries = sortedEntries(s);
+        return (
+          <DocumentPreview
+            number={periodLabel(s)}
+          plainTitle
+            status={s.status}
+            statusOptions={STATUSES}
+            amount={leftOf(s) > 0 ? leftOf(s) : s.totalAmount}
+            amountLabel={leftOf(s) > 0 ? "left to count" : "total"}
+            facts={[
+              { label: "Starts", value: formatDay(s.startDate) },
+              { label: "Ends", value: formatDay(s.endDate) },
+              { label: "How it's spread", value: methodOf(s) },
+              { label: "Next to count", value: next ? <DueCell value={next.periodDate} open lateWord="behind" /> : "—" },
+              { label: "Total", value: formatMoney(s.totalAmount) },
+              { label: "Counted so far", value: `${formatMoney(s.recognizedAmount)} · ${pctOf(s)}%` },
+            ]}
+            actions={
+              <>
+                {next && (
+                  <ActionButton
+                    primary
+                    icon={<Check className="size-3.5" />}
+                    success="Counted the next period as income"
+                    run={async () => {
+                      await postJson(`/api/v1/revenue-schedules/${s.id}/recognize`);
+                      helpers.refresh();
+                    }}
+                  >
+                    Count next period
+                  </ActionButton>
+                )}
+                <ActionButton icon={<FileText className="size-3.5" />} run={async () => router.push(`/sales/${s.invoiceId}`)}>
+                  View invoice
+                </ActionButton>
+              </>
+            }
           >
+            <div className="mt-6">
+              <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">Periods</p>
+              {entries.length > 0 ? (
+                <div className="divide-y divide-border/60 rounded-xl border border-border/80">
+                  {entries.map((e) => {
+                    const passed = (daysUntil(e.periodDate) ?? 1) <= 0;
+                    return (
+                      <div key={e.id} className="flex items-center gap-3 px-3 py-2 text-[13px]">
+                        <span
+                          className={cn(
+                            "flex size-5 items-center justify-center rounded-full",
+                            e.recognized ? "bg-emerald-500/12 text-emerald-600" : passed && s.status === "active" ? "bg-red-500/10 text-red-600" : "bg-foreground/[0.05] text-muted-foreground"
+                          )}
+                        >
+                          {e.recognized ? <Check className="size-3" /> : <span className="size-1.5 rounded-full bg-current" />}
+                        </span>
+                        <span className="flex-1 tabular-nums">{formatDay(e.periodDate)}</span>
+                        <span className="text-[12px] text-muted-foreground">
+                          {e.recognized ? "Counted" : passed && s.status === "active" ? "Ready to count" : "Not yet"}
+                        </span>
+                        <span className={cn("w-24 text-right tabular-nums", e.recognized ? "text-foreground/80" : "text-muted-foreground")}>{formatMoney(e.amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-[12.5px] text-muted-foreground">No periods</p>
+              )}
+            </div>
+          </DocumentPreview>
+        );
+      },
+      empty: <SchedulesEmpty onCreate={() => openDrawer("revenueSchedule")} />,
+    }),
+    [openDrawer, router]
+  );
+
+  return <Explorer config={config} />;
+}
+
+function SchedulesEmpty({ onCreate }: { onCreate: () => void }) {
+  return (
+    <ContentReveal>
+      <div className="pt-12 pb-12 space-y-10">
+        {/* Top: title + CTA */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Revenue Schedules</h2>
+            <p className="mt-1 text-sm text-muted-foreground max-w-md">
+              Count income from an invoice gradually over time instead of all at once — useful for upfront payments you earn month by month.
+            </p>
+          </div>
+          <Button onClick={onCreate} className="bg-brand-600 hover:bg-brand-700 shrink-0">
             <Plus className="mr-2 size-4" />
             New schedule
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search schedules..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-56 pl-8 text-xs"
-            />
-          </div>
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-muted-foreground"
-              onClick={() => { setSearch(""); }}
-            >
-              <X className="mr-1 size-3" />
-              Clear filters
-            </Button>
-          )}
-        </div>
-
-        {refetching || pendingSearch ? (
-          <BrandLoader className="h-48" />
-        ) : (
-          <ContentReveal key={`${fetchKey}-${searchKey}`}>
-            <DataTable
-              columns={columns}
-              data={filteredSchedules}
-              loading={false}
-              emptyMessage="No revenue schedules match your filters."
-              onRowClick={(r) => router.push(`/sales/revenue-schedules/${r.id}`)}
-            />
-          </ContentReveal>
-        )}
-
-        {/* Infinite scroll sentinel & count */}
-        {!refetching && !pendingSearch && filteredSchedules.length > 0 && (
-          <>
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-muted-foreground">
-                Showing {schedules.length} of {totalCount} schedule{totalCount !== 1 ? "s" : ""}
-              </p>
+        <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[1fr_1fr] items-start">
+          {/* Left: how it works */}
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="bg-muted/30 px-3 sm:px-5 py-3 border-b">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">How a schedule works</p>
             </div>
-            {hasMore && (
-              <div ref={sentinelRef} className="flex justify-center py-4">
-                {loadingMore && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+            <div className="divide-y">
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40">
+                    <CalendarClock className="size-3.5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Paid upfront</p>
+                    <p className="text-[11px] text-muted-foreground">INV-0042 · 12 months</p>
+                  </div>
+                </div>
+                <span className="font-mono text-sm font-medium">$1,200.00</span>
               </div>
-            )}
-          </>
-        )}
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3.5 bg-brand-50/30 dark:bg-brand-950/10">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-md bg-brand-50 dark:bg-brand-950/40">
+                    <TrendingUp className="size-3.5 text-brand-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-brand-700 dark:text-brand-300">Counted each month</p>
+                    <p className="text-[11px] text-muted-foreground">Spread evenly</p>
+                  </div>
+                </div>
+                <span className="font-mono text-sm font-medium text-brand-600 dark:text-brand-400">+$100.00</span>
+              </div>
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="size-7" />
+                  <p className="text-sm font-semibold">After 12 months</p>
+                </div>
+                <span className="font-mono text-sm font-bold">$1,200.00</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Use cases */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">When to use</p>
+            {[
+              { title: "Annual subscription paid upfront", desc: "Customer pays for a full year at once? Count the income one month at a time.", color: "border-l-blue-400" },
+              { title: "Prepaid retainer or support plan", desc: "Got paid in advance for ongoing work? Spread the income across the term.", color: "border-l-amber-400" },
+              { title: "Deposits for future delivery", desc: "Took a payment before the work is done? Recognise it as you deliver.", color: "border-l-brand-400" },
+              { title: "Multi-month projects", desc: "Billed once for a long project? Recognise the income as you progress.", color: "border-l-purple-400" },
+            ].map(({ title, desc, color }) => (
+              <div key={title} className={`rounded-lg border border-l-[3px] ${color} bg-card px-4 py-3`}>
+                <p className="text-sm font-medium">{title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </ContentReveal>
   );

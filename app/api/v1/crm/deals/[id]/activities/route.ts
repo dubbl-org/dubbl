@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { dealActivity, deal } from "@/lib/db/schema";
-import { eq, and, desc, asc, ilike, sql, count } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, count } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { ok, created, notFound, handleError } from "@/lib/api/response";
 import { z } from "zod";
@@ -65,7 +65,7 @@ export async function GET(
     // Fetch page
     const activities = await db.query.dealActivity.findMany({
       where,
-      with: { user: true },
+      with: { user: { columns: { id: true, name: true, email: true, image: true } } },
       orderBy: orderFn(orderCol),
       limit,
       offset,

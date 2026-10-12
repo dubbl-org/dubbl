@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { payrollEmployee } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { member, payrollEmployee } from "@/lib/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
+import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
@@ -39,7 +39,7 @@ export async function GET(
         eq(payrollEmployee.organizationId, ctx.organizationId),
         notDeleted(payrollEmployee.deletedAt)
       ),
-      with: { member: { with: { user: true } } },
+      with: { member: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } } },
     });
 
     if (!employee) return notFound("Employee");
@@ -70,6 +70,24 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    if (parsed.memberId) {
+      const linked = await db.query.member.findFirst({
+        where: and(eq(member.id, parsed.memberId), eq(member.organizationId, ctx.organizationId)),
+        columns: { id: true },
+      });
+      if (!linked) return validationError("That person isn't a member of this workspace");
+      const taken = await db.query.payrollEmployee.findFirst({
+        where: and(
+          eq(payrollEmployee.organizationId, ctx.organizationId),
+          eq(payrollEmployee.memberId, parsed.memberId),
+          ne(payrollEmployee.id, id),
+          notDeleted(payrollEmployee.deletedAt)
+        ),
+        columns: { name: true },
+      });
+      if (taken) return validationError(`That login is already linked to ${taken.name}`);
+    }
 
     const [updated] = await db
       .update(payrollEmployee)

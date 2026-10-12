@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
     const members = await db.query.member.findMany({
       where: eq(member.organizationId, ctx.organizationId),
-      with: { user: true, customRole: true },
+      with: { user: { columns: { id: true, name: true, email: true, image: true } }, customRole: true },
     });
 
     return NextResponse.json({

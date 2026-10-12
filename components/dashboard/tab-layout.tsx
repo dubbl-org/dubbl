@@ -4,6 +4,8 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BlurReveal } from "@/components/ui/blur-reveal";
+import { useShellSubnav } from "@/components/dashboard/shell/shell-context";
+import { findActiveHref } from "@/components/dashboard/shell/nav";
 import { cn } from "@/lib/utils";
 
 interface Tab {
@@ -13,6 +15,8 @@ interface Tab {
   exact?: boolean;
   badge?: string | number;
   title?: string;
+  /** Heading for this tab's group in the side panel. Tabs that share one sit together. */
+  group?: string;
 }
 
 export function TabLayout({
@@ -23,6 +27,17 @@ export function TabLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  // Consecutive tabs with the same group become one labelled section in the panel.
+  const sections: { label?: string; items: Omit<Tab, "icon" | "group">[] }[] = [];
+  for (const { href, label, exact, badge, title, group } of tabs) {
+    const last = sections[sections.length - 1];
+    const item = { href, label, exact, badge, title };
+    if (last && last.label === group) last.items.push(item);
+    else sections.push({ label: group, items: [item] });
+  }
+  useShellSubnav(sections);
+  // Longest match wins, so /accounting/banking/batches doesn't also light up /accounting/banking
+  const activeHref = findActiveHref(pathname, sections);
 
   // Hide tabs on detail pages (path has more segments than any tab href)
   const isDetailPage = !tabs.some((tab) =>
@@ -34,7 +49,7 @@ export function TabLayout({
   // extra segment (the ID) as a stable key.
   let blurKey = pathname;
   if (isDetailPage) {
-    const matchedTab = tabs.find((tab) => pathname.startsWith(tab.href + "/"));
+    const matchedTab = tabs.find((tab) => tab.href === activeHref) ?? tabs.find((tab) => pathname.startsWith(tab.href + "/"));
     if (matchedTab) {
       const rest = pathname.slice(matchedTab.href.length + 1);
       const idSegment = rest.split("/")[0];
@@ -45,11 +60,9 @@ export function TabLayout({
   return (
     <div>
       {!isDetailPage && (
-        <nav className="-mt-2 mb-6 sm:mb-8 flex items-center gap-1 overflow-x-auto border-b border-border scrollbar-none">
+        <nav className="-mt-2 mb-6 sm:mb-8 flex lg:hidden items-center gap-1 overflow-x-auto border-b border-border scrollbar-none">
           {tabs.map((tab) => {
-            const isActive = tab.exact
-              ? pathname === tab.href
-              : pathname.startsWith(tab.href);
+            const isActive = tab.href === activeHref;
             const Icon = tab.icon;
             return (
               <Link

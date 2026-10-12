@@ -703,6 +703,7 @@ export async function POST(
             reference: paymentNumber,
             amount: parsed.amount!,
             date: paymentDate,
+            bankAccountId: account.id,
             allocations: [
               {
                 amount: parsed.amount!,
@@ -810,6 +811,7 @@ export async function POST(
           reference: paymentNumber,
           amount: parsed.amount!,
           date: paymentDate,
+          bankAccountId: account.id,
           allocations: [
             {
               amount: parsed.amount!,

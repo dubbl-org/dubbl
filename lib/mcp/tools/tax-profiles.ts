@@ -10,12 +10,15 @@ import {
   applyTaxProfile,
   build1099Report,
   FORM_1099_NEC_THRESHOLD_CENTS,
+  COUNTRY_TAX_PROFILES,
 } from "@/lib/api/tax-profiles";
+
+const PROFILE_COUNTRIES = Object.keys(COUNTRY_TAX_PROFILES).join(", ");
 
 export function registerTaxProfileTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "list_tax_profiles",
-    "List the available country tax profiles (US, GB, ZA, AU, CA, IE, IN, NL). Each profile describes a country's default tax rate set (rates in basis points, 2000 = 20%), rate kinds, periodic return boxes, and which GL control accounts it posts to (output VAT/GST 2200 or US sales tax payable 2230, input VAT/GST 1500, VAT suspense 2240). Also returns recommendedCountry — the profile that best fits this organization based on its taxRegime/country. Use list_tax_profiles to discover what apply_tax_profile can seed. No amounts are monetary; rates are basis points.",
+    `List the available country tax profiles (${PROFILE_COUNTRIES}). Each profile describes a country's default tax rate set (rates in basis points, 2000 = 20%), rate kinds, periodic return boxes, and which GL control accounts it posts to, as canonical role codes (output VAT/GST 2200 or US sales tax payable 2230, input VAT/GST 1500, VAT suspense 2240 — on a Xero-style chart these resolve to e.g. 820 VAT / 821 VAT on Purchases). Also returns recommendedCountry — the profile that best fits this organization based on its taxRegime/country. Use list_tax_profiles to discover what apply_tax_profile can seed. No amounts are monetary; rates are basis points.`,
     {},
     () =>
       wrapTool(ctx, async () => {
@@ -37,7 +40,7 @@ export function registerTaxProfileTools(server: McpServer, ctx: AuthContext) {
         .length(2)
         .optional()
         .describe(
-          "Two-letter ISO country code of the profile to apply (US, GB, ZA, AU, CA, IE, IN, NL). Omit to auto-resolve from the organization's taxRegime/country."
+          `Two-letter ISO country code of the profile to apply (${PROFILE_COUNTRIES}). Omit to auto-resolve from the organization's taxRegime/country.`
         ),
     },
     (params) =>

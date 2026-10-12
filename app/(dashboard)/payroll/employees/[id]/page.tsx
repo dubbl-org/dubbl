@@ -133,6 +133,8 @@ export default function EmployeeDetailPage() {
   const [compensationType, setCompensationType] = useState("salary");
   const [hourlyRate, setHourlyRate] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [memberId, setMemberId] = useState<string>("none");
+  const [members, setMembers] = useState<{ id: string; userName: string | null; userEmail: string }[]>([]);
   useDocumentTitle("Payroll · Employee Details");
 
   const orgId =
@@ -164,6 +166,7 @@ export default function EmployeeDetailPage() {
           setCompensationType(e.compensationType || "salary");
           setHourlyRate(e.hourlyRate ? (e.hourlyRate / 100).toFixed(2) : "");
           setCurrency(e.currency || "USD");
+          setMemberId(e.memberId ?? "none");
         }
       })
       .finally(() => setLoading(false));
@@ -193,6 +196,13 @@ export default function EmployeeDetailPage() {
           setTcAddlFederal(String(tc.additionalFederalWithholding ?? 0));
           setTcAddlState(String(tc.additionalStateWithholding ?? 0));
         }
+      })
+      .catch(() => {});
+
+    fetch("/api/v1/members", { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.members) setMembers(data.members);
       })
       .catch(() => {});
 
@@ -272,6 +282,7 @@ export default function EmployeeDetailPage() {
           compensationType,
           hourlyRate: hourlyRate ? Math.round(parseFloat(hourlyRate) * 100) : null,
           currency,
+          memberId: memberId === "none" ? null : memberId,
         }),
       });
 
@@ -516,8 +527,25 @@ export default function EmployeeDetailPage() {
         <div className="h-px bg-border" />
 
         {/* Details */}
-        <Section title="Details" description="Banking and employment dates.">
+        <Section title="Details" description="Banking, employment dates and self-service access.">
           <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5 sm:col-span-3">
+              <Label className="text-xs">Self-service login</Label>
+              <Select value={memberId} onValueChange={setMemberId}>
+                <SelectTrigger className="sm:max-w-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not linked</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.userName ? `${m.userName} (${m.userEmail})` : m.userEmail}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[12px] text-muted-foreground">
+                The workspace member who is this employee. Once linked, they can see their payslips, leave and timesheets in Employee self-service.
+              </p>
+            </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Bank Account Number</Label>
               <Input

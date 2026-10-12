@@ -1,10 +1,12 @@
 import { db } from "@/lib/db";
-import { journalEntry, journalLine, chartAccount, organization, taxRate, inventoryItem, inventoryMovement } from "@/lib/db/schema";
+import { journalEntry, journalLine, organization, taxRate, inventoryItem, inventoryMovement, bankAccount as bankAccountTable } from "@/lib/db/schema";
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { recordInventoryReceipt, recordInventoryIssue, type ValuedItem } from "./inventory-valuation";
 import { getExchangeRate, convertAmount, MissingExchangeRateError } from "@/lib/currency/converter";
 import { convertLinesToBase, realizedSettlementLegs } from "@/lib/currency/convert-entry";
 import type { SettlementRole } from "@/lib/currency/convert-entry";
+import { ensureAccountForCode, findAccountForCode } from "./account-roles";
+import { ensureBankLedgerAccount } from "./bank-ledger";
 
 interface JournalAutomationContext {
   organizationId: string;
@@ -140,38 +142,20 @@ async function ensureFxAccount(
   baseCurrency: string,
   exec: DbOrTx = db
 ) {
-  const def = FX_ACCOUNTS[role];
-  const existing = await findAccountByCode(organizationId, def.code, exec);
-  if (existing) return existing;
   // Use the caller's executor so creating this account on demand commits/rolls
   // back with the surrounding settlement transaction (no orphaned account if
   // the payment is rolled back).
-  await exec
-    .insert(chartAccount)
-    .values({
-      organizationId,
-      code: def.code,
-      name: def.name,
-      type: def.type,
-      subType: def.subType,
-      currencyCode: baseCurrency,
-    })
-    .onConflictDoNothing({
-      target: [chartAccount.organizationId, chartAccount.code],
-    });
-  return findAccountByCode(organizationId, def.code, exec);
+  return ensureAccountForCode(organizationId, FX_ACCOUNTS[role], baseCurrency, exec);
 }
 
 /**
- * Find or create a system account by code/type for the given org.
+ * Find the org's account for a code. Canonical generic codes ("1200", "2200"…)
+ * resolve to whichever account plays that role in the org's chart — e.g. 610
+ * Accounts Receivable in a Xero-style chart (see account-roles.ts); any other
+ * code is matched literally.
  */
 export async function findAccountByCode(organizationId: string, code: string, exec: DbOrTx = db) {
-  return exec.query.chartAccount.findFirst({
-    where: and(
-      eq(chartAccount.organizationId, organizationId),
-      eq(chartAccount.code, code)
-    ),
-  });
+  return findAccountForCode(organizationId, code, exec);
 }
 
 /** System control/settlement accounts used by tax-aware and inventory postings. */
@@ -202,21 +186,7 @@ export async function ensureControlAccount(
   baseCurrency: string,
   exec: DbOrTx = db
 ) {
-  const def = CONTROL_ACCOUNTS[key];
-  const existing = await findAccountByCode(organizationId, def.code, exec);
-  if (existing) return existing;
-  await exec
-    .insert(chartAccount)
-    .values({
-      organizationId,
-      code: def.code,
-      name: def.name,
-      type: def.type,
-      subType: def.subType,
-      currencyCode: baseCurrency,
-    })
-    .onConflictDoNothing({ target: [chartAccount.organizationId, chartAccount.code] });
-  return findAccountByCode(organizationId, def.code, exec);
+  return ensureAccountForCode(organizationId, CONTROL_ACCOUNTS[key], baseCurrency, exec);
 }
 
 /**
@@ -232,20 +202,7 @@ export async function ensureAccountByCode(
   baseCurrency: string,
   exec: DbOrTx = db
 ) {
-  const existing = await findAccountByCode(organizationId, def.code, exec);
-  if (existing) return existing;
-  await exec
-    .insert(chartAccount)
-    .values({
-      organizationId,
-      code: def.code,
-      name: def.name,
-      type: def.type,
-      subType: def.subType ?? "current",
-      currencyCode: baseCurrency,
-    })
-    .onConflictDoNothing({ target: [chartAccount.organizationId, chartAccount.code] });
-  return findAccountByCode(organizationId, def.code, exec);
+  return ensureAccountForCode(organizationId, def, baseCurrency, exec);
 }
 
 /**
@@ -939,6 +896,13 @@ export async function createPaymentJournalEntry(
     date: string;
     bankAccountCode?: string;
     /**
+     * The bank account (bank_account row, not a chart account) the money moved
+     * through. When set, the cash leg posts to that account's own ledger
+     * account so each bank account reconciles on its own; otherwise it falls
+     * back to bankAccountCode / the main bank account.
+     */
+    bankAccountId?: string | null;
+    /**
      * The documents this payment settles, with each document's currency and
      * recognition (issue) date. When supplied and any are in a foreign
      * currency, the entry is posted in base currency with realised FX booked.
@@ -951,10 +915,34 @@ export async function createPaymentJournalEntry(
   tx: Tx
 ) {
   const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
-  const bankAccount = await findAccountByCode(
-    ctx.organizationId,
-    paymentData.bankAccountCode || "1100"
-  );
+  // Prefer the ledger account linked to the actual bank account (linking or
+  // creating one on demand, as the bank feed does); fall back to the code.
+  let bankAccount: { id: string } | null = null;
+  if (paymentData.bankAccountId) {
+    const bankRow = await tx.query.bankAccount.findFirst({
+      where: and(
+        eq(bankAccountTable.id, paymentData.bankAccountId),
+        eq(bankAccountTable.organizationId, ctx.organizationId),
+        isNull(bankAccountTable.deletedAt)
+      ),
+      columns: {
+        id: true,
+        accountName: true,
+        accountType: true,
+        currencyCode: true,
+        chartAccountId: true,
+      },
+    });
+    if (bankRow) {
+      bankAccount = { id: await ensureBankLedgerAccount(ctx.organizationId, bankRow, tx) };
+    }
+  }
+  if (!bankAccount) {
+    bankAccount = (await findAccountByCode(
+      ctx.organizationId,
+      paymentData.bankAccountCode || "1100"
+    )) ?? null;
+  }
   const counterAccount = await findAccountByCode(
     ctx.organizationId,
     paymentData.type === "invoice" ? "1200" : "2100"

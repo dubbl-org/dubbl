@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { notification } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, handleError } from "@/lib/api/response";
 
 export async function POST(request: Request) {
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
         and(
           eq(notification.organizationId, ctx.organizationId),
           eq(notification.userId, ctx.userId),
-          isNull(notification.readAt)
+          isNull(notification.readAt),
+          notDeleted(notification.deletedAt)
         )
       );
 

@@ -19,6 +19,7 @@ import {
   ClipboardCheck,
   ArrowUpRight,
   Info,
+  Receipt,
 } from "lucide-react";
 import {
   COUNTRIES,
@@ -29,11 +30,14 @@ import {
 import { INDUSTRIES, type Industry } from "@/lib/data/industries";
 import { REFERRAL_SOURCES, type ReferralSource } from "@/lib/data/referral-sources";
 import { BrandGrain } from "@/components/shared/brand-grain";
+import { getCountrySetup, fiscalYearEndLabel, MONTH_NAMES } from "@/lib/country-setup";
+import { chartTemplateForCountry, seededAccountsFor } from "@/lib/db/chart-templates";
 
 const STEPS = [
   { label: "Organization", icon: Building2 },
   { label: "Country", icon: Globe },
   { label: "Business Type", icon: Briefcase },
+  { label: "Tax & Year", icon: Receipt },
   { label: "Industry", icon: Factory },
   { label: "Referral", icon: Megaphone },
   { label: "Review", icon: ClipboardCheck },
@@ -62,6 +66,11 @@ export function OnboardingWizard() {
   const [industry, setIndustry] = useState("");
   const [referralSource, setReferralSource] = useState("");
   const [referralOther, setReferralOther] = useState("");
+  // Tax & financial year — defaulted from the country, Xero-style.
+  const [registered, setRegistered] = useState(true);
+  const [taxId, setTaxId] = useState("");
+  const [vatScheme, setVatScheme] = useState<"accrual" | "cash">("accrual");
+  const [fiscalStart, setFiscalStart] = useState(1);
 
   // Escape hatch: user has other completed orgs
   const [hasOtherOrgs, setHasOtherOrgs] = useState(false);
@@ -139,8 +148,9 @@ export function OnboardingWizard() {
         return countryCode.length > 0;
       case 2:
         return businessType.length > 0;
-      case 3: // optional
+      case 3: // defaults are always valid
       case 4: // optional
+      case 5: // optional
         return true;
       default:
         return true;
@@ -148,7 +158,7 @@ export function OnboardingWizard() {
   }
 
   function isOptionalStep(): boolean {
-    return step === 3 || step === 4;
+    return step === 4 || step === 5;
   }
 
   async function handleComplete() {
@@ -175,6 +185,7 @@ export function OnboardingWizard() {
       }
 
       const selectedCountry = COUNTRIES.find((c) => c.code === countryCode);
+      const setup = getCountrySetup(countryCode);
       const finalReferral =
         referralSource === "other" && referralOther.trim()
           ? `other: ${referralOther.trim()}`
@@ -198,6 +209,14 @@ export function OnboardingWizard() {
           businessType: businessType || null,
           industrySector: industry || null,
           referralSource: finalReferral || null,
+          fiscalYearStartMonth: fiscalStart,
+          ...(setup.regime
+            ? {
+                registeredForTax: registered,
+                ...(registered && taxId.trim() ? { taxId: taxId.trim() } : {}),
+                ...(registered && setup.cashScheme ? { vatScheme } : {}),
+              }
+            : {}),
         }),
       });
 
@@ -288,6 +307,11 @@ export function OnboardingWizard() {
                   onSelect={(code) => {
                     setCountryCode(code);
                     setBusinessType("");
+                    const defaults = getCountrySetup(code);
+                    setRegistered(true);
+                    setTaxId("");
+                    setVatScheme("accrual");
+                    setFiscalStart(defaults.fiscalYearStartMonth);
                   }}
                 />
               )}
@@ -299,9 +323,22 @@ export function OnboardingWizard() {
                 />
               )}
               {step === 3 && (
-                <StepIndustry selected={industry} onSelect={setIndustry} />
+                <StepTax
+                  countryCode={countryCode}
+                  registered={registered}
+                  onRegisteredChange={setRegistered}
+                  taxId={taxId}
+                  onTaxIdChange={setTaxId}
+                  vatScheme={vatScheme}
+                  onVatSchemeChange={setVatScheme}
+                  fiscalStart={fiscalStart}
+                  onFiscalStartChange={setFiscalStart}
+                />
               )}
               {step === 4 && (
+                <StepIndustry selected={industry} onSelect={setIndustry} />
+              )}
+              {step === 5 && (
                 <StepReferral
                   selected={referralSource}
                   other={referralOther}
@@ -309,10 +346,12 @@ export function OnboardingWizard() {
                   onOtherChange={setReferralOther}
                 />
               )}
-              {step === 5 && (
+              {step === 6 && (
                 <StepReview
                   orgName={orgName}
                   countryCode={countryCode}
+                  registered={registered}
+                  fiscalStart={fiscalStart}
                   businessType={businessType}
                   industry={industry}
                   referralSource={referralSource}
@@ -447,7 +486,7 @@ function StepCountry({
             onClick={() => onSelect(c.code)}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
               selected === c.code
-                ? "bg-brand-500/10 text-brand-700 dark:text-brand-400"
+                ? "bg-foreground/[0.055] text-foreground"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -501,7 +540,7 @@ function StepBusinessType({
             onClick={() => onSelect(t.code)}
             className={`flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition-colors ${
               selected === t.code
-                ? "bg-brand-500/10 text-brand-700 dark:text-brand-400"
+                ? "bg-foreground/[0.055] text-foreground"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -518,7 +557,156 @@ function StepBusinessType({
   );
 }
 
-// ── Step 4: Industry ──
+// ── Step 4: Tax & financial year ──
+
+function Choice({
+  active,
+  onClick,
+  title,
+  hint,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  hint?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex flex-1 flex-col rounded-lg px-3 py-2.5 text-left transition-colors ${
+        active ? "bg-foreground/[0.055] text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+      }`}
+    >
+      <span className="flex items-center gap-1.5 text-sm font-medium">
+        {active && <Check className="size-3.5" />}
+        {title}
+      </span>
+      {hint && <span className="mt-0.5 text-xs text-muted-foreground">{hint}</span>}
+    </button>
+  );
+}
+
+function StepTax({
+  countryCode,
+  registered,
+  onRegisteredChange,
+  taxId,
+  onTaxIdChange,
+  vatScheme,
+  onVatSchemeChange,
+  fiscalStart,
+  onFiscalStartChange,
+}: {
+  countryCode: string;
+  registered: boolean;
+  onRegisteredChange: (v: boolean) => void;
+  taxId: string;
+  onTaxIdChange: (v: string) => void;
+  vatScheme: "accrual" | "cash";
+  onVatSchemeChange: (v: "accrual" | "cash") => void;
+  fiscalStart: number;
+  onFiscalStartChange: (v: number) => void;
+}) {
+  const setup = getCountrySetup(countryCode);
+  const tax = setup.taxName;
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold tracking-tight text-foreground">
+        Tax and financial year
+      </h2>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        Pre-filled for {COUNTRIES.find((c) => c.code === countryCode)?.name ?? "your country"}. You can change any of this later in settings.
+      </p>
+
+      <div className="mt-6 space-y-5">
+        {setup.regime && (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">
+              {setup.regime === "us_sales_tax" ? "Do you collect sales tax?" : `Are you registered for ${tax}?`}
+            </Label>
+            <div className="flex gap-2">
+              <Choice
+                active={registered}
+                onClick={() => onRegisteredChange(true)}
+                title="Yes"
+                hint={setup.regime === "us_sales_tax" ? "Charge tax on invoices" : `Charge and reclaim ${tax}`}
+              />
+              <Choice
+                active={!registered}
+                onClick={() => onRegisteredChange(false)}
+                title="Not yet"
+                hint={`Invoices default to no ${tax}`}
+              />
+            </div>
+          </div>
+        )}
+
+        {setup.regime && registered && (
+          <div className="space-y-2">
+            <Label htmlFor="tax-id" className="text-xs font-medium">
+              {setup.taxIdLabel} <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="tax-id"
+              value={taxId}
+              onChange={(e) => onTaxIdChange(e.target.value)}
+              placeholder={setup.taxIdPlaceholder}
+              className="h-10 rounded-lg"
+            />
+          </div>
+        )}
+
+        {setup.regime && registered && setup.cashScheme && (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">When do you account for {tax}?</Label>
+            <div className="flex gap-2">
+              <Choice
+                active={vatScheme === "accrual"}
+                onClick={() => onVatSchemeChange("accrual")}
+                title="Invoice basis"
+                hint="When you invoice or are billed"
+              />
+              <Choice
+                active={vatScheme === "cash"}
+                onClick={() => onVatSchemeChange("cash")}
+                title="Cash basis"
+                hint="When money is paid or received"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="fy-start" className="text-xs font-medium">
+            Financial year
+          </Label>
+          <div className="flex items-center gap-3">
+            <select
+              id="fy-start"
+              value={fiscalStart}
+              onChange={(e) => onFiscalStartChange(Number(e.target.value))}
+              className="h-10 flex-1 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {MONTH_NAMES.map((m, i) => (
+                <option key={m} value={i + 1}>
+                  Starts 1 {m}
+                </option>
+              ))}
+            </select>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              Ends {fiscalYearEndLabel(fiscalStart)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 5: Industry ──
 
 function StepIndustry({
   selected,
@@ -542,7 +730,7 @@ function StepIndustry({
             onClick={() => onSelect(selected === ind.code ? "" : ind.code)}
             className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
               selected === ind.code
-                ? "bg-brand-500/10 text-brand-700 dark:text-brand-400"
+                ? "bg-foreground/[0.055] text-foreground"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -554,7 +742,7 @@ function StepIndustry({
   );
 }
 
-// ── Step 5: Referral ──
+// ── Step 6: Referral ──
 
 function StepReferral({
   selected,
@@ -582,7 +770,7 @@ function StepReferral({
             onClick={() => onSelect(selected === src.code ? "" : src.code)}
             className={`rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
               selected === src.code
-                ? "bg-brand-500/10 text-brand-700 dark:text-brand-400"
+                ? "bg-foreground/[0.055] text-foreground"
                 : "hover:bg-muted/60"
             }`}
           >
@@ -609,11 +797,13 @@ function StepReferral({
   );
 }
 
-// ── Step 6: Review ──
+// ── Step 7: Review ──
 
 function StepReview({
   orgName,
   countryCode,
+  registered,
+  fiscalStart,
   businessType,
   industry,
   referralSource,
@@ -621,11 +811,19 @@ function StepReview({
 }: {
   orgName: string;
   countryCode: string;
+  registered: boolean;
+  fiscalStart: number;
   businessType: string;
   industry: string;
   referralSource: string;
   referralOther: string;
 }) {
+  const setup = getCountrySetup(countryCode);
+  const chart = chartTemplateForCountry(countryCode);
+  const chartAccounts = seededAccountsFor(chart);
+  const keyAccounts = ["1100", "4000", "1200", "2100", "2200", "3100"]
+    .map((role) => chartAccounts.find((a) => a.roles?.includes(role)))
+    .filter((a): a is NonNullable<typeof a> => !!a);
   const country = COUNTRIES.find((c) => c.code === countryCode);
   const types = getBusinessTypesForCountry(countryCode);
   const bt = types.find((t) => t.code === businessType);
@@ -640,6 +838,10 @@ function StepReview({
     },
     { label: "Currency", value: country?.defaultCurrency ?? "-" },
     { label: "Business Type", value: bt?.localName ?? "-" },
+    ...(setup.regime
+      ? [{ label: setup.taxName, value: registered ? "Registered" : "Not registered" }]
+      : []),
+    { label: "Financial year end", value: fiscalYearEndLabel(fiscalStart) },
     { label: "Industry", value: ind?.name ?? "-" },
     {
       label: "Referral",
@@ -671,11 +873,23 @@ function StepReview({
           </div>
         ))}
       </div>
-      <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-amber-50 px-3.5 py-3 dark:bg-amber-950/30">
-        <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          A default chart of accounts for your country will be created. We recommend reviewing it with your accountant to ensure it meets local regulatory requirements.
-        </p>
+      <div className="mt-4 rounded-lg border border-border/70 px-4 py-3">
+        <div className="flex items-start gap-2.5">
+          <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-foreground">
+              {chart.name} · {chartAccounts.length} accounts
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {keyAccounts.map((a) => `${a.code} ${a.name}`).join(" · ")}
+            </p>
+            {setup.regime && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Standard {setup.taxName} rates are added and each account gets its usual default rate. Review the chart with your accountant if you have local requirements.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

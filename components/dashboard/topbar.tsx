@@ -12,24 +12,36 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Menu } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { useSidebar } from "@/components/ui/sidebar";
-import { usePathname, useRouter } from "next/navigation";
+import { useShell } from "@/components/dashboard/shell/shell-context";
+import { usePathname } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
+import { AssistantButton } from "@/components/dashboard/assistant/assistant-panel";
 
 /* ------------------------------------------------------------------ */
 /*  Custom topbar action slot                                          */
 /* ------------------------------------------------------------------ */
 
-const TopbarActionCtx = createContext<{
-  setAction: (node: ReactNode) => void;
-}>({ setAction: () => {} });
+// The setter and the value live in separate contexts: pages only read the
+// stable setter, so publishing an action never re-renders the page itself.
+const TopbarActionSetter = createContext<(node: ReactNode) => void>(() => {});
+const TopbarActionValue = createContext<ReactNode>(null);
+
+/** Wraps the dashboard so any page can put an action in the topbar. */
+export function TopbarActionProvider({ children }: { children: ReactNode }) {
+  const [action, setAction] = useState<ReactNode>(null);
+  const set = useCallback((node: ReactNode) => setAction(node), []);
+  return (
+    <TopbarActionSetter.Provider value={set}>
+      <TopbarActionValue.Provider value={action}>{children}</TopbarActionValue.Provider>
+    </TopbarActionSetter.Provider>
+  );
+}
 
 /** Render a custom action in the topbar from any page. */
 export function useTopbarAction(node: ReactNode) {
-  const { setAction } = useContext(TopbarActionCtx);
+  const setAction = useContext(TopbarActionSetter);
   useLayoutEffect(() => {
     setAction(node);
     return () => setAction(null);
@@ -48,11 +60,15 @@ const LABELS: Record<string, string> = {
   payroll: "Payroll",
   reports: "Reports",
   notifications: "Notifications",
+  assistant: "Tilly",
   documents: "Documents",
   settings: "Settings",
   tax: "Tax",
   crm: "CRM",
-  portal: "Portal",
+  portal: "Customer Portal",
+  // Contacts
+  people: "People",
+  duplicates: "Duplicates",
   consolidation: "Consolidation",
   // Sales
   invoices: "Invoices",
@@ -83,6 +99,7 @@ const LABELS: Record<string, string> = {
   "opening-balances": "Opening Balances",
   accruals: "Accruals",
   "recurring-journals": "Recurring Journals",
+  "asset-categories": "Asset Categories",
   // Settings
   general: "General",
   members: "Members",
@@ -113,6 +130,7 @@ const LABELS: Record<string, string> = {
   leave: "Leave",
   reviews: "Reviews",
   pay: "Pay",
+  "tax-liabilities": "Tax Liabilities",
   // Reports
   "trial-balance": "Trial Balance",
   "balance-sheet": "Balance Sheet",
@@ -132,6 +150,16 @@ const LABELS: Record<string, string> = {
   "expense-analytics": "Expense Analytics",
   profitability: "Profitability",
   "tax-summary": "Tax Summary",
+  "executive-summary": "Executive Summary",
+  pack: "Report Pack",
+  tracking: "Tracking",
+  saved: "Saved Reports",
+  schedules: "Schedules",
+  "bank-reconciliation-status": "Reconciliation Status",
+  "bank-cash-flow": "Bank Cash Flow",
+  "1099": "1099 Totals",
+  "sales-by-customer": "Sales by Customer",
+  "sales-by-item": "Sales by Item",
   forecasting: "Forecasting",
   custom: "Custom Reports",
   "report-schedules": "Report Schedules",
@@ -151,8 +179,13 @@ const LABELS: Record<string, string> = {
   "landed-costs": "Landed Costs",
   // CRM
   deals: "Deals",
+  activities: "Activities",
   analytics: "Analytics",
   "duplicate-detection": "Duplicate Detection",
+  // Documents
+  unlinked: "Not Attached",
+  attachments: "Attached to Records",
+  emails: "Sent Emails",
   // Projects
   tasks: "Tasks",
   milestones: "Milestones",
@@ -181,6 +214,14 @@ const LABELS: Record<string, string> = {
   docs: "Docs",
   admin: "Admin",
   "email-preview": "Email Preview",
+  "import-export": "Import & Export",
+  backups: "Backups",
+  trash: "Trash",
+  procurement: "Bill Matching",
+  integrations: "Integrations",
+  stripe: "Stripe",
+  email: "Email Sending",
+  "fiscal-years": "Financial Years",
 };
 
 function getLabel(segment: string): string {
@@ -201,6 +242,12 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   "purchases/expenses": { label: "New Expense", drawer: "expense" },
   "purchases/orders": { label: "New PO", drawer: "purchaseOrder" },
   "purchases/debit-notes": { label: "New supplier credit", drawer: "debitNote" },
+  // These pages have their own create flow (or come from a purchase order)
+  "purchases/requisitions": null,
+  "purchases/goods-receipts": null,
+  "purchases/landed-costs": null,
+  "purchases/bills/recurring": null,
+  "purchases/expenses/recurring": null,
   accounting: { label: "New Entry", drawer: "entry" },
   "accounting/accounts": { label: "New Account", drawer: "account" },
   "accounting/banking": { label: "New Account", drawer: "bankAccount" },
@@ -210,13 +257,26 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   "accounting/opening-balances": { label: "Set opening balances", drawer: "openingBalance" },
   "accounting/accruals": { label: "New accrual", drawer: "accrualSchedule" },
   "accounting/recurring-journals": { label: "New recurring journal", drawer: "recurringJournal" },
+  "accounting/asset-categories": null,
+  "accounting/banking/scheduled": null,
+  "accounting/banking/batches": null,
+  "accounting/fiscal-years": null,
   contacts: { label: "New Contact", drawer: "contact" },
+  // These contact pages have their own actions (or none)
+  "contacts/people": null,
+  "contacts/statements": null,
+  "contacts/portal": null,
+  "contacts/duplicates": null,
   projects: { label: "New Project", drawer: "project" },
   inventory: { label: "New Item", drawer: "inventory" },
   "inventory/stock-takes": { label: "New Stock Take", drawer: "stockTake" },
   "inventory/warehouses": { label: "New Warehouse", drawer: "warehouse" },
   "inventory/transfers": { label: "New Transfer", drawer: "transfer" },
   "inventory/valuation": null,
+  "inventory/categories": null,
+  "inventory/alerts": null,
+  "inventory/bom": null,
+  "inventory/assembly": null,
   "payroll/employees": { label: "New Employee", drawer: "employee" },
   "payroll/contractors": { label: "Add Contractor", drawer: "contractor" },
   "payroll/time-leave": null,
@@ -226,22 +286,15 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
 };
 
 export function Topbar() {
-  const [customAction, setCustomAction] = useState<ReactNode>(null);
-  const stableSetAction = useCallback((n: ReactNode) => setCustomAction(n), []);
-
-  return (
-    <TopbarActionCtx.Provider value={{ setAction: stableSetAction }}>
-      <TopbarInner customAction={customAction} />
-    </TopbarActionCtx.Provider>
-  );
+  const customAction = useContext(TopbarActionValue);
+  return <TopbarInner customAction={customAction} />;
 }
 
 function TopbarInner({ customAction }: { customAction: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
-  const { toggleSidebar, isMobile } = useSidebar();
+  const { setMobileOpen } = useShell();
   const segments = pathname.split("/").filter(Boolean);
 
   // For group roots, show the default subtab in the breadcrumb
@@ -288,76 +341,69 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
     parentLabel = effectiveSegments.length > 1 ? getLabel(effectiveSegments[0]) : null;
   }
 
-  const subtabKey = `${segments[0]}/${segments[1]}`;
-  const cta = subtabKey in CTA_MAP ? CTA_MAP[subtabKey] : CTA_MAP[segments[0]];
+  // Most specific entry wins: /purchases/expenses/recurring before /purchases/expenses before /purchases
+  const ctaKey = [segments.slice(0, 3).join("/"), segments.slice(0, 2).join("/"), segments[0]].find((k) => k in CTA_MAP);
+  const cta = ctaKey ? CTA_MAP[ctaKey] : undefined;
 
   const openCommandPalette = useCallback(() => {
     document.dispatchEvent(new CustomEvent("open-command-palette"));
   }, []);
 
   return (
-    <header className="shrink-0">
-      <div className="mx-auto flex h-14 w-full max-w-[1250px] items-center justify-between gap-2 px-3 sm:px-6">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          {isMobile && (
-            <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={toggleSidebar}>
-              <Menu className="size-4" />
-            </Button>
-          )}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <Logo className="h-5 w-auto" />
-            <span className="text-[14px] font-semibold tracking-tight hidden sm:inline">dubbl</span>
+    <header className="shrink-0 border-b border-border/70">
+      <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-ml-1.5 size-8 shrink-0 md:hidden"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu className="size-4" />
+          </Button>
+          <Link href="/dashboard" className="mr-1 shrink-0 md:hidden" aria-label="dubbl">
+            <Logo className="h-4 w-auto" />
           </Link>
-          <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
           {parentLabel && effectiveSegments.length > 1 && (
-            <div className="hidden sm:contents">
+            <div className="hidden items-center gap-2 sm:flex">
               {parentHref ? (
-                <Link href={parentHref} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                <Link href={parentHref} className="shrink-0 text-[13.5px] text-muted-foreground transition-colors hover:text-foreground">
                   {parentLabel}
                 </Link>
               ) : (
-                <span className="text-[13px] text-muted-foreground shrink-0">{parentLabel}</span>
+                <span className="shrink-0 text-[13.5px] text-muted-foreground">{parentLabel}</span>
               )}
-              <span className="text-muted-foreground/40 shrink-0">/</span>
+              <span className="shrink-0 text-muted-foreground/40">/</span>
             </div>
           )}
-          <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
+          <h1 className="truncate text-[13.5px] font-medium tracking-[-0.005em]">{pageTitle}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <NotificationDropdown />
-          <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
-          <div className="h-4 w-px bg-border" />
-          <Button
-            variant="outline"
-            size="sm"
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
             onClick={openCommandPalette}
-            className="hidden sm:flex items-center gap-2 text-muted-foreground text-xs h-7 px-2.5"
+            className="mr-1 hidden h-8 w-56 items-center gap-2 rounded-lg bg-foreground/[0.04] px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] sm:flex"
           >
-            <Search className="size-3" />
-            <span>Search...</span>
-            <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              <span className="text-xs">&#8984;</span>K
+            <Search className="size-3.5" />
+            <span>Search</span>
+            <kbd className="pointer-events-none ml-auto font-mono text-[11px] text-muted-foreground/70">
+              &#8984;K
             </kbd>
-          </Button>
+          </button>
+          <AssistantButton />
+          <NotificationDropdown />
           {cta && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              <Button
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => openDrawer(cta.drawer)}
-              >
-                <Plus className="size-3" />
-                <span className="hidden sm:inline">{cta.label}</span>
-              </Button>
-            </>
+            <Button
+              size="sm"
+              className="ml-1 h-8 gap-1.5 rounded-lg px-3 text-[13px]"
+              onClick={() => openDrawer(cta.drawer)}
+            >
+              <Plus className="size-3.5" />
+              <span className="hidden sm:inline">{cta.label}</span>
+            </Button>
           )}
-          {customAction && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              {customAction}
-            </>
-          )}
+          {customAction && <div className="ml-1 flex items-center">{customAction}</div>}
         </div>
       </div>
     </header>

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { timesheet, payrollEmployee } from "@/lib/db/schema";
+import { timesheet } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -36,7 +36,8 @@ export async function GET(request: Request) {
     const timesheets = await db.query.timesheet.findMany({
       where: and(...conditions),
       orderBy: desc(timesheet.createdAt),
-      with: { employee: true },
+      // Only what the list shows: no pay or bank details in a list response
+      with: { employee: { columns: { id: true, name: true, employeeNumber: true, department: true, position: true } } },
       limit,
       offset,
     });

@@ -67,6 +67,9 @@ type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "invent
 interface DrawerInitialData {
   contactId?: string;
   contactName?: string;
+  /** Deals: open the drawer on this pipeline and stage. */
+  pipelineId?: string;
+  stageId?: string;
 }
 
 interface CreateDrawerContextValue {
@@ -3767,14 +3770,19 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
       .then((data) => {
         const pipes = data.pipelines || [];
         setPipelines(pipes);
-        const def = pipes.find((p: DealPipeline) => p.isDefault) || pipes[0];
+        const def =
+          pipes.find((p: DealPipeline) => p.id === initialData?.pipelineId) ||
+          pipes.find((p: DealPipeline) => p.isDefault) ||
+          pipes[0];
         if (def) {
           setPipelineId(def.id);
-          if (def.stages?.length) setStageId(def.stages[0].id);
+          const preset = def.stages?.find((st: { id: string }) => st.id === initialData?.stageId);
+          if (preset) setStageId(preset.id);
+          else if (def.stages?.length) setStageId(def.stages[0].id);
         }
       })
       .catch(() => {});
-  }, [open]);
+  }, [open, initialData]);
 
   const activePipeline = pipelines.find((p) => p.id === pipelineId);
   const stages = activePipeline?.stages || [];

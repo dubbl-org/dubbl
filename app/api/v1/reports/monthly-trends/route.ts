@@ -13,8 +13,13 @@ export async function GET(request: Request) {
 
     // Go back N months from today
     const now = new Date();
-    const startMonth = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
-    const startDate = startMonth.toISOString().slice(0, 10);
+    // Build keys from local year/month: toISOString() would shift to UTC and
+    // land on the previous month east of Greenwich.
+    const monthKey = (offset: number) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    };
+    const startDate = `${monthKey(-months + 1)}-01`;
 
     const rows = await db
       .select({
@@ -46,9 +51,7 @@ export async function GET(request: Request) {
 
     // Initialize all months
     for (let i = 0; i < months; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - months + 1 + i, 1);
-      const key = d.toISOString().slice(0, 7);
-      monthMap.set(key, { revenue: 0, expenses: 0 });
+      monthMap.set(monthKey(-months + 1 + i), { revenue: 0, expenses: 0 });
     }
 
     for (const row of rows) {

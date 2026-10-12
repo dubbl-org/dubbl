@@ -4,15 +4,20 @@ import { AuthError } from "./auth-context";
 import { PeriodLockedError } from "./period-lock";
 import { LimitExceededError } from "./check-limit";
 import { MissingExchangeRateError } from "@/lib/currency/converter";
+import { safeStringify } from "./redact";
+
+function json(data: unknown, status = 200) {
+  return new NextResponse(safeStringify(data), { status, headers: { "content-type": "application/json" } });
+}
 
 /** 200 OK response */
 export function ok<T>(data: T) {
-  return NextResponse.json(data);
+  return json(data);
 }
 
 /** 201 Created response */
 export function created<T>(data: T) {
-  return NextResponse.json(data, { status: 201 });
+  return json(data, 201);
 }
 
 /** Error response with status code */

@@ -137,23 +137,8 @@ export default function ScheduledPaymentsPage() {
       .then((data) => setBills(data.data || []));
   }, [orgId]);
 
-  // Process due payments on load
-  useEffect(() => {
-    if (!orgId) return;
-    fetch("/api/v1/scheduled-payments/process", {
-      method: "POST",
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.processed > 0) {
-          toast.success(`Processed ${data.processed} scheduled payment(s)`);
-        }
-      })
-      .catch(() => {})
-      .finally(() => fetchItems());
-  }, [orgId, fetchItems]);
-
+  // Due payments are no longer paid just by opening this page: paying posts
+  // payments and journal entries, so it waits for an explicit "Pay now".
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
@@ -275,6 +260,9 @@ export default function ScheduledPaymentsPage() {
 
   if (loading) return <BrandLoader />;
 
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const due = items.filter((i) => i.status === "pending" && i.scheduledDate.slice(0, 10) <= todayKey);
+
   return (
     <ContentReveal className="space-y-6">
       {/* Header */}
@@ -322,6 +310,24 @@ export default function ScheduledPaymentsPage() {
           </Button>
         </div>
       </div>
+
+      {due.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/80 px-4 py-3">
+          <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+          <p className="min-w-0 flex-1 text-[13px]">
+            <span className="font-medium">
+              {due.length} payment{due.length === 1 ? " is" : "s are"} due
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {" "}· {formatMoney(due.reduce((sum, i) => sum + i.amount, 0))}. Paying records each payment against its bill and posts it to your books.
+            </span>
+          </p>
+          <Button size="sm" className="h-8 text-xs" onClick={handleProcessNow} disabled={processing}>
+            {processing && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
+            Pay now
+          </Button>
+        </div>
+      )}
 
       {/* Empty state */}
       {items.length === 0 && (

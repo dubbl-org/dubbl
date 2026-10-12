@@ -45,7 +45,7 @@ export async function GET(
       orderBy: desc(timeEntry.date),
       limit,
       offset,
-      with: { user: true },
+      with: { user: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     const [countResult] = await db

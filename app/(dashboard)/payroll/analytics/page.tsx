@@ -1,20 +1,20 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import {
+  ArrowUpRight,
   BarChart3,
   FileText,
   DollarSign,
   TrendingUp,
   Download,
-  LineChart,
   Users,
   Calculator,
 } from "lucide-react";
-import { Section } from "@/components/dashboard/section";
 import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -290,7 +290,13 @@ export default function AnalyticsPage() {
       {/* Section 1: Reports */}
       {hasData && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold">Reports</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">Reports</h2>
+            <Link href="/payroll/reports" className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground">
+              All reports
+              <ArrowUpRight className="size-3" />
+            </Link>
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {REPORT_TYPES.map((report, i) => (
               <motion.button
@@ -315,7 +321,13 @@ export default function AnalyticsPage() {
       {/* Section 2: 12-Month Forecast */}
       {hasData && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold">Forecast</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">Forecast</h2>
+            <Link href="/payroll/forecasting" className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground">
+              Open forecasting
+              <ArrowUpRight className="size-3" />
+            </Link>
+          </div>
 
           {projection.length > 0 ? (
             <div className="rounded-xl border bg-card divide-y">

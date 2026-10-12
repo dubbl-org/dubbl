@@ -1,3 +1,4 @@
+import { accountCodeMatch } from "@/lib/api/account-roles";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -175,14 +176,14 @@ export async function POST(
     const arAccount = await db.query.chartAccount.findFirst({
       where: and(
         eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "1200")
+        accountCodeMatch("1200")
       ),
     });
 
     const interestIncomeAccount = await db.query.chartAccount.findFirst({
       where: and(
         eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "4100")
+        accountCodeMatch("4100")
       ),
     });
 

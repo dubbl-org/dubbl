@@ -12,8 +12,12 @@ import {
   isNotNull,
   ilike,
   count,
+  inArray,
+  lt,
+  gte,
 } from "drizzle-orm";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
 import type { AuthContext } from "@/lib/api/auth-context";
 import { wrapTool } from "@/lib/mcp/errors";
@@ -151,7 +155,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
         const all = await db.query.deal.findMany({
           where: and(...conditions),
-          with: { contact: true, assignedUser: true },
+          with: { contact: true, assignedUser: { columns: { id: true, name: true, email: true } } },
           orderBy: orderFn(orderCol),
         });
 
@@ -217,7 +221,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
           ),
           with: {
             contact: true,
-            assignedUser: true,
+            assignedUser: { columns: { id: true, name: true, email: true } },
             activities: true,
             pipeline: true,
           },
@@ -591,7 +595,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
         const offset = (params.page - 1) * params.limit;
         const activities = await db.query.dealActivity.findMany({
           where,
-          with: { user: true },
+          with: { user: { columns: { id: true, name: true, email: true } } },
           orderBy: orderFn(orderCol),
           limit: params.limit,
           offset,
@@ -650,6 +654,199 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
           .returning();
 
         return { activity };
+      })
+  );
+
+  // --- Cross-deal activity feed ---
+
+  server.tool(
+    "list_all_deal_activities",
+    "List deal activities across every deal in the workspace (the CRM activity feed), newest first. Filter by type, by deal, by content search, and by status: 'planned' (scheduled, not done), 'overdue' (scheduled in the past, not done), 'upcoming' (scheduled in the future, not done), 'done' (marked complete) or 'logged' (never scheduled, not done). Returns activities with the user who logged them and their deal (title, valueCents in integer cents, currency, stage, contact name), plus pagination.",
+    {
+      type: z.enum(["note", "email", "call", "meeting", "task"]).optional().describe("Only this activity type"),
+      status: z.enum(["planned", "overdue", "upcoming", "done", "logged"]).optional().describe("Only activities in this state"),
+      dealId: z.string().uuid().optional().describe("Only activities on this deal (UUID)"),
+      search: z.string().optional().describe("Case-insensitive search in the activity content"),
+      limit: z.number().int().min(1).max(100).optional().default(50).describe("Activities per page (max 100)"),
+      page: z.number().int().min(1).optional().default(1).describe("Page number (1-based)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const orgDeals = db
+          .select({ id: deal.id })
+          .from(deal)
+          .where(and(eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)));
+        const conditions = [inArray(dealActivity.dealId, orgDeals)];
+        if (params.type) conditions.push(eq(dealActivity.type, params.type));
+        if (params.dealId) conditions.push(eq(dealActivity.dealId, params.dealId));
+        if (params.search) conditions.push(ilike(dealActivity.content, `%${params.search}%`));
+        const now = new Date();
+        if (params.status === "done") conditions.push(isNotNull(dealActivity.completedAt));
+        else if (params.status === "planned") conditions.push(isNotNull(dealActivity.scheduledAt), isNull(dealActivity.completedAt));
+        else if (params.status === "overdue") conditions.push(lt(dealActivity.scheduledAt, now), isNull(dealActivity.completedAt));
+        else if (params.status === "upcoming") conditions.push(gte(dealActivity.scheduledAt, now), isNull(dealActivity.completedAt));
+        else if (params.status === "logged") conditions.push(isNull(dealActivity.scheduledAt), isNull(dealActivity.completedAt));
+        const where = and(...conditions);
+
+        const [{ total }] = await db.select({ total: count() }).from(dealActivity).where(where);
+        const activities = await db.query.dealActivity.findMany({
+          where,
+          orderBy: desc(dealActivity.createdAt),
+          limit: params.limit,
+          offset: (params.page - 1) * params.limit,
+          with: {
+            user: { columns: { id: true, name: true, email: true } },
+            deal: {
+              columns: { id: true, title: true, valueCents: true, currency: true, stageId: true, pipelineId: true, wonAt: true, lostAt: true },
+              with: { contact: { columns: { id: true, name: true } } },
+            },
+          },
+        });
+        return {
+          activities,
+          pagination: { page: params.page, limit: params.limit, total, totalPages: Math.ceil(total / params.limit) },
+        };
+      })
+  );
+
+  /** Activity by id, only when its deal is in this workspace. */
+  async function findOrgActivity(activityId: string) {
+    const [row] = await db
+      .select({ activity: dealActivity })
+      .from(dealActivity)
+      .innerJoin(deal, eq(deal.id, dealActivity.dealId))
+      .where(and(eq(dealActivity.id, activityId), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)))
+      .limit(1);
+    if (!row) throw new Error("Activity not found");
+    return row.activity;
+  }
+
+  server.tool(
+    "complete_deal_activity",
+    "Mark a deal activity (usually a task, call or meeting that was planned) as done, or set it back to not done. Returns the updated activity with its completedAt time (null when not done).",
+    {
+      activityId: z.string().uuid().describe("The UUID of the deal activity"),
+      completed: z.boolean().optional().default(true).describe("true to mark done (default), false to mark not done yet"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        await findOrgActivity(params.activityId);
+        const [activity] = await db
+          .update(dealActivity)
+          .set({ completedAt: params.completed ? new Date() : null })
+          .where(eq(dealActivity.id, params.activityId))
+          .returning();
+        logAudit({ ctx, action: "update", entityType: "deal_activity", entityId: params.activityId, changes: { completed: params.completed } });
+        return { activity };
+      })
+  );
+
+  server.tool(
+    "delete_deal_activity",
+    "Permanently delete one activity from a deal's history. Returns { success: true }.",
+    {
+      activityId: z.string().uuid().describe("The UUID of the deal activity to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const existing = await findOrgActivity(params.activityId);
+        await db.delete(dealActivity).where(eq(dealActivity.id, params.activityId));
+        logAudit({ ctx, action: "delete", entityType: "deal_activity", entityId: params.activityId, changes: existing as Record<string, unknown> });
+        return { success: true };
+      })
+  );
+
+  server.tool(
+    "delete_deal",
+    "Delete a deal (soft delete: it disappears from the pipeline, lists and analytics). Returns { success: true }.",
+    {
+      dealId: z.string().uuid().describe("The UUID of the deal to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const [deleted] = await db
+          .update(deal)
+          .set(softDelete())
+          .where(and(eq(deal.id, params.dealId), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)))
+          .returning();
+        if (!deleted) throw new Error("Deal not found");
+        logAudit({ ctx, action: "delete", entityType: "deal", entityId: params.dealId, changes: deleted as Record<string, unknown> });
+        return { success: true };
+      })
+  );
+
+  // --- Pipeline management ---
+
+  const stageSchema = z.object({
+    id: z.string().min(1).describe("Stable stage id stored on deals, e.g. 'lead'. Use 'closed_won' and 'closed_lost' for the outcome stages"),
+    name: z.string().min(1).describe("Stage name shown on the board, e.g. 'Proposal sent'"),
+    color: z.string().describe("Hex colour for the stage, e.g. '#3b82f6'"),
+  });
+
+  server.tool(
+    "create_pipeline",
+    "Create a sales pipeline with its ordered stages. Deals move through the stages left to right; include 'closed_won' and 'closed_lost' stages so won/lost deals have a home. Set isDefault to make it the pipeline new deals and the board use first. Requires the manage:contacts permission. Returns the created pipeline.",
+    {
+      name: z.string().min(1).describe("Pipeline name, e.g. 'New business'"),
+      stages: z.array(stageSchema).min(1).describe("Ordered list of stages"),
+      isDefault: z.boolean().optional().describe("Make this the default pipeline"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:contacts");
+        const [created] = await db
+          .insert(pipeline)
+          .values({ organizationId: ctx.organizationId, name: params.name, stages: params.stages, isDefault: params.isDefault ?? false })
+          .returning();
+        logAudit({ ctx, action: "create", entityType: "pipeline", entityId: created.id });
+        return { pipeline: created };
+      })
+  );
+
+  server.tool(
+    "update_pipeline",
+    "Rename a pipeline, replace its ordered stages (to add, remove, rename, recolour or reorder them), or make it the default. Only provided fields change. Deals keep their stage id, so keep ids stable when renaming a stage. Requires the manage:contacts permission. Returns the updated pipeline.",
+    {
+      pipelineId: z.string().uuid().describe("The UUID of the pipeline"),
+      name: z.string().min(1).optional().describe("New pipeline name"),
+      stages: z.array(stageSchema).min(1).optional().describe("The full new ordered list of stages"),
+      isDefault: z.boolean().optional().describe("Make this the default pipeline"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:contacts");
+        const updates: Partial<typeof pipeline.$inferInsert> = {};
+        if (params.name !== undefined) updates.name = params.name;
+        if (params.stages !== undefined) updates.stages = params.stages;
+        if (params.isDefault !== undefined) updates.isDefault = params.isDefault;
+        const [updated] = await db
+          .update(pipeline)
+          .set(updates)
+          .where(and(eq(pipeline.id, params.pipelineId), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)))
+          .returning();
+        if (!updated) throw new Error("Pipeline not found");
+        logAudit({ ctx, action: "update", entityType: "pipeline", entityId: params.pipelineId, changes: updates as Record<string, unknown> });
+        return { pipeline: updated };
+      })
+  );
+
+  server.tool(
+    "delete_pipeline",
+    "Delete a sales pipeline (soft delete). Its deals are not deleted. Requires the manage:contacts permission. Returns { success: true }.",
+    {
+      pipelineId: z.string().uuid().describe("The UUID of the pipeline to delete"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:contacts");
+        const [deleted] = await db
+          .update(pipeline)
+          .set(softDelete())
+          .where(and(eq(pipeline.id, params.pipelineId), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)))
+          .returning();
+        if (!deleted) throw new Error("Pipeline not found");
+        logAudit({ ctx, action: "delete", entityType: "pipeline", entityId: params.pipelineId, changes: deleted as Record<string, unknown> });
+        return { success: true };
       })
   );
 }
