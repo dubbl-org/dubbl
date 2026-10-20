@@ -32,7 +32,9 @@ export async function POST(
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     automatic_tax: { enabled: true },
-    payment_method_types: ["card"],
+    // stripe v23: payment_method_types was removed; filter card via the
+    // dynamically eligible set instead
+    allowed_payment_method_types: ["card"],
     line_items: [
       {
         price_data: {

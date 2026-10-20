@@ -203,10 +203,7 @@ export async function handleChargeSucceeded(
       // Already recorded via invoice payment link - only record the fee
       if (!charge.balance_transaction) return;
 
-      const balanceTx = await stripe.balanceTransactions.retrieve(
-        charge.balance_transaction as string,
-        { stripeAccount: integration.stripeAccountId }
-      );
+      const balanceTx = await stripe.balanceTransactions.retrieve(charge.balance_transaction as string, {}, { stripeAccount: integration.stripeAccountId });
       const fee = balanceTx.fee;
 
       if (fee > 0) {
@@ -319,10 +316,7 @@ export async function handleChargeSucceeded(
   // Fee journal entry: DR Fees, CR Stripe Clearing
   if (!charge.balance_transaction) return;
 
-  const balanceTx = await stripe.balanceTransactions.retrieve(
-    charge.balance_transaction as string,
-    { stripeAccount: integration.stripeAccountId }
-  );
+  const balanceTx = await stripe.balanceTransactions.retrieve(charge.balance_transaction as string, {}, { stripeAccount: integration.stripeAccountId });
   const fee = balanceTx.fee;
 
   if (fee > 0) {
@@ -430,12 +424,9 @@ export async function handleChargeRefunded(
     if (refund.balance_transaction) {
       const feeRefundKey = `refund_fee_${refund.id}`;
       if (!await isDuplicate(integration.organizationId, feeRefundKey, refund.id)) {
-        const balanceTx = await stripe.balanceTransactions.retrieve(
-          typeof refund.balance_transaction === "string"
+        const balanceTx = await stripe.balanceTransactions.retrieve(typeof refund.balance_transaction === "string"
             ? refund.balance_transaction
-            : refund.balance_transaction.id,
-          { stripeAccount: integration.stripeAccountId }
-        );
+            : refund.balance_transaction.id, {}, { stripeAccount: integration.stripeAccountId });
 
         // Fee refund is negative fee on the balance transaction
         const feeRefund = Math.abs(balanceTx.fee);
@@ -843,9 +834,7 @@ export async function handleDisputeCreated(
 
     if (chargeMap?.metadata && typeof chargeMap.metadata === "object") {
       // Look up payment by charge's payment intent
-      const charge = await stripe.charges.retrieve(chargeId, {
-        stripeAccount: integration.stripeAccountId,
-      });
+      const charge = await stripe.charges.retrieve(chargeId, {}, { stripeAccount: integration.stripeAccountId, });
       const piId = typeof charge.payment_intent === "string"
         ? charge.payment_intent
         : charge.payment_intent?.id ?? null;
@@ -1143,7 +1132,7 @@ export async function handleInvoicePaid(
 
   // Fallback: check via payment_intent if charge field isn't present
   if (!invoiceChargeId && invoicePIId) {
-    const pi = await stripe.paymentIntents.retrieve(invoicePIId, { stripeAccount: integration.stripeAccountId });
+    const pi = await stripe.paymentIntents.retrieve(invoicePIId, {}, { stripeAccount: integration.stripeAccountId });
     const latestChargeId = typeof pi.latest_charge === "string"
       ? pi.latest_charge
       : (pi.latest_charge as { id?: string } | null)?.id ?? null;
