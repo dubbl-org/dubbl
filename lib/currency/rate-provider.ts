@@ -5,7 +5,7 @@
  * key, ~160 currencies, and it honours any base currency. This is what lets
  * "any base currency" work out of the box with no configuration or paid plan.
  *
- * Two alternatives can be selected by env:
+ * Three alternatives can be selected by env:
  *   - EXCHANGE_RATE_PROVIDER=frankfurter  → Frankfurter / ECB official daily
  *     reference rates. Only ~31 major currencies, but the most authoritative
  *     source for those (preferred by some accountants for audit defensibility).
@@ -13,6 +13,9 @@
  *     incl. crypto/metals). The free OXR plan is USD-base only; we triangulate
  *     other bases out of the USD feed (see ./triangulate), so any base still
  *     works even on the free plan.
+ *   - ALLRATESTODAY_API_KEY=<key>         → AllRatesToday. Any base currency,
+ *     fetched directly in one call. Needs an API key (free trial, then paid
+ *     plans).
  *
  * Whatever the provider quotes against, the sync triangulates each org's base
  * out of a single feed, so base-currency support never depends on the plan.
@@ -116,9 +119,45 @@ function openExchangeRatesProvider(appId: string): RateProvider {
   };
 }
 
+/** AllRatesToday — any base in one call; needs an API key (Bearer). */
+export function allRatesTodayProvider(apiKey: string): RateProvider {
+  return {
+    name: "allratestoday",
+    async fetchRates(base: string): Promise<RateFeed> {
+      const url = `https://allratestoday.com/api/v1/rates?source=${encodeURIComponent(base)}`;
+      const res = await fetch(url, {
+        headers: { accept: "application/json", authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) {
+        throw new Error(`allratestoday ${res.status} for base ${base}`);
+      }
+      // A JSON array of { source, target, rate, time }; the base itself is omitted.
+      const data = (await res.json()) as unknown;
+      if (!Array.isArray(data)) {
+        throw new Error(`allratestoday returned a non-array body for base ${base}`);
+      }
+      const rates: Record<string, number> = {};
+      let latest = "";
+      for (const row of data as { target?: string; rate?: number; time?: string }[]) {
+        if (typeof row?.target !== "string" || typeof row.rate !== "number") continue;
+        rates[row.target.toUpperCase()] = row.rate;
+        if (typeof row.time === "string" && row.time > latest) latest = row.time;
+      }
+      return {
+        date: latest ? latest.slice(0, 10) : unixToIsoDate(null),
+        base: base.toUpperCase(),
+        rates,
+      };
+    },
+  };
+}
+
 export function getRateProvider(): RateProvider {
   const appId = process.env.OPENEXCHANGERATES_APP_ID;
   if (appId) return openExchangeRatesProvider(appId);
+
+  const allRatesTodayKey = process.env.ALLRATESTODAY_API_KEY;
+  if (allRatesTodayKey) return allRatesTodayProvider(allRatesTodayKey);
 
   if ((process.env.EXCHANGE_RATE_PROVIDER || "").toLowerCase() === "frankfurter") {
     return frankfurterProvider;
