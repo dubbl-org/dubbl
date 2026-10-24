@@ -10,10 +10,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await getAuthContext(request);
+    const ctx = await getAuthContext(request);
     const { id } = await params;
-    const form = await db.query.taxForm.findFirst({ where: eq(taxForm.id, id) });
-    if (!form) return notFound("Tax form");
+    const form = await db.query.taxForm.findFirst({
+      where: eq(taxForm.id, id),
+      with: { generation: true },
+    });
+    // tax_form rows carry no organizationId — scope via the parent generation.
+    if (!form || form.generation?.organizationId !== ctx.organizationId) return notFound("Tax form");
 
     return NextResponse.json({
       formType: form.formType,

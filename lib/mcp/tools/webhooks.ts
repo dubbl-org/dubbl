@@ -8,6 +8,7 @@ import { wrapTool } from "@/lib/mcp/errors";
 import { softDelete } from "@/lib/db/soft-delete";
 import { deliverWebhook } from "@/lib/webhooks/deliver";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { assertPublicHttpsUrl } from "@/lib/api/url-guard";
 
 export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -52,7 +53,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
           .where(and(...conditions));
 
         return {
-          webhooks: results,
+          webhooks: results.map(({ secret: _secret, ...wh }) => wh),
           total: Number(countResult?.count || 0),
           page: params.page,
           limit: params.limit,
@@ -78,6 +79,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        await assertPublicHttpsUrl(params.url);
         const secret = crypto.randomBytes(32).toString("hex");
 
         const [created] = await db
@@ -129,6 +131,8 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
         if (!existing) {
           throw new Error("Webhook not found");
         }
+
+        if (params.url !== undefined) await assertPublicHttpsUrl(params.url);
 
         const updates: Record<string, unknown> = {};
         if (params.url !== undefined) updates.url = params.url;

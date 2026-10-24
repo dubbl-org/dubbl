@@ -12,6 +12,7 @@ interface InviteInfo {
   orgName: string;
   role: string;
   inviterName: string;
+  email?: string;
   type: "email" | "link";
 }
 
@@ -22,9 +23,17 @@ export default function InviteAcceptPage() {
   const [info, setInfo] = useState<InviteInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [authed, setAuthed] = useState<boolean | null>(null);
 
   // Determine if this is an email invite token (64 chars hex) or link token (32 chars hex)
   const isLinkToken = token.length === 32;
+
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((s) => setAuthed(!!s?.user))
+      .catch(() => setAuthed(false));
+  }, []);
 
   useEffect(() => {
     // Try to load invite info
@@ -47,7 +56,7 @@ export default function InviteAcceptPage() {
           const res = await fetch(`/api/v1/invitations/info?token=${token}`);
           if (res.ok) {
             const data = await res.json();
-            setInfo({ orgName: data.orgName, role: data.role, inviterName: data.inviterName, type: "email" });
+            setInfo({ orgName: data.orgName, role: data.role, inviterName: data.inviterName, email: data.email, type: "email" });
             setState("ready");
           } else {
             const data = await res.json().catch(() => ({}));
@@ -134,13 +143,41 @@ export default function InviteAcceptPage() {
                 </div>
               </div>
 
-              <Button
-                onClick={handleAccept}
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-                size="lg"
-              >
-                Accept Invitation
-              </Button>
+              {authed === false ? (
+                <div className="space-y-3">
+                  <Button
+                    onClick={() =>
+                      router.push(
+                        `/sign-up?next=/invite/${token}&invite=${token}${
+                          info.type === "email" && info.email ? `&email=${encodeURIComponent(info.email)}` : ""
+                        }`
+                      )
+                    }
+                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    size="lg"
+                  >
+                    Create your account
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    size="lg"
+                    onClick={() =>
+                      router.push(`/sign-in?callbackUrl=/invite/${token}`)
+                    }
+                  >
+                    I already have an account
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleAccept}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  size="lg"
+                >
+                  Accept Invitation
+                </Button>
+              )}
             </div>
           )}
 

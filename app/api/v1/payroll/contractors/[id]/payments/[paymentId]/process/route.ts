@@ -18,9 +18,17 @@ export async function POST(
 
     const payment = await db.query.contractorPayment.findFirst({
       where: eq(contractorPayment.id, paymentId),
+      with: { contractor: true },
     });
-
-    if (!payment) return notFound("Payment");
+    // contractor_payment rows carry no organizationId — scope via the contractor,
+    // and require it to be the contractor named in the path.
+    if (
+      !payment ||
+      payment.contractorId !== id ||
+      payment.contractor?.organizationId !== ctx.organizationId
+    ) {
+      return notFound("Payment");
+    }
     if (payment.status !== "pending") return validationError("Only pending payments can be processed");
 
     // Resolve the org base currency so any auto-created accounts are stamped with it.
@@ -96,7 +104,12 @@ export async function POST(
         paidAt: new Date(),
         journalEntryId,
       })
-      .where(eq(contractorPayment.id, paymentId))
+      .where(
+        and(
+          eq(contractorPayment.id, paymentId),
+          eq(contractorPayment.contractorId, id)
+        )
+      )
       .returning();
 
     logAudit({ ctx, action: "process", entityType: "contractorPayment", entityId: paymentId, request });

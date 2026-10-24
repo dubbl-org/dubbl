@@ -66,7 +66,11 @@ function SignInContent() {
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    searchParams.get("error") === "2fa_required"
+      ? "This account has two-factor authentication enabled. Sign in with your email, password and code."
+      : ""
+  );
   const [loading, setLoading] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [providers, setProviders] = useState<ProvidersConfig | null>(null);

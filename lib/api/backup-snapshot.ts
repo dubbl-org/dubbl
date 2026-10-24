@@ -286,7 +286,9 @@ export async function restoreFromSnapshot(
             })
             .onConflictDoUpdate({
               target: table.id,
-              set: { ...cleanRecord, deletedAt: null },
+              set: { ...cleanRecord, organizationId: orgId, deletedAt: null },
+              // Never let a crafted/foreign snapshot overwrite another org's rows.
+              setWhere: eq(table.organizationId, orgId),
             });
         } catch {
           // Skip records that fail FK constraints

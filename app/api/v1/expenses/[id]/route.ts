@@ -8,6 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { decimalToMinorUnits } from "@/lib/money";
+import { isOrgOwnedKey } from "@/lib/s3";
 import { z } from "zod";
 
 const itemSchema = z.object({
@@ -103,7 +104,11 @@ export async function PATCH(
           amount,
           category: item.category || null,
           accountId: item.accountId || null,
-          receiptFileKey: item.receiptFileKey || null,
+          // Client-supplied: it must point inside this org's own object prefix.
+        receiptFileKey:
+          item.receiptFileKey && isOrgOwnedKey(item.receiptFileKey, ctx.organizationId)
+            ? item.receiptFileKey
+            : null,
           receiptFileName: item.receiptFileName || null,
           sortOrder: i,
         };

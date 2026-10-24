@@ -49,7 +49,9 @@ function createTransporter(config: SmtpConfig) {
     port: config.smtpPort,
     secure: config.smtpPort === 465,
     auth: { user: config.smtpUsername, pass: password },
-    tls: config.useTls ? { rejectUnauthorized: false } : undefined,
+    // Certificate validation stays on: skipping it exposes the SMTP password
+    // and all outgoing mail to active network attackers (STARTTLS MITM).
+    tls: config.useTls ? { rejectUnauthorized: true } : undefined,
   });
 }
 

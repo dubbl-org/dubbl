@@ -656,8 +656,8 @@ export default function TimePage() {
                     background: "hsl(var(--card))",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
                   }}
-                  formatter={(value: number | undefined, name: string | undefined) => [
-                    `${value ?? 0}h`,
+                  formatter={(value, name) => [
+                    `${Number(value ?? 0)}h`,
                     name === "billable" ? "Billable" : "Total",
                   ]}
                   cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}

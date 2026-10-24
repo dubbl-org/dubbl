@@ -5,6 +5,7 @@ import { subscription } from "@/lib/db/schema/billing";
 import { eq, and, count } from "drizzle-orm";
 import { getEffectiveLimits } from "@/lib/plans";
 import { auth } from "@/lib/auth";
+import { rateLimit, clientIp } from "@/lib/api/rate-limit";
 import { z } from "zod";
 
 const joinSchema = z.object({
@@ -15,6 +16,9 @@ const joinSchema = z.object({
 export async function POST(request: Request) {
   try {
     const session = await auth();
+    if (!rateLimit(`invite-join:${session?.user?.id ?? clientIp(request)}`, 20)) {
+      return NextResponse.json({ error: "Too many attempts, try again later" }, { status: 429 });
+    }
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }

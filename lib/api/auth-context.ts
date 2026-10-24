@@ -73,12 +73,17 @@ export async function getAuthContext(
       ),
     });
 
-    const customRoleInfo = mem ? await resolveCustomRole(mem) : {};
+    // Fail closed: a key whose owner is no longer a member must stop working.
+    // Defaulting to "member" here kept offboarded users' keys alive forever,
+    // because apiKey.expiresAt is optional.
+    if (!mem) throw new AuthError("API key owner is no longer a member", 401);
+
+    const customRoleInfo = await resolveCustomRole(mem);
 
     return {
       userId: key.createdBy,
       organizationId: key.organizationId,
-      role: (mem?.role ?? "member") as MemberRole,
+      role: mem.role as MemberRole,
       ...customRoleInfo,
     };
   }
@@ -93,9 +98,10 @@ export async function getAuthContext(
     columns: { sessionRevokedAt: true },
   });
   if (user?.sessionRevokedAt) {
-    // JWT iat is in seconds, sessionRevokedAt is a Date
+    // JWT iat is in seconds, sessionRevokedAt is a Date. Fail closed: a token
+    // without an iat claim cannot be proven older than the revocation.
     const tokenIat = (session as unknown as { iat?: number }).iat;
-    if (tokenIat && tokenIat < Math.floor(user.sessionRevokedAt.getTime() / 1000)) {
+    if (!tokenIat || tokenIat < Math.floor(user.sessionRevokedAt.getTime() / 1000)) {
       throw new AuthError("Session expired. Please sign in again.", 401);
     }
   }

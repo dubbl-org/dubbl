@@ -29,7 +29,11 @@ export async function resolveToken(bearerToken: string): Promise<AuthContext> {
     ),
   });
 
-  const role = (mem?.role ?? token.role) as MemberRole;
+  // Fail closed: removing a member must revoke their MCP access, not leave the
+  // token working with its old role.
+  if (!mem) throw new AuthError("Access token owner is no longer a member", 401);
+
+  const role = mem.role as MemberRole;
 
   return {
     userId: token.userId,

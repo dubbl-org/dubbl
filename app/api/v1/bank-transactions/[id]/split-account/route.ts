@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -154,6 +155,8 @@ export async function POST(
     const reference = transaction.reference || transaction.description;
 
     const { entry } = await db.transaction(async (tx) => {
+      await assertNotLocked(ctx.organizationId, transaction.date, ctx);
+
       const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
       const { currency, rate } = await resolveBaseRate(
         ctx.organizationId,
@@ -162,6 +165,7 @@ export async function POST(
       );
 
       const [entry] = await tx
+
         .insert(journalEntry)
         .values({
           organizationId: ctx.organizationId,

@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -61,6 +62,7 @@ export async function POST(
     }
 
     const today = new Date().toISOString().split("T")[0];
+    await assertNotLocked(ctx.organizationId, today, ctx);
 
     const amount = calculateMonthlyDepreciation({
       purchasePrice: asset.purchasePrice,
@@ -98,6 +100,7 @@ export async function POST(
       const entryNumber = (maxResult?.max || 0) + 1;
 
       const [entry] = await db
+
         .insert(journalEntry)
         .values({
           organizationId: ctx.organizationId,

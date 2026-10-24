@@ -79,7 +79,11 @@ export async function DELETE(
     const labelId = url.searchParams.get("labelId");
     if (!labelId) return NextResponse.json({ error: "labelId required" }, { status: 400 });
 
-    await db.delete(projectLabel).where(eq(projectLabel.id, labelId));
+    // labelId comes from the query string: bind it to this project, or a
+    // caller can delete any tenant's label by id.
+    await db
+      .delete(projectLabel)
+      .where(and(eq(projectLabel.id, labelId), eq(projectLabel.projectId, id)));
     return NextResponse.json({ success: true });
   } catch (err) { return handleError(err); }
 }

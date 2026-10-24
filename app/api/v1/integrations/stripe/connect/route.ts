@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { encodeStripeState } from "@/lib/integrations/stripe/state";
 
 export async function GET(request: Request) {
   try {
@@ -21,13 +22,12 @@ export async function GET(request: Request) {
     const label = reqUrl.searchParams.get("label") || "Default";
 
     const nonce = crypto.randomBytes(16).toString("hex");
-    const statePayload = JSON.stringify({
+    const state = encodeStripeState({
       orgId: ctx.organizationId,
       userId: ctx.userId,
       nonce,
       label,
     });
-    const state = Buffer.from(statePayload).toString("base64url");
 
     const params = new URLSearchParams({
       response_type: "code",

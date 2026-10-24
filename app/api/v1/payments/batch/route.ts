@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { payment, paymentAllocation, invoice, bill } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { getNextNumber } from "@/lib/api/numbering";
@@ -74,6 +75,8 @@ export async function POST(request: Request) {
       amountDue: number;
       status: "paid" | "partial";
     }[] = [];
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
+
     for (const alloc of parsed.allocations) {
       const allocCents = decimalToCents(alloc.amount);
 
@@ -152,6 +155,7 @@ export async function POST(request: Request) {
           contactId: parsed.contactId,
           paymentNumber,
           type: parsed.type,
+
           date: parsed.date,
           amount: totalAmount,
           method: parsed.method,

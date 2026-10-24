@@ -57,9 +57,7 @@ export async function retryFailedStripeEvents(): Promise<{
 
     try {
       // Fetch the event from Stripe API
-      const event = await stripe.events.retrieve(log.stripeEventId, {
-        stripeAccount: integration.stripeAccountId,
-      });
+      const event = await stripe.events.retrieve(log.stripeEventId, {}, { stripeAccount: integration.stripeAccountId, });
 
       await processStripeEvent(event, integration);
 

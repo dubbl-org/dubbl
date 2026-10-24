@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { Markdown, MarkdownHint } from "@/components/shared/markdown";
 import { CircleDashed } from "lucide-react";
 import {
   useProject,
@@ -334,6 +335,7 @@ export default function TasksPage() {
               <div className="space-y-2">
                 <Label>Description</Label>
                 <Textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Details, notes, acceptance criteria..." rows={4} />
+                <MarkdownHint />
               </div>
             </div>
 
@@ -846,7 +848,9 @@ function TaskDetailDrawer({
             <div className="h-px bg-border" />
             <div className="space-y-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Description</p>
-              <p className="text-[13px] text-muted-foreground leading-relaxed whitespace-pre-wrap rounded-lg bg-muted/30 p-4">{task.description}</p>
+              <div className="rounded-lg bg-muted/30 p-4">
+                <Markdown content={task.description} className="text-[13px] text-muted-foreground" />
+              </div>
             </div>
           </>
         )}

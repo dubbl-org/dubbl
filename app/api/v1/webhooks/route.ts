@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { webhook } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertPublicHttpsUrl } from "@/lib/api/url-guard";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -42,8 +43,16 @@ export async function GET(request: Request) {
       .from(webhook)
       .where(and(...conditions));
 
+    // The signing secret is the only integrity control on deliveries: a
+    // read-only member who can read it can forge events into the receiver.
+    // It is shown once, at creation, and never listed.
     return NextResponse.json(
-      paginatedResponse(webhooks, Number(countResult?.count || 0), page, limit)
+      paginatedResponse(
+        webhooks.map(({ secret: _secret, ...wh }) => wh),
+        Number(countResult?.count || 0),
+        page,
+        limit
+      )
     );
   } catch (err) {
     return handleError(err);
@@ -57,6 +66,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    // User-chosen target: must be a public https endpoint, or this becomes an
+    // internal port scanner with a response body returned to the caller.
+    await assertPublicHttpsUrl(parsed.url);
 
     const secret = crypto.randomBytes(32).toString("hex");
 

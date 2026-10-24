@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Github } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { GithubIcon } from "@/components/brand-icons";
 import Link from "next/link";
 import { Container } from "@/components/shared/container";
 import { cn } from "@/lib/utils";
@@ -637,7 +638,7 @@ export function Hero() {
                   animate={{ left: ["0%", "100%", "0%"] }}
                   transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 />
-                <Github className="relative size-4" />
+                <GithubIcon className="relative size-4" />
                 <span className="relative">&gt; git clone</span>
                 <motion.span
                   className="relative inline-block h-4 w-px bg-emerald-400"

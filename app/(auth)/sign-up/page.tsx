@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -50,10 +50,15 @@ interface ProvidersConfig {
   allowedDomains: string;
 }
 
-export default function SignUpPage() {
+function SignUpPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Invite flow: /sign-up?next=/invite/<token>&invite=<token>. The invite lets
+  // registration through even when open registration is locked.
+  const inviteToken = searchParams.get("invite");
+  const nextPath = searchParams.get("next");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,12 +69,12 @@ export default function SignUpPage() {
       .then((r) => r.json())
       .then((data) => {
         setProviders(data);
-        if (data.registrationMode === "disabled") {
+        if (data.registrationMode === "disabled" && !inviteToken) {
           router.replace("/sign-in");
         }
       })
       .catch(() => setProviders({ google: false, apple: false, registrationMode: "open", allowedDomains: "" }));
-  }, [router]);
+  }, [router, inviteToken]);
 
   const hasOAuth = providers?.google || providers?.apple;
 
@@ -82,7 +87,12 @@ export default function SignUpPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          ...(inviteToken ? { inviteToken } : {}),
+        }),
       });
 
       if (!res.ok) {
@@ -100,7 +110,8 @@ export default function SignUpPage() {
         throw new Error("Failed to sign in after registration");
       }
 
-      router.push("/onboarding");
+      // Return to the invite the user came from; otherwise onboard as usual.
+      router.push(nextPath && nextPath.startsWith("/invite/") ? nextPath : "/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
       setLoading(false);
@@ -287,5 +298,13 @@ export default function SignUpPage() {
         Open source &middot; Self-hosted option &middot; Apache 2.0
       </motion.p>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpPageInner />
+    </Suspense>
   );
 }
