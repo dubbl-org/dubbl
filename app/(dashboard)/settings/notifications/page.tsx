@@ -17,8 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { FormSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -126,7 +126,7 @@ export default function NotificationPreferencesPage() {
 
   const anyEmailEnabled = Object.values(prefs).some((v) => v.email);
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <FormSkeleton />;
 
   return (
     <ContentReveal>

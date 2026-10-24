@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import {
   ArrowLeft,
@@ -17,8 +18,8 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { cn } from "@/lib/utils";
@@ -411,13 +412,15 @@ export default function BankAccountDetailLayout({ children }: { children: React.
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   if (!account) {
     return (
       <div className="space-y-4 pt-12 text-center">
         <p className="text-sm text-muted-foreground">Account not found</p>
-        <Button variant="outline" size="sm" onClick={() => router.push("/accounting/banking")}>Back to Banking</Button>
+        <Button variant="outline" size="sm" asChild>
+              <Link href="/accounting/banking">Back to Banking</Link>
+            </Button>
       </div>
     );
   }
@@ -449,13 +452,13 @@ export default function BankAccountDetailLayout({ children }: { children: React.
     }}>
       <ContentReveal>
         {/* Back link */}
-        <button
-          onClick={() => router.push("/accounting/banking")}
+        <Link
+          href="/accounting/banking"
           className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="size-3.5" />
           Back to banking
-        </button>
+        </Link>
 
         {/* Header */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between mb-5">
@@ -480,9 +483,16 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)} title="Tick off transactions against your bank statement">
-              <RefreshCcw className="mr-2 size-3.5" />
-              Match statement to your books
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              title="Tick off transactions against your bank statement"
+            >
+              <Link href={`/accounting/banking/${id}/reconcile`}>
+                <RefreshCcw className="mr-2 size-3.5" />
+                Match statement to your books
+              </Link>
             </Button>
             <Button size="sm" onClick={() => setImportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
               <Upload className="mr-2 size-3.5" />
@@ -523,9 +533,9 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             const tabHref = t.href(id);
             const active = activeTab === t.value;
             return (
-              <button
+              <Link
                 key={t.value}
-                onClick={() => router.push(tabHref)}
+                href={tabHref}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
                   active
@@ -541,7 +551,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
                 {t.value === "imports" && imports.length > 0 && (
                   <span className="ml-1 text-[11px] tabular-nums text-muted-foreground">{imports.length}</span>
                 )}
-              </button>
+              </Link>
             );
           })}
         </nav>

@@ -6,8 +6,8 @@ import { Users, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
@@ -87,7 +87,7 @@ export default function TeamMembersPage() {
     return true;
   });
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   return (
     <ContentReveal className="space-y-6">

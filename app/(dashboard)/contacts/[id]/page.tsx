@@ -16,10 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { decimalToCents } from "@/lib/money";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencyInput } from "@/components/shared/currency-input";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import { useContactContext, getOrgId } from "./layout";
 import type { Account, TaxRate, ContactDetail } from "./layout";
 

@@ -27,7 +27,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import { cn } from "@/lib/utils";
 import { COUNTRIES as ALL_COUNTRIES } from "@/lib/countries";
 import { PAYMENT_TERMS } from "@/lib/payment-terms";

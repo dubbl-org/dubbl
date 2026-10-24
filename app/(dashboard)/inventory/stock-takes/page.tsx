@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,7 +95,7 @@ export default function StockTakesPage() {
     return () => window.removeEventListener("refetch-stock-takes", handler);
   }, []);
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   const draftCount = stockTakes.filter((s) => s.status === "draft").length;
   const inProgressCount = stockTakes.filter((s) => s.status === "in_progress").length;

@@ -6,8 +6,8 @@ import { Package, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 
@@ -64,7 +64,7 @@ export default function BOMDetailPage() {
     setData(await res.json());
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
   if (!data) return <div className="py-20 text-center text-sm text-muted-foreground">BOM not found</div>;
 
   const { bom, costBreakdown } = data;

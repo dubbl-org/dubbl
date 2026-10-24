@@ -20,7 +20,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, Tags } from "lucide-react";
 import { toast } from "sonner";

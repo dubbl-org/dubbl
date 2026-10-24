@@ -1,5 +1,6 @@
 "use client";
 
+import { setActiveOrgId } from "@/lib/active-org";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
         throw new Error(typeof data.error === "string" ? data.error : "Failed to create organization");
       }
       const data = await res.json();
-      localStorage.setItem("activeOrgId", data.organization.id);
+      setActiveOrgId(data.organization.id);
       toast.success("Organization created");
       onOpenChange(false);
       window.location.href = "/onboarding";

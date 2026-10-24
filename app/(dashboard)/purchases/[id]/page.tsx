@@ -7,17 +7,17 @@ import { ArrowLeft, Check, DollarSign, Ban, Undo2, ThumbsUp, X, GitCompareArrows
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/shared/currency-input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney, minorUnitsToDecimal } from "@/lib/money";
-import { DualAmount } from "@/components/ui/dual-amount";
-import { RateNote, type RateInfo } from "@/components/ui/rate-note";
+import { DualAmount } from "@/components/shared/dual-amount";
+import { RateNote, type RateInfo } from "@/components/shared/rate-note";
 import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
 import Link from "next/link";
 
@@ -216,7 +216,7 @@ export default function BillDetailPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   if (!b) {
     return (

@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -223,7 +223,7 @@ export default function NotificationsPage() {
     });
   };
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   const groups = groupByDate(notifications);
 

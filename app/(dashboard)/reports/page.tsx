@@ -29,7 +29,7 @@ import {
   FileCheck2,
 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 const reportCategories = [
