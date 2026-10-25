@@ -252,9 +252,13 @@ export default function TaxReturnPage({
                       ) : (
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                       )}
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded bg-muted font-mono text-xs font-semibold text-muted-foreground">
-                        {b.box}
-                      </span>
+                      {/* Box numbers only: named boxes (revenue, chargeable_income) are
+                          machine keys the label already says in words. */}
+                      {/^[\dA-Z]{1,3}$/.test(b.box) && (
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded bg-muted font-mono text-xs font-semibold text-muted-foreground">
+                          {b.box}
+                        </span>
+                      )}
                       <span className="truncate text-sm font-medium">
                         {b.label}
                         {b.optional && b.amount === 0 && (

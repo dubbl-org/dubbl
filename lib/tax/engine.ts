@@ -463,7 +463,10 @@ export async function rateWarningsForPeriod(
 
   const warnings: string[] = [];
   for (const r of rates) {
-    const expired = r.effectiveTo != null && r.effectiveTo < period.endDate;
+    // A rate that ended before the period began is history, not a problem: the
+    // 8% GST rate is still seeded (auditable) long after 9% replaced it.
+    const expired =
+      r.effectiveTo != null && r.effectiveTo >= period.startDate && r.effectiveTo < period.endDate;
     const notYet = r.effectiveFrom != null && r.effectiveFrom > period.startDate;
     if (!r.isActive) warnings.push(`${r.name}: inactive rate`);
     else if (expired) warnings.push(`${r.name}: not in force for this period (ended ${r.effectiveTo})`);
