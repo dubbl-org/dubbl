@@ -53,6 +53,8 @@ export interface ReturnInputs {
   reverseChargeDocs: number;
   /** box → cents, from tax_return_line (isCalculated = false) */
   manual: Record<string, number>;
+  /** box → cents, from the tax computation (capital allowances, exemption). */
+  schedule: Record<string, number>;
 }
 
 export interface ReturnContext {
@@ -76,6 +78,7 @@ const emptyInputs = (): ReturnInputs => ({
   reverseChargeLedger: 0,
   reverseChargeDocs: 0,
   manual: {},
+  schedule: {},
 });
 
 /** Every box source in a definition, including the ones derived boxes point at. */
@@ -253,7 +256,7 @@ async function orgCountry(organizationId: string): Promise<string | null> {
 }
 
 /** Which figure a leaf source resolves to. Derived boxes are handled separately. */
-function leafValue(source: BoxSource, inputs: ReturnInputs): number | null {
+function leafValue(boxId: string, source: BoxSource, inputs: ReturnInputs): number | null {
   switch (source.type) {
     case "controlAccount": {
       const m = inputs.controls[source.account] ?? { debits: 0, credits: 0 };
@@ -287,8 +290,9 @@ function leafValue(source: BoxSource, inputs: ReturnInputs): number | null {
           `${source.subType}:${source.sign}:${source.disallowedWeighted ? "weighted" : "gross"}`
         ] ?? 0
       );
-    case "manual":
     case "taxBasisSchedule":
+      return inputs.schedule[boxId] ?? 0;
+    case "manual":
       return 0;
     default:
       // sum / difference are derived, not leaves.
@@ -316,7 +320,7 @@ export function computeReturn(
       values.set(box.box, override);
       continue;
     }
-    const leaf = leafValue(box.compute, inputs);
+    const leaf = leafValue(box.box, box.compute, inputs);
     if (leaf != null) values.set(box.box, leaf);
   }
 

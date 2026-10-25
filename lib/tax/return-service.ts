@@ -16,6 +16,7 @@ import {
 } from "@/lib/tax/engine";
 import { getOrgTaxConfig, resolveBasis } from "@/lib/tax/ledger";
 import { getReturnDefinition, resolveTaxModuleForOrg } from "@/lib/tax/registry";
+import { needsBasisSchedule, sgBasisValues } from "@/lib/tax/sg-basis";
 import type { ReturnResult, TaxBasis, TaxModule } from "@/lib/tax/types";
 
 export interface GetTaxReturnOptions {
@@ -82,6 +83,15 @@ export async function getTaxReturn(
     : (def.bases[0] ?? "accrual");
 
   const manual = await manualOverrides(organizationId, options.periodId, kind);
+
+  // Singapore's Form C-S and ECI report figures that come from the tax
+  // computation (capital allowances from the asset register, the exemption
+  // ladder), not from a ledger account. Compute them before the boxes.
+  const schedule =
+    module.country === "SG" && needsBasisSchedule(def)
+      ? (await sgBasisValues(organizationId, options, kind)).boxes
+      : {};
+
   const inputs = await gatherReturnInputs(
     organizationId,
     module,
@@ -90,6 +100,7 @@ export async function getTaxReturn(
     basis,
     manual
   );
+  inputs.schedule = schedule;
 
   const ctx: ReturnContext = {
     country: module.country,

@@ -1,12 +1,13 @@
+import { redirect } from "next/navigation";
 import { getServerContext } from "@/lib/server/context";
-import { callRoute } from "@/lib/server/call-route";
-import { GET } from "@/app/api/v1/reports/vat-return/route";
-import VatReturnPage from "./vat-return-client";
+import { resolveTaxModuleForOrg } from "@/lib/tax/registry";
 
+/**
+ * The VAT return now lives at /tax/returns/<kind>, driven by the jurisdiction
+ * module. This path is kept only so old bookmarks and links land somewhere real.
+ */
 export default async function Page() {
   const ctx = await getServerContext();
-  const now = new Date();
-  const params = new URLSearchParams({ startDate: String(`${(new Date()).getFullYear()}-01-01`), endDate: String((new Date()).toISOString().slice(0, 10)), basis: String("accrual") });
-  const data = await callRoute<Record<string, unknown>>(GET, ctx, "reports/vat-return", params);
-  return <VatReturnPage initialData={data} />;
+  const module = await resolveTaxModuleForOrg(ctx.organizationId);
+  redirect(`/tax/returns/${module.returns[0]?.kind ?? "vat100"}`);
 }

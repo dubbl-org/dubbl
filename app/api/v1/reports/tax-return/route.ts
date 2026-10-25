@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { getTaxReturn } from "@/lib/tax/return-service";
+import { workpaperXlsx } from "@/lib/tax/workpaper";
 
 /**
  * Generic tax return endpoint: `?kind=gst_f5|vat100|bas|form_c_s|eci|…`
@@ -41,6 +42,19 @@ export async function GET(request: Request) {
       endDate,
       basis: url.searchParams.get("basis"),
     });
+
+    // `format=xlsx` downloads the workpaper (boxes, reconciliation, rate
+    // warnings); the JSON response below is unchanged.
+    if ((url.searchParams.get("format") || "json").toLowerCase() === "xlsx") {
+      const buffer = await workpaperXlsx(response.result);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${response.result.kind}-${startDate}-${endDate}.xlsx"`,
+        },
+      });
+    }
 
     return NextResponse.json({
       ...response.result,

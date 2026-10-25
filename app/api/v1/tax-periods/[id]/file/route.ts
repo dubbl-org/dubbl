@@ -15,7 +15,7 @@ import {
   resolveBasis,
   controlAccountMovement,
   computeEcSales,
-} from "@/lib/reports/tax-return";
+} from "@/lib/tax/ledger";
 import { z } from "zod";
 
 /**

@@ -95,7 +95,7 @@ export default function TaxSummaryPage({ initialData }: { initialData: Record<st
         description="Tax you charged on sales vs tax you paid on purchases, by tax rate."
       >
         <Button asChild variant="outline" size="sm">
-          <a href="/reports/vat-return">Open the full tax return</a>
+          <a href="/tax">Open the full tax return</a>
         </Button>
       </PageHeader>
 

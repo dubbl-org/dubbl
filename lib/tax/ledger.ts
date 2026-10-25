@@ -1,10 +1,10 @@
 /**
  * Ledger primitives behind every tax return.
  *
- * Moved verbatim out of lib/reports/tax-return.ts (which re-exports it) so the
- * existing importers and the GB numbers are unchanged. Jurisdiction-specific
- * knowledge — box ids, labels, rate sets — lives in lib/tax/modules/*; nothing
- * here knows about a country.
+ * Moved out of the old lib/reports/tax-return.ts (deleted) without changing the
+ * logic, so the GB numbers are unchanged. Jurisdiction-specific knowledge — box
+ * ids, labels, rate sets — lives in lib/tax/modules/*; nothing here knows about
+ * a country.
  *
  * Conventions: integer minor units (cents); only `status = 'posted'`,
  * non-deleted, org-scoped entries count; accrual recognises on the entry date,
@@ -342,16 +342,25 @@ async function lineTotalsQuery(
     .groupBy(supplyCategorySql);
 }
 
-/** Posted movement on all accounts of an account type (revenue for F5 box 13). */
+/**
+ * Posted movement on all accounts of an account type (revenue for F5 box 13).
+ *
+ * `disallowedWeighted` returns only the portion each account marks as
+ * non-deductible for income tax (chartAccount.taxDisallowedPercent) — that is the
+ * add-back line on a Singapore tax computation.
+ */
 export async function accountTypeBalance(
   organizationId: string,
   type: "revenue" | "expense" | "asset" | "liability" | "equity",
   sign: "credit" | "debit",
   startDate: string,
-  endDate: string
+  endDate: string,
+  disallowedWeighted = false
 ): Promise<number> {
-  const [row] = await db
+  const rows = await db
     .select({
+      accountId: chartAccount.id,
+      disallowedPercent: chartAccount.taxDisallowedPercent,
       debits: sql<number>`COALESCE(SUM(${journalLine.debitAmount}), 0)`.mapWith(Number),
       credits: sql<number>`COALESCE(SUM(${journalLine.creditAmount}), 0)`.mapWith(Number),
     })
@@ -367,10 +376,17 @@ export async function accountTypeBalance(
         lte(journalEntry.date, endDate),
         isNull(journalEntry.deletedAt)
       )
-    );
-  const debits = row?.debits || 0;
-  const credits = row?.credits || 0;
-  return sign === "credit" ? credits - debits : debits - credits;
+    )
+    .groupBy(chartAccount.id, chartAccount.taxDisallowedPercent);
+
+  let total = 0;
+  for (const r of rows) {
+    const gross = sign === "credit" ? r.credits - r.debits : r.debits - r.credits;
+    total += disallowedWeighted
+      ? Math.round((gross * (r.disallowedPercent ?? 0)) / 10000)
+      : gross;
+  }
+  return total;
 }
 
 /**

@@ -98,7 +98,9 @@ export const SG_ACCOUNTS: AccountTemplate[] = [
   // ── Other operating expenses ──
   { code: "6140", name: "Transport and Travelling", type: "expense", subType: "transport" },
   { code: "6145", name: "Airfare and Accommodation", type: "expense", subType: "transport" },
-  { code: "6150", name: "Entertainment", type: "expense", subType: "entertainment" },
+  // IRAS denies 50% of business entertainment (s15(1)(a)); the add-back is
+  // seeded on the account so the tax computation picks it up automatically.
+  { code: "6150", name: "Entertainment", type: "expense", subType: "entertainment", taxDisallowedPercent: 5000 },
   { code: "6160", name: "ACRA and Secretarial Fees", type: "expense", subType: "professional" },
   { code: "6170", name: "Audit and Accounting Fees", type: "expense", subType: "professional" },
   { code: "6180", name: "Legal and Professional Fees", type: "expense", subType: "professional" },

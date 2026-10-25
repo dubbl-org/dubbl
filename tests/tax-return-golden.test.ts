@@ -29,6 +29,7 @@ function inputs(overrides: Partial<ReturnInputs> = {}): ReturnInputs {
     reverseChargeLedger: 0,
     reverseChargeDocs: 0,
     manual: {},
+    schedule: {},
     ...overrides,
   };
 }

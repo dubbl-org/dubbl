@@ -59,6 +59,15 @@ interface OrgSettings {
   contactWebsite: string | null;
   defaultPaymentTerms: string | null;
   industrySector: string | null;
+  // Jurisdiction filing settings
+  gstRegisteredAt: string | null;
+  gstDeregisteredAt: string | null;
+  gstFilingFrequency: string | null;
+  gstPeriodStartMonth: number | null;
+  xbrlTemplate: string | null;
+  accountingStandard: string | null;
+  newStartupExemption: boolean | null;
+  isExemptPrivateCompany: boolean | null;
 }
 
 const MONTHS = [
@@ -96,6 +105,14 @@ export default function SettingsPage() {
     contactWebsite: "",
     defaultPaymentTerms: "",
     industrySector: "",
+    gstRegisteredAt: "",
+    gstDeregisteredAt: "",
+    gstFilingFrequency: "quarterly",
+    gstPeriodStartMonth: "1",
+    xbrlTemplate: "simplified",
+    accountingStandard: "sfrs",
+    newStartupExemption: true,
+    isExemptPrivateCompany: true,
   });
   const [saving, setSaving] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
@@ -240,6 +257,14 @@ export default function SettingsPage() {
             contactWebsite: o.contactWebsite || "",
             defaultPaymentTerms: o.defaultPaymentTerms || "",
             industrySector: o.industrySector || "",
+            gstRegisteredAt: o.gstRegisteredAt || "",
+            gstDeregisteredAt: o.gstDeregisteredAt || "",
+            gstFilingFrequency: o.gstFilingFrequency || "quarterly",
+            gstPeriodStartMonth: String(o.gstPeriodStartMonth ?? 1),
+            xbrlTemplate: o.xbrlTemplate || "simplified",
+            accountingStandard: o.accountingStandard || "sfrs",
+            newStartupExemption: o.newStartupExemption !== false,
+            isExemptPrivateCompany: o.isExemptPrivateCompany !== false,
           });
         }
       });
@@ -290,6 +315,16 @@ export default function SettingsPage() {
           industrySector: form.industrySector || null,
           peppolId: peppolId || null,
           peppolScheme: peppolScheme || null,
+          // Filing settings (only meaningful where a module uses them; harmless
+          // elsewhere because the module ignores them).
+          gstRegisteredAt: form.gstRegisteredAt || null,
+          gstDeregisteredAt: form.gstDeregisteredAt || null,
+          gstFilingFrequency: form.gstFilingFrequency || null,
+          gstPeriodStartMonth: parseInt(form.gstPeriodStartMonth) || null,
+          xbrlTemplate: form.xbrlTemplate || null,
+          accountingStandard: form.accountingStandard || null,
+          newStartupExemption: form.newStartupExemption,
+          isExemptPrivateCompany: form.isExemptPrivateCompany,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -603,6 +638,125 @@ export default function SettingsPage() {
       </Section>
 
       <div className="h-px bg-border" />
+
+      {form.countryCode === "SG" && (
+        <>
+          <Section
+            title="GST and annual filing"
+            description="What IRAS and ACRA expect from this company. The GST period start month and frequency are assigned by IRAS when you register."
+          >
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">GST registration date</Label>
+                <Input
+                  type="date"
+                  value={form.gstRegisteredAt}
+                  onChange={(e) => setForm({ ...form, gstRegisteredAt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">GST deregistration date</Label>
+                <Input
+                  type="date"
+                  value={form.gstDeregisteredAt}
+                  onChange={(e) => setForm({ ...form, gstDeregisteredAt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">GST return frequency</Label>
+                <Select
+                  value={form.gstFilingFrequency}
+                  onValueChange={(v) => setForm({ ...form, gstFilingFrequency: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">First month of the GST period</Label>
+                <Select
+                  value={form.gstPeriodStartMonth}
+                  onValueChange={(v) => setForm({ ...form, gstPeriodStartMonth: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((m, i) => (
+                      <SelectItem key={i} value={String(i + 1)}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Accounting standard</Label>
+                <Select
+                  value={form.accountingStandard}
+                  onValueChange={(v) => setForm({ ...form, accountingStandard: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sfrs">SFRS</SelectItem>
+                    <SelectItem value="sfrs_se">SFRS for Small Entities</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Picks the ACRA XBRL entry point.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">XBRL template</Label>
+                <Select
+                  value={form.xbrlTemplate}
+                  onValueChange={(v) => setForm({ ...form, xbrlTemplate: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="simplified">Simplified (revenue and assets ≤ S$500k)</SelectItem>
+                    <SelectItem value="full">Full</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  ACRA decides from the year&apos;s own figures; crossing S$500,000 means Full.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.newStartupExemption}
+                  onChange={(e) => setForm({ ...form, newStartupExemption: e.target.checked })}
+                />
+                Qualifies for the start-up tax exemption (first three years of assessment)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.isExemptPrivateCompany}
+                  onChange={(e) =>
+                    setForm({ ...form, isExemptPrivateCompany: e.target.checked })
+                  }
+                />
+                Exempt private company (no corporate shareholder) — exempt from XBRL filing
+              </label>
+            </div>
+          </Section>
+
+          <div className="h-px bg-border" />
+        </>
+      )}
 
       {/* Save */}
       <div className="flex justify-end">

@@ -1,36 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Percent, Coins, Calendar, Globe, FileSpreadsheet, MapPin, Calculator } from "lucide-react";
+import { Percent, Coins, Calendar, Globe, FileSpreadsheet } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
 
-const EU_COUNTRIES = [
-  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
-  "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
-  "PL", "PT", "RO", "SK", "SI", "ES", "SE",
-];
+interface FilingReturn {
+  kind: string;
+  title: string;
+  authority: string;
+}
 
-function getFilingTabs(countryCode: string | null) {
-  if (!countryCode) return [];
-
-  const tabs: { href: string; label: string; icon: typeof Percent }[] = [];
-
-  if (countryCode === "GB" || EU_COUNTRIES.includes(countryCode)) {
-    tabs.push({ href: "/tax/vat-return", label: "VAT Return", icon: Globe });
-  }
-
-  if (countryCode === "AU") {
-    tabs.push({ href: "/tax/bas", label: "BAS", icon: FileSpreadsheet });
-  }
-
-  if (countryCode === "US") {
-    tabs.push(
-      { href: "/tax/sales-tax", label: "Sales Tax", icon: MapPin },
-      { href: "/tax/schedule-c", label: "Schedule C", icon: Calculator },
-    );
-  }
-
-  return tabs;
+/** Filing tabs come from the jurisdiction module, not from a country list. */
+function filingTabs(returns: FilingReturn[]) {
+  return returns.map((r, index) => ({
+    href: `/tax/returns/${r.kind}`,
+    label: r.title,
+    icon: index === 0 ? Globe : FileSpreadsheet,
+  }));
 }
 
 export default function TaxLayout({
@@ -38,7 +24,7 @@ export default function TaxLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [countryCode, setCountryCode] = useState<string | null>(null);
+  const [returns, setReturns] = useState<FilingReturn[]>([]);
   const [openPeriods, setOpenPeriods] = useState(0);
 
   useEffect(() => {
@@ -46,11 +32,10 @@ export default function TaxLayout({
     if (!orgId) return;
     const headers = { "x-organization-id": orgId };
 
-    fetch("/api/v1/organization", { headers })
+    fetch("/api/v1/tax/returns", { headers })
       .then((r) => r.json())
       .then((data) => {
-        const code = data.organization?.countryCode || data.countryCode;
-        if (code) setCountryCode(code);
+        if (Array.isArray(data.returns)) setReturns(data.returns);
       })
       .catch(() => {});
 
@@ -71,7 +56,7 @@ export default function TaxLayout({
     { href: "/tax/periods", label: "Tax Periods", icon: Calendar, badge: openPeriods > 0 ? openPeriods : undefined },
   ];
 
-  const tabs = [...baseTabs, ...getFilingTabs(countryCode)];
+  const tabs = [...baseTabs, ...filingTabs(returns)];
 
   return <TabLayout tabs={tabs}>{children}</TabLayout>;
 }

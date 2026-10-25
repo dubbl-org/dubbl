@@ -24,7 +24,8 @@ import {
   resolveBasis,
   controlAccountMovement,
   computeEcSales,
-} from "@/lib/reports/tax-return";
+} from "@/lib/tax/ledger";
+import { getTaxReturn } from "@/lib/tax/return-service";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 const taxRateKindEnum = z.enum([
@@ -429,6 +430,69 @@ export function registerTaxTools(server: McpServer, ctx: AuthContext) {
           inputVat: result.clearing?.inputBalance ?? 0,
           basis,
           filedLines: result.lines,
+        };
+      })
+  );
+
+  server.tool(
+    "get_tax_return",
+    "Read a tax return's computed boxes for a period, for the organization's jurisdiction. " +
+      "The module is picked from the organization's country (or the country argument), and the return kind from that " +
+      "module: Singapore offers gst_f5, form_c_s, eci and capital_allowances; the UK offers vat100; Australia bas; " +
+      "the US sales_tax. Box amounts are in integer cents. Singapore returns are filed in SGD on an accrual basis " +
+      "(no cash accounting in Singapore); a requested 'cash' basis is downgraded rather than silently misreported. " +
+      "Manual box values already persisted on the tax period win over computed figures. " +
+      "Returns the boxes with their source (ledger, documents, derived, manual), the document-vs-ledger reconciliation " +
+      "deltas, and any rate warnings (a rate whose effective window does not cover the period).",
+    {
+      kind: z
+        .string()
+        .optional()
+        .describe("Return kind, e.g. 'gst_f5', 'vat100', 'bas', 'form_c_s', 'eci'. Defaults to the module's first return."),
+      startDate: z.string().describe("Period start, YYYY-MM-DD"),
+      endDate: z.string().describe("Period end, YYYY-MM-DD"),
+      basis: z
+        .enum(["accrual", "cash"])
+        .optional()
+        .describe("Recognition basis; ignored where the jurisdiction does not allow cash accounting"),
+      country: z
+        .string()
+        .length(2)
+        .optional()
+        .describe("Two-letter ISO country code to force a jurisdiction, e.g. 'SG'"),
+      taxPeriodId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe("Load persisted manual box values from this tax period"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+        const response = await getTaxReturn(ctx.organizationId, {
+          kind: params.kind ?? null,
+          country: params.country ?? null,
+          periodId: params.taxPeriodId ?? null,
+          startDate: params.startDate,
+          endDate: params.endDate,
+          basis: params.basis ?? null,
+        });
+        return {
+          kind: response.result.kind,
+          title: response.result.title,
+          authority: response.result.authority,
+          country: response.result.country,
+          currency: response.result.currency,
+          basis: response.result.basis,
+          period: response.result.period,
+          boxes: response.result.boxes,
+          reconciliation: response.result.reconciliation,
+          rateWarnings: response.result.rateWarnings,
+          availableKinds: response.module.returns.map((r) => ({
+            kind: r.kind,
+            title: r.title,
+            bases: r.bases,
+          })),
         };
       })
   );

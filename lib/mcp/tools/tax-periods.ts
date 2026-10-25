@@ -6,12 +6,14 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { createVatReturnClearingJournalEntry } from "@/lib/api/journal-automation";
+import { generatePeriods } from "@/lib/tax/periods";
+import { organization } from "@/lib/db/schema";
 import {
   getOrgTaxConfig,
   resolveBasis,
   controlAccountMovement,
   computeEcSales,
-} from "@/lib/reports/tax-return";
+} from "@/lib/tax/ledger";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 /**
@@ -257,6 +259,56 @@ export function registerTaxPeriodTools(server: McpServer, ctx: AuthContext) {
           inputVat: result.clearing?.inputBalance ?? 0,
           basis,
           filedLines: result.lines,
+        };
+      })
+  );
+  server.tool(
+    "generate_tax_periods",
+    "Generate the filing calendar for a fiscal year as tax periods: for a Singapore org, its GST periods " +
+      "(monthly or quarterly, from the GST registration date and period anchor), one ECI period (due three months " +
+      "after the financial year end) and one Form C-S period (due 30 November of the following year). Idempotent — " +
+      "periods that already exist are skipped, so it is safe to call repeatedly. Returns the generated periods with " +
+      "their statutory due dates, which periods were created, and how many already existed. Nothing is generated for " +
+      "GST until a GST registration date is set on the organization.",
+    {
+      fiscalYear: z.number().int().min(2000).max(2100).describe("Fiscal year to generate, e.g. 2026"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:tax-config");
+        const org = await db.query.organization.findFirst({
+          where: eq(organization.id, ctx.organizationId),
+          columns: {
+            fiscalYearStartMonth: true,
+            gstRegisteredAt: true,
+            gstDeregisteredAt: true,
+            gstFilingFrequency: true,
+            gstPeriodStartMonth: true,
+          },
+        });
+        const generated = generatePeriods(org ?? {}, params.fiscalYear);
+        const inserted = generated.length
+          ? await db
+              .insert(taxPeriod)
+              .values(
+                generated.map((p) => ({
+                  organizationId: ctx.organizationId,
+                  name: p.name,
+                  startDate: p.startDate,
+                  endDate: p.endDate,
+                  type: p.type,
+                  returnKind: p.returnKind,
+                  authority: p.authority,
+                }))
+              )
+              .onConflictDoNothing()
+              .returning({ id: taxPeriod.id, name: taxPeriod.name })
+          : [];
+        return {
+          fiscalYear: params.fiscalYear,
+          created: inserted,
+          existing: generated.length - inserted.length,
+          periods: generated,
         };
       })
   );
