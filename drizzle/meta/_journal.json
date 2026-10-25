@@ -50,6 +50,13 @@
       "when": 1792947024797,
       "tag": "0006_tiny_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792957152333,
+      "tag": "0007_greedy_hellcat",
+      "breakpoints": true
     }
   ]
 }

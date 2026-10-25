@@ -82,7 +82,12 @@ export const bankAccount = pgTable("bank_account", {
   accountType: bankAccountTypeEnum("account_type").notNull().default("checking"),
   color: text("color").notNull().default("#0f766e"),
   chartAccountId: uuid("chart_account_id").references(() => chartAccount.id),
+  // `balance` is the anchor, not the live balance: the money the account held at
+  // `balanceAsOfDate` (the bank's closing balance on the last imported
+  // statement). A null date means "before every transaction", so the opening
+  // balance still counts. The live balance is this plus the movements after it.
   balance: integer("balance").notNull().default(0),
+  balanceAsOfDate: date("balance_as_of_date"),
   lowBalanceThreshold: integer("low_balance_threshold"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

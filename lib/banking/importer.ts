@@ -227,14 +227,19 @@ export async function commitBankStatementImport(
     await db.insert(bankTransaction).values(insertedRows);
   }
 
-  const finalBalance =
-    parsed.closingBalance ??
-    insertedRows[insertedRows.length - 1]?.balance ??
-    account.balance;
+  const lastInserted = insertedRows[insertedRows.length - 1];
+  const finalBalance = parsed.closingBalance ?? lastInserted?.balance ?? account.balance;
+
+  // The account balance is stored as an anchor: what the bank said it held at
+  // the statement's end date, with movements after that date added on read.
+  // Without a closing balance the last imported row is the anchor instead.
+  const balanceAsOfDate = parsed.closingBalance
+    ? (parsed.statementEndDate ?? lastInserted?.date ?? account.balanceAsOfDate)
+    : (lastInserted?.date ?? account.balanceAsOfDate);
 
   await db
     .update(bankAccount)
-    .set({ balance: finalBalance })
+    .set({ balance: finalBalance, balanceAsOfDate })
     .where(eq(bankAccount.id, bankAccountId));
 
   await db

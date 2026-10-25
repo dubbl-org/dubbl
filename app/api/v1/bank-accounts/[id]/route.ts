@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { withBankBalances } from "@/lib/api/bank-balances";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
@@ -43,7 +44,8 @@ export async function GET(
     });
 
     if (!found) return notFound("Bank account");
-    return NextResponse.json({ bankAccount: found });
+    const [account] = await withBankBalances([found]);
+    return NextResponse.json({ bankAccount: account });
   } catch (err) {
     return handleError(err);
   }
