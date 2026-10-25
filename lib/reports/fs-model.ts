@@ -73,6 +73,17 @@ const NON_CURRENT_ASSET_SUBTYPES = new Set([
   "rou",
 ]);
 
+/**
+ * Liability subtags that are non-current. A payable is current by default:
+ * GST and income tax payable carry their own subtags (`output_vat`, `tax`) and
+ * are due within the year.
+ */
+const NON_CURRENT_LIABILITY_SUBTYPES = new Set([
+  "non_current",
+  "long_term",
+  "loan",
+]);
+
 /** Default caption when the module has none for a subtag. */
 const GENERIC_CAPTIONS: Record<string, string> = {
   bank: "Cash and cash equivalents",
@@ -99,9 +110,13 @@ const GENERIC_CAPTIONS: Record<string, string> = {
   non_operating: "Other income and expenses",
 };
 
-function captionFor(subType: string | null, presentation: FsPresentation): string {
-  const key = subType ?? "";
+function captionFor(a: AccountAggregate, presentation: FsPresentation): string {
+  const key = a.subType ?? "";
+  // A subtag can mean different things per statement side: `current` is "Other
+  // current assets" on the asset side and trade payables on the liability side,
+  // so a module may caption "<type>.<subType>" explicitly.
   return (
+    presentation.balanceSheetCaptions[`${a.type}.${key}`] ??
     presentation.balanceSheetCaptions[key] ??
     GENERIC_CAPTIONS[key] ??
     (key ? key.replace(/_/g, " ") : "Other")
@@ -111,14 +126,13 @@ function captionFor(subType: string | null, presentation: FsPresentation): strin
 /** Accumulate accounts into caption buckets, preserving first-seen order. */
 function bucket(
   accounts: AccountAggregate[],
-  presentation: FsPresentation,
-  sign: 1 | -1 = 1
+  presentation: FsPresentation
 ): FsCaption[] {
   const byCaption = new Map<string, FsCaption>();
   for (const a of accounts) {
-    const caption = captionFor(a.subType, presentation);
+    const caption = captionFor(a, presentation);
     const row = byCaption.get(caption) ?? { caption, amount: 0, codes: [] };
-    row.amount += sign * a.balance;
+    row.amount += a.balance;
     row.codes.push(a.code);
     byCaption.set(caption, row);
   }
@@ -165,9 +179,11 @@ export function buildFsModel({
   );
 
   const liabilities = ofType("liability");
-  const currentLiabilities = liabilities.filter((a) => (a.subType ?? "current") === "current");
-  const nonCurrentLiabilities = liabilities.filter(
-    (a) => (a.subType ?? "current") !== "current"
+  const nonCurrentLiabilities = liabilities.filter((a) =>
+    NON_CURRENT_LIABILITY_SUBTYPES.has(a.subType ?? "")
+  );
+  const currentLiabilities = liabilities.filter(
+    (a) => !NON_CURRENT_LIABILITY_SUBTYPES.has(a.subType ?? "")
   );
 
   const equity = ofType("equity");
@@ -201,7 +217,7 @@ export function buildFsModel({
   );
   const expenses = section(
     "Expenses",
-    order(bucket(expense, presentation, -1), presentation.captionOrder.expenses)
+    order(bucket(expense, presentation), presentation.captionOrder.expenses)
   );
   const netProfit = income.total - expenses.total;
 
@@ -211,11 +227,17 @@ export function buildFsModel({
   // the balance check (and for the SOCE's "profit for the year" row).
   const equityWithProfit = equitySection.total + netProfit;
 
-  const shareCapital = equityCycleOf(equity, "share") ?? 0;
-  const retainedNow =
-    equitySection.rows
-      .filter((r) => !/share/i.test(r.caption))
-      .reduce((s, r) => s + r.amount, 0) + netProfit;
+  // Chart convention: subType "retained" is retained earnings (and dividends,
+  // which net against it); every other equity subtag is share capital and
+  // reserves. Postings are per account, so split by account rather than by
+  // caption ("Share capital and reserves" covers both columns).
+  const shareCapital = equity
+    .filter((a) => (a.subType ?? "") !== "retained")
+    .reduce((s, a) => s + a.balance, 0);
+  const retainedPosted = equity
+    .filter((a) => (a.subType ?? "") === "retained")
+    .reduce((s, a) => s + a.balance, 0);
+  const retainedNow = retainedPosted + netProfit;
   const opening = openingEquity ?? {
     shareCapital,
     retainedEarnings: retainedNow - netProfit,
@@ -261,9 +283,3 @@ export function buildFsModel({
   };
 }
 
-/** Share-capital balance from equity accounts, if any. */
-function equityCycleOf(accounts: AccountAggregate[], match: string): number | null {
-  const hits = accounts.filter((a) => (a.subType ?? "").toLowerCase().includes(match));
-  if (hits.length === 0) return null;
-  return hits.reduce((s, a) => s + a.balance, 0);
-}

@@ -7,7 +7,14 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { centsToDecimal } from "@/lib/money";
 import { aggregateAsAt, type AccountAggregate } from "@/lib/reports/gl-query";
-import type { Statement } from "@/lib/reports/statement-export";
+import {
+  buildFsModel,
+  type FsModel,
+  type FsSection,
+} from "@/lib/reports/fs-model";
+import type { Statement, StatementSection } from "@/lib/reports/statement-export";
+import { resolveTaxModuleForOrg } from "@/lib/tax/registry";
+import { SG_MODULE } from "@/lib/tax/modules/sg";
 
 type BsType = "asset" | "liability" | "equity";
 const BS_TYPES: BsType[] = ["asset", "liability", "equity"];
@@ -43,12 +50,63 @@ function parseCompareDates(url: URL, asAt: string): string[] {
   return out;
 }
 
+/**
+ * Balance sheet.
+ *
+ * Query params: `asAt` (alias `asOf`), `compareDate` (repeated or comma
+ * separated), `format=json|xlsx|pdf`, and `presentation=sfrs`.
+ *
+ * The default JSON shape is unchanged: flat Assets / Liabilities / Equity
+ * sections with one `balance` per account, decimal amounts.
+ *
+ * `presentation=sfrs` (Singapore's SFRS) adds an `sfrs` object for the primary
+ * `asAt` date: Current / Non-current assets, Current / Non-current liabilities
+ * and Equity, captioned by the org's tax module and ordered by its
+ * `captionOrder`, plus `netProfit` and `imbalance` (assets − liabilities −
+ * equity, 0 when the books balance). For `format=xlsx|pdf` it renders that
+ * grouping as the exported statement instead. SFRS is Singapore's standard, so
+ * a module without a presentation falls back to Singapore's.
+ */
+function sfrsStatement(model: FsModel, asAt: string, currency: string): Statement {
+  const group = (label: string, s: FsSection): StatementSection => ({
+    label,
+    rows: s.rows.map((r) => ({ name: r.caption, amount: r.amount, depth: 1 })),
+    subtotal: s.total,
+  });
+  return {
+    title: "Balance Sheet",
+    periodLabel: `As at ${asAt} (SFRS)`,
+    currency,
+    sections: [
+      group("Current assets", model.assets.current),
+      group("Non-current assets", model.assets.nonCurrent),
+      group("Current liabilities", model.liabilities.current),
+      group("Non-current liabilities", model.liabilities.nonCurrent),
+      group("Equity", model.equity),
+    ],
+  };
+}
+
+/** Section in the `sfrs` JSON: captions with decimal amounts, cents in codes. */
+function sfrsJson(s: FsSection) {
+  return {
+    caption: s.caption,
+    rows: s.rows.map((r) => ({
+      caption: r.caption,
+      amount: centsToDecimal(r.amount),
+      codes: r.codes,
+    })),
+    total: centsToDecimal(s.total),
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "view:data");
     const url = new URL(request.url);
     const format = (url.searchParams.get("format") || "json").toLowerCase();
+    const sfrs = url.searchParams.get("presentation") === "sfrs";
 
     // `asAt` is the canonical param; `asOf` is accepted as an alias for
     // backward-compat with existing callers (e.g. the comparative page).
@@ -147,6 +205,18 @@ export async function GET(request: Request) {
     }
     const sections = [assets, liabilities, equity];
 
+    // SFRS grouping for the primary asAt: the balance-sheet balances plus the
+    // cumulative revenue/expenses to the same date, which the model adds back
+    // into equity as unclosed profit.
+    const model: FsModel | null = sfrs
+      ? buildFsModel({
+          accounts: [...primary, ...plPerDate[0]],
+          presentation:
+            (await resolveTaxModuleForOrg(ctx.organizationId)).fsPresentation ??
+            SG_MODULE.fsPresentation!,
+        })
+      : null;
+
     const hasComparatives = compareDates.length > 0;
     const labelFor = (t: BsType) =>
       t === "asset" ? "Assets" : t === "liability" ? "Liabilities" : "Equity";
@@ -158,7 +228,9 @@ export async function GET(request: Request) {
       });
       const currency = org?.defaultCurrency || "USD";
 
-      const statement: Statement = hasComparatives
+      const statement: Statement = model
+        ? sfrsStatement(model, asAt, currency)
+        : hasComparatives
         ? {
             title: "Balance Sheet",
             periodLabel: `As at ${asAt}`,
@@ -237,6 +309,27 @@ export async function GET(request: Request) {
       assets: toJson(assets),
       liabilities: toJson(liabilities),
       equity: toJson(equity),
+      ...(model
+        ? {
+            sfrs: {
+              presentation: "sfrs",
+              asAt,
+              assets: {
+                current: sfrsJson(model.assets.current),
+                nonCurrent: sfrsJson(model.assets.nonCurrent),
+                total: centsToDecimal(model.assets.total),
+              },
+              liabilities: {
+                current: sfrsJson(model.liabilities.current),
+                nonCurrent: sfrsJson(model.liabilities.nonCurrent),
+                total: centsToDecimal(model.liabilities.total),
+              },
+              equity: sfrsJson(model.equity),
+              netProfit: centsToDecimal(model.netProfit),
+              imbalance: centsToDecimal(model.imbalance),
+            },
+          }
+        : {}),
     });
   } catch (err) {
     return handleError(err);
