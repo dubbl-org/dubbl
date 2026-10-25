@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   pgEnum,
   jsonb,
+  date,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -155,6 +156,23 @@ export const organization = pgTable("organization", {
   vatScheme: text("vat_scheme").notNull().default("accrual"),
   // Tax regime that drives the country tax profile: vat | gst | us_sales_tax | none.
   taxRegime: text("tax_regime"),
+  // ── Jurisdiction filing settings (SG first; EU modules ignore them) ──
+  /** Date GST registration took effect (IRAS liability starts here). */
+  gstRegisteredAt: date("gst_registered_at"),
+  gstDeregisteredAt: date("gst_deregistered_at"),
+  /** "monthly" | "quarterly" — IRAS assigns one; the default is quarterly. */
+  gstFilingFrequency: text("gst_filing_frequency"),
+  /** 1-12. First month of the GST accounting period (IRAS assigns it). */
+  gstPeriodStartMonth: integer("gst_period_start_month"),
+  // ACRA XBRL template. "simplified" when revenue AND total assets are both
+  // ≤ S$500,000 in the FY; otherwise "full". Not the S$10m small-company test.
+  xbrlTemplate: text("xbrl_template"),
+  /** "sfrs" | "sfrs_se" — picks the taxonomy entry point. */
+  accountingStandard: text("accounting_standard"),
+  /** Claims the start-up (new company) tax exemption in the first three YAs. */
+  newStartupExemption: boolean("new_startup_exemption").default(false),
+  /** Private company whose members are not all corporates: EPC exemption test. */
+  isExemptPrivateCompany: boolean("is_exempt_private_company").default(true),
   // Duplicate supplier-invoice handling: 'off' | 'warn' | 'block' | 'hold'.
   duplicateBillStrategy: text("duplicate_bill_strategy").notNull().default("warn"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

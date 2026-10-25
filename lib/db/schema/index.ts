@@ -38,5 +38,6 @@ export * from "./approvals";
 export * from "./invitations";
 export * from "./login-history";
 export * from "./integrations";
+export * from "./xbrl";
 export * from "./backups";
 export * from "./site-settings";

@@ -43,6 +43,13 @@
       "when": 1792574692823,
       "tag": "0005_easy_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792947024797,
+      "tag": "0006_tiny_liz_osborn",
+      "breakpoints": true
     }
   ]
 }
