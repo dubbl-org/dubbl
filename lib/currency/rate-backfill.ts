@@ -6,6 +6,16 @@ import { datedProvider } from "./rate-provider";
 /** Rate stored as an integer with this many decimal places (1.000000 = 1000000). */
 const SCALE = 1_000_000;
 
+/**
+ * A feed quotes `rates[code]` as units of `code` per one unit of the feed's
+ * base, which is exactly what `exchange_rate.rate` stores (target per base) and
+ * what `convertAmount` multiplies by. Stored unscaled, it converts one way;
+ * stored reciprocated it converts the other, off by the rate squared.
+ */
+export function feedRateToPairRate(perUnit: number): number {
+  return Math.round(perUnit * SCALE);
+}
+
 function toIso(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -69,7 +79,7 @@ export async function backfillRates(
           organizationId,
           baseCurrency,
           targetCurrency: code,
-          rate: Math.round(SCALE / perUnit),
+          rate: feedRateToPairRate(perUnit),
           date: feed.date,
           source: "api" as const,
         };
