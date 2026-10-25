@@ -26,12 +26,27 @@ const sgRates: ModuleRate[] = [
   { name: "Reverse charge — imported services / LVG", rate: 900, type: "purchase", kind: "reverse_charge", supplyCategory: "standard", recoverablePercent: 10000, effectiveFrom: "2020-01-01", effectiveTo: null },
 ];
 
-/** F5 boxes that IRAS wants keyed but that an SME leaves blank. */
-const sgManualBoxes = [
+/** The three parts of the printed F5, printed as ruled headings above the boxes. */
+const SG_SUPPLIES = "Supplies and purchases";
+const SG_TAX = "GST to be paid or claimed";
+const SG_ADDITIONAL = "Additional information";
+/** Annual returns print the accounts first, then the tax working. */
+const SG_PNL = "Profit and loss";
+const SG_TAX_COMPUTATION = "Tax computation";
+
+/**
+ * F5 boxes that IRAS wants keyed but that an SME leaves blank. The printed form
+ * leaves 13 and 14 to be computed in the middle of them, so the hand-keyed ones
+ * arrive in two runs.
+ */
+const sgManualEarly = [
   { box: "9", label: "Goods imported under AHTN / MES", help: "Imports where GST was paid to Singapore Customs, not to the supplier.", optional: true },
   { box: "10", label: "Imports under MES or A3PL", help: "Leave blank unless you buy through an approved third-party logistics scheme.", optional: true },
   { box: "11", label: "Tourist refunds", help: "Refunds you paid tourists under the Electronic Tourist Refund Scheme.", optional: true },
   { box: "12", label: "Bad debt relief / (recovery)", help: "GST relief on debts written off, less any relief you previously claimed and later recovered.", optional: true },
+] as const;
+
+const sgManualLate = [
   { box: "15", label: "Pre-registration GST", help: "GST on purchases and imports made before you registered.", optional: true },
   { box: "16", label: "GST on imported services (non-LVG)", help: "Reverse charge on imported services outside the LVG scheme.", optional: true },
   { box: "17", label: "GST on reverse-charge LVG purchases", help: "Reverse charge on low-value goods bought from an overseas supplier.", optional: true },
@@ -60,35 +75,41 @@ export const SG_MODULE: TaxModule = {
           box: "1",
           label: "Total value of standard-rated supplies",
           help: "Everything you sold with GST charged at 9% (or 8% before 2024).",
+          section: SG_SUPPLIES,
           compute: { type: "docLines", doc: "invoiceLine", measure: "net", supplyCategory: ["standard"] },
         },
         {
           box: "2",
           label: "Total value of zero-rated supplies",
           help: "Exports of goods and international services.",
+          section: SG_SUPPLIES,
           compute: { type: "docLines", doc: "invoiceLine", measure: "net", supplyCategory: ["zero_rated"] },
         },
         {
           box: "3",
           label: "Total value of exempt supplies",
           help: "Financial services, residential property, and other exempt sales.",
+          section: SG_SUPPLIES,
           compute: { type: "docLines", doc: "invoiceLine", measure: "net", supplyCategory: ["exempt"] },
         },
         {
           box: "4",
           label: "Total value of taxable supplies (1 + 2 + 3)",
+          section: SG_SUPPLIES,
           compute: { type: "sum", of: ["1", "2", "3"] },
         },
         {
           box: "5",
           label: "Total value of taxable purchases",
           help: "Standard-rated purchases you paid GST on, including goods imported under AHTN.",
+          section: SG_SUPPLIES,
           compute: { type: "docLines", doc: "billLine", measure: "net", supplyCategory: ["standard"] },
         },
         {
           box: "6",
           label: "Output tax",
           help: "GST you charged on sales, from the output GST control account.",
+          section: SG_TAX,
           compute: {
             type: "controlAccount",
             account: "2200",
@@ -101,27 +122,32 @@ export const SG_MODULE: TaxModule = {
           box: "7",
           label: "Input tax and refunds claimed",
           help: "GST you can claim on purchases, from the input GST control account.",
+          section: SG_TAX,
           compute: { type: "controlAccount", account: "1500", sign: "debit" },
         },
         {
           box: "8",
           label: "Net GST to be paid to IRAS / claimed from IRAS",
           help: "Box 6 minus box 7. Positive: pay IRAS. Negative: claim from IRAS.",
+          section: SG_TAX,
           compute: { type: "difference", plus: ["6"], minus: ["7"] },
         },
-        ...sgManualBoxes.map((b) => ({ ...b, compute: { type: "manual" as const } })),
+        ...sgManualEarly.map((b) => ({ ...b, section: SG_ADDITIONAL, compute: { type: "manual" as const } })),
         {
           box: "13",
           label: "Revenue",
           help: "Your total revenue for the accounting period, from the profit and loss.",
+          section: SG_ADDITIONAL,
           compute: { type: "revenueFromPnl" },
         },
         {
           box: "14",
           label: "GST on imported services / LVG (reverse charge)",
           help: "GST you accounted for yourself on services or low-value goods bought from overseas.",
+          section: SG_ADDITIONAL,
           compute: { type: "reverseCharge", from: "docLines" },
         },
+        ...sgManualLate.map((b) => ({ ...b, section: SG_ADDITIONAL, compute: { type: "manual" as const } })),
       ],
     },
     {
@@ -130,45 +156,46 @@ export const SG_MODULE: TaxModule = {
       authority: "IRAS",
       bases: ["accrual"],
       boxes: [
-        { box: "revenue", label: "Revenue", compute: { type: "revenueFromPnl" } },
+        { box: "revenue", label: "Revenue", section: SG_PNL, compute: { type: "revenueFromPnl" } },
+        { box: "cost_of_sales", label: "Cost of sales", section: SG_PNL, compute: { type: "accountTag", subType: "cogs", sign: "debit" } },
         {
           box: "gross_profit",
           label: "Gross profit",
+          section: SG_PNL,
           compute: { type: "difference", plus: ["revenue"], minus: ["cost_of_sales"] },
         },
-        {
-          box: "cost_of_sales",
-          label: "Cost of sales",
-          compute: { type: "accountTag", subType: "cogs", sign: "debit" },
-        },
-        { box: "directors_fees", label: "Directors' fees", compute: { type: "accountTag", subType: "directors_fees", sign: "debit" } },
-        { box: "remuneration", label: "Total remuneration (excluding directors' fees)", compute: { type: "accountTag", subType: "payroll", sign: "debit" } },
-        { box: "medical", label: "Medical expenses", compute: { type: "accountTag", subType: "medical", sign: "debit" } },
-        { box: "transport", label: "Transport and travelling", compute: { type: "accountTag", subType: "transport", sign: "debit" } },
-        { box: "entertainment", label: "Entertainment", compute: { type: "accountTag", subType: "entertainment", sign: "debit" } },
-        { box: "inventories", label: "Inventories at year end", compute: { type: "accountTag", subType: "inventory", sign: "debit" } },
-        { box: "trade_receivables", label: "Trade receivables", compute: { type: "accountTag", subType: "receivable", sign: "debit" } },
-        { box: "total_expenses", label: "Total expenses", compute: { type: "accountType", accountType: "expense", sign: "debit" } },
+        { box: "directors_fees", label: "Directors' fees", section: SG_PNL, compute: { type: "accountTag", subType: "directors_fees", sign: "debit" } },
+        { box: "remuneration", label: "Total remuneration (excluding directors' fees)", section: SG_PNL, compute: { type: "accountTag", subType: "payroll", sign: "debit" } },
+        { box: "medical", label: "Medical expenses", section: SG_PNL, compute: { type: "accountTag", subType: "medical", sign: "debit" } },
+        { box: "transport", label: "Transport and travelling", section: SG_PNL, compute: { type: "accountTag", subType: "transport", sign: "debit" } },
+        { box: "entertainment", label: "Entertainment", section: SG_PNL, compute: { type: "accountTag", subType: "entertainment", sign: "debit" } },
+        { box: "inventories", label: "Inventories at year end", section: SG_PNL, compute: { type: "accountTag", subType: "inventory", sign: "debit" } },
+        { box: "trade_receivables", label: "Trade receivables", section: SG_PNL, compute: { type: "accountTag", subType: "receivable", sign: "debit" } },
+        { box: "total_expenses", label: "Total expenses", section: SG_PNL, compute: { type: "accountType", accountType: "expense", sign: "debit" } },
         {
           box: "net_profit",
           label: "Net profit before tax",
+          section: SG_PNL,
           compute: { type: "difference", plus: ["revenue"], minus: ["total_expenses"] },
         },
         {
           box: "add_backs",
           label: "Non-deductible expenses (add-backs)",
+          section: SG_TAX_COMPUTATION,
           compute: { type: "accountTag", subType: "operating", sign: "debit", disallowedWeighted: true },
         },
-        { box: "capital_allowances", label: "Capital allowances", compute: { type: "taxBasisSchedule" } },
+        { box: "capital_allowances", label: "Capital allowances", section: SG_TAX_COMPUTATION, compute: { type: "taxBasisSchedule" } },
         {
           box: "chargeable_income",
           label: "Chargeable income before exemption",
+          section: SG_TAX_COMPUTATION,
           compute: { type: "difference", plus: ["net_profit", "add_backs"], minus: ["capital_allowances"] },
         },
-        { box: "exemption", label: "Partial / start-up tax exemption", compute: { type: "taxBasisSchedule" } },
+        { box: "exemption", label: "Partial / start-up tax exemption", section: SG_TAX_COMPUTATION, compute: { type: "taxBasisSchedule" } },
         {
           box: "chargeable_after_exemption",
           label: "Chargeable income after exemption",
+          section: SG_TAX_COMPUTATION,
           compute: { type: "difference", plus: ["chargeable_income"], minus: ["exemption"] },
         },
       ],
@@ -179,28 +206,32 @@ export const SG_MODULE: TaxModule = {
       authority: "IRAS",
       bases: ["accrual"],
       boxes: [
-        { box: "revenue", label: "Revenue", compute: { type: "revenueFromPnl" } },
-        { box: "total_expenses", label: "Total expenses", compute: { type: "accountType", accountType: "expense", sign: "debit" } },
+        { box: "revenue", label: "Revenue", section: SG_PNL, compute: { type: "revenueFromPnl" } },
+        { box: "total_expenses", label: "Total expenses", section: SG_PNL, compute: { type: "accountType", accountType: "expense", sign: "debit" } },
         {
           box: "net_profit",
           label: "Net profit before tax",
+          section: SG_PNL,
           compute: { type: "difference", plus: ["revenue"], minus: ["total_expenses"] },
         },
         {
           box: "add_backs",
           label: "Non-deductible expenses (add-backs)",
+          section: SG_TAX_COMPUTATION,
           compute: { type: "accountTag", subType: "operating", sign: "debit", disallowedWeighted: true },
         },
-        { box: "capital_allowances", label: "Capital allowances", compute: { type: "taxBasisSchedule" } },
+        { box: "capital_allowances", label: "Capital allowances", section: SG_TAX_COMPUTATION, compute: { type: "taxBasisSchedule" } },
         {
           box: "chargeable_income",
           label: "Estimated chargeable income before exemption",
+          section: SG_TAX_COMPUTATION,
           compute: { type: "difference", plus: ["net_profit", "add_backs"], minus: ["capital_allowances"] },
         },
-        { box: "exemption", label: "Partial / start-up tax exemption", compute: { type: "taxBasisSchedule" } },
+        { box: "exemption", label: "Partial / start-up tax exemption", section: SG_TAX_COMPUTATION, compute: { type: "taxBasisSchedule" } },
         {
           box: "eci",
           label: "Estimated chargeable income",
+          section: SG_TAX_COMPUTATION,
           compute: { type: "difference", plus: ["chargeable_income"], minus: ["exemption"] },
         },
       ],

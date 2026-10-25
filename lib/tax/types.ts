@@ -95,6 +95,8 @@ export interface BoxSpec {
   help?: string;
   /** May be left blank on the official form (e.g. SG F5 boxes 9–21 for an SME). */
   optional?: boolean;
+  /** Part of the form this line sits in, printed as a ruled heading above it. */
+  section?: string;
   compute: BoxSource;
 }
 
@@ -161,8 +163,9 @@ export interface ComputedBox {
   help?: string;
   amount: number;
   optional?: boolean;
+  section?: string;
   /** Where the figure came from, for the workpaper's "source" column. */
-  source: "ledger" | "documents" | "derived" | "manual";
+  source: "ledger" | "documents" | "derived" | "manual" | "accounts" | "schedule";
 }
 
 /** A single line shown in the reconciliation column (never auto-posted). */

@@ -362,6 +362,7 @@ export function computeReturn(
     label: b.label,
     help: b.help,
     optional: b.optional,
+    section: b.section,
     amount: resolve(b.box),
     source: inputs.manual[b.box] != null ? "manual" : sourceKind(b.compute),
   }));
@@ -393,6 +394,12 @@ function sourceKind(source: BoxSource): ComputedBox["source"] {
     case "sum":
     case "difference":
       return "derived";
+    case "accountType":
+    case "accountTag":
+    case "revenueFromPnl":
+      return "accounts";
+    case "taxBasisSchedule":
+      return "schedule";
     default:
       return "manual";
   }

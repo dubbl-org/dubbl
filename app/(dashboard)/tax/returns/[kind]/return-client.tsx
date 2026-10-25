@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronRight, Download, AlertTriangle } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -10,6 +9,8 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
+import { cn } from "@/lib/utils";
+import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { BackToReports, ReportHelp, BasisToggle } from "@/app/(dashboard)/reports/_components";
 
 interface ComputedBox {
@@ -17,8 +18,11 @@ interface ComputedBox {
   label: string;
   help?: string;
   amount: number;
-  source: "ledger" | "documents" | "derived" | "manual";
+  /** "accounts" = summed by account type/tag, "schedule" = tax-basis workpaper. */
+  source: "ledger" | "documents" | "derived" | "manual" | "accounts" | "schedule";
   optional?: boolean;
+  /** Part of the printed form this line belongs to. */
+  section?: string;
 }
 
 interface Reconciliation {
@@ -58,8 +62,29 @@ const SOURCE_LABEL: Record<ComputedBox["source"], string> = {
   ledger: "From the ledger",
   documents: "From your invoices and bills",
   derived: "Calculated from the boxes above",
-  manual: "Entered by you",
+  manual: "You key this in from your records",
+  accounts: "From your chart of accounts",
+  schedule: "From the tax computation workpaper",
 };
+
+/**
+ * Group rows into the printed form's parts. Rows keep the module's order, so a
+ * section is one run of consecutive rows that share it.
+ */
+function groupBySection(boxes: ComputedBox[]) {
+  const groups: { section?: string; rows: ComputedBox[] }[] = [];
+  for (const row of boxes) {
+    const last = groups[groups.length - 1];
+    if (last && last.section === row.section) last.rows.push(row);
+    else groups.push({ section: row.section, rows: [row] });
+  }
+  return groups;
+}
+
+/** Real box numbers print as they are; named keys fall back to the item number. */
+function boxNumber(box: string, position: number) {
+  return /^[\dA-Z]{1,3}$/.test(box) ? box : String(position);
+}
 
 /**
  * One page for every periodic return the org's jurisdiction files. The boxes,
@@ -149,6 +174,9 @@ export default function TaxReturnPage({
     }
   }
 
+  // The breadcrumb reads the module's name for this return, not the URL slug.
+  useEntityTitle(data?.title);
+
   const money = (amount: number) => formatMoney(amount, data?.currency ?? "USD");
   const supportsCash = data?.availableKinds.find((k) => k.kind === kind)?.bases.includes("cash");
   const workpaperParams = new URLSearchParams({ kind, startDate, endDate, basis, format: "xlsx" });
@@ -201,22 +229,6 @@ export default function TaxReturnPage({
         {supportsCash && <BasisToggle basis={basis} onChange={setBasis} />}
       </div>
 
-      {data && data.availableKinds.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {data.availableKinds.map((k) => (
-            <Link
-              key={k.kind}
-              href={`/tax/returns/${k.kind}`}
-              className={`rounded-md border px-3 py-1.5 text-sm ${
-                k.kind === kind ? "bg-muted font-medium" : "hover:bg-muted/50"
-              }`}
-            >
-              {k.title}
-            </Link>
-          ))}
-        </div>
-      )}
-
       {data && data.rateWarnings.length > 0 && (
         <div className="flex gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 p-3 text-sm dark:bg-amber-950/20">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
@@ -237,80 +249,118 @@ export default function TaxReturnPage({
         <p className="text-sm text-muted-foreground">No figures for this period.</p>
       ) : (
         <>
-          <div className="space-y-2">
-            {data.boxes.map((b) => {
-              const isOpen = expanded.has(b.box);
-              return (
-                <div key={b.box} className="overflow-hidden rounded-lg border">
-                  <button
-                    onClick={() => toggle(b.box, b.source)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/40 sm:px-4"
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      {isOpen ? (
-                        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          <div className="overflow-hidden rounded-lg border bg-card">
+            {/* Form header: what is being filed, for which period, in what currency. */}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b bg-muted/40 px-4 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {data.authority} · {data.title}
+              </p>
+              <p className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                {data.period.startDate} – {data.period.endDate} · {data.currency} · {data.basis}
+              </p>
+            </div>
+
+            {groupBySection(data.boxes).map((group, groupIndex) => (
+              <div key={group.section ?? groupIndex}>
+                {group.section && (
+                  <p className="border-b border-border/70 bg-muted/20 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {group.section}
+                  </p>
+                )}
+                {group.rows.map((b) => {
+                  const isOpen = expanded.has(b.box);
+                  // A derived line is a subtotal on every form: it reads heavier,
+                  // so the eye lands on the figure the authority asks for.
+                  const isTotal = b.source === "derived";
+                  const blank = b.source === "manual" && b.amount === 0;
+                  return (
+                    <div
+                      key={b.box}
+                      className={cn(
+                        "border-t border-border/60 first:border-t-0",
+                        isTotal && "border-border bg-muted/40"
                       )}
-                      {/* Box numbers only: named boxes (revenue, chargeable_income) are
-                          machine keys the label already says in words. */}
-                      {/^[\dA-Z]{1,3}$/.test(b.box) && (
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded bg-muted font-mono text-xs font-semibold text-muted-foreground">
-                          {b.box}
+                    >
+                      <button
+                        onClick={() => toggle(b.box, b.source)}
+                        aria-expanded={isOpen}
+                        className="group flex w-full items-stretch text-left transition-colors hover:bg-muted/40"
+                      >
+                        <span className="flex w-11 shrink-0 items-center justify-center border-r border-border/60 font-mono text-[11px] text-muted-foreground tabular-nums">
+                          {boxNumber(b.box, data.boxes.indexOf(b) + 1)}
                         </span>
-                      )}
-                      <span className="truncate text-sm font-medium">
-                        {b.label}
-                        {b.optional && b.amount === 0 && (
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">optional</span>
-                        )}
-                      </span>
-                    </div>
-                    <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
-                      {money(b.amount)}
-                    </span>
-                  </button>
-                  {isOpen && (
-                    <div className="space-y-2 border-t bg-muted/20 px-3 py-3 text-sm text-muted-foreground sm:px-4">
-                      {b.help && <p>{b.help}</p>}
-                      <p className="text-xs">Source: {SOURCE_LABEL[b.source]}</p>
-                      {b.source === "ledger" && (
-                        <div className="pt-1">
-                          {drill[b.box]?.loading ? (
-                            <BrandLoader className="h-16" />
-                          ) : drill[b.box]?.error ? (
-                            <p className="text-xs text-amber-600">{drill[b.box].error}</p>
-                          ) : drill[b.box] && drill[b.box].rows.length > 0 ? (
-                            <div className="divide-y rounded-md border bg-background">
-                              {drill[b.box].rows.slice(0, 50).map((t) => (
-                                <div
-                                  key={t.journalLineId}
-                                  className="flex items-center justify-between gap-3 px-2 py-1.5 text-xs"
-                                >
-                                  <span className="truncate">
-                                    {t.date} · #{t.entryNumber} · {t.description ?? "—"}
-                                  </span>
-                                  <span className="shrink-0 font-mono tabular-nums">
-                                    {money(t.amount)}
-                                  </span>
+                        <span className="flex min-w-0 flex-1 items-center gap-1.5 py-2.5 pl-2 pr-3">
+                          <ChevronRight
+                            className={cn(
+                              "size-3.5 shrink-0 text-muted-foreground/40 transition-transform group-hover:text-muted-foreground",
+                              isOpen && "rotate-90 text-muted-foreground"
+                            )}
+                          />
+                          <span className={cn("truncate text-[13px]", isTotal && "font-semibold")}>
+                            {b.label}
+                          </span>
+                          {b.optional && b.amount === 0 && (
+                            <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                              optional
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "flex w-32 shrink-0 items-center justify-end border-l border-border/60 px-3 py-2.5 font-mono text-[13px] tabular-nums sm:w-40",
+                            isTotal && "font-semibold"
+                          )}
+                        >
+                          {blank ? (
+                            <span className="font-sans text-[11px] text-muted-foreground/70">to key in</span>
+                          ) : (
+                            money(b.amount)
+                          )}
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="space-y-2 border-t border-border/60 bg-background px-4 py-3 text-sm text-muted-foreground sm:pl-[4.5rem]">
+                          {b.help && <p>{b.help}</p>}
+                          <p className="text-xs">Source: {SOURCE_LABEL[b.source]}</p>
+                          {b.source === "ledger" && (
+                            <div className="pt-1">
+                              {drill[b.box]?.loading ? (
+                                <BrandLoader className="h-16" />
+                              ) : drill[b.box]?.error ? (
+                                <p className="text-xs text-amber-600">{drill[b.box].error}</p>
+                              ) : drill[b.box] && drill[b.box].rows.length > 0 ? (
+                                <div className="divide-y rounded-md border bg-background">
+                                  {drill[b.box].rows.slice(0, 50).map((t) => (
+                                    <div
+                                      key={t.journalLineId}
+                                      className="flex items-center justify-between gap-3 px-2 py-1.5 text-xs"
+                                    >
+                                      <span className="truncate">
+                                        {t.date} · #{t.entryNumber} · {t.description ?? "—"}
+                                      </span>
+                                      <span className="shrink-0 font-mono tabular-nums">
+                                        {money(t.amount)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {drill[b.box].rows.length > 50 && (
+                                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                                      Showing the first 50 of {drill[b.box].rows.length} lines.
+                                    </p>
+                                  )}
                                 </div>
-                              ))}
-                              {drill[b.box].rows.length > 50 && (
-                                <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                                  Showing the first 50 of {drill[b.box].rows.length} lines.
-                                </p>
-                              )}
+                              ) : drill[b.box] ? (
+                                <p className="text-xs">No lines in this period.</p>
+                              ) : null}
                             </div>
-                          ) : drill[b.box] ? (
-                            <p className="text-xs">No lines in this period.</p>
-                          ) : null}
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           {data.reconciliation.length > 0 && (

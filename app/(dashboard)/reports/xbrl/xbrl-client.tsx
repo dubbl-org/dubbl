@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BackToReports } from "@/app/(dashboard)/reports/_components";
+import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 
 interface ValidationIssue {
   severity: "genuine" | "possible";
@@ -45,6 +46,7 @@ const money = (cents: number) =>
  * report, download the package, upload it at BizFinx.
  */
 export default function XbrlPage({ initialData }: { initialData: Record<string, unknown> | null }) {
+  useEntityTitle("Annual return (XBRL)");
   const now = new Date();
   const [fiscalYearEnd, setFiscalYearEnd] = useState(
     `${now.getFullYear() - 1}-12-31`
