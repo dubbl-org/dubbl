@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
+import type { ExpenseCounts } from "@/lib/server/data/expenses";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ListSkeleton } from "@/components/dashboard/skeletons";
 import { ContentReveal } from "@/components/shared/content-reveal";
@@ -62,7 +63,7 @@ export default function ExpensesPage({
   initialHasMore,
 }: {
   initialClaims: ExpenseClaim[];
-  initialCounts: { counts: Record<string, { count: number; amount: number }>; total: number };
+  initialCounts: ExpenseCounts;
   initialHasMore: boolean;
 }) {
   const router = useRouter();
@@ -221,12 +222,26 @@ export default function ExpensesPage({
     return c;
   }, [countsData]);
 
-  const totalAmount = useMemo(() => {
-    if (!countsData) return 0;
-    return Object.values(countsData.counts).reduce((s, d) => s + d.amount, 0);
-  }, [countsData]);
-  const pendingAmount = countsData?.counts.submitted?.amount || 0;
-  const approvedAmount = countsData?.counts.approved?.amount || 0;
+  // A claim is a memo amount until it posts, so each currency keeps its own
+  // figure. Only the booked total is one real currency: the base currency.
+  const moneyList = (amounts: { currency: string; amount: number }[]) =>
+    amounts.length
+      ? amounts.map((a) => formatMoney(a.amount, a.currency)).join(" \u00B7 ")
+      : formatMoney(0, booked.currency);
+  const sumByCurrency = (statuses: string[]) => {
+    const byCurrency = new Map<string, number>();
+    for (const status of statuses) {
+      for (const a of countsData?.counts[status]?.amounts ?? []) {
+        byCurrency.set(a.currency, (byCurrency.get(a.currency) ?? 0) + a.amount);
+      }
+    }
+    return [...byCurrency]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, amount]) => ({ currency, amount }));
+  };
+  const booked = countsData?.booked ?? { currency: "USD", amount: 0 };
+  const unapproved = sumByCurrency(["draft", "submitted"]);
+  const approved = sumByCurrency(["approved"]);
 
   if (loading) return <ListSkeleton />;
 
@@ -333,19 +348,21 @@ export default function ExpensesPage({
         {/* Stats strip */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-xs text-muted-foreground">In your books</p>
             <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight">
-              {formatMoney(totalAmount)}
+              {formatMoney(booked.amount, booked.currency)}
             </p>
+            <p className="text-[11px] text-muted-foreground">posted claims only</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-blue-500" />
-              Pending
+              Not yet approved
             </p>
             <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-blue-600 dark:text-blue-400">
-              {formatMoney(pendingAmount)}
+              {moneyList(unapproved)}
             </p>
+            <p className="text-[11px] text-muted-foreground">drafts and submitted</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -353,8 +370,9 @@ export default function ExpensesPage({
               Approved
             </p>
             <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
-              {formatMoney(approvedAmount)}
+              {moneyList(approved)}
             </p>
+            <p className="text-[11px] text-muted-foreground">approved, not yet booked</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Claims</p>

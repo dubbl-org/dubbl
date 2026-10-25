@@ -46,6 +46,8 @@ export interface Entry {
   status: "draft" | "posted" | "void";
   totalDebit: string;
   createdAt: string;
+  reversesEntryId: string | null;
+  reversedByEntryId: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -62,7 +64,7 @@ const statusLabels: Record<string, string> = {
   void: "cancelled",
 };
 
-const columns: Column<Entry>[] = [
+const makeColumns = (currency: string): Column<Entry>[] => [
   {
     key: "number",
     header: "#",
@@ -107,13 +109,19 @@ const columns: Column<Entry>[] = [
     className: "w-28 text-right",
     render: (r) => (
       <span className="font-mono text-sm tabular-nums">
-        {formatMoney(Math.round(parseFloat(r.totalDebit) * 100))}
+        {formatMoney(Math.round(parseFloat(r.totalDebit) * 100), currency)}
       </span>
     ),
   },
 ];
 
-export default function TransactionsPage({ initialEntries }: { initialEntries: Entry[] }) {
+export default function TransactionsPage({
+  initialEntries,
+  currency,
+}: {
+  initialEntries: Entry[];
+  currency: string;
+}) {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const [entries, setEntries] = useServerSeeded(initialEntries, initialEntries);
@@ -150,10 +158,13 @@ export default function TransactionsPage({ initialEntries }: { initialEntries: E
   const posted = entries.filter((e) => e.status === "posted");
   const drafts = entries.filter((e) => e.status === "draft");
   const voids = entries.filter((e) => e.status === "void");
-  const totalPosted = posted.reduce(
+  // A reversal and the entry it reverses cancel out, so neither is "in the books".
+  const live = posted.filter((e) => !e.reversesEntryId && !e.reversedByEntryId);
+  const totalPosted = live.reduce(
     (sum, e) => sum + Math.round(parseFloat(e.totalDebit) * 100),
     0
   );
+  const columns = useMemo(() => makeColumns(currency), [currency]);
 
   const filtered = useMemo(() => {
     let result = entries;
@@ -340,8 +351,11 @@ export default function TransactionsPage({ initialEntries }: { initialEntries: E
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
               Total in your books
             </p>
-            <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
-              {formatMoney(totalPosted)}
+            <p
+              className="mt-1 font-mono text-lg font-semibold tabular-nums"
+              title={`Debits of posted entries in ${currency}. A reversal and the entry it reverses are left out.`}
+            >
+              {formatMoney(totalPosted, currency)}
             </p>
           </div>
 
