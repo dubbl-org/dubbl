@@ -2,6 +2,8 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { expenseClaim, journalEntry, journalLine, organization } from "@/lib/db/schema";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { convertAmount } from "@/lib/currency/converter";
+import { getRateStatus } from "@/lib/currency/rate-status";
 
 /**
  * Server-side first page of expense claims, mirroring GET /api/v1/expenses with
@@ -32,7 +34,12 @@ export async function listExpenseClaims(organizationId: string, limit = 50) {
 export interface ExpenseStatusCount {
   count: number;
   /** Native claim amounts, per currency. Never added together. */
-  amounts: { currency: string; amount: number }[];
+  amounts: {
+    currency: string;
+    amount: number;
+    /** Estimate in the books' currency at today's rate; null when no rate exists. */
+    baseAmount: number | null;
+  }[];
 }
 
 export interface ExpenseCounts {
@@ -103,18 +110,37 @@ export async function expenseStatusCounts(
   for (const row of rows) {
     const entry = (counts[row.status] ??= { count: 0, amounts: [] });
     entry.count += row.count;
-    entry.amounts.push({ currency: row.currency, amount: row.amount });
+    entry.amounts.push({ currency: row.currency, amount: row.amount, baseAmount: null });
     total += row.count;
   }
+  // A memo has no booked rate, so the header's estimate uses today's. One
+  // lookup per currency, and a missing rate stays null instead of guessing.
+  const baseCurrency = org?.defaultCurrency ?? "USD";
+  const today = new Date().toISOString().slice(0, 10);
+  const rates = new Map<string, number | null>();
   for (const entry of Object.values(counts)) {
     entry.amounts.sort((a, b) => a.currency.localeCompare(b.currency));
+    for (const a of entry.amounts) {
+      if (a.currency === baseCurrency) {
+        a.baseAmount = a.amount;
+        continue;
+      }
+      if (!rates.has(a.currency)) {
+        rates.set(
+          a.currency,
+          (await getRateStatus(organizationId, a.currency, baseCurrency, today)).rate
+        );
+      }
+      const rate = rates.get(a.currency) ?? null;
+      a.baseAmount = rate == null ? null : convertAmount(a.amount, rate);
+    }
   }
 
   return {
     counts,
     total,
     booked: {
-      currency: org?.defaultCurrency ?? "USD",
+      currency: baseCurrency,
       amount: bookedRow?.amount ?? 0,
     },
   };

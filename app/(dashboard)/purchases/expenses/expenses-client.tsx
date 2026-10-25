@@ -222,26 +222,43 @@ export default function ExpensesPage({
     return c;
   }, [countsData]);
 
-  // A claim is a memo amount until it posts, so each currency keeps its own
-  // figure. Only the booked total is one real currency: the base currency.
+  // A claim is a memo until it posts, so it has no booked rate. The header
+  // shows it in the books' currency at today's rate, and keeps a currency
+  // that has no rate at all at its own figure rather than inventing one.
   const moneyList = (amounts: { currency: string; amount: number }[]) =>
-    amounts.length
-      ? amounts.map((a) => formatMoney(a.amount, a.currency)).join(" \u00B7 ")
-      : formatMoney(0, booked.currency);
-  const sumByCurrency = (statuses: string[]) => {
-    const byCurrency = new Map<string, number>();
+    amounts.map((a) => formatMoney(a.amount, a.currency)).join(" \u00B7 ");
+  const memoTotal = (statuses: string[]) => {
+    let amount = 0;
+    let converted = false;
+    const missing: { currency: string; amount: number }[] = [];
     for (const status of statuses) {
       for (const a of countsData?.counts[status]?.amounts ?? []) {
-        byCurrency.set(a.currency, (byCurrency.get(a.currency) ?? 0) + a.amount);
+        if (a.baseAmount == null) {
+          missing.push({ currency: a.currency, amount: a.amount });
+        } else {
+          amount += a.baseAmount;
+          converted ||= a.currency !== booked.currency;
+        }
       }
     }
-    return [...byCurrency]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([currency, amount]) => ({ currency, amount }));
+    return { amount, converted, missing };
   };
+  const memoLabel = (statuses: string[]) => {
+    const { amount, converted, missing } = memoTotal(statuses);
+    const parts: string[] = [];
+    if (amount || !missing.length) {
+      parts.push(`${converted ? "\u2248 " : ""}${formatMoney(amount, booked.currency)}`);
+    }
+    if (missing.length) parts.push(moneyList(missing));
+    return parts.join(" + ") || formatMoney(0, booked.currency);
+  };
+  const memoNote = (statuses: string[], extra: string) =>
+    memoTotal(statuses).missing.length
+      ? `${extra} \u00B7 no rate yet, shown as claimed`
+      : `${extra} \u00B7 at today's rate`;
   const booked = countsData?.booked ?? { currency: "USD", amount: 0 };
-  const unapproved = sumByCurrency(["draft", "submitted"]);
-  const approved = sumByCurrency(["approved"]);
+  const unapproved = ["draft", "submitted"];
+  const approved = ["approved"];
 
   if (loading) return <ListSkeleton />;
 
@@ -360,9 +377,11 @@ export default function ExpensesPage({
               Not yet approved
             </p>
             <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-blue-600 dark:text-blue-400">
-              {moneyList(unapproved)}
+              {memoLabel(unapproved)}
             </p>
-            <p className="text-[11px] text-muted-foreground">drafts and submitted</p>
+            <p className="text-[11px] text-muted-foreground">
+              {memoNote(unapproved, "drafts and submitted")}
+            </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -370,9 +389,11 @@ export default function ExpensesPage({
               Approved
             </p>
             <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
-              {moneyList(approved)}
+              {memoLabel(approved)}
             </p>
-            <p className="text-[11px] text-muted-foreground">approved, not yet booked</p>
+            <p className="text-[11px] text-muted-foreground">
+              {memoNote(approved, "approved, not yet booked")}
+            </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Claims</p>
