@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+       *************** Element declaration : 2026-01-01*************
+                      
+       *************** Financial Statements Highlights *************
+ 		*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+
+ -->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-fsh" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sg-fsh="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-fsh" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:nonnum="http://www.xbrl.org/dtr/type/non-numeric" xmlns:sg-parts="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" xmlns:sg-types="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../labels/sg-fsh_2026-01-01_lab.xml" xlink:title="Label Linkbase" xlink:role="http://www.xbrl.org/2003/role/labelLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/non-numeric" schemaLocation="http://www.xbrl.org/dtr/type/nonNumeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/numeric" schemaLocation="http://www.xbrl.org/dtr/type/numeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" schemaLocation="sg-types_2026-01-01.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/2006/ref" schemaLocation="http://www.xbrl.org/2006/ref-2006-02-27.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" schemaLocation="sg-parts_2026-01-01.xsd"/>
+  <xsd:element name="NatureOfCompanyFilingFinancialStatementsHighlights" id="sg-fsh_NatureOfCompanyFilingFinancialStatementsHighlights" type="sg-types:NatureOfCompanyFilingFinancialHighlightsItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="StatementOfFinancialPositionAbstract" id="sg-fsh_StatementOfFinancialPositionAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="IncomeStatementAbstract" id="sg-fsh_IncomeStatementAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="FinancialStatementsHighlightsAbstract" id="sg-fsh_FinancialStatementsHighlightsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DisclosuresInStatementByDirectorsAbstract" id="sg-fsh_DisclosuresInStatementByDirectorsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DisclosuresInIndependentAuditorsReportAbstract" id="sg-fsh_DisclosuresInIndependentAuditorsReportAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DisclosuresInStatementByDirectorsAndIndependentAuditorsReportAbstract" id="sg-fsh_DisclosuresInStatementByDirectorsAndIndependentAuditorsReportAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="RevenueFromInterestNet" id="sg-fsh_RevenueFromInterestNet" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  <xsd:element name="InterestExpenditure" id="sg-fsh_InterestExpenditure" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="RevenueFromInsurancePremium" id="sg-fsh_RevenueFromInsurancePremium" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  <xsd:element name="ReinsurersShareGrossWrittenPremiumIncome" id="sg-fsh_ReinsurersShareGrossWrittenPremiumIncome" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="GeneralAllowanceForDebts" id="sg-fsh_GeneralAllowanceForDebts" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="instant"/>
+  <xsd:element name="SpecificAllowanceForDebts" id="sg-fsh_SpecificAllowanceForDebts" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="instant"/>
+  <xsd:element name="CollateralsForDebts" id="sg-fsh_CollateralsForDebts" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CommitmentsAgainstDebts" id="sg-fsh_CommitmentsAgainstDebts" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="RevenueFromInsurancePremiumNet" id="sg-fsh_RevenueFromInsurancePremiumNet" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  <xsd:element name="InsuranceUnderwritingProfit" id="sg-fsh_InsuranceUnderwritingProfit" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  <xsd:element name="AdditionalFinancialStatementsHighlightsAbstract" id="sg-fsh_AdditionalFinancialStatementsHighlightsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="CreditQualityOfDebtsAbstract" id="sg-fsh_CreditQualityOfDebtsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="CreditFacilitiesCategorisedAsPass" id="sg-fsh_CreditFacilitiesCategorisedAsPass" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CreditFacilitiesCategorisedAsSpecialMention" id="sg-fsh_CreditFacilitiesCategorisedAsSpecialMention" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CreditFacilitiesCategorisedAsSubstandard" id="sg-fsh_CreditFacilitiesCategorisedAsSubstandard" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CreditFacilitiesCategorisedAsDoubtful" id="sg-fsh_CreditFacilitiesCategorisedAsDoubtful" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CreditFacilitiesCategorisedAsLoss" id="sg-fsh_CreditFacilitiesCategorisedAsLoss" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CreditFacilities" id="sg-fsh_CreditFacilities" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  
+  <xsd:element name="InsuranceRevenue" id="sg-fsh_InsuranceRevenue" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  <xsd:element name="InsuranceServiceExpensesFromInsuranceContractsIssued" id="sg-fsh_InsuranceServiceExpensesFromInsuranceContractsIssued" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="IncomeExpensesFromReinsuranceContractsHeldOtherThanFinanceIncomeExpenses" id="sg-fsh_IncomeExpensesFromReinsuranceContractsHeldOtherThanFinanceIncomeExpenses" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  <xsd:element name="InsuranceServiceResult" id="sg-fsh_InsuranceServiceResult" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="credit" xbrli:periodType="duration"/>
+  
+</xsd:schema>

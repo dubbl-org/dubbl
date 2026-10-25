@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+       *************** Typed Domain Constraints : 2026-01-01*************
+      
+	  *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+                
+ -->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ty-dim" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sg-ty-dim="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ty-dim" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xbrldt="http://xbrl.org/2005/xbrldt" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+  <xsd:import namespace="http://xbrl.org/2005/xbrldt" schemaLocation="http://www.xbrl.org/2005/xbrldt-2005.xsd"/>
+  <xsd:element name="ProductsAndServicesDomain" id="sg-ty-dim_ProductsAndServicesDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="GeographicalAreasDomain" id="sg-ty-dim_GeographicalAreasDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="MajorCustomersDomain" id="sg-ty-dim_MajorCustomersDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="SubsidiaryDomain" id="sg-ty-dim_SubsidiaryDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="JointVentureDomain" id="sg-ty-dim_JointVentureDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="AssociateDomain" id="sg-ty-dim_AssociateDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="JointOperationDomain" id="sg-ty-dim_JointOperationDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="DefaultFinancialStatementsDateDomain" id="sg-ty-dim_DefaultFinancialStatementsDateDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:date"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="RangesOfExercisePricesDomain" id="sg-ty-dim_RangesOfExercisePricesDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+    <xsd:element name="DateOfGrantDomain" id="sg-ty-dim_DateOfGrantDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:date"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="DateOfExerciseDomain" id="sg-ty-dim_DateOfExerciseDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:date"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="DerivativeInstrumentsDomain" id="sg-ty-dim_DerivativeInstrumentsDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="OperatingSegmentsDomain" id="sg-ty-dim_OperatingSegmentsDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="StartDateOfExerciseDomain" id="sg-ty-dim_StartDateOfExerciseDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:date"/>
+    </xsd:simpleType>
+  </xsd:element>
+  <xsd:element name="EndDateOfExerciseDomain" id="sg-ty-dim_EndDateOfExerciseDomain" nillable="true">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:date"/>
+    </xsd:simpleType>
+  </xsd:element>
+</xsd:schema>

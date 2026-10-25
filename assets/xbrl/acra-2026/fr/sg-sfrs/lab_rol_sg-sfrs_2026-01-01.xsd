@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--                     
+            *************** Extended links : 2026-01-01*************
+
+            *************** Entities following SFRS *************
+			
+			*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+
+  -->
+<xsd:schema xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:lab_rol_sg-sfrs_2026-01-01="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01" elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01/ReportingLabel" id="ReportingLabel">
+        <link:definition>ACRA Reporting - Standard label</link:definition>
+        <link:usedOn>link:label</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01/ReportingTotalLabel" id="ReportingTotalLabel">
+        <link:definition>ACRA Reporting - Total label</link:definition>
+        <link:usedOn>link:label</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01/ReportingNetLabel" id="ReportingNetLabel">
+        <link:definition>ACRA Reporting - Net label</link:definition>
+        <link:usedOn>link:label</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01/ReportingPeriodStartLabel" id="ReportingPeriodStartLabel">
+        <link:definition>ACRA Reporting - Period start label</link:definition>
+        <link:usedOn>link:label</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/lab_rol_sg-sfrs_2026-01-01/ReportingPeriodEndLabel" id="ReportingPeriodEndLabel">
+        <link:definition>ACRA Reporting - Period end label</link:definition>
+        <link:usedOn>link:label</link:usedOn>
+      </link:roleType>
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd" />
+</xsd:schema>

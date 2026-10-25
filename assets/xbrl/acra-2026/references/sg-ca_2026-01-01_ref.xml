@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--                     
+       *************** References : 2026-01-01*************
+                      
+       *************** Companies Act *************
+	   
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2006/ref http://www.xbrl.org/2006/ref-2006-02-27.xsd http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:ref="http://www.xbrl.org/2006/ref" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <link:roleRef roleURI="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:type="simple" xlink:href="http://www.xbrl.org/lrr/role/reference-2009-12-16.xsd#commonPracticeRef"/>
+  <link:referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_DisclosuresInDirectorsReportTextBlock" xlink:label="DisclosuresInDirectorsReportTextBlock" xlink:title="DisclosuresInDirectorsReportTextBlock"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DisclosuresInDirectorsReportTextBlock" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DisclosuresInDirectorsReportTextBlock" id="reference_DisclosuresInDirectorsReportTextBlock">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>5</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DisclosuresInDirectorsReportTextBlock" xlink:to="reference_DisclosuresInDirectorsReportTextBlock" xlink:title="reference: DisclosuresInDirectorsReportTextBlock to reference_DisclosuresInDirectorsReportTextBlock"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DisclosuresInDirectorsReportTextBlock_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DisclosuresInDirectorsReportTextBlock" id="reference_DisclosuresInDirectorsReportTextBlock_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>6A</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DisclosuresInDirectorsReportTextBlock" xlink:to="reference_DisclosuresInDirectorsReportTextBlock_2" xlink:title="reference: DisclosuresInDirectorsReportTextBlock to reference_DisclosuresInDirectorsReportTextBlock"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_DateOfDirectorsReport" xlink:label="DateOfDirectorsReport" xlink:title="DateOfDirectorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DisclosuresInDirectorsReportTextBlock_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DisclosuresInDirectorsReportTextBlock" id="reference_DisclosuresInDirectorsReportTextBlock_3">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>5</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfDirectorsReport" xlink:to="reference_DisclosuresInDirectorsReportTextBlock_3" xlink:title="reference: DateOfDirectorsReport to reference_DateOfDirectorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DisclosuresInDirectorsReportTextBlock_2_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DisclosuresInDirectorsReportTextBlock" id="reference_DisclosuresInDirectorsReportTextBlock_2_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>6A</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfDirectorsReport" xlink:to="reference_DisclosuresInDirectorsReportTextBlock_2_2" xlink:title="reference: DateOfDirectorsReport to reference_DateOfDirectorsReport"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" xlink:label="WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" xlink:title="WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" id="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>6</ref:Paragraph>
+      <ref:Subparagraph>f</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" xlink:to="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" xlink:title="reference: WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures to reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" id="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>6A</ref:Paragraph>
+      <ref:Subparagraph>g</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" xlink:to="reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures_2" xlink:title="reference: WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures to reference_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_NumberOfOptionsGrantedDuringPeriod" xlink:label="NumberOfOptionsGrantedDuringPeriod" xlink:title="NumberOfOptionsGrantedDuringPeriod"/>
+    <link:reference xlink:type="resource" xlink:label="reference_EndDateOfExercisePeriodOfOptions_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_EndDateOfExercisePeriodOfOptions" id="reference_EndDateOfExercisePeriodOfOptions_3">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>11</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsGrantedDuringPeriod" xlink:to="reference_EndDateOfExercisePeriodOfOptions_3" xlink:title="reference: NumberOfOptionsGrantedDuringPeriod to reference_NumberOfOptionsGrantedDuringPeriod"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfOptionsGrantedDuringPeriod" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfOptionsGrantedDuringPeriod" id="reference_NumberOfOptionsGrantedDuringPeriod">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsGrantedDuringPeriod" xlink:to="reference_NumberOfOptionsGrantedDuringPeriod" xlink:title="reference: NumberOfOptionsGrantedDuringPeriod to reference_NumberOfOptionsGrantedDuringPeriod"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_NumberOfOptionsOutstanding" xlink:label="NumberOfOptionsOutstanding" xlink:title="NumberOfOptionsOutstanding"/>
+    <link:reference xlink:type="resource" xlink:label="reference_EndDateOfExercisePeriodOfOptions_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_EndDateOfExercisePeriodOfOptions" id="reference_EndDateOfExercisePeriodOfOptions_4">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>11</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsOutstanding" xlink:to="reference_EndDateOfExercisePeriodOfOptions_4" xlink:title="reference: NumberOfOptionsOutstanding to reference_NumberOfOptionsOutstanding"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfOptionsGrantedDuringPeriod_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfOptionsGrantedDuringPeriod" id="reference_NumberOfOptionsGrantedDuringPeriod_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsOutstanding" xlink:to="reference_NumberOfOptionsGrantedDuringPeriod_2" xlink:title="reference: NumberOfOptionsOutstanding to reference_NumberOfOptionsOutstanding"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_DetailsOfShareOptionsTable" xlink:label="DetailsOfShareOptionsTable" xlink:title="DetailsOfShareOptionsTable"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DetailsOfShareOptionsTable" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DetailsOfShareOptionsTable" id="reference_DetailsOfShareOptionsTable">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DetailsOfShareOptionsTable" xlink:to="reference_DetailsOfShareOptionsTable" xlink:title="reference: DetailsOfShareOptionsTable to reference_DetailsOfShareOptionsTable"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_DateOfGrantOfOptionAxis" xlink:label="DateOfGrantOfOptionAxis" xlink:title="DateOfGrantOfOptionAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfOptionsGrantedDuringPeriod_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfOptionsGrantedDuringPeriod" id="reference_NumberOfOptionsGrantedDuringPeriod_3">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfGrantOfOptionAxis" xlink:to="reference_NumberOfOptionsGrantedDuringPeriod_3" xlink:title="reference: DateOfGrantOfOptionAxis to reference_DateOfGrantOfOptionAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DateOfGrantOfOptionAxis" xlink:role="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:title="reference_DateOfGrantOfOptionAxis" id="reference_DateOfGrantOfOptionAxis">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>26.18</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfGrantOfOptionAxis" xlink:to="reference_DateOfGrantOfOptionAxis" xlink:title="reference: DateOfGrantOfOptionAxis to reference_DateOfGrantOfOptionAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DateOfGrantOfOptionAxis_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DateOfGrantOfOptionAxis" id="reference_DateOfGrantOfOptionAxis_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>102</ref:Number>
+      <ref:Paragraph>45</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfGrantOfOptionAxis" xlink:to="reference_DateOfGrantOfOptionAxis_2" xlink:title="reference: DateOfGrantOfOptionAxis to reference_DateOfGrantOfOptionAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DateOfGrantOfOptionAxis_3" xlink:role="http://www.xbrl.org/2003/role/exampleRef" xlink:title="reference_DateOfGrantOfOptionAxis" id="reference_DateOfGrantOfOptionAxis_3">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>102</ref:Number>
+      <ref:Paragraph>IG23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfGrantOfOptionAxis" xlink:to="reference_DateOfGrantOfOptionAxis_3" xlink:title="reference: DateOfGrantOfOptionAxis to reference_DateOfGrantOfOptionAxis"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_NumberOfOptionsExercisedDuringPeriod" xlink:label="NumberOfOptionsExercisedDuringPeriod" xlink:title="NumberOfOptionsExercisedDuringPeriod"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfOptionsGrantedDuringPeriod_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfOptionsGrantedDuringPeriod" id="reference_NumberOfOptionsGrantedDuringPeriod_4">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsExercisedDuringPeriod" xlink:to="reference_NumberOfOptionsGrantedDuringPeriod_4" xlink:title="reference: NumberOfOptionsExercisedDuringPeriod to reference_NumberOfOptionsExercisedDuringPeriod"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_NumberOfOptionsCancelledOrLapsedDuringPeriod" xlink:label="NumberOfOptionsCancelledOrLapsedDuringPeriod" xlink:title="NumberOfOptionsCancelledOrLapsedDuringPeriod"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfOptionsGrantedDuringPeriod_5" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfOptionsGrantedDuringPeriod" id="reference_NumberOfOptionsGrantedDuringPeriod_5">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsCancelledOrLapsedDuringPeriod" xlink:to="reference_NumberOfOptionsGrantedDuringPeriod_5" xlink:title="reference: NumberOfOptionsCancelledOrLapsedDuringPeriod to reference_NumberOfOptionsCancelledOrLapsedDuringPeriod"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfOptionsCancelledOrLapsedDuringPeriod" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfOptionsCancelledOrLapsedDuringPeriod" id="reference_NumberOfOptionsCancelledOrLapsedDuringPeriod">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>11</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfOptionsCancelledOrLapsedDuringPeriod" xlink:to="reference_NumberOfOptionsCancelledOrLapsedDuringPeriod" xlink:title="reference: NumberOfOptionsCancelledOrLapsedDuringPeriod to reference_NumberOfOptionsCancelledOrLapsedDuringPeriod"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_ExercisePricePerOption" xlink:label="ExercisePricePerOption" xlink:title="ExercisePricePerOption"/>
+    <link:reference xlink:type="resource" xlink:label="reference_EndDateOfExercisePeriodOfOptions_2_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_EndDateOfExercisePeriodOfOptions" id="reference_EndDateOfExercisePeriodOfOptions_2_3">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ExercisePricePerOption" xlink:to="reference_EndDateOfExercisePeriodOfOptions_2_3" xlink:title="reference: ExercisePricePerOption to reference_ExercisePricePerOption"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" xlink:label="WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" xlink:title="WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" id="reference_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>Twelfth</ref:Section>
+      <ref:Paragraph>1</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" xlink:to="reference_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" xlink:title="reference: WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView to reference_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" xlink:label="WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" xlink:title="WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" id="reference_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>Twelfth</ref:Section>
+      <ref:Paragraph>1</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" xlink:to="reference_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" xlink:title="reference: WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement to reference_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_DateOfStatementByDirectors" xlink:label="DateOfStatementByDirectors" xlink:title="DateOfStatementByDirectors"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DateOfStatementByDirectors" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DateOfStatementByDirectors" id="reference_DateOfStatementByDirectors">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>15</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DateOfStatementByDirectors" xlink:to="reference_DateOfStatementByDirectors" xlink:title="reference: DateOfStatementByDirectors to reference_DateOfStatementByDirectors"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_DisclosuresInStatementByDirectorsTextBlock" xlink:label="DisclosuresInStatementByDirectorsTextBlock" xlink:title="DisclosuresInStatementByDirectorsTextBlock"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DateOfStatementByDirectors_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DateOfStatementByDirectors" id="reference_DateOfStatementByDirectors_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>15</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DisclosuresInStatementByDirectorsTextBlock" xlink:to="reference_DateOfStatementByDirectors_2" xlink:title="reference: DisclosuresInStatementByDirectorsTextBlock to reference_DisclosuresInStatementByDirectorsTextBlock"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_NumberOfDirectorsSigningStatementByDirectors" xlink:label="NumberOfDirectorsSigningStatementByDirectors" xlink:title="NumberOfDirectorsSigningStatementByDirectors"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DateOfStatementByDirectors_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DateOfStatementByDirectors" id="reference_DateOfStatementByDirectors_3">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>15</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfDirectorsSigningStatementByDirectors" xlink:to="reference_DateOfStatementByDirectors_3" xlink:title="reference: NumberOfDirectorsSigningStatementByDirectors to reference_NumberOfDirectorsSigningStatementByDirectors"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" xlink:label="WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" xlink:title="WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" id="reference_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>207</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" xlink:to="reference_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" xlink:title="reference: WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct to reference_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:label="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:title="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>6</ref:Paragraph>
+      <ref:Subparagraph>g</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:to="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:title="reference: WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations to reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>6A</ref:Paragraph>
+      <ref:Subparagraph>h</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:to="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_2" xlink:title="reference: WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations to reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_3">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>7</ref:Section>
+      <ref:Paragraph>4</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:to="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_3" xlink:title="reference: WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations to reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_4">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>7</ref:Section>
+      <ref:Paragraph>4A</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:to="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_4" xlink:title="reference: WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations to reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_5" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_5">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>7</ref:Section>
+      <ref:Paragraph>5</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:to="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_5" xlink:title="reference: WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations to reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_6" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_6">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>7</ref:Section>
+      <ref:Paragraph>6</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" xlink:to="reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations_6" xlink:title="reference: WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations to reference_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_WhetherThereIsAnyTrueAndFairOverrideInFinancialStatements" xlink:label="WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements" xlink:title="WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements" id="reference_WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>14B</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements" xlink:to="reference_WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements" xlink:title="reference: WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements to reference_WhetherThereIsAnyTrueAndFairOverrideInTheFinancialStatements"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_StartDateOfExerciseOfOptionAxis" xlink:label="StartDateOfExerciseOfOptionAxis" xlink:title="StartDateOfExerciseOfOptionAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_StartDateOfExerciseOfOptionAxis" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_StartDateOfExerciseOfOptionAxis" id="reference_StartDateOfExerciseOfOptionAxis">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="StartDateOfExerciseOfOptionAxis" xlink:to="reference_StartDateOfExerciseOfOptionAxis" xlink:title="reference: StartDateOfExerciseOfOptionAxis to reference_StartDateOfExerciseOfOptionAxis"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ca-cor_2026-01-01.xsd#sg-ca_EndDateOfExerciseOfOptionsAxis" xlink:label="EndDateOfExerciseOfOptionsAxis" xlink:title="EndDateOfExerciseOfOptionsAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_EndDateOfExerciseOfOptionsAxis" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_EndDateOfExerciseOfOptionsAxis" id="reference_EndDateOfExerciseOfOptionsAxis">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>12</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="EndDateOfExerciseOfOptionsAxis" xlink:to="reference_EndDateOfExerciseOfOptionsAxis" xlink:title="reference: EndDateOfExerciseOfOptionsAxis to reference_EndDateOfExerciseOfOptionsAxis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_EndDateOfExerciseOfOptionsAxis_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_EndDateOfExerciseOfOptionsAxis" id="reference_EndDateOfExerciseOfOptionsAxis_2">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>11</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="EndDateOfExerciseOfOptionsAxis" xlink:to="reference_EndDateOfExerciseOfOptionsAxis_2" xlink:title="reference: EndDateOfExerciseOfOptionsAxis to reference_EndDateOfExerciseOfOptionsAxis"/>
+	
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_NumberOfEmployeesOfCompany" xlink:label="NumberOfEmployeesOfCompany" xlink:title="NumberOfEmployeesOfCompany"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfEmployeesOfCompany" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfEmployeesOfCompany" id="reference_NumberOfEmployeesOfCompany">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>205C</ref:Section>
+      <ref:Paragraph>1</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfEmployeesOfCompany" xlink:to="reference_NumberOfEmployeesOfCompany" xlink:title="reference: NumberOfEmployeesOfCompany to reference_NumberOfEmployeesOfCompany"/>
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_NumberOfEmployeesOfGroup" xlink:label="NumberOfEmployeesOfGroup" xlink:title="NumberOfEmployeesOfGroup"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NumberOfEmployeesOfGroup" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NumberOfEmployeesOfGroup" id="reference_NumberOfEmployeesOfGroup">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>205C</ref:Section>
+      <ref:Paragraph>1</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NumberOfEmployeesOfGroup" xlink:to="reference_NumberOfEmployeesOfGroup" xlink:title="reference: NumberOfEmployeesOfGroup to reference_NumberOfEmployeesOfGroup"/>
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_WhetherCompanyIsSubsidiary" xlink:label="WhetherCompanyIsSubsidiary" xlink:title="WhetherCompanyIsSubsidiary"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherCompanyIsSubsidiary" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherCompanyIsSubsidiary" id="reference_WhetherCompanyIsSubsidiary">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherCompanyIsSubsidiary" xlink:to="reference_WhetherCompanyIsSubsidiary" xlink:title="reference: WhetherCompanyIsSubsidiary to reference_WhetherCompanyIsSubsidiary"/>
+	<link:reference xlink:type="resource" xlink:label="reference_WhetherCompanyIsSubsidiary_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherCompanyIsSubsidiary" id="reference_WhetherCompanyIsSubsidiary_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>24</ref:Number>
+      <ref:Paragraph>13</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherCompanyIsSubsidiary" xlink:to="reference_WhetherCompanyIsSubsidiary_2" xlink:title="reference: WhetherCompanyIsSubsidiary to reference_WhetherCompanyIsSubsidiary"/>
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" xlink:label="UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" xlink:title="UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements"/>
+    <link:reference xlink:type="resource" xlink:label="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" id="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" xlink:to="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" xlink:title="reference: UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements to reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements"/>
+	
+    <link:reference xlink:type="resource" xlink:label="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" id="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>24</ref:Number>
+      <ref:Paragraph>13</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements" xlink:to="reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements_2" xlink:title="reference: UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements to reference_UniqueEntityNumberOfSingaporeParentCompanyPreparingConsolidatedFinancialStatements"/>
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" xlink:label="WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" xlink:title="WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" id="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" xlink:to="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" xlink:title="reference: WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA to reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA"/>
+	
+	
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" id="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>24</ref:Number>
+      <ref:Paragraph>13</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA" xlink:to="reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA_2" xlink:title="reference: WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA to reference_WhetherEntityIsSingaporeIncorporatedParentPreparingAndFilingSetOfConsolidatedFinancialStatementsWithACRA"/>
+	
+	
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_WhetherEntityHasAnySingaporeIncorporatedParentCompany" xlink:label="WhetherEntityHasAnySingaporeIncorporatedParentCompany" xlink:title="WhetherEntityHasAnySingaporeIncorporatedParentCompany"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany" id="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherEntityHasAnySingaporeIncorporatedParentCompany" xlink:to="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany" xlink:title="reference: WhetherEntityHasAnySingaporeIncorporatedParentCompany to reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany"/>
+	
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany" id="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>24</ref:Number>
+      <ref:Paragraph>13</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherEntityHasAnySingaporeIncorporatedParentCompany" xlink:to="reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany_2" xlink:title="reference: WhetherEntityHasAnySingaporeIncorporatedParentCompany to reference_WhetherEntityHasAnySingaporeIncorporatedParentCompany"/>
+	
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" xlink:label="WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" xlink:title="WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" id="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" xlink:to="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" xlink:title="reference: WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture to reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture"/>
+	
+	<link:reference xlink:type="resource" xlink:label="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" id="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>27</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture" xlink:to="reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture_2" xlink:title="reference: WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture to reference_WhetherCompanyHasAnySubsidiaryAssociateOrJointVenture"/>
+	
+	<link:loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" xlink:label="WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" xlink:title="WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" id="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Section>201</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" xlink:to="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" xlink:title="reference: WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound to reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound"/>
+	
+	<link:reference xlink:type="resource" xlink:label="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" id="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>27</ref:Number>
+      <ref:Paragraph>16</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound" xlink:to="reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound_2" xlink:title="reference: WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound to reference_WhetherEntityIsForeignIncorporatedCompanyPreparingAndFilingSetOfConsolidatedFinancialStatementsIndicateWebsiteOrAvenueWhereConsolidatedFinancialStatementsCanBeFound"/>
+	
+  </link:referenceLink>
+</link:linkbase>

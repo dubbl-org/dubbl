@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+            *************** Entry-point : 2026-01-01*************
+          
+            *************** Entities following SFRS *************
+			
+			*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+					     
+      
+-->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ee/sg-ee-sfrs" attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sg-ee-sfrs="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ee/sg-ee-sfrs" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:nonnum="http://www.xbrl.org/dtr/type/non-numeric" xmlns:xbrldt="http://xbrl.org/2005/xbrldt" xmlns:enum="http://xbrl.org/2014/extensible-enumerations" xmlns:sg-as="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-as" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:linkbaseRef xlink:type="simple" xlink:href="def_sg-ee-sfrs_2026-01-01.xml" xlink:role="http://www.xbrl.org/2003/role/definitionLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+      <link:linkbaseRef xlink:type="simple" xlink:href="lab_sg-ee-sfrs_2026-01-01.xml" xlink:role="http://www.xbrl.org/2003/role/labelLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ee/sg-ee-sfrs/sg-ee-sfrs_2026-01-01/sg-ee-sfrs_2026-01-01_role-0a" id="sg-ee-sfrs_2026-01-01_role-0a">
+        <link:definition>Enumeration - Nature of financial statements</link:definition>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://xbrl.org/2014/extensible-enumerations" schemaLocation="http://www.xbrl.org/2014/extensible-enumerations.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-as" schemaLocation="../../sg-as-cor_2026-01-01.xsd"/>
+  <xsd:import namespace="http://xbrl.org/2005/xbrldt" schemaLocation="http://www.xbrl.org/2005/xbrldt-2005.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/non-numeric" schemaLocation="http://www.xbrl.org/dtr/type/nonNumeric-2009-12-16.xsd"/>
+  <xsd:element name="NatureOfFinancialStatements" id="sg-ee-sfrs_NatureOfFinancialStatements" type="enum:enumerationItemType" enum:linkrole="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ee/sg-ee-sfrs/sg-ee-sfrs_2026-01-01/sg-ee-sfrs_2026-01-01_role-0a" substitutionGroup="xbrli:item" enum:headUsable="true" enum:domain="sg-as:ConsolidatedMember" nillable="true" xbrli:periodType="duration"/>
+</xsd:schema>

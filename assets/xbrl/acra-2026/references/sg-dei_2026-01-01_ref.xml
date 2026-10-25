@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--                     
+       *************** References : 2026-01-01*************
+                      
+       *************** Document and entity information *************
+	   
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2006/ref http://www.xbrl.org/2006/ref-2006-02-27.xsd http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:ref="http://www.xbrl.org/2006/ref" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <link:roleRef roleURI="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:type="simple" xlink:href="http://www.xbrl.org/lrr/role/reference-2009-12-16.xsd#commonPracticeRef"/>
+  <link:referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_WhetherThereAreRestatementsToComparativeAmounts" xlink:label="WhetherThereAreRestatementsToComparativeAmounts" xlink:title="WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreRestatementsToComparativeAmounts" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreRestatementsToComparativeAmounts" id="reference_WhetherThereAreRestatementsToComparativeAmounts">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+      <ref:Subparagraph>f</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreRestatementsToComparativeAmounts" xlink:to="reference_WhetherThereAreRestatementsToComparativeAmounts" xlink:title="reference: WhetherThereAreRestatementsToComparativeAmounts to reference_WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreRestatementsToComparativeAmounts_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreRestatementsToComparativeAmounts" id="reference_WhetherThereAreRestatementsToComparativeAmounts_4">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>10.13</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreRestatementsToComparativeAmounts" xlink:to="reference_WhetherThereAreRestatementsToComparativeAmounts_4" xlink:title="reference: WhetherThereAreRestatementsToComparativeAmounts to reference_WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreRestatementsToComparativeAmounts_5" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreRestatementsToComparativeAmounts" id="reference_WhetherThereAreRestatementsToComparativeAmounts_5">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>10.14</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreRestatementsToComparativeAmounts" xlink:to="reference_WhetherThereAreRestatementsToComparativeAmounts_5" xlink:title="reference: WhetherThereAreRestatementsToComparativeAmounts to reference_WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreRestatementsToComparativeAmounts_6" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreRestatementsToComparativeAmounts" id="reference_WhetherThereAreRestatementsToComparativeAmounts_6">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>10.23</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreRestatementsToComparativeAmounts" xlink:to="reference_WhetherThereAreRestatementsToComparativeAmounts_6" xlink:title="reference: WhetherThereAreRestatementsToComparativeAmounts to reference_WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreRestatementsToComparativeAmounts_7" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreRestatementsToComparativeAmounts" id="reference_WhetherThereAreRestatementsToComparativeAmounts_7">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>10.23</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreRestatementsToComparativeAmounts" xlink:to="reference_WhetherThereAreRestatementsToComparativeAmounts_7" xlink:title="reference: WhetherThereAreRestatementsToComparativeAmounts to reference_WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreRestatementsToComparativeAmounts_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreRestatementsToComparativeAmounts" id="reference_WhetherThereAreRestatementsToComparativeAmounts_3">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>6.3</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreRestatementsToComparativeAmounts" xlink:to="reference_WhetherThereAreRestatementsToComparativeAmounts_3" xlink:title="reference: WhetherThereAreRestatementsToComparativeAmounts to reference_WhetherThereAreRestatementsToComparativeAmounts"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_WhetherThereAreReclassificationsToComparativeAmounts" xlink:label="WhetherThereAreReclassificationsToComparativeAmounts" xlink:title="WhetherThereAreReclassificationsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreReclassificationsToComparativeAmounts" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreReclassificationsToComparativeAmounts" id="reference_WhetherThereAreReclassificationsToComparativeAmounts">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>41</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreReclassificationsToComparativeAmounts" xlink:to="reference_WhetherThereAreReclassificationsToComparativeAmounts" xlink:title="reference: WhetherThereAreReclassificationsToComparativeAmounts to reference_WhetherThereAreReclassificationsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreReclassificationsToComparativeAmounts_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreReclassificationsToComparativeAmounts" id="reference_WhetherThereAreReclassificationsToComparativeAmounts_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>42</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreReclassificationsToComparativeAmounts" xlink:to="reference_WhetherThereAreReclassificationsToComparativeAmounts_2" xlink:title="reference: WhetherThereAreReclassificationsToComparativeAmounts to reference_WhetherThereAreReclassificationsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreReclassificationsToComparativeAmounts_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreReclassificationsToComparativeAmounts" id="reference_WhetherThereAreReclassificationsToComparativeAmounts_3">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.12</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreReclassificationsToComparativeAmounts" xlink:to="reference_WhetherThereAreReclassificationsToComparativeAmounts_3" xlink:title="reference: WhetherThereAreReclassificationsToComparativeAmounts to reference_WhetherThereAreReclassificationsToComparativeAmounts"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreReclassificationsToComparativeAmounts_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreReclassificationsToComparativeAmounts" id="reference_WhetherThereAreReclassificationsToComparativeAmounts_4">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.13</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreReclassificationsToComparativeAmounts" xlink:to="reference_WhetherThereAreReclassificationsToComparativeAmounts_4" xlink:title="reference: WhetherThereAreReclassificationsToComparativeAmounts to reference_WhetherThereAreReclassificationsToComparativeAmounts"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_NameOfCompany" xlink:label="NameOfCompany" xlink:title="NameOfCompany"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NameOfCompany" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NameOfCompany" id="reference_NameOfCompany">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NameOfCompany" xlink:to="reference_NameOfCompany" xlink:title="reference: NameOfCompany to reference_NameOfCompany"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NameOfCompany_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NameOfCompany" id="reference_NameOfCompany_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NameOfCompany" xlink:to="reference_NameOfCompany_2" xlink:title="reference: NameOfCompany to reference_NameOfCompany"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_UniqueEntityNumber" xlink:label="UniqueEntityNumber" xlink:title="UniqueEntityNumber"/>
+    <link:reference xlink:type="resource" xlink:label="reference_UniqueEntityNumber" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_UniqueEntityNumber" id="reference_UniqueEntityNumber">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="UniqueEntityNumber" xlink:to="reference_UniqueEntityNumber" xlink:title="reference: UniqueEntityNumber to reference_UniqueEntityNumber"/>
+    <link:reference xlink:type="resource" xlink:label="reference_UniqueEntityNumber_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_UniqueEntityNumber" id="reference_UniqueEntityNumber_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="UniqueEntityNumber" xlink:to="reference_UniqueEntityNumber_2" xlink:title="reference: UniqueEntityNumber to reference_UniqueEntityNumber"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_CurrentPeriodStartDate" xlink:label="CurrentPeriodStartDate" xlink:title="CurrentPeriodStartDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_CurrentPeriodStartDate" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CurrentPeriodStartDate" id="reference_CurrentPeriodStartDate">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CurrentPeriodStartDate" xlink:to="reference_CurrentPeriodStartDate" xlink:title="reference: CurrentPeriodStartDate to reference_CurrentPeriodStartDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_CurrentPeriodStartDate_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CurrentPeriodStartDate" id="reference_CurrentPeriodStartDate_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CurrentPeriodStartDate" xlink:to="reference_CurrentPeriodStartDate_2" xlink:title="reference: CurrentPeriodStartDate to reference_CurrentPeriodStartDate"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_CurrentPeriodEndDate" xlink:label="CurrentPeriodEndDate" xlink:title="CurrentPeriodEndDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_CurrentPeriodEndDate" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CurrentPeriodEndDate" id="reference_CurrentPeriodEndDate">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CurrentPeriodEndDate" xlink:to="reference_CurrentPeriodEndDate" xlink:title="reference: CurrentPeriodEndDate to reference_CurrentPeriodEndDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_CurrentPeriodEndDate_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CurrentPeriodEndDate" id="reference_CurrentPeriodEndDate_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CurrentPeriodEndDate" xlink:to="reference_CurrentPeriodEndDate_2" xlink:title="reference: CurrentPeriodEndDate to reference_CurrentPeriodEndDate"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_PriorPeriodStartDate" xlink:label="PriorPeriodStartDate" xlink:title="PriorPeriodStartDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_PriorPeriodStartDate" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_PriorPeriodStartDate" id="reference_PriorPeriodStartDate">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="PriorPeriodStartDate" xlink:to="reference_PriorPeriodStartDate" xlink:title="reference: PriorPeriodStartDate to reference_PriorPeriodStartDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_PriorPeriodStartDate_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_PriorPeriodStartDate" id="reference_PriorPeriodStartDate_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="PriorPeriodStartDate" xlink:to="reference_PriorPeriodStartDate_2" xlink:title="reference: PriorPeriodStartDate to reference_PriorPeriodStartDate"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_PriorPeriodEndDate" xlink:label="PriorPeriodEndDate" xlink:title="PriorPeriodEndDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_PriorPeriodEndDate" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_PriorPeriodEndDate" id="reference_PriorPeriodEndDate">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="PriorPeriodEndDate" xlink:to="reference_PriorPeriodEndDate" xlink:title="reference: PriorPeriodEndDate to reference_PriorPeriodEndDate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_PriorPeriodEndDate_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_PriorPeriodEndDate" id="reference_PriorPeriodEndDate_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="PriorPeriodEndDate" xlink:to="reference_PriorPeriodEndDate_2" xlink:title="reference: PriorPeriodEndDate to reference_PriorPeriodEndDate"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_DescriptionOfPresentationCurrency" xlink:label="DescriptionOfPresentationCurrency" xlink:title="DescriptionOfPresentationCurrency"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DescriptionOfPresentationCurrency" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DescriptionOfPresentationCurrency" id="reference_DescriptionOfPresentationCurrency">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>d</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DescriptionOfPresentationCurrency" xlink:to="reference_DescriptionOfPresentationCurrency" xlink:title="reference: DescriptionOfPresentationCurrency to reference_DescriptionOfPresentationCurrency"/>
+    <link:reference xlink:type="resource" xlink:label="reference_DescriptionOfPresentationCurrency_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_DescriptionOfPresentationCurrency" id="reference_DescriptionOfPresentationCurrency_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>d</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="DescriptionOfPresentationCurrency" xlink:to="reference_DescriptionOfPresentationCurrency_2" xlink:title="reference: DescriptionOfPresentationCurrency to reference_DescriptionOfPresentationCurrency"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_LevelOfRoundingUsedInFinancialStatements" xlink:label="LevelOfRoundingUsedInFinancialStatements" xlink:title="LevelOfRoundingUsedInFinancialStatements"/>
+    <link:reference xlink:type="resource" xlink:label="reference_LevelOfRoundingUsedInFinancialStatements" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_LevelOfRoundingUsedInFinancialStatements" id="reference_LevelOfRoundingUsedInFinancialStatements">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>e</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="LevelOfRoundingUsedInFinancialStatements" xlink:to="reference_LevelOfRoundingUsedInFinancialStatements" xlink:title="reference: LevelOfRoundingUsedInFinancialStatements to reference_LevelOfRoundingUsedInFinancialStatements"/>
+    <link:reference xlink:type="resource" xlink:label="reference_LevelOfRoundingUsedInFinancialStatements_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_LevelOfRoundingUsedInFinancialStatements" id="reference_LevelOfRoundingUsedInFinancialStatements_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>e</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="LevelOfRoundingUsedInFinancialStatements" xlink:to="reference_LevelOfRoundingUsedInFinancialStatements_2" xlink:title="reference: LevelOfRoundingUsedInFinancialStatements to reference_LevelOfRoundingUsedInFinancialStatements"/>
+    <link:reference xlink:type="resource" xlink:label="reference_LevelOfRoundingUsedInFinancialStatements_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_LevelOfRoundingUsedInFinancialStatements" id="reference_LevelOfRoundingUsedInFinancialStatements_3">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>53</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="LevelOfRoundingUsedInFinancialStatements" xlink:to="reference_LevelOfRoundingUsedInFinancialStatements_3" xlink:title="reference: LevelOfRoundingUsedInFinancialStatements to reference_LevelOfRoundingUsedInFinancialStatements"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_TypeOfStatementOfFinancialPosition" xlink:label="TypeOfStatementOfFinancialPosition" xlink:title="TypeOfStatementOfFinancialPosition"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfStatementOfFinancialPosition" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfStatementOfFinancialPosition" id="reference_TypeOfStatementOfFinancialPosition">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>60</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfStatementOfFinancialPosition" xlink:to="reference_TypeOfStatementOfFinancialPosition" xlink:title="reference: TypeOfStatementOfFinancialPosition to reference_TypeOfStatementOfFinancialPosition"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfStatementOfFinancialPosition_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfStatementOfFinancialPosition" id="reference_TypeOfStatementOfFinancialPosition_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>4.4</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfStatementOfFinancialPosition" xlink:to="reference_TypeOfStatementOfFinancialPosition_2" xlink:title="reference: TypeOfStatementOfFinancialPosition to reference_TypeOfStatementOfFinancialPosition"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_TypeOfOtherComprehensiveIncome" xlink:label="TypeOfOtherComprehensiveIncome" xlink:title="TypeOfOtherComprehensiveIncome"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfOtherComprehensiveIncome" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfOtherComprehensiveIncome" id="reference_TypeOfOtherComprehensiveIncome">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>91</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfOtherComprehensiveIncome" xlink:to="reference_TypeOfOtherComprehensiveIncome" xlink:title="reference: TypeOfOtherComprehensiveIncome to reference_TypeOfOtherComprehensiveIncome"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfOtherComprehensiveIncome_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfOtherComprehensiveIncome" id="reference_TypeOfOtherComprehensiveIncome_3">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>91</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfOtherComprehensiveIncome" xlink:to="reference_TypeOfOtherComprehensiveIncome_3" xlink:title="reference: TypeOfOtherComprehensiveIncome to reference_TypeOfOtherComprehensiveIncome"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfOtherComprehensiveIncome_2" xlink:role="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:title="reference_TypeOfOtherComprehensiveIncome" id="reference_TypeOfOtherComprehensiveIncome_2">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>5.5</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfOtherComprehensiveIncome" xlink:to="reference_TypeOfOtherComprehensiveIncome_2" xlink:title="reference: TypeOfOtherComprehensiveIncome to reference_TypeOfOtherComprehensiveIncome"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_TypeOfIncomeStatement" xlink:label="TypeOfIncomeStatement" xlink:title="TypeOfIncomeStatement"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfIncomeStatement" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfIncomeStatement" id="reference_TypeOfIncomeStatement">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>99</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfIncomeStatement" xlink:to="reference_TypeOfIncomeStatement" xlink:title="reference: TypeOfIncomeStatement to reference_TypeOfIncomeStatement"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfIncomeStatement_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfIncomeStatement" id="reference_TypeOfIncomeStatement_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>5.11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfIncomeStatement" xlink:to="reference_TypeOfIncomeStatement_2" xlink:title="reference: TypeOfIncomeStatement to reference_TypeOfIncomeStatement"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_TypeOfStatementOfCashFlows" xlink:label="TypeOfStatementOfCashFlows" xlink:title="TypeOfStatementOfCashFlows"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfStatementOfCashFlows" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfStatementOfCashFlows" id="reference_TypeOfStatementOfCashFlows">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>7</ref:Number>
+      <ref:Paragraph>18</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfStatementOfCashFlows" xlink:to="reference_TypeOfStatementOfCashFlows" xlink:title="reference: TypeOfStatementOfCashFlows to reference_TypeOfStatementOfCashFlows"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfStatementOfCashFlows_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfStatementOfCashFlows" id="reference_TypeOfStatementOfCashFlows_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>7.7</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfStatementOfCashFlows" xlink:to="reference_TypeOfStatementOfCashFlows_2" xlink:title="reference: TypeOfStatementOfCashFlows to reference_TypeOfStatementOfCashFlows"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_NatureOfFinancialStatementsCompanyLevelOrConsolidated" xlink:label="NatureOfFinancialStatementsCompanyLevelOrConsolidated" xlink:title="NatureOfFinancialStatementsCompanyLevelOrConsolidated"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated" id="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated_4">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>51</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NatureOfFinancialStatementsCompanyLevelOrConsolidated" xlink:to="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated_4" xlink:title="reference: NatureOfFinancialStatementsCompanyLevelOrConsolidated to reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated" id="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.23</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NatureOfFinancialStatementsCompanyLevelOrConsolidated" xlink:to="reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated_2" xlink:title="reference: NatureOfFinancialStatementsCompanyLevelOrConsolidated to reference_NatureOfFinancialStatementsCompanyLevelOrConsolidated"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_WhetherStatementOfIncomeAndRetainedEarningsUsed" xlink:label="WhetherStatementOfIncomeAndRetainedEarningsUsed" xlink:title="WhetherStatementOfIncomeAndRetainedEarningsUsed"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed" id="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed_2">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.18</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherStatementOfIncomeAndRetainedEarningsUsed" xlink:to="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed_2" xlink:title="reference: WhetherStatementOfIncomeAndRetainedEarningsUsed to reference_WhetherStatementOfIncomeAndRetainedEarningsUsed"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed" id="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed_3">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>6.4</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherStatementOfIncomeAndRetainedEarningsUsed" xlink:to="reference_WhetherStatementOfIncomeAndRetainedEarningsUsed_3" xlink:title="reference: WhetherStatementOfIncomeAndRetainedEarningsUsed to reference_WhetherStatementOfIncomeAndRetainedEarningsUsed"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_ReasonForNotPreparingStatementOfCashFlows" xlink:label="ReasonForNotPreparingStatementOfCashFlows" xlink:title="ReasonForNotPreparingStatementOfCashFlows"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForNotPreparingStatementOfCashFlows" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForNotPreparingStatementOfCashFlows" id="reference_ReasonForNotPreparingStatementOfCashFlows">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+      <ref:Subparagraph>d</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForNotPreparingStatementOfCashFlows" xlink:to="reference_ReasonForNotPreparingStatementOfCashFlows" xlink:title="reference: ReasonForNotPreparingStatementOfCashFlows to reference_ReasonForNotPreparingStatementOfCashFlows"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForNotPreparingStatementOfCashFlows_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForNotPreparingStatementOfCashFlows" id="reference_ReasonForNotPreparingStatementOfCashFlows_3">
+      <ref:Name>SFRS for SE </ref:Name>
+      <ref:Paragraph>3.17</ref:Paragraph>
+      <ref:Subparagraph>d</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForNotPreparingStatementOfCashFlows" xlink:to="reference_ReasonForNotPreparingStatementOfCashFlows_3" xlink:title="reference: ReasonForNotPreparingStatementOfCashFlows to reference_ReasonForNotPreparingStatementOfCashFlows"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:label="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:title="MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:reference xlink:type="resource" xlink:label="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" id="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>5.2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:to="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:title="reference: MethodOfPresentingAllItemsOfIncomeAndExpenses to reference_MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:reference xlink:type="resource" xlink:label="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" id="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_2">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>3.17</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:to="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_2" xlink:title="reference: MethodOfPresentingAllItemsOfIncomeAndExpenses to reference_MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:reference xlink:type="resource" xlink:label="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" id="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_3">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>5.7</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:to="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_3" xlink:title="reference: MethodOfPresentingAllItemsOfIncomeAndExpenses to reference_MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:reference xlink:type="resource" xlink:label="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" id="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_4">
+      <ref:Name>SFRS for SE</ref:Name>
+      <ref:Paragraph>5.4</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:to="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_4" xlink:title="reference: MethodOfPresentingAllItemsOfIncomeAndExpenses to reference_MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:reference xlink:type="resource" xlink:label="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_5" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" id="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_5">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>81A</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:to="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_5" xlink:title="reference: MethodOfPresentingAllItemsOfIncomeAndExpenses to reference_MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:reference xlink:type="resource" xlink:label="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_6" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses" id="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_6">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>10A</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="MethodOfPresentingAllItemsOfIncomeAndExpenses" xlink:to="reference_MethodOfPresentingAllItemsOfIncomeAndExpenses_6" xlink:title="reference: MethodOfPresentingAllItemsOfIncomeAndExpenses to reference_MethodOfPresentingAllItemsOfIncomeAndExpenses"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_WhetherFinancialStatementsArePreparedOnGoingConcernBasis" xlink:label="WhetherFinancialStatementsArePreparedOnGoingConcernBasis" xlink:title="WhetherFinancialStatementsArePreparedOnGoingConcernBasis"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherFinancialStatementsArePreparedOnGoingConcernBasis" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherFinancialStatementsArePreparedOnGoingConcernBasis" id="reference_WhetherFinancialStatementsArePreparedOnGoingConcernBasis">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>25</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherFinancialStatementsArePreparedOnGoingConcernBasis" xlink:to="reference_WhetherFinancialStatementsArePreparedOnGoingConcernBasis" xlink:title="reference: WhetherFinancialStatementsArePreparedOnGoingConcernBasis to reference_WhetherFinancialStatementsArePreparedOnGoingConcernBasis"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-dei-cor_2026-01-01.xsd#sg-dei_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" xlink:label="WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" xlink:title="WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" id="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+      <ref:Subparagraph>i</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" xlink:to="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" xlink:title="reference: WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons to reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons"/>
+    <link:reference xlink:type="resource" xlink:label="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" id="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>41</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" xlink:to="reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons_2" xlink:title="reference: WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons to reference_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons"/>
+  </link:referenceLink>
+</link:linkbase>
