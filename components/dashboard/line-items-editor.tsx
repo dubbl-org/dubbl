@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,7 @@ function reclaimHint(rate: TaxRateOption): string | null {
 }
 
 export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext }: LineItemsEditorProps) {
+  const t = useTranslations("Common");
   const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
 
   // Fetch the org's tax rates once (org via x-organization-id, mirroring the
@@ -115,10 +117,10 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
     <div className="space-y-3">
       <div className="rounded-lg border">
         <div className="grid grid-cols-[1fr_80px_100px_120px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
-          <span>Description</span>
-          <span className="text-right">Qty</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Amount</span>
+          <span>{t("description")}</span>
+          <span className="text-right">{t("quantity")}</span>
+          <span className="text-right">{t("price")}</span>
+          <span className="text-right">{t("amount")}</span>
           <span />
         </div>
         {lines.map((line, i) => {
@@ -137,23 +139,23 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
                   className="h-8 text-sm"
                   value={line.description}
                   onChange={(e) => updateLine(i, "description", e.target.value)}
-                  placeholder="Item description"
+                  placeholder={t("description")}
                 />
                 <AccountPicker
                   value={line.accountId}
                   onChange={(v) => updateLine(i, "accountId", v)}
                   typeFilter={accountTypeFilter}
-                  placeholder="Account"
+                  placeholder={t("account")}
                 />
                 <Select
                   value={line.taxRateId || "none"}
                   onValueChange={(v) => updateLine(i, "taxRateId", v === "none" ? "" : v)}
                 >
                   <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="No tax" />
+                    <SelectValue placeholder={t("noTax")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No tax</SelectItem>
+                    <SelectItem value="none">{t("noTax")}</SelectItem>
                     {taxRates.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name} ({formatRatePct(t.rate)}%)
@@ -207,15 +209,15 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
           </Button>
           <div className="space-y-0.5 text-right text-sm font-mono tabular-nums">
             <div className="flex justify-between gap-6">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">{t("subtotal")}</span>
               <span>{subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between gap-6">
-              <span className="text-muted-foreground">Tax</span>
+              <span className="text-muted-foreground">{t("tax")}</span>
               <span>{taxTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between gap-6 font-semibold">
-              <span>Total</span>
+              <span>{t("total")}</span>
               <span>{total.toFixed(2)}</span>
             </div>
           </div>

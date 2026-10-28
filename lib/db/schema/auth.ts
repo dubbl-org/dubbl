@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
   passwordHash: text("password_hash"),
+  locale: text("locale").notNull().default("en"),
   isSiteAdmin: boolean("is_site_admin").notNull().default(false),
   sessionRevokedAt: timestamp("session_revoked_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -119,6 +120,7 @@ export const organization = pgTable("organization", {
   country: text("country"),
   businessType: text("business_type"),
   defaultCurrency: text("default_currency").notNull().default("USD"),
+  documentLocale: text("document_locale").notNull().default("en"),
   fiscalYearStartMonth: integer("fiscal_year_start_month")
     .notNull()
     .default(1),

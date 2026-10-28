@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -51,6 +52,7 @@ interface ProvidersConfig {
 }
 
 export default function SignUpPage() {
+  const t = useTranslations("Auth");
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -116,10 +118,10 @@ export default function SignUpPage() {
         transition={{ duration: 0.4 }}
       >
         <h1 className="text-[28px] font-extrabold tracking-tight text-foreground">
-          Create your account
+          {t("createYourAccount")}
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Get started with dubbl for free
+          {t("getStartedFree")}
         </p>
       </motion.div>
 
@@ -131,7 +133,7 @@ export default function SignUpPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.03 }}
         >
-          Registration is by invitation only. You need an invite to create an account.
+          {t("inviteOnly")}
         </motion.div>
       )}
       {providers?.allowedDomains && (
@@ -141,7 +143,7 @@ export default function SignUpPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.03 }}
         >
-          Registration is limited to: {providers.allowedDomains.split(",").join(", ")}
+          {t("registrationLimited", { domains: providers.allowedDomains.split(",").join(", ") })}
         </motion.div>
       )}
 
@@ -181,7 +183,7 @@ export default function SignUpPage() {
           <div className="my-5 flex items-center gap-3">
             <Separator className="flex-1" />
             <span className="text-[11px] text-muted-foreground">
-              or continue with email
+              {t("orContinueWithEmail")}
             </span>
             <Separator className="flex-1" />
           </div>
@@ -203,13 +205,13 @@ export default function SignUpPage() {
 
         <div className="space-y-2">
           <Label htmlFor="name" className="text-xs font-medium">
-            Name
+            {t("name")}
           </Label>
           <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
+            placeholder={t("yourName")}
             required
             autoFocus
             className="h-11 rounded-lg"
@@ -218,14 +220,14 @@ export default function SignUpPage() {
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-xs font-medium">
-            Email
+            {t("email")}
           </Label>
           <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            placeholder={t("emailPlaceholder")}
             required
             className="h-11 rounded-lg"
           />
@@ -233,14 +235,14 @@ export default function SignUpPage() {
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-xs font-medium">
-            Password
+            {t("password")}
           </Label>
           <Input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 8 characters"
+            placeholder={t("passwordHelp")}
             required
             minLength={8}
             className="h-11 rounded-lg"
@@ -253,10 +255,10 @@ export default function SignUpPage() {
           disabled={loading}
         >
           {loading ? (
-            "Creating account..."
+            t("creatingAccount")
           ) : (
             <span className="inline-flex items-center gap-2">
-              Create account
+              {t("createAccount")}
               <ArrowRight className="size-4" />
             </span>
           )}
@@ -269,12 +271,12 @@ export default function SignUpPage() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.2 }}
       >
-        Already have an account?{" "}
+        {t("alreadyHaveAccount")} {" "}
         <Link
           href="/sign-in"
           className="font-medium text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
         >
-          Sign in
+          {t("signIn")}
         </Link>
       </motion.p>
 
@@ -284,7 +286,7 @@ export default function SignUpPage() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.25 }}
       >
-        Open source &middot; Self-hosted option &middot; Apache 2.0
+        {t("openSourceFooter")}
       </motion.p>
     </div>
   );

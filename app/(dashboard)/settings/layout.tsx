@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Settings, Users, CreditCard, Key, ScrollText, Target,
   Bell, BellRing, GitBranch, Tags, Shield, ShieldCheck,
@@ -80,6 +81,7 @@ export default function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const t = useTranslations("Settings.Navigation");
   const pathname = usePathname();
 
   const isDetailPage =
@@ -102,7 +104,7 @@ export default function SettingsLayout({
           {GROUPS.map((group) => (
             <div key={group.label}>
               <p className="mb-1.5 pl-0 pr-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                {group.label}
+                {t(`groups.${group.label}`)}
               </p>
               <div className="flex flex-col gap-0.5">
                 {group.items.map((item) => {
@@ -122,7 +124,7 @@ export default function SettingsLayout({
                       )}
                     >
                       <Icon className="size-3.5" />
-                      {item.label}
+                      {t(`items.${item.label}`)}
                     </Link>
                   );
                 })}
@@ -152,7 +154,7 @@ export default function SettingsLayout({
                 )}
               >
                 <Icon className="size-3.5" />
-                {item.label}
+                {t(`items.${item.label}`)}
               </Link>
             );
           })}

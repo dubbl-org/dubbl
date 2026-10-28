@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   FileText,
   Receipt,
@@ -52,6 +53,7 @@ const GROUP_ORDER: SearchResult["type"][] = [
  * do not render it inside this file.
  */
 export function CommandPalette() {
+  const t = useTranslations("Common");
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -141,13 +143,13 @@ export function CommandPalette() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title="Search"
-      description="Search invoices, bills, contacts, and documents."
+      title={t("searchTitle")}
+      description={t("searchDescription")}
       // Disable cmdk's built-in fuzzy filter — results come from the server.
       shouldFilter={false}
     >
       <CommandInput
-        placeholder="Search invoices, bills, contacts, documents..."
+        placeholder={t("searchPlaceholder")}
         value={query}
         onValueChange={setQuery}
       />
@@ -155,17 +157,17 @@ export function CommandPalette() {
         {loading && (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Searching...
+            {t("searching")}
           </div>
         )}
 
         {!loading && trimmedLen >= 2 && grouped.length === 0 && (
-          <CommandEmpty>No results found.</CommandEmpty>
+          <CommandEmpty>{t("noResultsFound")}</CommandEmpty>
         )}
 
         {!loading && trimmedLen < 2 && (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            Type to search invoices, bills, contacts, and documents.
+            {t("typeToSearch")}
           </div>
         )}
 
@@ -175,7 +177,7 @@ export function CommandPalette() {
             return (
               <CommandGroup
                 key={group.type}
-                heading={TYPE_META[group.type].label}
+                heading={t(`${group.type === "invoice" ? "invoices" : group.type === "bill" ? "bills" : group.type === "contact" ? "contacts" : "documents"}`)}
               >
                 {group.items.map((item) => (
                   <CommandItem

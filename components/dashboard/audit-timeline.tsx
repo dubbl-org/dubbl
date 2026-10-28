@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { useTranslations } from "next-intl";
 
 interface AuditTimelineEntry {
   id: string;
@@ -33,9 +34,10 @@ const ACTION_BADGE_COLORS: Record<string, string> = {
 };
 
 export function AuditTimeline({ entries }: AuditTimelineProps) {
+  const t = useTranslations("Common");
   if (entries.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No activity recorded.</p>
+      <p className="text-sm text-muted-foreground">{t("noActivity")}</p>
     );
   }
 

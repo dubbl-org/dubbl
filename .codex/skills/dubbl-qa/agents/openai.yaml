@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dubbl QA"
+  short_description: "Verify Dubbl changes safely"

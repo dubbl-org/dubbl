@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import {
   Bell,
   FileText,
@@ -23,13 +24,13 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 const NOTIFICATION_TYPES = [
-  { type: "invoice_overdue", label: "Invoice Overdue", description: "When an invoice passes its due date", icon: FileText, color: "text-red-500 bg-red-500/10" },
-  { type: "payment_received", label: "Payment Received", description: "When a payment is recorded", icon: DollarSign, color: "text-emerald-500 bg-emerald-500/10" },
-  { type: "inventory_low", label: "Low Inventory", description: "When stock falls below minimum threshold", icon: Package, color: "text-amber-500 bg-amber-500/10" },
-  { type: "payroll_due", label: "Payroll Due", description: "When a payroll run is approaching", icon: Landmark, color: "text-blue-500 bg-blue-500/10" },
-  { type: "approval_needed", label: "Approval Needed", description: "When something requires your approval", icon: ShieldCheck, color: "text-purple-500 bg-purple-500/10" },
-  { type: "system_alert", label: "System Alert", description: "Important system notifications", icon: AlertTriangle, color: "text-orange-500 bg-orange-500/10" },
-  { type: "task_assigned", label: "Task Assigned", description: "When a task is assigned to you", icon: ClipboardList, color: "text-indigo-500 bg-indigo-500/10" },
+  { type: "invoice_overdue", label: "invoiceOverdue", description: "invoiceOverdueDescription", icon: FileText, color: "text-red-500 bg-red-500/10" },
+  { type: "payment_received", label: "paymentReceived", description: "paymentReceivedDescription", icon: DollarSign, color: "text-emerald-500 bg-emerald-500/10" },
+  { type: "inventory_low", label: "inventoryLow", description: "inventoryLowDescription", icon: Package, color: "text-amber-500 bg-amber-500/10" },
+  { type: "payroll_due", label: "payrollDue", description: "payrollDueDescription", icon: Landmark, color: "text-blue-500 bg-blue-500/10" },
+  { type: "approval_needed", label: "approvalNeeded", description: "approvalNeededDescription", icon: ShieldCheck, color: "text-purple-500 bg-purple-500/10" },
+  { type: "system_alert", label: "systemAlert", description: "systemAlertDescription", icon: AlertTriangle, color: "text-orange-500 bg-orange-500/10" },
+  { type: "task_assigned", label: "taskAssigned", description: "taskAssignedDescription", icon: ClipboardList, color: "text-indigo-500 bg-indigo-500/10" },
 ] as const;
 
 const DEBOUNCE_MINUTES = 120; // 2 hours
@@ -65,6 +66,7 @@ function mergePrefs(prefs: Preference[]): PrefState {
 }
 
 export default function NotificationPreferencesPage() {
+  const t = useTranslations("Settings.Notifications");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [prefs, setPrefs] = useState<PrefState>(buildDefaultState);
@@ -106,11 +108,11 @@ export default function NotificationPreferencesPage() {
         body: JSON.stringify({ preferences }),
       });
 
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) throw new Error(t("saveFailed"));
 
-      toast.success("Notification preferences saved");
+      toast.success(t("saved"));
     } catch {
-      toast.error("Failed to save preferences");
+      toast.error(t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -134,15 +136,15 @@ export default function NotificationPreferencesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold">Notification Preferences</h2>
+            <h2 className="text-base font-semibold">{t("title")}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Choose how you want to be notified
+              {t("description")}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" className="h-7 text-xs gap-1.5" onClick={handleSave} disabled={saving}>
               <Save className="size-3" />
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("saving") : t("saveChanges")}
             </Button>
           </div>
         </div>
@@ -151,51 +153,51 @@ export default function NotificationPreferencesPage() {
         <div className="flex items-center gap-6 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Bell className="size-3.5" />
-            <span>In-App</span>
+            <span>{t("inApp")}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Mail className="size-3.5" />
-            <span>Email</span>
+            <span>{t("email")}</span>
           </div>
         </div>
 
         {/* Notification type list */}
         <div className="rounded-lg border divide-y">
-          {NOTIFICATION_TYPES.map((t) => {
-            const Icon = t.icon;
-            const val = prefs[t.type];
+          {NOTIFICATION_TYPES.map((notification) => {
+            const Icon = notification.icon;
+            const val = prefs[notification.type];
 
             return (
-              <div key={t.type} className="flex items-center gap-4 px-4 py-3.5">
-                <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", t.color)}>
+              <div key={notification.type} className="flex items-center gap-4 px-4 py-3.5">
+                <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", notification.color)}>
                   <Icon className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium">{t.label}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{t.description}</p>
+                  <p className="text-[13px] font-medium">{t(notification.label)}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{t(notification.description)}</p>
                 </div>
                 <div className="flex items-center gap-5 shrink-0">
                   {/* In-app toggle */}
                   <div className="flex items-center gap-2">
-                    <Label htmlFor={`${t.type}-inapp`} className="text-[11px] text-muted-foreground">
+                    <Label htmlFor={`${notification.type}-inapp`} className="text-[11px] text-muted-foreground">
                       <Bell className="size-3" />
                     </Label>
                     <Switch
-                      id={`${t.type}-inapp`}
+                      id={`${notification.type}-inapp`}
                       checked={val.inApp}
-                      onCheckedChange={() => toggleInApp(t.type)}
+                      onCheckedChange={() => toggleInApp(notification.type)}
                       className="scale-90"
                     />
                   </div>
                   {/* Email toggle */}
                   <div className="flex items-center gap-2">
-                    <Label htmlFor={`${t.type}-email`} className="text-[11px] text-muted-foreground">
+                    <Label htmlFor={`${notification.type}-email`} className="text-[11px] text-muted-foreground">
                       <Mail className="size-3" />
                     </Label>
                     <Switch
-                      id={`${t.type}-email`}
+                      id={`${notification.type}-email`}
                       checked={val.email}
-                      onCheckedChange={() => toggleEmail(t.type)}
+                      onCheckedChange={() => toggleEmail(notification.type)}
                       className="scale-90"
                     />
                   </div>
@@ -210,9 +212,9 @@ export default function NotificationPreferencesPage() {
           <div className="flex items-start gap-3 rounded-lg border border-dashed px-4 py-3">
             <Clock className="size-4 text-muted-foreground shrink-0 mt-0.5" />
             <div>
-              <p className="text-[13px] font-medium">Email debounce</p>
+              <p className="text-[13px] font-medium">{t("emailDigest")}</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                If multiple notifications arrive close together, they&apos;ll be grouped into a single digest email sent after a 2-hour window. This prevents inbox spam.
+                {t("emailDigestDescription")}
               </p>
             </div>
           </div>

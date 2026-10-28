@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Check, ChevronsUpDown, Plus, Loader2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ interface ContactPickerProps {
 }
 
 export function ContactPicker({ value, onChange, type, placeholder = "Select contact..." }: ContactPickerProps) {
+  const t = useTranslations("Common");
   const [open, setOpen] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +119,7 @@ export function ContactPicker({ value, onChange, type, placeholder = "Select con
                 <CommandEmpty>
                   <div className="flex flex-col items-center gap-1.5 py-2">
                     <Users className="size-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">No contacts found</span>
+                    <span className="text-muted-foreground">{t("noContacts")}</span>
                   </div>
                 </CommandEmpty>
                 <CommandGroup>

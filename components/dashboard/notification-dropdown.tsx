@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface Notification {
   id: string;
@@ -107,6 +108,7 @@ function relativeTime(date: string) {
 }
 
 export function NotificationDropdown() {
+  const t = useTranslations("Common");
   const router = useRouter();
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
@@ -262,7 +264,7 @@ export function NotificationDropdown() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Notifications</h3>
+            <h3 className="text-sm font-semibold">{t("notifications")}</h3>
             {unreadCount > 0 && (
               <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-semibold">
                 {unreadCount}
@@ -343,8 +345,8 @@ export function NotificationDropdown() {
               <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
                 <Bell className="size-5 text-muted-foreground" />
               </div>
-              <p className="mt-3 text-sm font-medium text-muted-foreground">All caught up</p>
-              <p className="mt-0.5 text-xs text-muted-foreground/60">No notifications yet</p>
+              <p className="mt-3 text-sm font-medium text-muted-foreground">{t("allCaughtUp")}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground/60">{t("noNotifications")}</p>
             </div>
             )
           ) : (

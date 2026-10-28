@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface AuditEntry {
   id: string;
@@ -114,6 +115,7 @@ function ActivitySkeleton() {
 }
 
 export function ActivityFeed() {
+  const t = useTranslations("Common");
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -149,7 +151,7 @@ export function ActivityFeed() {
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
       <div className="px-4 py-3 border-b">
-        <h3 className="text-[13px] font-semibold">Recent Activity</h3>
+        <h3 className="text-[13px] font-semibold">{t("recentActivity")}</h3>
       </div>
 
       {loading ? (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { LocaleSwitcher } from "@/components/shared/locale-switcher";
 import { Container } from "@/components/shared/container";
 import { OrbitalDecoration } from "@/components/shared/orbital-decoration";
 import { GrainGradient } from "@paper-design/shaders-react";
@@ -72,7 +73,7 @@ export default function AuthLayout({
               dubbl
             </span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2"><LocaleSwitcher /><ThemeToggle /></div>
         </Container>
       </header>
 

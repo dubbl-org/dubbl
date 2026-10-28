@@ -1,0 +1,3 @@
+interface:
+  display_name: "Dubbl Developer"
+  short_description: "Implement Dubbl features across UI, API and MCP"

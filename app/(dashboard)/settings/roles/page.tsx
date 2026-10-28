@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Plus, ShieldCheck, MoreHorizontal, Loader2, Trash2, Pencil } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -55,62 +56,8 @@ const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "Owner": ["manage:billing", "delete:organization"],
 };
 
-// Plain-language label for each permission. The end user is not an accountant,
-// so these describe what the permission lets someone DO rather than echoing the
-// internal permission code (e.g. "post:entries" -> "Finalize transactions").
-const PERMISSION_LABELS: Record<string, string> = {
-  "view:data": "See data (read-only)",
-  "create:entries": "Add transactions",
-  "edit:entries": "Edit transactions",
-  "post:entries": "Finalize transactions (lock them in)",
-  "void:entries": "Cancel transactions",
-  "manage:accounts": "Manage the chart of accounts",
-  "manage:recurring": "Manage repeating transactions",
-  "manage:period-lock": "Lock past dates",
-  "manage:invoices": "Manage invoices",
-  "approve:invoices": "Approve invoices",
-  "manage:credit-notes": "Manage refunds to customers",
-  "manage:debit-notes": "Manage charge-backs to suppliers",
-  "manage:bills": "Manage bills you owe",
-  "approve:bills": "Approve bills you owe",
-  "manage:banking": "Manage bank accounts & feeds",
-  "manage:bank-rules": "Manage auto-sorting rules for bank activity",
-  "manage:contacts": "Manage customers & suppliers",
-  "manage:payments": "Manage payments",
-  "manage:expenses": "Manage expenses",
-  "approve:expenses": "Approve expenses",
-  "manage:inventory": "Manage stock & products",
-  "manage:payroll": "Manage payroll",
-  "approve:payroll": "Approve payroll",
-  "manage:timesheets": "Manage timesheets",
-  "manage:leave": "Manage time off",
-  "manage:contractors": "Manage contractors",
-  "view:payslips": "See pay slips",
-  "manage:compensation": "Manage pay & salaries",
-  "manage:tax-config": "Manage payroll tax setup",
-  "manage:shifts": "Manage shifts",
-  "self-service:payroll": "See their own pay info",
-  "view:payroll-reports": "See payroll reports",
-  "manage:projects": "Manage projects",
-  "manage:assets": "Manage equipment & assets",
-  "manage:budgets": "Manage budgets",
-  "manage:tax-rates": "Manage tax rates",
-  "manage:cost-centers": "Manage cost centers",
-  "manage:teams": "Manage teams",
-  "invite:members": "Invite people",
-  "change:roles": "Change people's access level",
-  "remove:members": "Remove people",
-  "manage:api-keys": "Manage developer API keys",
-  "view:audit-log": "See the activity history",
-  "manage:billing": "Manage billing & subscription",
-  "delete:organization": "Delete the whole organization",
-};
-
-function formatPermission(p: string) {
-  return PERMISSION_LABELS[p] ?? p.replace(":", " ").replace(/-/g, " ");
-}
-
 export default function RolesPage() {
+  const t = useTranslations("Settings.Roles");
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -185,12 +132,12 @@ export default function RolesPage() {
         },
         body: JSON.stringify({ name, description: description || null, permissions: selectedPermissions }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) throw new Error(t("saveFailed"));
       setSheetOpen(false);
       await fetchRoles();
-      toast.success(editingRole ? "Role updated" : "Role created");
+      toast.success(editingRole ? t("updated") : t("created"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save role");
+      toast.error(err instanceof Error ? err.message : t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -204,11 +151,11 @@ export default function RolesPage() {
         method: "DELETE",
         headers: { "x-organization-id": orgId },
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) throw new Error(t("deleteFailed"));
       await fetchRoles();
-      toast.success("Role deleted");
+      toast.success(t("deleted"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete role");
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"));
     }
   }
 
@@ -216,22 +163,22 @@ export default function RolesPage() {
     <ContentReveal className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Custom Roles</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{t("title")}</h2>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Build your own access levels by choosing exactly what each person can see and do.
+            {t("description")}
           </p>
         </div>
         <Button size="sm" onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
           <Plus className="mr-1.5 size-3.5" />
-          Create Role
+          {t("createRole")}
         </Button>
       </div>
 
       {!loading && roles.length === 0 ? (
         <EmptyState
           icon={ShieldCheck}
-          title="No custom roles"
-          description="Create custom roles to assign specific permissions to team members."
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
         />
       ) : (
         <div className="divide-y rounded-lg border">
@@ -241,37 +188,37 @@ export default function RolesPage() {
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">{role.name}</p>
                   {role.isSystem && (
-                    <Badge variant="secondary" className="text-[10px]">System</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{t("system")}</Badge>
                   )}
                   <Badge variant="outline" className="text-[10px]">
-                    {role.memberCount} member{role.memberCount !== 1 ? "s" : ""}
+                    {t("memberCount", { count: role.memberCount })}
                   </Badge>
                 </div>
                 {role.description && (
                   <p className="mt-0.5 text-xs text-muted-foreground">{role.description}</p>
                 )}
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  {role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}
+                  {t("permissionCount", { count: role.permissions.length })}
                 </p>
               </div>
               {!role.isSystem && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-8">
+                    <Button variant="ghost" size="icon" className="size-8" aria-label={t("roleActions", { name: role.name })}>
                       <MoreHorizontal className="size-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => openEdit(role)}>
                       <Pencil className="mr-2 size-3.5" />
-                      Edit
+                      {t("edit")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => deleteRole(role.id)}
                       className="text-red-600"
                     >
                       <Trash2 className="mr-2 size-3.5" />
-                      Delete
+                      {t("delete")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -284,28 +231,28 @@ export default function RolesPage() {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingRole ? "Edit Role" : "Create Role"}</SheetTitle>
+            <SheetTitle>{editingRole ? t("editRole") : t("createRole")}</SheetTitle>
           </SheetHeader>
           <div className="space-y-4 px-4 py-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{t("name")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Bookkeeper"
+                placeholder={t("namePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("roleDescription")}</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description..."
+                placeholder={t("optionalDescription")}
                 rows={2}
               />
             </div>
             <div className="space-y-3">
-              <Label>Permissions</Label>
+              <Label>{t("permissionsTitle")}</Label>
               {Object.entries(PERMISSION_CATEGORIES).map(([category, perms]) => {
                 const allSelected = perms.every((p) => selectedPermissions.includes(p));
                 const someSelected = perms.some((p) => selectedPermissions.includes(p));
@@ -322,7 +269,7 @@ export default function RolesPage() {
                         onCheckedChange={() => toggleCategory(perms)}
                       />
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {category}
+                        {t(`categories.${category}`)}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 gap-1.5 pl-6">
@@ -332,7 +279,7 @@ export default function RolesPage() {
                             checked={selectedPermissions.includes(perm)}
                             onCheckedChange={() => togglePermission(perm)}
                           />
-                          <span>{formatPermission(perm)}</span>
+                          <span>{t(`permissions.${perm}`)}</span>
                         </label>
                       ))}
                     </div>
@@ -342,14 +289,14 @@ export default function RolesPage() {
             </div>
           </div>
           <SheetFooter>
-            <Button variant="outline" onClick={() => setSheetOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>{t("cancel")}</Button>
             <Button
               onClick={save}
               disabled={!name || selectedPermissions.length === 0 || saving}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              {editingRole ? "Update" : "Create"}
+              {editingRole ? t("update") : t("create")}
             </Button>
           </SheetFooter>
         </SheetContent>

@@ -44,6 +44,7 @@ import { UsersAnimatedIcon } from "@/components/ui/users-animated";
 import { TargetIcon } from "@/components/ui/target";
 import { FolderOpenIcon } from "@/components/ui/folder-open";
 import { PercentAnimatedIcon } from "@/components/ui/percent-animated";
+import { useTranslations } from "next-intl";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnimatedIcon = React.ForwardRefExoticComponent<any>;
@@ -110,6 +111,7 @@ function isActive(pathname: string, href: string) {
 }
 
 function NavItemLink({ item, active, badge }: { item: NavItem; active: boolean; badge?: number }) {
+  const t = useTranslations("Navigation");
   const [hovered, setHovered] = useState(false);
   const iconRef = useRef<IconHandle>(null);
   const IconComp = item.icon;
@@ -137,7 +139,7 @@ function NavItemLink({ item, active, badge }: { item: NavItem; active: boolean; 
         )}
       >
         <IconComp ref={iconRef} size={16} className="shrink-0" />
-        <span className="flex-1">{item.label}</span>
+        <span className="flex-1">{t.has(item.href.slice(1)) ? t(item.href.slice(1)) : item.label}</span>
         {badge !== undefined && badge > 0 && (
           <span className="size-4 rounded-full bg-red-100 text-red-600 text-[9px] font-medium flex items-center justify-center shrink-0 dark:bg-red-950 dark:text-red-400">
             {badge}
@@ -157,6 +159,7 @@ interface ProjectListItem {
 }
 
 function ProjectsCollapsible({ pathname }: { pathname: string }) {
+  const t = useTranslations("Navigation");
   const [open, setOpen] = useState(() => pathname.startsWith("/projects"));
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [hovered, setHovered] = useState(false);
@@ -210,7 +213,7 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
           )}
         >
           <LayersIcon ref={iconRef} size={16} className="shrink-0" />
-          <span className="flex-1 text-left">Projects</span>
+          <span className="flex-1 text-left">{t("projects")}</span>
           <ChevronRight className={cn(
             "size-3.5 shrink-0 transition-transform duration-200",
             open && "rotate-90"
@@ -255,7 +258,7 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
               onClick={() => openDrawer("project")}
             >
               <Plus className="size-3.5" />
-              <span>New project</span>
+              <span>{t("newProject")}</span>
             </SidebarMenuSubButton>
           </SidebarMenuSubItem>
         </SidebarMenuSub>
@@ -265,6 +268,7 @@ function ProjectsCollapsible({ pathname }: { pathname: string }) {
 }
 
 export function AppSidebar() {
+  const t = useTranslations("Navigation");
   const pathname = usePathname();
   const [overdueCounts, setOverdueCounts] = useState<{ sales: number; purchases: number }>({ sales: 0, purchases: 0 });
 
@@ -301,7 +305,7 @@ export function AppSidebar() {
           <SidebarGroup key={section.label || `section-${i}`} className="px-0 py-1">
             {section.label && (
               <SidebarGroupLabel className="h-7 px-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                {section.label}
+                {section.label === "Financials" ? t("financials") : section.label === "Operations" ? t("operations") : section.label}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>

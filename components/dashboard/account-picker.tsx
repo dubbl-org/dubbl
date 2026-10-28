@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Check, ChevronsUpDown, Loader2, Plus, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ export function AccountPicker({
   placeholder = "Select account...",
   allowCreate = false,
 }: AccountPickerProps) {
+  const t = useTranslations("Common");
   const [open, setOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +140,7 @@ export function AccountPicker({
                 <CommandEmpty>
                   <div className="flex flex-col items-center gap-1.5 py-2">
                     <Wallet className="size-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">No accounts found</span>
+                    <span className="text-muted-foreground">{t("noAccounts")}</span>
                   </div>
                 </CommandEmpty>
                 {groups.map((group) => (

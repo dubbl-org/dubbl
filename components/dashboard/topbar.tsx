@@ -13,11 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, Menu } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { LocaleSwitcher } from "@/components/shared/locale-switcher";
 import { useSidebar } from "@/components/ui/sidebar";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
+import { useTranslations } from "next-intl";
 
 /* ------------------------------------------------------------------ */
 /*  Custom topbar action slot                                          */
@@ -183,8 +185,8 @@ const LABELS: Record<string, string> = {
   "email-preview": "Email Preview",
 };
 
-function getLabel(segment: string): string {
-  return LABELS[segment] || segment;
+function getLabel(segment: string, t: ReturnType<typeof useTranslations<"Navigation">>): string {
+  return t.has(segment) ? t(segment) : LABELS[segment] || segment;
 }
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "contractor" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";
@@ -237,8 +239,8 @@ export function Topbar() {
 }
 
 function TopbarInner({ customAction }: { customAction: ReactNode }) {
+  const t = useTranslations("Navigation");
   const pathname = usePathname();
-  const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const entityTitle = useEntityTitle();
   const { toggleSidebar, isMobile } = useSidebar();
@@ -264,28 +266,28 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
   let parentHref: string | null = null;
 
   if (isNestedEntityDetail) {
-    parentLabel = getLabel(segments[1]);
+    parentLabel = getLabel(segments[1], t);
     parentHref = `/${segments[0]}/${segments[1]}`;
     if (entityTitle) {
       pageTitle = entityTitle;
     } else {
       const subTab = segments.length > 3 ? segments[segments.length - 1] : null;
-      pageTitle = subTab ? (getLabel(subTab)) : (getLabel(segments[1]));
+      pageTitle = subTab ? getLabel(subTab, t) : getLabel(segments[1], t);
       if (!subTab) parentLabel = null;
     }
   } else if (isEntityDetail) {
-    parentLabel = getLabel(segments[0]);
+    parentLabel = getLabel(segments[0], t);
     parentHref = `/${segments[0]}`;
     if (entityTitle) {
       pageTitle = entityTitle;
     } else {
       const subTab = segments.length > 2 ? segments[segments.length - 1] : null;
-      pageTitle = subTab ? (getLabel(subTab)) : (getLabel(segments[0]));
+      pageTitle = subTab ? getLabel(subTab, t) : getLabel(segments[0], t);
       if (!subTab) parentLabel = null;
     }
   } else {
-    pageTitle = effectiveSegments[effectiveSegments.length - 1] ? getLabel(effectiveSegments[effectiveSegments.length - 1]) : "Overview";
-    parentLabel = effectiveSegments.length > 1 ? getLabel(effectiveSegments[0]) : null;
+    pageTitle = effectiveSegments[effectiveSegments.length - 1] ? getLabel(effectiveSegments[effectiveSegments.length - 1], t) : t("overview");
+    parentLabel = effectiveSegments.length > 1 ? getLabel(effectiveSegments[0], t) : null;
   }
 
   const subtabKey = `${segments[0]}/${segments[1]}`;
@@ -324,6 +326,7 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
           <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <LocaleSwitcher className="h-7 max-w-24 text-xs sm:max-w-none" />
           <NotificationDropdown />
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
           <div className="h-4 w-px bg-border" />
@@ -334,7 +337,7 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
             className="hidden sm:flex items-center gap-2 text-muted-foreground text-xs h-7 px-2.5"
           >
             <Search className="size-3" />
-            <span>Search...</span>
+            <span>{t("search")}</span>
             <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
               <span className="text-xs">&#8984;</span>K
             </kbd>

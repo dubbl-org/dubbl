@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   DollarSign,
@@ -249,6 +250,7 @@ function KpiItem({ label, value, good }: { label: string; value: string; good: b
 }
 
 export default function DashboardPage() {
+  const t = useTranslations("Dashboard");
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const { data: session } = useSession();
@@ -543,7 +545,7 @@ export default function DashboardPage() {
                 </button>
                 <div className="flex items-center gap-2">
                   <Rocket className="size-4 text-emerald-600" />
-                  <h3 className="text-sm font-semibold">Getting started</h3>
+                  <h3 className="text-sm font-semibold">{t("gettingStarted")}</h3>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   A few quick steps to set up your books. Tackle them in any order.
@@ -679,7 +681,7 @@ export default function DashboardPage() {
                 <div className="mt-4 space-y-3">
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Revenue</span>
+                      <span className="text-muted-foreground">{t("revenue")}</span>
                       <span className="font-mono text-sm tabular-nums font-medium">
                         {formatMoney(pnl.totalRevenue)}
                       </span>
@@ -693,7 +695,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Expenses</span>
+                      <span className="text-muted-foreground">{t("expenses")}</span>
                       <span className="font-mono text-sm tabular-nums font-medium">
                         {formatMoney(pnl.totalExpenses)}
                       </span>
@@ -808,7 +810,7 @@ export default function DashboardPage() {
                     onClick={() => router.push("/sales")}
                     className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-left transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
                   >
-                    <p className="text-xs font-medium text-red-800 dark:text-red-300">Overdue Invoices</p>
+                    <p className="text-xs font-medium text-red-800 dark:text-red-300">{t("overdueInvoices")}</p>
                     <p className="text-lg font-bold font-mono tabular-nums text-red-600 mt-0.5">{actionAlerts.overdueInvoices.count}</p>
                     <p className="text-[11px] text-red-600/70 font-mono tabular-nums">{formatMoney(actionAlerts.overdueInvoices.total)} outstanding</p>
                   </button>
@@ -818,7 +820,7 @@ export default function DashboardPage() {
                     onClick={() => router.push("/purchases")}
                     className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-3 text-left transition-colors hover:bg-orange-100 dark:hover:bg-orange-950/50"
                   >
-                    <p className="text-xs font-medium text-orange-800 dark:text-orange-300">Overdue Bills</p>
+                    <p className="text-xs font-medium text-orange-800 dark:text-orange-300">{t("overdueBills")}</p>
                     <p className="text-lg font-bold font-mono tabular-nums text-orange-600 mt-0.5">{actionAlerts.overdueBills.count}</p>
                     <p className="text-[11px] text-orange-600/70 font-mono tabular-nums">{formatMoney(actionAlerts.overdueBills.total)} to pay</p>
                   </button>
@@ -828,9 +830,9 @@ export default function DashboardPage() {
                     onClick={() => router.push("/accounting/banking")}
                     className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3 text-left transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/50"
                   >
-                    <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Uncategorized Transactions</p>
+                    <p className="text-xs font-medium text-blue-800 dark:text-blue-300">{t("uncategorizedTransactions")}</p>
                     <p className="text-lg font-bold font-mono tabular-nums text-blue-600 mt-0.5">{actionAlerts.uncategorizedTransactions}</p>
-                    <p className="text-[11px] text-blue-600/70">Need categorization</p>
+                    <p className="text-[11px] text-blue-600/70">{t("needCategorization")}</p>
                   </button>
                 )}
                 {actionAlerts.accountsNeedingReconciliation?.length > 0 && (
@@ -838,7 +840,7 @@ export default function DashboardPage() {
                     onClick={() => router.push("/accounting/banking")}
                     className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-3 text-left transition-colors hover:bg-violet-100 dark:hover:bg-violet-950/50"
                   >
-                    <p className="text-xs font-medium text-violet-800 dark:text-violet-300">Needs Reconciliation</p>
+                    <p className="text-xs font-medium text-violet-800 dark:text-violet-300">{t("needsReconciliation")}</p>
                     <p className="text-lg font-bold font-mono tabular-nums text-violet-600 mt-0.5">{actionAlerts.accountsNeedingReconciliation.length}</p>
                     <p className="text-[11px] text-violet-600/70">bank account{actionAlerts.accountsNeedingReconciliation.length !== 1 ? "s" : ""}</p>
                   </button>
@@ -850,7 +852,7 @@ export default function DashboardPage() {
             <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-[13px] font-semibold">Recent Entries</h2>
+                  <h2 className="text-[13px] font-semibold">{t("recentEntries")}</h2>
                   <Button
                     variant="ghost"
                     size="sm"

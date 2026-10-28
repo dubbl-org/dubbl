@@ -11,9 +11,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface ForecastWeek {
   weekOf: string;
@@ -74,6 +74,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function CashFlowWidget() {
+  const t = useTranslations("Common");
   const [weeks, setWeeks] = useState(4);
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -231,19 +232,19 @@ export function CashFlowWidget() {
 
           <div className="mt-4 grid grid-cols-3 gap-4 border-t pt-4">
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Expected In</p>
+              <p className="text-xs text-muted-foreground">{t("expectedIn")}</p>
               <p className="text-sm font-bold font-mono tabular-nums text-emerald-600">
                 {formatMoney(forecast.totalInflows)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Expected Out</p>
+              <p className="text-xs text-muted-foreground">{t("expectedOut")}</p>
               <p className="text-sm font-bold font-mono tabular-nums text-red-600">
                 {formatMoney(forecast.totalOutflows)}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Net Position</p>
+              <p className="text-xs text-muted-foreground">{t("netPosition")}</p>
               <p
                 className={cn(
                   "text-sm font-bold font-mono tabular-nums",

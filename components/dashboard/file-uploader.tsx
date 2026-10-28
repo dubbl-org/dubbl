@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Upload, X, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ export function FileUploader({
   entityId,
   onAttached,
 }: FileUploaderProps) {
+  const t = useTranslations("Common");
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -162,7 +164,7 @@ export function FileUploader({
       {uploading ? (
         <>
           <Loader2 className="size-6 animate-spin text-emerald-600" />
-          <p className="mt-2 text-xs text-muted-foreground">Uploading...</p>
+          <p className="mt-2 text-xs text-muted-foreground">{t("uploading")}</p>
         </>
       ) : fileName ? (
         <>

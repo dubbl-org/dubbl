@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Check, ChevronsUpDown, Lock } from "lucide-react";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
@@ -62,11 +63,13 @@ interface OrgSettings {
 }
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
 ];
 
 export default function SettingsPage() {
+  const t = useTranslations("Settings.General");
+  const format = useFormatter();
   const [, setOrg] = useState<OrgSettings | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -96,7 +99,7 @@ export default function SettingsPage() {
   const [peppolId, setPeppolId] = useState("");
   const [peppolScheme, setPeppolScheme] = useState("");
 
-  useDocumentTitle("Settings · General");
+  useDocumentTitle(t("pageTitle"));
 
   const businessTypes = useMemo(
     () => (form.countryCode ? getBusinessTypesForCountry(form.countryCode) : []),
@@ -200,9 +203,9 @@ export default function SettingsPage() {
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      toast.success("Settings saved");
+      toast.success(t("saved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -215,13 +218,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-10">
       {/* Organization */}
-      <Section title="Organization" description="Basic details about your organization.">
+      <Section title={t("organization")} description={t("organizationDescription")}>
         <div className="space-y-1.5">
-          <Label className="text-xs">Name</Label>
+          <Label className="text-xs">{t("name")}</Label>
           <Input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Acme Inc."
+            placeholder={t("organizationNamePlaceholder")}
           />
         </div>
       </Section>
@@ -229,16 +232,17 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Legal */}
-      <Section title="Legal" description="Legal entity information, tax IDs, and registration details.">
+      <Section title={t("legal")} description={t("legalDescription")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Country (sets your tax rules)</Label>
+            <Label className="text-xs">{t("countrySetsTaxRules")}</Label>
             <Popover open={countryOpen} onOpenChange={setCountryOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   role="combobox"
                   aria-expanded={countryOpen}
+                  aria-controls="organization-country-options"
                   className={cn(
                     "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors",
                     "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
@@ -247,15 +251,15 @@ export default function SettingsPage() {
                 >
                   {selectedCountry
                     ? `${selectedCountry.flag} ${selectedCountry.name}`
-                    : "Select country..."}
+                    : t("selectCountry")}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Search country..." />
-                  <CommandList>
-                    <CommandEmpty>No country found.</CommandEmpty>
+                  <CommandInput placeholder={t("searchCountry")} />
+                  <CommandList id="organization-country-options">
+                    <CommandEmpty>{t("noCountryFound")}</CommandEmpty>
                     <CommandGroup>
                       {BUSINESS_COUNTRIES.map((country) => (
                         <CommandItem
@@ -280,18 +284,18 @@ export default function SettingsPage() {
               </PopoverContent>
             </Popover>
             <p className="text-[11px] text-muted-foreground">
-              Picks the right tax rules and forms for where your business is based (for example VAT, GST or sales tax).
+              {t("countryTaxHelp")}
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Business structure</Label>
+            <Label className="text-xs">{t("businessStructure")}</Label>
             {form.countryCode ? (
               <Select
                 value={form.businessType}
                 onValueChange={(v) => setForm({ ...form, businessType: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type..." />
+                  <SelectValue placeholder={t("selectType")} />
                 </SelectTrigger>
                 <SelectContent>
                   {businessTypes.map((bt) => (
@@ -308,36 +312,36 @@ export default function SettingsPage() {
               </Select>
             ) : (
               <div className="flex h-9 items-center rounded-md border border-input px-3 text-xs text-muted-foreground">
-                Select a country first
+                {t("selectCountryFirst")}
               </div>
             )}
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Tax ID / VAT</Label>
+            <Label className="text-xs">{t("taxIdVat")}</Label>
             <Input
               value={form.taxId}
               onChange={(e) => setForm({ ...form, taxId: e.target.value })}
-              placeholder="e.g. US12-3456789"
+              placeholder={t("taxIdPlaceholder")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Registration number</Label>
+            <Label className="text-xs">{t("registrationNumber")}</Label>
             <Input
               value={form.businessRegistrationNumber}
               onChange={(e) =>
                 setForm({ ...form, businessRegistrationNumber: e.target.value })
               }
-              placeholder="e.g. 12345678"
+              placeholder={t("registrationNumberPlaceholder")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Industry</Label>
+            <Label className="text-xs">{t("industry")}</Label>
             <Input
               value={form.industrySector}
               onChange={(e) =>
                 setForm({ ...form, industrySector: e.target.value })
               }
-              placeholder="e.g. Technology"
+              placeholder={t("industryPlaceholder")}
             />
           </div>
         </div>
@@ -346,59 +350,59 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Address */}
-      <Section title="Address" description="Your organization's registered address.">
+      <Section title={t("address")} description={t("addressDescription")}>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs">Street</Label>
+            <Label className="text-xs">{t("street")}</Label>
             <Input
               value={form.addressStreet}
               onChange={(e) =>
                 setForm({ ...form, addressStreet: e.target.value })
               }
-              placeholder="123 Main Street"
+              placeholder={t("streetPlaceholder")}
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">City</Label>
+              <Label className="text-xs">{t("city")}</Label>
               <Input
                 value={form.addressCity}
                 onChange={(e) =>
                   setForm({ ...form, addressCity: e.target.value })
                 }
-                placeholder="San Francisco"
+                placeholder={t("cityPlaceholder")}
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">State / Province</Label>
+              <Label className="text-xs">{t("stateProvince")}</Label>
               <Input
                 value={form.addressState}
                 onChange={(e) =>
                   setForm({ ...form, addressState: e.target.value })
                 }
-                placeholder="California"
+                placeholder={t("statePlaceholder")}
               />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Postal code</Label>
+              <Label className="text-xs">{t("postalCode")}</Label>
               <Input
                 value={form.addressPostalCode}
                 onChange={(e) =>
                   setForm({ ...form, addressPostalCode: e.target.value })
                 }
-                placeholder="94105"
+                placeholder={t("postalCodePlaceholder")}
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Country</Label>
+              <Label className="text-xs">{t("country")}</Label>
               <Select
                 value={form.addressCountry}
                 onValueChange={(v) => setForm({ ...form, addressCountry: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
+                <SelectValue placeholder={t("selectCountry")} />
                 </SelectTrigger>
                 <SelectContent>
                   {ALL_COUNTRIES.map((c) => (
@@ -416,37 +420,37 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Contact */}
-      <Section title="Contact" description="How customers and partners can reach your organization.">
+      <Section title={t("contact")} description={t("contactDescription")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Phone</Label>
+            <Label className="text-xs">{t("phone")}</Label>
             <Input
               value={form.contactPhone}
               onChange={(e) =>
                 setForm({ ...form, contactPhone: e.target.value })
               }
-              placeholder="+1 (555) 123-4567"
+              placeholder={t("phonePlaceholder")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Email</Label>
+            <Label className="text-xs">{t("email")}</Label>
             <Input
               type="email"
               value={form.contactEmail}
               onChange={(e) =>
                 setForm({ ...form, contactEmail: e.target.value })
               }
-              placeholder="billing@company.com"
+              placeholder={t("emailPlaceholder")}
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs">Website</Label>
+            <Label className="text-xs">{t("website")}</Label>
             <Input
               value={form.contactWebsite}
               onChange={(e) =>
                 setForm({ ...form, contactWebsite: e.target.value })
               }
-              placeholder="https://company.com"
+              placeholder={t("websitePlaceholder")}
             />
           </div>
         </div>
@@ -455,10 +459,10 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Financials */}
-      <Section title="Financials" description="Currency, fiscal year, and default payment terms.">
+      <Section title={t("financials")} description={t("financialsDescription")}>
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Default currency</Label>
+            <Label className="text-xs">{t("defaultCurrency")}</Label>
             <CurrencySelect
               value={form.defaultCurrency}
               onValueChange={(v) =>
@@ -467,7 +471,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Fiscal year start</Label>
+            <Label className="text-xs">{t("fiscalYearStart")}</Label>
             <Select
               value={form.fiscalYearStartMonth}
               onValueChange={(v) =>
@@ -480,14 +484,14 @@ export default function SettingsPage() {
               <SelectContent>
                 {MONTHS.map((m, i) => (
                   <SelectItem key={i} value={String(i + 1)}>
-                    {m}
+                    {t(`months.${m}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Payment terms</Label>
+            <Label className="text-xs">{t("paymentTerms")}</Label>
             <Select
               value={form.defaultPaymentTerms}
               onValueChange={(v) =>
@@ -495,12 +499,12 @@ export default function SettingsPage() {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select terms" />
+                <SelectValue placeholder={t("selectTerms")} />
               </SelectTrigger>
               <SelectContent>
-                {PAYMENT_TERMS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
+                  {PAYMENT_TERMS.map((paymentTerm) => (
+                  <SelectItem key={paymentTerm.value} value={paymentTerm.value}>
+                    {paymentTerm.value === "due_on_receipt" ? t("dueOnReceipt") : t("netDays", { days: paymentTerm.value.replace("net_", "") })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -519,56 +523,56 @@ export default function SettingsPage() {
           size="sm"
           className="bg-emerald-600 hover:bg-emerald-700"
         >
-          {saving ? "Saving..." : "Save changes"}
+          {saving ? t("saving") : t("saveChanges")}
         </Button>
       </div>
 
       <div className="h-px bg-border" />
 
       {/* E-Invoicing / PEPPOL */}
-      <Section title="Send invoices electronically" description="Your business ID on the PEPPOL network, which lets you send invoices straight into another company's system (required in parts of the EU, UK and Singapore). Leave blank if you don't use it.">
+      <Section title={t("electronicInvoicing")} description={t("electronicInvoicingDescription")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">PEPPOL Participant ID</Label>
+            <Label className="text-xs">{t("peppolParticipantId")}</Label>
             <Input
               value={peppolId}
               onChange={(e) => setPeppolId(e.target.value)}
-              placeholder="e.g. 0088:1234567890"
+              placeholder={t("peppolIdPlaceholder")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">PEPPOL Scheme</Label>
+            <Label className="text-xs">{t("peppolScheme")}</Label>
             <Select
               value={peppolScheme}
               onValueChange={setPeppolScheme}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select scheme" />
+                <SelectValue placeholder={t("selectScheme")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="0088">0088 - EAN/GLN</SelectItem>
-                <SelectItem value="0007">0007 - SE Org Nr</SelectItem>
-                <SelectItem value="0009">0009 - FR SIRET</SelectItem>
-                <SelectItem value="0088">0088 - GLN</SelectItem>
-                <SelectItem value="9925">9925 - IT VAT</SelectItem>
-                <SelectItem value="9930">9930 - DE VAT</SelectItem>
-                <SelectItem value="9944">9944 - GB VAT</SelectItem>
+                <SelectItem value="0088">0088 - {t("schemeEanGln")}</SelectItem>
+                <SelectItem value="0007">0007 - {t("schemeSwedishOrganizationNumber")}</SelectItem>
+                <SelectItem value="0009">0009 - {t("schemeFrenchSiret")}</SelectItem>
+                <SelectItem value="0088">0088 - {t("schemeGln")}</SelectItem>
+                <SelectItem value="9925">9925 - {t("schemeItalianVat")}</SelectItem>
+                <SelectItem value="9930">9930 - {t("schemeGermanVat")}</SelectItem>
+                <SelectItem value="9944">9944 - {t("schemeUkVat")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          Once configured, you can download UBL XML invoices from each invoice detail page.
+          {t("electronicInvoicingHelp")}
         </p>
       </Section>
 
       <div className="h-px bg-border" />
 
       {/* Period Lock */}
-      <Section title="Lock past dates" description="Lock past dates so they can't be changed. Once set, nothing dated on or before this day can be added or edited — useful after you've filed taxes or closed your books for a period.">
+      <Section title={t("lockPastDates")} description={t("lockPastDatesDescription")}>
         <div className="flex items-end gap-3">
           <div className="space-y-1.5 flex-1 max-w-xs">
-            <Label className="text-xs">Lock everything up to and including</Label>
+            <Label className="text-xs">{t("lockThroughDate")}</Label>
             <Input
               type="date"
               value={lockDate}
@@ -592,22 +596,24 @@ export default function SettingsPage() {
                 });
                 if (!res.ok) {
                   const data = await res.json();
-                  toast.error(data.error || "Failed to set lock");
+                  toast.error(data.error || t("lockFailed"));
                   return;
                 }
-                toast.success("Period locked");
+                toast.success(t("periodLocked"));
               } finally {
                 setLockSaving(false);
               }
             }}
           >
             <Lock className="size-3.5" />
-            {lockSaving ? "Saving..." : "Lock dates"}
+            {lockSaving ? t("saving") : t("lockDates")}
           </Button>
         </div>
         {lockDate && (
           <p className="text-xs text-amber-600 mt-2">
-            Nothing dated on or before {lockDate} can be added or changed.
+            {t("lockedThroughWarning", {
+              date: format.dateTime(new Date(`${lockDate}T12:00:00`), { dateStyle: "long" }),
+            })}
           </p>
         )}
       </Section>
@@ -615,16 +621,16 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       {/* Danger zone */}
-      <Section title="Danger zone" description="Irreversible actions for this organization.">
+      <Section title={t("dangerZone")} description={t("dangerZoneDescription")}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
           <div>
-            <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete organization</p>
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">{t("deleteOrganization")}</p>
             <p className="text-[12px] text-muted-foreground">
-              Permanently delete this organization and all its data.
+              {t("deleteOrganizationDescription")}
             </p>
           </div>
           <Button variant="destructive" size="sm" className="w-fit">
-            Delete
+            {t("delete")}
           </Button>
         </div>
       </Section>
