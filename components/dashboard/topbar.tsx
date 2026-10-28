@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, Menu } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { LocaleSwitcher } from "@/components/shared/locale-switcher";
 import { useSidebar } from "@/components/ui/sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -324,6 +325,7 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
           <h1 className="text-[13px] text-muted-foreground truncate">{pageTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <LocaleSwitcher className="h-7 max-w-24 text-xs sm:max-w-none" />
           <NotificationDropdown />
           <ThemeToggle className="[&_button]:size-6 [&_button_svg]:size-3" />
           <div className="h-4 w-px bg-border" />

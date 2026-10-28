@@ -3,6 +3,8 @@ import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { Toaster } from "sonner";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import "fumadocs-ui/style.css";
 import "./globals.css";
@@ -100,25 +102,28 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
-    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
+    <html lang={locale} className="scroll-smooth" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-title" content="Dubbl" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} font-sans antialiased`}
       >
-        <ThemeProvider>
-          <RootProvider>
-            <SessionProvider>{children}</SessionProvider>
-          </RootProvider>
-          <Toaster richColors position="bottom-right" />
-        </ThemeProvider>
+        <NextIntlClientProvider>
+          <ThemeProvider>
+            <RootProvider>
+              <SessionProvider>{children}</SessionProvider>
+            </RootProvider>
+            <Toaster richColors position="bottom-right" />
+          </ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

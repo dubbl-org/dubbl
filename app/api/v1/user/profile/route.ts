@@ -4,10 +4,12 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
+import { locales } from "@/lib/i18n/locales";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   image: z.string().url().nullable().optional(),
+  locale: z.enum(locales).optional(),
 });
 
 export async function GET() {
@@ -19,7 +21,7 @@ export async function GET() {
 
     const user = await db.query.users.findFirst({
       where: eq(users.id, session.user.id),
-      columns: { id: true, name: true, email: true, image: true },
+      columns: { id: true, name: true, email: true, image: true, locale: true },
     });
 
     return NextResponse.json({ user });
@@ -42,7 +44,7 @@ export async function PATCH(request: Request) {
       .update(users)
       .set(parsed)
       .where(eq(users.id, session.user.id))
-      .returning({ id: users.id, name: users.name, email: users.email, image: users.image });
+      .returning({ id: users.id, name: users.name, email: users.email, image: users.image, locale: users.locale });
 
     return NextResponse.json({ user: updated });
   } catch (err) {

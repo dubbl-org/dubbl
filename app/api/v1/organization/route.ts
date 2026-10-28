@@ -19,6 +19,7 @@ import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { seedDefaultAccounts } from "@/lib/db/default-accounts";
 import { ensureTaxRatesSeeded } from "@/lib/api/tax-profiles";
 import { toAppUrl } from "@/lib/public-url";
+import { locales } from "@/lib/i18n/locales";
 
 const updateSchema = z
   .object({
@@ -27,6 +28,7 @@ const updateSchema = z
     country: z.string().min(1).optional().nullable(),
     businessType: z.string().min(1).optional().nullable(),
     defaultCurrency: z.string().min(1).optional(),
+    documentLocale: z.enum(locales).optional(),
     fiscalYearStartMonth: z.number().min(1).max(12).optional(),
     countryCode: z.string().max(2).nullable().optional(),
     taxId: z.string().nullable().optional(),
