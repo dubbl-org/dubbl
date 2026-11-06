@@ -59,7 +59,7 @@ export function FAQ() {
     <Section className="py-20 lg:py-28">
       <div className="grid gap-12 lg:grid-cols-[1fr_1.2fr]">
         <div>
-          <Eyebrow index="03">FAQ</Eyebrow>
+          <Eyebrow index="04">FAQ</Eyebrow>
           <Heading lead="Questions." className="mt-5 max-w-[12ch]">
             Answered.
           </Heading>

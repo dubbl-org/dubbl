@@ -172,8 +172,8 @@ function Stack() {
 }
 
 const docs = [
-  { label: "API reference", href: "/docs/api-reference" },
-  { label: "Connect an AI agent", href: "/docs/guides/mcp" },
+  { label: "API reference", href: "/docs/developers/api-reference" },
+  { label: "Connect an AI agent", href: "/docs/developers/mcp" },
   { label: "Self-hosting guide", href: "/docs/self-hosting" },
 ];
 
