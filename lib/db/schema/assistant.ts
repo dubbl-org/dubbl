@@ -4,8 +4,9 @@ import { organization, users } from "./auth";
 
 /**
  * A conversation with Tilly, the in-app assistant. The transcript is kept in
- * the Anthropic message format so a run can pause for approval and resume on
- * the server without trusting tool history sent by the browser.
+ * dubbl's stored message format (text, tool_use, tool_result and file blocks)
+ * so a run can pause for approval and resume on the server without trusting
+ * tool history sent by the browser.
  */
 export const assistantConversation = pgTable(
   "assistant_conversation",
@@ -18,7 +19,7 @@ export const assistantConversation = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull().default("New chat"),
-    /** Anthropic-format messages; uploaded files are stored as references, not bytes. */
+    /** Messages in the stored message format; uploaded files are stored as references, not bytes. */
     messages: jsonb("messages").$type<unknown[]>().notNull().default([]),
     /** Results of calls that ran before the run paused for approval. */
     pendingResults: jsonb("pending_results").$type<unknown[]>().notNull().default([]),

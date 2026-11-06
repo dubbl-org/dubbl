@@ -1,0 +1,4 @@
+ALTER TABLE "payment_batch" ADD COLUMN "bank_account_id" uuid;--> statement-breakpoint
+ALTER TABLE "scheduled_payment" ADD COLUMN "bank_account_id" uuid;--> statement-breakpoint
+ALTER TABLE "payment_batch" ADD CONSTRAINT "payment_batch_bank_account_id_bank_account_id_fk" FOREIGN KEY ("bank_account_id") REFERENCES "public"."bank_account"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "scheduled_payment" ADD CONSTRAINT "scheduled_payment_bank_account_id_bank_account_id_fk" FOREIGN KEY ("bank_account_id") REFERENCES "public"."bank_account"("id") ON DELETE no action ON UPDATE no action;

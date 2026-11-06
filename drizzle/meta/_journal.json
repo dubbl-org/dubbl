@@ -57,6 +57,62 @@
       "when": 1791778144964,
       "tag": "0007_many_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791803533076,
+      "tag": "0008_plans_standard_premium",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791809464172,
+      "tag": "0009_native_app_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791906295749,
+      "tag": "0010_pale_warbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791906360916,
+      "tag": "0011_many_vision",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791906389195,
+      "tag": "0012_cute_wrecking_crew",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791906418621,
+      "tag": "0013_chunky_jean_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791949502112,
+      "tag": "0014_acoustic_sally_floyd",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791950066184,
+      "tag": "0015_little_nighthawk",
+      "breakpoints": true
     }
   ]
 }

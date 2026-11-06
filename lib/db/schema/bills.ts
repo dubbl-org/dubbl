@@ -8,6 +8,7 @@ import {
   pgEnum,
   boolean,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
@@ -319,6 +320,18 @@ export const billPurchaseOrder = pgTable("bill_purchase_order", {
   purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrder.id, { onDelete: "cascade" }),
 }, (t) => ({
   uniqueBillPo: uniqueIndex("bill_purchase_order_bill_po_unique").on(t.billId, t.purchaseOrderId),
+}));
+
+// Billed quantity a bill counted against each purchase order line (x100), so
+// voiding or deleting the bill can release exactly that amount.
+export const billPurchaseOrderLine = pgTable("bill_purchase_order_line", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  billId: uuid("bill_id").notNull().references(() => bill.id, { onDelete: "cascade" }),
+  purchaseOrderLineId: uuid("purchase_order_line_id").notNull().references(() => purchaseOrderLine.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+}, (t) => ({
+  billIdx: index("bill_purchase_order_line_bill_idx").on(t.billId),
 }));
 
 // Procurement settings — per-org three-way-match tolerances and controls.

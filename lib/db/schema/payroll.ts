@@ -201,7 +201,7 @@ export const payrollSettings = pgTable("payroll_settings", {
   employerFicaEnabled: boolean("employer_fica_enabled").notNull().default(true),
   // FUTA (federal unemployment): rate on wages up to the annual FUTA wage base.
   futaRateBp: integer("futa_rate_bp").notNull().default(60), // 0.6% net (after SUTA credit)
-  futaWageBaseCents: integer("futa_wage_base_cents").notNull().default(70000), // $7,000
+  futaWageBaseCents: integer("futa_wage_base_cents").notNull().default(700000), // $7,000
   // SUTA (state unemployment): rate on wages up to the state wage base.
   sutaRateBp: integer("suta_rate_bp").notNull().default(0),
   sutaWageBaseCents: integer("suta_wage_base_cents").notNull().default(0),
@@ -696,7 +696,12 @@ export const employeeTaxConfig = pgTable("employee_tax_config", {
   filingStatus: filingStatusEnum("filing_status").notNull().default("single"),
   federalAllowances: integer("federal_allowances").notNull().default(0),
   stateAllowances: integer("state_allowances").notNull().default(0),
-  additionalWithholding: integer("additional_withholding").default(0), // cents
+  additionalWithholding: integer("additional_withholding").default(0), // cents, federal
+  additionalStateWithholding: integer("additional_state_withholding").notNull().default(0), // cents
+  // Where the employee works, matched against taxBracket.jurisdiction for the
+  // state and local income-tax schedules (e.g. "CA", "NYC").
+  stateCode: text("state_code"),
+  localCode: text("local_code"),
   exempt: boolean("exempt").notNull().default(false),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

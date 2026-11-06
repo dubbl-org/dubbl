@@ -97,6 +97,9 @@ export const fixedAsset = pgTable("fixed_asset", {
   convention: depreciationConventionEnum("convention")
     .notNull()
     .default("full_month"),
+  // Declining-balance yearly rate in basis points (2000 = 20%). Null means
+  // double declining balance (twice the straight-line rate).
+  depreciationRateBp: integer("depreciation_rate_bp"),
   // Units-of-production inputs.
   totalExpectedUnits: integer("total_expected_units"),
   unitOfMeasure: text("unit_of_measure"),

@@ -41,3 +41,4 @@ export * from "./integrations";
 export * from "./backups";
 export * from "./site-settings";
 export * from "./assistant";
+export * from "./app-auth";

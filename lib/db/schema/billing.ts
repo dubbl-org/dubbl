@@ -12,7 +12,7 @@ import { relations } from "drizzle-orm";
 import { organization, users } from "./auth";
 
 // Enums
-export const planEnum = pgEnum("plan", ["free", "pro"]);
+export const planEnum = pgEnum("plan", ["free", "standard", "premium", "ultimate"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "active",
   "canceled",

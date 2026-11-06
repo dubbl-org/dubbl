@@ -11,6 +11,7 @@ import { relations } from "drizzle-orm";
 import { organization } from "./auth";
 import { bill } from "./bills";
 import { contact } from "./contacts";
+import { bankAccount } from "./banking";
 
 export const scheduledPaymentStatusEnum = pgEnum("scheduled_payment_status", [
   "pending",
@@ -36,6 +37,9 @@ export const scheduledPayment = pgTable("scheduled_payment", {
   amount: integer("amount").notNull(),
   currencyCode: text("currency_code").notNull().default("USD"),
   scheduledDate: date("scheduled_date").notNull(),
+  // The bank account the money will leave from. Null = the default bank
+  // ledger account (1100), the behaviour before a choice was offered.
+  bankAccountId: uuid("bank_account_id").references(() => bankAccount.id),
   status: scheduledPaymentStatusEnum("status").notNull().default("pending"),
   processedAt: timestamp("processed_at", { mode: "date" }),
   notes: text("notes"),
@@ -54,6 +58,9 @@ export const paymentBatch = pgTable("payment_batch", {
   totalAmount: integer("total_amount").notNull().default(0),
   currencyCode: text("currency_code").notNull().default("USD"),
   paymentCount: integer("payment_count").notNull().default(0),
+  // The bank account every payment in the batch is paid from. Null = the
+  // default bank ledger account (1100).
+  bankAccountId: uuid("bank_account_id").references(() => bankAccount.id),
   submittedAt: timestamp("submitted_at", { mode: "date" }),
   completedAt: timestamp("completed_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -89,6 +96,10 @@ export const scheduledPaymentRelations = relations(
       fields: [scheduledPayment.contactId],
       references: [contact.id],
     }),
+    bankAccount: one(bankAccount, {
+      fields: [scheduledPayment.bankAccountId],
+      references: [bankAccount.id],
+    }),
   })
 );
 
@@ -98,6 +109,10 @@ export const paymentBatchRelations = relations(
     organization: one(organization, {
       fields: [paymentBatch.organizationId],
       references: [organization.id],
+    }),
+    bankAccount: one(bankAccount, {
+      fields: [paymentBatch.bankAccountId],
+      references: [bankAccount.id],
     }),
     items: many(paymentBatchItem),
   })
