@@ -1,0 +1,93 @@
+---
+title: Background jobs
+description: "The scheduled work dubbl does every night and every hour, and how to run it with Trigger.dev."
+icon: Clock
+---
+
+A lot of what makes dubbl feel automatic happens on a schedule, not when someone clicks: invoices turning overdue, recurring invoices going out, depreciation posting, nightly backups. dubbl runs this work with [Trigger.dev](https://trigger.dev). The jobs live in the `trigger/` folder of the repository and run on Trigger.dev's workers, not inside the app container.
+
+<JobSchedule />
+
+<Callout type="warn" title="Without Trigger.dev, none of this runs">
+The app works without Trigger.dev, but nothing on this page happens: no invoice goes overdue, no recurring invoice, bill or journal is created, no reminder or digest is sent, no depreciation or loan payment posts, the trash is never emptied, there are no nightly backups and no daily exchange rates, and failed webhook deliveries are never retried. dubbl has no other scheduler to fall back on.
+</Callout>
+
+## Set up Trigger.dev
+
+<Steps>
+
+<Step>
+
+Create a project on [Trigger.dev](https://cloud.trigger.dev) (or on your own Trigger.dev instance). Copy its project ref (`proj_...`) and the **production** secret key from the project's API keys page.
+
+</Step>
+
+<Step>
+
+Give the app both values and restart it. The app needs the secret key to schedule webhook retries:
+
+```bash
+TRIGGER_PROJECT_REF=proj_kz81vq3lmt
+TRIGGER_SECRET_KEY=tr_prod_your_secret_key
+```
+
+</Step>
+
+<Step>
+
+The jobs run on Trigger.dev's machines, so they need the same settings as the app. In the Trigger.dev project, open **Environment Variables** for production and add at least `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, the `S3_*` variables, `RESEND_API_KEY` (with `RESEND_FROM` and `RESEND_DOCUMENTS_FROM` if you set them) and `EMAIL_ENCRYPTION_KEY`, plus `STRIPE_SECRET_KEY` and any exchange rate settings you use.
+
+`DATABASE_URL` there must reach your database from the internet, with your server's public address, not `postgres:5432` from inside Compose. Allow only what you need through your firewall, and use TLS (`?sslmode=require`) if your PostgreSQL supports it.
+
+</Step>
+
+<Step>
+
+From your checkout, sign in to Trigger.dev and deploy the jobs:
+
+```bash
+npx trigger.dev@4.4.6 login
+TRIGGER_PROJECT_REF=proj_kz81vq3lmt pnpm trigger:deploy
+```
+
+The schedules are part of the code, so they start as soon as the deploy finishes. Deploy again after every dubbl update; see [Updates](/docs/self-hosting/updates).
+
+</Step>
+
+</Steps>
+
+You can check every run, with its logs, in the Trigger.dev dashboard. To try a job before its time, open it there and choose **Test**.
+
+## What each job does
+
+| Job | When (UTC) | What it does | Needs |
+| --- | --- | --- | --- |
+| `notification-digest` | Every 15 minutes | Emails each person's notification digest | Resend |
+| `report-schedules` | Every hour | Runs and emails scheduled reports that are due | The organization's mail server |
+| `stripe-retry` | Every hour | Retries Stripe integration events that failed, up to 3 times within 7 days | Stripe |
+| `invoicing-maintenance` | 01:00 | Creates recurring invoices, bills and expense claims, sends payment reminders, expires old quotes, marks invoices and bills overdue, and sends the overdue invoice notifications | The organization's mail server or Resend, for reminders |
+| `recurring-journals` | 01:00 | Posts recurring journal entries that are due | |
+| `bookkeeping-maintenance` | 02:00 | Posts depreciation, loan payments and revenue recognition, auto-matches bank transactions, and sends budget and low-balance alerts | |
+| `trash-purge` | 03:00 | Permanently deletes what has been in the trash for 30 days | |
+| `scheduled-backups` | 04:00 | Backs up every organization (skipped if it has one from the last 23 hours) and removes backups past their retention | Storage |
+| `auto-reverse-journals` | 05:00 | Posts reversing entries whose date has arrived | |
+| `exchange-rate-sync` | 06:00 | Fetches the day's exchange rates | |
+| `notification-checks` | 08:00 | Sends the payroll due and low stock notifications | |
+| `fx-revaluation` | 1st of the month, 07:00 | Revalues foreign currency balances at month end | |
+| `webhook-delivery-retry` | When a delivery fails | Sends a failed webhook delivery again at its next retry time | `TRIGGER_SECRET_KEY` in the app |
+
+A scheduled job that throws is tried again by Trigger.dev, up to 3 attempts, waiting between 30 seconds and 10 minutes. Each run may take up to 30 minutes.
+
+## Good to know
+
+- The times are fixed in UTC in the code. To move one, change its `cron` in `trigger/scheduled.ts` (or `trigger/recurring-journals.ts`, `trigger/auto-reverse.ts`) and deploy again.
+- Webhook retries are scheduled from the app the moment a delivery fails. If `TRIGGER_SECRET_KEY` isn't set on the app, nothing is scheduled and the delivery stays in **retrying**. See [Webhooks](/docs/developers/webhooks).
+- For development, `pnpm trigger:dev` runs the jobs on your own machine against your local database, with a development secret key (`tr_dev_...`).
+
+## Related
+
+<Cards>
+  <Card title="Configuration" href="/docs/self-hosting/configuration" description="Every environment variable." />
+  <Card title="Backups" href="/docs/self-hosting/backups" description="What the nightly backup covers, and what it doesn't." />
+  <Card title="Troubleshooting" href="/docs/self-hosting/troubleshooting" description="When invoices don't go overdue." />
+</Cards>

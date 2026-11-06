@@ -1,0 +1,182 @@
+---
+title: Bills
+description: Record what suppliers charge you, post it to your books, and pay it off in full or in parts.
+icon: Receipt
+---
+
+A bill is a supplier's invoice to you: rent, hosting, stock, a lawyer's fee. You record it in dubbl so you know what you owe and when it's due, and so the cost lands in the right expense account. When you pay, the bill tracks how much is left until it's settled.
+
+<Shot name="bills" alt="The bills list with what you owe, a chart by month, top suppliers and the list of bills" pins />
+
+## Record your first bill
+
+<Steps>
+
+<Step>
+
+Open **Purchases** and choose **New Bill** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **Supplier** and type the **Supplier bill number**, the number printed on their invoice. Check the **Issue Date** and **Due Date** (dubbl suggests 30 days from today).
+
+</Step>
+
+<Step>
+
+Add a **line** for each thing on the invoice: a description, quantity, price, the expense account it belongs to and a tax rate if one applies.
+
+</Step>
+
+<Step>
+
+Choose **Create Bill**. It's saved as a draft, and the bill opens.
+
+</Step>
+
+<Step>
+
+Check it against the supplier's invoice, then choose **Add to my books**. The bill becomes **To pay** and counts toward what you owe.
+
+</Step>
+
+</Steps>
+
+<Shot name="bills-new" alt="The New Bill drawer with a supplier, the supplier's bill number and one line filled in" narrow />
+
+## Good to know
+
+- A draft bill isn't in your books. **Add to my books** is what records the cost and what you owe.
+- Leave **Supplier bill number** empty and dubbl numbers the bill for you (BILL-00010, BILL-00011 and so on).
+- If you've already entered a bill with the same supplier bill number for that supplier, dubbl warns you it might be a duplicate. Choose **Create anyway** if it really is a new one, or **Go back**.
+- Unpaid bills past their due date show as **Overdue** on their own.
+- While a bill is a draft, choose **Edit** on its page to change the supplier, the supplier bill number, the dates, the notes or any line. Totals are worked out again when you choose **Save changes**.
+- Once a bill is in your books it can't be edited. If it's wrong, choose **Cancel bill** and record it again.
+
+## How a bill moves
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Saved, not in your books yet." },
+    { name: "Awaiting approval", t: "info", note: "Optional. Someone approves it first." },
+    { name: "To pay", t: "watch", note: "In your books. You owe the supplier." },
+    { name: "Part paid", t: "watch", note: "Some paid, some still owed." },
+    { name: "Paid", t: "good", note: "Settled in full." },
+  ]}
+  caption="Unpaid bills past their due date show as Overdue. Cancelled bills stop counting toward what you owe."
+/>
+
+<Shot name="bills-draft" alt="A draft bill with Edit, Add to my books, Cancel bill, the payment status and supplier documents" pins />
+
+<Shot name="bills-edit" alt="The Edit bill drawer with the supplier, dates and line items of a draft bill" narrow />
+
+<Fold>
+
+## What gets recorded in your books
+
+Adding a bill to your books posts one journal entry. Each line's cost goes to its expense account, any tax you can reclaim goes to input tax, and what you owe the supplier goes up.
+
+<JournalEntry
+  title="Bill INV-88213 from AWS added to your books"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Software & Subscriptions", debit: 48000 },
+    { account: "Input VAT / GST Receivable", debit: 9600 },
+    { account: "Accounts Payable - Trade", credit: 57600 },
+  ]}
+  caption="A $480 bill with 20% tax. The tax is money you can claim back, so it isn't part of the cost."
+/>
+
+When you pay, what you owe goes down and so does your bank balance:
+
+<JournalEntry
+  title="Payment for INV-88213"
+  date="Nov 10, 2026"
+  lines={[
+    { account: "Accounts Payable - Trade", debit: 57600 },
+    { account: "Checking Account", credit: 57600 },
+  ]}
+/>
+
+Why bills sit in a payable account until they're paid is explained in [Receivables and payables](/docs/learn/receivables-and-payables).
+
+</Fold>
+
+<Fold>
+
+## Recording a payment
+
+Open a bill that's **To pay**, **Part paid** or **Overdue** and choose **Record Payment**. Enter the **Amount** and the **Date** you paid, and under **Paid from** pick the bank account the money left. A payment smaller than what's still due leaves the bill **Part paid**; dubbl won't accept more than what's due.
+
+<Shot name="bills-payment" alt="The Record Payment dialog with an amount, a date and Paid from" narrow />
+
+The payment is recorded as a bank transfer from the account in **Paid from**, or from your main checking account if you leave it on **Default bank account**. The bank account has to be in the bill's currency or your base currency. To pay several bills at once, or to set a payment for a later date, see [Paying bills](/docs/guides/paying-bills). If you already imported the payment from your bank, link it to the bill instead with **Find a match…** when you [categorize the bank line](/docs/guides/categorizing-transactions), so it isn't recorded twice.
+
+<Shot name="bills-open" alt="A bill in your books with Record Payment, Record a supplier credit, Supplier statement and Cancel bill" pins />
+
+</Fold>
+
+<Fold>
+
+## Approvals before posting
+
+If someone should check bills before they hit your books, tick **Submit for approval instead of posting** when you create one, or choose **Submit for approval** on a draft. The bill waits as **Awaiting approval**. On its page, a member who can approve bills chooses **Approve**, which adds it to your books, or **Reject**, which sends it back to a draft with an optional reason. If an [approval workflow](/docs/guides/approvals) covers the bill, its approvers say yes one after another, and the bill is added to your books only after the last one. The last rejection reason stays on the bill so whoever fixes it knows why.
+
+You can also select several bills in the list and approve them, or add them to your books, in one go. See [Approvals](/docs/guides/approvals) for who can approve what.
+
+</Fold>
+
+<Fold>
+
+## Bills from a purchase order
+
+When you order through a [purchase order](/docs/guides/purchase-orders), choose **Create a bill from this order** on the order instead of typing the bill again. dubbl makes a draft bill with the lines still to be billed. If the goods were marked as received first, the bill's lines are linked to that delivery and the bill shows an **Order match** card: each line is either matched to a delivery or **Not on an order**.
+
+<ThreeWayMatchCheck />
+
+When the bill goes into your books, dubbl compares it with the order and the delivery. You set how strict that check is in **Settings**, under **Bill Matching**:
+
+<Shot name="bills-matching" alt="Bill Matching settings with allowed price and quantity differences, and two switches" />
+
+- **Allowed price difference** and **Allowed quantity difference** are percentages. Anything beyond them is flagged.
+- **Block bills that charge more than ordered** turns a flag into a hard stop: the bill can't be added to your books until it's fixed.
+- **Require goods to be received first** stops a bill with stock items from being posted until the delivery is marked as received.
+
+</Fold>
+
+<Fold>
+
+## Supplier credits, statements and cancelling
+
+- **Record a supplier credit** opens a new [supplier credit](/docs/guides/supplier-credits) with this bill's supplier, number and lines (with their accounts and tax rates) filled in, for when the supplier refunds you or gives you money off.
+- **Supplier statement** opens everything you've had with this supplier, bills and payments together. See [Statements](/docs/guides/statements).
+- **Cancel bill** is for bills that shouldn't exist. It reverses what the bill recorded and can't be undone. A bill with payments against it can't be cancelled until the payment is removed.
+
+</Fold>
+
+<Fold>
+
+## Keeping the supplier's invoice
+
+Drop the supplier's PDF, receipts or delivery notes onto **Supplier documents** on the bill, or pick them **From Documents**. They stay with the bill for whoever checks it later. See [Documents](/docs/guides/documents).
+
+</Fold>
+
+<Fold>
+
+## Bills in another currency
+
+A bill can be in the supplier's currency. Amounts show in that currency, with the value in your own currency underneath and the exchange rate used. Paying it later at a different rate records the gain or loss for you. See [Multi-currency](/docs/guides/multi-currency).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Paying bills" href="/docs/guides/paying-bills" description="Pay many bills in one batch, or schedule a payment." />
+  <Card title="Purchase orders" href="/docs/guides/purchase-orders" description="Order first, then turn the order into a bill." />
+  <Card title="Recurring bills" href="/docs/guides/recurring-bills" description="Bills that arrive every month, created for you." />
+  <Card title="Aged payables" href="/docs/guides/aged-receivables-and-payables" description="See who you owe, and for how long." />
+</Cards>

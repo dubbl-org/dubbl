@@ -1,0 +1,162 @@
+---
+title: Configuration
+description: "Every environment variable dubbl reads, grouped by what it switches on, with defaults and examples."
+icon: Settings2
+---
+
+dubbl is configured entirely with environment variables. Only four are needed to start; each group after that switches on one more part of the app. `.env.example` in the repository lists them with comments; copy it to `.env.production` (Docker) or `.env` (running with Node) and fill in what you use.
+
+<Callout title="Restart after changes">
+dubbl reads its environment when it starts. After you change a value, restart the app: `docker compose -f docker-compose.prod.yml --env-file .env.production up -d`.
+</Callout>
+
+## Required
+
+| Variable | What it's for | Example |
+| --- | --- | --- |
+| `DATABASE_URL` | The PostgreSQL connection string | `postgresql://dubbl:secret@postgres:5432/dubbl` |
+| `AUTH_SECRET` | Signs sign-in sessions. Changing it signs everyone out | Output of `openssl rand -base64 32` |
+| `NEXT_PUBLIC_APP_URL` | The address people use, without a trailing slash. Used in emailed links, payment and portal links, and the MCP sign-in details | `https://books.example.com` |
+| `AUTH_URL` | The same address, for sign-in. In production, set it (or `AUTH_TRUST_HOST=true`) or sign-in refuses your domain | `https://books.example.com` |
+
+## Sign in with Google or Apple
+
+Email and password sign-in always works. Each provider appears on the sign-in page once its variables are set.
+
+| Variable | What it's for |
+| --- | --- |
+| `AUTH_GOOGLE_ID` | OAuth client ID from Google Cloud |
+| `AUTH_GOOGLE_SECRET` | Its client secret |
+| `AUTH_APPLE_ID` | Your Sign in with Apple Services ID |
+| `AUTH_APPLE_TEAM_ID` | Your Apple team ID |
+| `AUTH_APPLE_KEY_ID` | The ID of your Sign in with Apple key |
+| `AUTH_APPLE_KEY_BASE64` | The `.p8` key file, base64-encoded (`base64 -w0 AuthKey_XXXXXXXXXX.p8`). dubbl makes the client secret from it as needed |
+| `AUTH_APPLE_SECRET` | Instead of the key: a client secret JWT you generate yourself. It expires after six months |
+
+Register these redirect URLs with the provider: `https://books.example.com/api/auth/callback/google` and `https://books.example.com/api/auth/callback/apple`.
+
+## File storage
+
+Needed for attachments, receipts, documents and backups. See [Storage](/docs/self-hosting/storage).
+
+| Variable | Default | What it's for |
+| --- | --- | --- |
+| `S3_ENDPOINT` | AWS S3 | The S3 API address for MinIO, R2 and others. Leave unset for AWS |
+| `S3_REGION` | `us-east-1` | The bucket's region |
+| `S3_BUCKET` | `dubbl` | The bucket name |
+| `S3_ACCESS_KEY_ID` | | Access key with read, write and delete on the bucket |
+| `S3_SECRET_ACCESS_KEY` | | Its secret |
+| `S3_PUBLIC_ENDPOINT` | `S3_ENDPOINT` | The address browsers use for download and upload links, when it differs from the one the app uses. For example, the app reaches MinIO at `http://minio:9000` inside Docker but browsers need `https://files.example.com` |
+
+## Email
+
+See [Email](/docs/self-hosting/email) for which messages use which.
+
+| Variable | What it's for |
+| --- | --- |
+| `RESEND_API_KEY` | Account email (welcome, invitations, sign-in alerts, notification digests) and documents from organizations without their own mail server |
+| `EMAIL_ENCRYPTION_KEY` | Encrypts each organization's SMTP password. 64 hex characters: `openssl rand -hex 32`. Required before anyone can save a mail server. The prod compose file won't start without it |
+| `RESEND_FROM` | The sender of account email. Defaults to `dubbl <noreply@dubbl.dev>`; use an address on a domain you've verified in Resend |
+| `RESEND_DOCUMENTS_FROM` | The sender of invoices and other documents sent through Resend. Defaults to `dubbl <invoices@dubbl.dev>` |
+
+## Background jobs
+
+| Variable | What it's for |
+| --- | --- |
+| `TRIGGER_PROJECT_REF` | Your Trigger.dev project, like `proj_abc123` |
+| `TRIGGER_SECRET_KEY` | The project's secret key for this environment. The app uses it to schedule webhook retries |
+
+Without these, nothing runs on a schedule. See [Background jobs](/docs/self-hosting/background-jobs).
+
+## Stripe
+
+Leave all of these out and dubbl runs without billing, with every organization unlimited. The **Self-hosted unlimited mode** setting in the admin area overrides this either way. See [Payments](/docs/self-hosting/payments).
+
+| Variable | What it's for |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Turns on invoice payment links, and plans and billing unless **Self-hosted unlimited mode** is **Always on** |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret of the webhook at `/api/stripe/webhook` |
+| `STRIPE_STANDARD_PRICE_ID`, `STRIPE_STANDARD_ANNUAL_PRICE_ID` | Monthly and yearly prices for Standard |
+| `STRIPE_PREMIUM_PRICE_ID`, `STRIPE_PREMIUM_ANNUAL_PRICE_ID` | The same for Premium |
+| `STRIPE_ULTIMATE_PRICE_ID`, `STRIPE_ULTIMATE_ANNUAL_PRICE_ID` | The same for Ultimate |
+| `STRIPE_PRO_PRICE_ID`, `STRIPE_PRO_ANNUAL_PRICE_ID` | Older names, still read for Standard when the Standard ones are empty |
+| `STRIPE_CONNECT_CLIENT_ID` | Lets organizations connect their own Stripe account (the Stripe integration) |
+| `STRIPE_CONNECT_WEBHOOK_SECRET` | Signing secret of the Connect webhook at `/api/integrations/stripe/webhook` |
+
+## Exchange rates
+
+Multi-currency works with no setup: rates come from ExchangeRate-API's free open endpoint (about 160 currencies, any base currency).
+
+| Variable | What it's for |
+| --- | --- |
+| `EXCHANGE_RATE_PROVIDER` | Set to `frankfurter` for the European Central Bank's official rates (about 31 major currencies) |
+| `OPENEXCHANGERATES_APP_ID` | Use Open Exchange Rates instead (about 200 currencies). Takes priority over the other two. Works on the free, USD-only plan |
+
+Rates you enter by hand always win over fetched ones.
+
+## Tilly, the assistant
+
+Tilly is off until you give it a key. See [Ask Tilly](/docs/guides/tilly).
+
+| Variable | Default | What it's for |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | | Your OpenRouter key. Turns Tilly on |
+| `ASSISTANT_MODEL` | `openai/gpt-6-luna` | Any OpenRouter model ID that supports tool calling |
+| `ASSISTANT_REASONING_EFFORT` | `medium` | `minimal`, `low`, `medium` or `high` |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Send requests through a proxy or gateway that speaks the same API |
+
+## Your instance
+
+| Variable | Default | What it's for |
+| --- | --- | --- |
+| `REGISTRATION_MODE` | `open` | `open`, `invite_only` or `disabled`. A value saved in the admin area overrides it |
+| `ALLOWED_EMAIL_DOMAINS` | empty (any) | Comma-separated domains allowed to sign up, like `acme.com,example.com` |
+| `NEXT_PUBLIC_SITE_URL` | `NEXT_PUBLIC_APP_URL` | Your public website, if it isn't the app's address. Used for links in email footers |
+
+## Docker Compose
+
+`docker-compose.prod.yml` also reads these, for the containers themselves:
+
+| Variable | Default | What it's for |
+| --- | --- | --- |
+| `POSTGRES_PASSWORD` | (required) | The database password. Use the same one in `DATABASE_URL` |
+| `POSTGRES_USER` | `dubbl` | The database user |
+| `POSTGRES_DB` | `dubbl` | The database name |
+| `POSTGRES_PORT` | `5432` | The host port PostgreSQL is published on |
+| `PORT` | `3000` | The host port the app is published on |
+
+<Fold>
+
+## A complete example
+
+```bash
+# .env.production
+NEXT_PUBLIC_APP_URL=https://books.example.com
+AUTH_URL=https://books.example.com
+AUTH_SECRET=your_auth_secret
+POSTGRES_PASSWORD=your_database_password
+DATABASE_URL=postgresql://dubbl:your_database_password@postgres:5432/dubbl
+
+S3_ENDPOINT=https://3f9c8b1e2d7a4c6b.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=dubbl-files
+S3_ACCESS_KEY_ID=your_access_key_id
+S3_SECRET_ACCESS_KEY=your_secret_access_key
+
+RESEND_API_KEY=re_your_api_key
+EMAIL_ENCRYPTION_KEY=your_64_character_hex_key
+
+TRIGGER_PROJECT_REF=proj_kz81vq3lmt
+TRIGGER_SECRET_KEY=tr_prod_your_secret_key
+```
+
+Replace each `your_...` value with your own. The tables above say how to generate each secret.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Self-hosting" href="/docs/self-hosting" description="Deploy with Docker Compose." />
+  <Card title="Troubleshooting" href="/docs/self-hosting/troubleshooting" description="When a setting doesn't take." />
+</Cards>

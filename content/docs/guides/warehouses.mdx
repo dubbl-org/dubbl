@@ -1,0 +1,131 @@
+---
+title: Locations and transfers
+description: Keep stock in more than one place and move it between your warehouses.
+icon: Warehouse
+---
+
+If you keep stock in more than one place, say a main warehouse and a shop, add each place as a location. A transfer records stock leaving one location and arriving at another, so you always know where your units are, not just how many you have.
+
+<Shot name="warehouses" alt="The Locations page with an overview of active locations, the default warehouse, and a card for each location" pins />
+
+## Add a location
+
+<Steps>
+
+<Step>
+
+Open **Inventory**, then **Locations**, and choose **New Warehouse**.
+
+</Step>
+
+<Step>
+
+Give it a **Name** and a short **Code**, such as `WH-WEST`. Codes are unique.
+
+</Step>
+
+<Step>
+
+Add the **Address** if you like, and choose **Create Warehouse**.
+
+</Step>
+
+</Steps>
+
+<Shot name="warehouses-new" alt="The New Warehouse drawer with a name, code and address" narrow />
+
+## Move stock between locations
+
+<Steps>
+
+<Step>
+
+Open **Transfers** and choose **New Transfer**.
+
+</Step>
+
+<Step>
+
+Pick where the stock comes **From** and where it goes **To**.
+
+</Step>
+
+<Step>
+
+Add each item with how many units you're moving. **Add Item** adds another line.
+
+</Step>
+
+<Step>
+
+Choose **Create Transfer**. It's saved as a **Draft**: nothing has moved yet. The two locations must be different.
+
+</Step>
+
+<Step>
+
+When the stock leaves, open the transfer from the list and choose **Mark on the way**. The units come out of the first location.
+
+</Step>
+
+<Step>
+
+When it arrives, choose **Complete**. The units land in the second location. You can also complete a draft straight away if the move is instant.
+
+</Step>
+
+</Steps>
+
+<Shot name="warehouses-transfer-new" alt="The New Transfer drawer moving 40 shipping boxes from the main warehouse to the east distribution center" narrow />
+
+## Good to know
+
+- Creating a transfer doesn't move anything. Stock leaves the first location when you choose **Mark on the way** (or **Complete**), and lands in the second on **Complete**.
+- dubbl checks the first location has enough of every item before anything leaves. If it doesn't, the transfer stays as it was and you're told which item is short.
+- A transfer only changes where stock is. Your total units and their value stay the same, so nothing is recorded in your books.
+- The value shown on a transfer is the units at each item's current average cost.
+- An item's page shows **Stock by location** once it has stock recorded in specific locations.
+- **Set Default** marks the location you use most, and only one location can be the default. New items' opening stock and imported stock go there.
+
+## How a transfer moves
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Saved, not sent. Nothing has moved." },
+    { name: "On the way", t: "info", note: "Mark on the way. Stock has left." },
+    { name: "Arrived", t: "good", note: "Completed. Stock moved." },
+  ]}
+  caption="A draft or on-the-way transfer can be cancelled. Stock that was on the way goes back to where it came from."
+/>
+
+<WarehouseTransferFlow />
+
+<Fold>
+
+## The transfers list
+
+**Transfers** shows what's on the way, what hasn't been sent and what has arrived, the value moved, your busiest route and how long transfers take to arrive. **Top routes** lists the paths stock moves along most; click one to filter the list.
+
+<Shot name="warehouses-transfers" alt="The Transfers list with units on the way, transfers not sent yet, a chart by month, the top routes and a draft, an on-the-way and an arrived transfer" pins />
+
+Click a row to preview a transfer: the route, the items and units, and **Mark on the way**, **Complete** or **Cancel** while it's still open.
+
+<Shot name="warehouses-transfer-preview" alt="A draft transfer of four wireless keyboards previewed beside the list, with Mark on the way, Complete and Cancel buttons and its line items" />
+
+</Fold>
+
+<Fold>
+
+## Editing and removing locations
+
+Each location card has **Edit** (name, code, address and **Active**); cards other than the default also have **Delete**. An inactive location can't be the default or receive transfers. You can only delete a location that holds no stock and has no open transfers, so move its stock out first. Use the **All**, **Active** and **Inactive** tabs and the search box to find a location when you have many.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Inventory" href="/docs/guides/inventory" description="Items, counts and what your stock is worth." />
+  <Card title="Stocktakes" href="/docs/guides/stock-takes" description="Count what's on the shelf and fix any differences." />
+  <Card title="Purchase orders" href="/docs/guides/purchase-orders" description="Order stock from suppliers." />
+</Cards>

@@ -1,0 +1,127 @@
+---
+title: Self-hosting
+description: "Run your own dubbl with Docker Compose: the app, PostgreSQL, and the services you add when you need them."
+icon: Server
+---
+
+dubbl is open source, and the same code that runs dubbl.dev runs on your own server. The repository ships a production `Dockerfile` and a `docker-compose.prod.yml` that start the app and PostgreSQL together. With just those two you have a working dubbl; file storage, email, background jobs, Stripe and the Tilly assistant are switched on with environment variables when you want them.
+
+<SelfHostArchitecture />
+
+## Deploy with Docker Compose
+
+<Steps>
+
+<Step>
+
+On a server with Docker, get the code:
+
+```bash
+git clone https://github.com/dubbl-org/dubbl.git
+cd dubbl
+```
+
+</Step>
+
+<Step>
+
+Create `.env.production` next to the compose file. These are the values you must set:
+
+```bash
+# .env.production
+NEXT_PUBLIC_APP_URL=https://books.example.com
+AUTH_URL=https://books.example.com
+AUTH_SECRET=paste-the-output-of-openssl-rand-base64-32
+POSTGRES_PASSWORD=a-long-random-password
+EMAIL_ENCRYPTION_KEY=paste-the-output-of-openssl-rand-hex-32
+```
+
+Generate the secret with `openssl rand -base64 32` and the encryption key with `openssl rand -hex 32`. The compose file builds the database address from `POSTGRES_PASSWORD`, so you don't need `DATABASE_URL` unless your database is somewhere else. Everything else is in [Configuration](/docs/self-hosting/configuration).
+
+</Step>
+
+<Step>
+
+Build the image and start it:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+The app listens on port 3000 (set `PORT` to change the host port). Check it with `curl localhost:3000/api/health`, which answers `{"status":"ok"}`.
+
+</Step>
+
+<Step>
+
+Create the tables. The image contains only the built app, so run migrations from your checkout, with Node 22 and pnpm, against the database port Compose publishes:
+
+```bash
+corepack enable && pnpm install --frozen-lockfile
+DATABASE_URL=postgresql://dubbl:a-long-random-password@localhost:5432/dubbl pnpm db:migrate
+```
+
+You'll see `Migrations applied.` Do the same after every update; see [Updates](/docs/self-hosting/updates).
+
+</Step>
+
+<Step>
+
+Put HTTPS in front of port 3000 with your usual reverse proxy. With Caddy, the whole config is:
+
+```
+books.example.com {
+  reverse_proxy localhost:3000
+}
+```
+
+</Step>
+
+<Step>
+
+Open your address and sign up. The first account on a new dubbl becomes the **site admin** and can always register, whatever the registration settings say. Then create your organization and follow [Set up your business](/docs/guides/setup).
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Without Stripe keys, dubbl doesn't bill anyone: every organization gets every feature with no limits. To decide this yourself, set **Self-hosted unlimited mode** in the admin area's **Settings**: **Always on** gives every organization everything even with Stripe keys set (for example, to take card payments without selling plans), and **Always off** applies plan limits.
+- `NEXT_PUBLIC_APP_URL` must be the address people use. It goes into emailed links, payment links, the customer portal and the MCP server's sign-in details.
+- In production, sign-in needs `AUTH_URL` (or `AUTH_TRUST_HOST=true`) so it trusts your domain. Without it, signing in fails with an "untrusted host" error.
+- The prod compose file publishes PostgreSQL on port 5432 so you can migrate and back up from the host. Firewall that port, or change it with `POSTGRES_PORT`.
+- File uploads need [object storage](/docs/self-hosting/storage), and scheduled work (overdue invoices, recurring invoices, backups, reminders) needs [background jobs](/docs/self-hosting/background-jobs). Plan for both before real use.
+
+## The admin area
+
+Site admins get a separate admin area at `/admin`: **Dashboard**, **Users**, **Organizations**, **Settings** and **Email Preview**. Under **Users**, the **...** menu can **Grant Admin** or **Revoke Admin** for anyone else.
+
+<Shot name="selfhost-admin-settings" alt="The admin Site Settings page: registration mode, allowed email domains, organization creation and Stripe status" pins />
+
+<Fold>
+
+## Who can sign up
+
+**Settings** in the admin area controls registration for the whole instance:
+
+- **Registration mode**: **Open** lets anyone sign up. **Disabled** turns sign-up off. **Invite only** lets people sign up only if they've been invited: by email to an organization (with the address the invitation went to) or through an organization's invite link. Everyone else is refused.
+- **Allowed email domains**: a comma-separated list, such as `acme.com, example.com`. Only addresses at those domains can sign up, by email or with Google or Apple. Leave it empty to allow any domain.
+- **Allow users to create organizations**: turn it off and only site admins can create organizations.
+
+You can set the first two before the database exists with `REGISTRATION_MODE` and `ALLOWED_EMAIL_DOMAINS`. Once you change them in the admin area, the saved value wins.
+
+</Fold>
+
+## Next steps
+
+<Cards>
+  <Card icon={<Settings2 />} title="Configuration" href="/docs/self-hosting/configuration" description="Every environment variable, grouped." />
+  <Card icon={<HardDrive />} title="Storage" href="/docs/self-hosting/storage" description="S3, MinIO or R2 for files and backups." />
+  <Card icon={<Mail />} title="Email" href="/docs/self-hosting/email" description="Resend and per-organization SMTP." />
+  <Card icon={<Clock />} title="Background jobs" href="/docs/self-hosting/background-jobs" description="The nightly jobs and how to run them." />
+  <Card icon={<CreditCard />} title="Payments" href="/docs/self-hosting/payments" description="Stripe for plans, payment links and sync." />
+  <Card icon={<DatabaseBackup />} title="Backups" href="/docs/self-hosting/backups" description="What to back up, and how to restore." />
+  <Card icon={<RefreshCw />} title="Updates" href="/docs/self-hosting/updates" description="New versions and database migrations." />
+  <Card icon={<LifeBuoy />} title="Troubleshooting" href="/docs/self-hosting/troubleshooting" description="The errors people hit, and the fix." />
+</Cards>

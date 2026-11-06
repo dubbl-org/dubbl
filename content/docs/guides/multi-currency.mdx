@@ -1,30 +1,162 @@
 ---
-title: Multi-Currency
-description: Set up multi-currency support for international transactions.
+title: Multi-currency
+description: Invoice, bill and bank in other currencies while your books and reports stay in your own, with exchange rates kept up to date for you.
+icon: Coins
 ---
 
-dubbl supports 30+ currencies out of the box.
+Your books have one base currency, the one your reports add up in. You can still invoice a customer in euros, pay a supplier in pounds or keep a bank account in yen. dubbl records each foreign amount as it is, converts it to your base currency with the exchange rate for that day, and books the gain or loss when the rate has moved by the time the money arrives.
 
-## Organization Currency
+<Shot name="currencies" alt="The currencies page with the base currency, unrealised gains and losses, and the list of exchange rates" pins />
 
-Each organization has a **default currency** set during registration (Settings → General). All reports use this currency.
+## Invoice a customer in another currency
 
-## Contact Currency
+<Steps>
 
-Assign a default currency to contacts. When creating invoices or bills for that contact, the currency is pre-selected.
+<Step>
 
-## Exchange Rates
+Open the customer's page and set their **Currency code**, for example EUR.
 
-Exchange rates are stored as integers with 6 decimal places of precision:
+</Step>
 
-| Rate | Stored Value |
-|------|-------------|
-| 1.000000 | 1,000,000 |
-| 1.350000 | 1,350,000 |
-| 0.850000 | 850,000 |
+<Step>
 
-Journal line items include `currencyCode` and `exchangeRate` fields for proper multi-currency tracking.
+Create the invoice as usual. It's in the customer's currency, and every amount you enter is in that currency.
 
-## Available Currencies
+</Step>
 
-dubbl seeds 30 currencies including USD, EUR, GBP, JPY, CHF, CAD, AUD, CNY, INR, BRL, and more. View and manage currencies in **Settings → Currencies**.
+<Step>
+
+Open the invoice. Under the total, **In USD** shows its value in your base currency, with the rate behind it, such as "1 EUR ≈ 1.08 USD", and whether it's an **Auto rate** or a **Manual rate**.
+
+</Step>
+
+<Step>
+
+Send it. Your books record it at that day's rate.
+
+</Step>
+
+</Steps>
+
+Bills work the same way: set the supplier's **Currency code** and their bills use it.
+
+## Good to know
+
+- Your base currency is the **Default currency** in **Settings**, under **Financials**. Every report is in it.
+- Rates are fetched for you every day. A rate you enter yourself is never overwritten.
+- dubbl uses the latest rate on or before the document's date. If you only have the rate the other way round (EUR to USD instead of USD to EUR), it uses that.
+- If there's no rate at all, the document can't be recorded. The invoice shows "No EUR→USD rate available" with **Set a custom rate**. Elsewhere the error points you to **Tax**, then **Currencies**, to add one.
+- Currencies other than your base currency are included from the Standard plan.
+
+## When the rate moves before you're paid
+
+<ForeignInvoiceSettlement />
+
+<Fold>
+
+## Add an exchange rate yourself
+
+Use your own rate when your bank gave you a specific one, or when a currency isn't in the daily feed.
+
+<Steps>
+
+<Step>
+
+Open **Tax**, then **Currencies**, and choose **Add Rate**.
+
+</Step>
+
+<Step>
+
+Pick the **Base Currency** and **Target Currency**.
+
+</Step>
+
+<Step>
+
+Enter the **Rate**: how much 1 unit of the base currency is worth in the target currency. For USD to EUR, that's about 0.92.
+
+</Step>
+
+<Step>
+
+Set the **Date** it applies from and choose **Create**.
+
+</Step>
+
+</Steps>
+
+<Shot name="currencies-rate" alt="The New Exchange Rate form with the base and target currency, the rate and the date" narrow />
+
+In the **Exchange Rates** list, rates you entered are marked **Manual** and fetched ones **Auto**.
+
+</Fold>
+
+<Fold>
+
+## What gets recorded in your books
+
+A €1,000 invoice issued when 1 EUR was 1.08 USD is recorded at $1,080:
+
+<JournalEntry
+  title="Invoice in EUR, converted at 1.08"
+  date="Mar 2, 2026"
+  lines={[
+    { account: "1200 Accounts Receivable", debit: 108000 },
+    { account: "4000 Sales Revenue", credit: 108000 },
+  ]}
+/>
+
+When the customer pays €1,000 and the rate is now 1.10, $1,100 arrives but only $1,080 was owed in your books. The extra $20 is a realised gain:
+
+<JournalEntry
+  title="Payment received, converted at 1.10"
+  date="Apr 10, 2026"
+  lines={[
+    { account: "1100 Checking Account", debit: 110000 },
+    { account: "1200 Accounts Receivable", credit: 108000 },
+    { account: "4910 Realised Currency Gains", credit: 2000 },
+  ]}
+  caption="A worse rate would post the difference to 5930 Realised Currency Losses instead. Bills work the same way in reverse."
+/>
+
+The idea behind this is in [Multi-currency](/docs/learn/multi-currency).
+
+</Fold>
+
+<Fold>
+
+## Open invoices and bills at month end
+
+Until a foreign invoice or bill is paid, its value in your base currency drifts with the rate. **Unrealised FX Gains & Losses** on the currencies page shows how much your open ones have gained or lost at today's rate.
+
+Your books catch up once a month as well:
+
+<FxRevaluationCycle />
+
+</Fold>
+
+<Fold>
+
+## Bank accounts and accounts in another currency
+
+Each bank account has its own currency, set when you add it and shown in its settings. Accounts in your chart of accounts have a currency too, which can't be changed after the account is created. See [Bank accounts](/docs/guides/bank-accounts) and [Chart of accounts](/docs/guides/chart-of-accounts).
+
+</Fold>
+
+<Fold>
+
+## Add a currency
+
+The currencies page lists every ISO 4217 currency under **Currency Reference**. If you need one that isn't there, choose **Add Currency** and enter its **Code**, **Name**, **Symbol** and **Decimal Places**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Multi-currency explained" href="/docs/learn/multi-currency" description="Rates, realised and unrealised gains, from scratch." />
+  <Card title="Invoices" href="/docs/guides/invoices" description="Bill your customers." />
+  <Card title="Contacts" href="/docs/guides/contacts" description="Set a customer's or supplier's currency." />
+  <Card title="Bank accounts" href="/docs/guides/bank-accounts" description="Keep accounts in other currencies." />
+</Cards>

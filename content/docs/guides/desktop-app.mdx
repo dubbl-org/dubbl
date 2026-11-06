@@ -1,0 +1,98 @@
+---
+title: Desktop app
+description: Run dubbl in its own window on macOS, Windows or Linux, connected to dubbl Cloud or your own server.
+icon: Monitor
+---
+
+The desktop app puts dubbl in its own window, with a menu bar, keyboard shortcuts and a native look on macOS and Windows. It's the same dubbl you use in the browser: the pages come from dubbl Cloud or your own server, so every new feature reaches the app the moment it reaches the server, without an app update.
+
+<Shot name="desktop-app-connect" alt="The desktop app's first screen: Welcome to dubbl, choose dubbl Cloud or Self-hosted, then Continue" />
+
+## Get started
+
+<Steps>
+
+<Step>
+
+Download the installer for your computer from dubbl's [GitHub releases](https://github.com/dubbl-org/dubbl/releases): a `.dmg` for macOS (Apple silicon or Intel), an installer `.exe` for Windows, or an AppImage or `.deb` for Linux.
+
+</Step>
+
+<Step>
+
+Open the app. On **Welcome to dubbl**, choose **dubbl Cloud**, or **Self-hosted** and type your server's address (like `books.example.com`).
+
+</Step>
+
+<Step>
+
+Choose **Continue**. The app checks that a dubbl server answers at that address, then opens its sign-in page.
+
+</Step>
+
+<Step>
+
+Sign in as you would in the browser. Signing in with Google or Apple happens inside the app.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Only one copy of the app runs at a time. Opening it again brings the existing window forward.
+- The app remembers its window size and position, and the server you chose.
+- Links to other websites open in your normal browser. PDFs and previews from dubbl open in a separate app window.
+- Packaged apps check for updates on their own and install them when you quit.
+- If the server can't be reached you'll see **Can't reach dubbl**. The app keeps trying; choose **Try again** to retry now or **Change server** to connect somewhere else.
+
+## What's different from the browser
+
+<DesktopAppShell />
+
+<Fold>
+
+## Menus and shortcuts
+
+- **Go** jumps to **Overview** (**⌘1**), **Sales** (**⌘2**), **Purchases** (**⌘3**), **Contacts** (**⌘4**), **Accounting** (**⌘5**), **Reports** (**⌘6**), **Tilly** (**⌘J**), **Notifications** and **Documents**.
+- **View** has **Back** (**⌘[**), **Forward** (**⌘]**) and **Reload** (**⌘R**).
+- **Settings…** (**⌘,**) opens dubbl's settings.
+- **Help > dubbl Documentation** opens these docs in your browser.
+
+On Windows and Linux, use **Ctrl** instead of **⌘**.
+
+</Fold>
+
+<Fold>
+
+## Switch to another server
+
+Choose **Change Server…** in the app menu (on Windows and Linux, the **File** menu), pick **dubbl Cloud** or **Self-hosted**, and choose **Continue**. The app checks the new address before it switches, and you sign in again there.
+
+</Fold>
+
+<Fold>
+
+## Build it yourself
+
+The app lives in the `desktop/` folder of the dubbl repository. With Node.js and pnpm installed:
+
+```bash
+cd desktop
+pnpm install
+pnpm dist:mac     # dmg and zip, Apple silicon and Intel
+pnpm dist:win     # Windows installer
+pnpm dist:linux   # AppImage and deb
+```
+
+See [Contributing](/docs/developers/contributing) for working on the code.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Mobile app" href="/docs/guides/mobile-app" description="dubbl on your iPhone." />
+  <Card title="Tilly" href="/docs/guides/tilly" description="One shortcut away with ⌘J." />
+  <Card title="Self-hosting" href="/docs/self-hosting" description="Run your own dubbl server to connect to." />
+</Cards>

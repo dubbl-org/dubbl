@@ -1,0 +1,194 @@
+---
+title: Contributing
+description: "Run dubbl on your machine, find your way around the code, and send a pull request that passes CI the first time."
+icon: GitPullRequest
+---
+
+dubbl is open source under the Apache 2.0 license, and contributions of every size are welcome: a fix, a missing report, a tax rule that changed, a clearer sentence in these docs. It's a Next.js app on PostgreSQL, so if you can run Node and Docker you can run all of it.
+
+## Run dubbl locally
+
+<Tabs items={["Node on your machine", "Everything in Docker"]}>
+
+<Tab value="Node on your machine">
+
+<Steps>
+
+<Step>
+
+You need Node.js 22 (what CI uses), pnpm (turn it on with `corepack enable`) and Docker for the database.
+
+</Step>
+
+<Step>
+
+Get the code and its dependencies:
+
+```bash
+git clone https://github.com/dubbl-org/dubbl.git
+cd dubbl
+pnpm install
+cp .env.example .env
+```
+
+The defaults in `.env` already point at the database and storage from the next step.
+
+</Step>
+
+<Step>
+
+Start PostgreSQL and MinIO (local S3 storage, with a `dubbl` bucket made for you):
+
+```bash
+docker compose up -d
+```
+
+</Step>
+
+<Step>
+
+Create the tables, then load the demo company:
+
+```bash
+DATABASE_URL=postgresql://dubbl:dubbl@localhost:5432/dubbl pnpm db:migrate
+pnpm db:seed
+```
+
+</Step>
+
+<Step>
+
+Start the app and open [localhost:3000](http://localhost:3000):
+
+```bash
+pnpm dev
+```
+
+Sign in as `demo@dubbl.dev` with `password123`, or use **Dev Login (test account)** on the sign-in page, which only appears in development.
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+<Tab value="Everything in Docker">
+
+The `web` profile runs the app in a container too. It installs dependencies, creates the tables with the same migrations production uses (`pnpm db:migrate`), seeds the demo company and starts `pnpm dev` with your folder mounted, so edits reload as usual.
+
+```bash
+git clone https://github.com/dubbl-org/dubbl.git
+cd dubbl
+docker compose --profile web up
+```
+
+Put any keys you want to try (Google sign-in, Stripe test keys, OpenRouter for Tilly) in `.env.local`; the container reads it.
+
+</Tab>
+
+</Tabs>
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | The app with hot reload, on port 3000 |
+| `pnpm lint` | ESLint |
+| `npx tsc --noEmit` | Type check. Run `pnpm fumadocs-mdx` first on a fresh clone, as CI does |
+| `pnpm test` | Unit tests in `tests/*.test.ts`, with Node's built-in test runner |
+| `pnpm db:generate` | Write a migration for your schema change into `drizzle/` |
+| `pnpm db:migrate` | Apply pending migrations to `DATABASE_URL` |
+| `pnpm db:seed` | Load the demo company (reads `.env`) |
+| `pnpm db:studio` | Drizzle Studio, to browse the database |
+| `pnpm trigger:dev` | Run the background jobs locally against Trigger.dev |
+| `pnpm docs:shots` | Retake the docs screenshots from the running app |
+
+## Changing the database
+
+Every change to the schema ships with a migration, so self-hosters can update safely.
+
+<Steps>
+
+<Step>
+
+Edit the tables in `lib/db/schema/`.
+
+</Step>
+
+<Step>
+
+Run `pnpm db:generate`. Drizzle compares the schema with the last migration and writes the SQL to `drizzle/`.
+
+</Step>
+
+<Step>
+
+Read the SQL, apply it to your database with `pnpm db:migrate`, and commit the `drizzle/` files together with your schema change.
+
+</Step>
+
+</Steps>
+
+<Callout type="warn" title="Don't use drizzle-kit push on real data">
+`pnpm db:push` changes a database straight from the schema without a migration. It's handy for a throwaway local database, but never point it at production: the database would no longer match the migration history.
+</Callout>
+
+A pull request that changes `lib/db/schema` without the matching migration fails CI's **Migration Drift** check.
+
+## Before you open a pull request
+
+- `pnpm lint`, `npx tsc --noEmit` and `pnpm test` pass. CI runs all three, then builds the app and the Docker image.
+- Money is integer cents everywhere (`$12.50` is `1250`). Use the helpers in `lib/money.ts` instead of floating-point maths.
+- A feature people can use in the app has matching MCP tools (see below), and the tools change when the API route does.
+- Screens use the existing UI pieces in `components/ui` and the app's colour tokens, so light and dark both work.
+
+## Adding MCP tools
+
+The MCP server is how agents use dubbl, so it grows with the app. The rules:
+
+- Tools live in `lib/mcp/tools/`, one file per area, each exporting a `registerXTools(server, ctx)` function. Register new files in `lib/mcp/tools/index.ts`.
+- One tool per operation, named for what it does: `create_invoice`, not `manage_invoices`.
+- Tools talk to the database directly with Drizzle, scoped to `ctx.organizationId`. They don't call the HTTP API.
+- Wrap every handler in `wrapTool()` from `lib/mcp/errors.ts`, and check permissions with `requireRole(ctx, ...)` as the matching route does.
+- Put `.describe()` on every Zod field. Say what the input expects ("amount in cents", "date as YYYY-MM-DD") and what comes back.
+
+A real one, from `lib/mcp/tools/tags.ts`:
+
+```ts
+export function registerTagTools(server: McpServer, ctx: AuthContext) {
+  server.tool(
+    "list_tags",
+    "List all tags for the organization (excludes deleted), ordered by name. Each tag has id, name, color (hex), and optional description. Returns the tags.",
+    {},
+    () =>
+      wrapTool(ctx, async () => {
+        const tags = await db.query.tag.findMany({
+          where: and(eq(tag.organizationId, ctx.organizationId), notDeleted(tag.deletedAt)),
+          orderBy: tag.name,
+        });
+        return { tags };
+      })
+  );
+}
+```
+
+## Where things live
+
+| Path | What's there |
+| --- | --- |
+| `app/(dashboard)/` | The app's screens |
+| `app/api/v1/` | The REST API, one folder per resource |
+| `app/api/mcp/` | The MCP endpoint and its OAuth routes |
+| `lib/db/schema/` | Drizzle tables; `drizzle/` holds the migrations |
+| `lib/api/` | Shared server logic: auth, permissions, posting to the ledger, numbering |
+| `lib/mcp/tools/` | MCP tools |
+| `trigger/` | Background jobs (Trigger.dev) |
+| `content/docs/` | These docs (MDX). Screenshots are specs in `scripts/docs-shots/`, diagrams in `components/docs/diagrams/` |
+
+## Related
+
+<Cards>
+  <Card title="Self-hosting" href="/docs/self-hosting" description="Run dubbl for real, with Docker." />
+  <Card title="Updates and migrations" href="/docs/self-hosting/updates" description="How a release reaches a server." />
+  <Card title="MCP server" href="/docs/developers/mcp" description="What the tools you add are for." />
+</Cards>

@@ -1,0 +1,115 @@
+---
+title: Approvals
+description: Make bills, expenses, invoices, journal entries and purchase orders wait for one or more people to approve them, in order.
+icon: Stamp
+---
+
+An approval workflow is a rule like "bills over $5,000 need Priya, then Alex, to approve". When a matching record is sent for approval, each approver sees it in their bell when it's their turn, and it only moves on once everyone has said yes. Workflows work for bills, expenses, invoices, journal entries and purchase orders, and live under **Settings > Approvals**.
+
+<Shot name="approvals" alt="The Approval Workflows page with the Create Workflow button" pins />
+
+## Create a workflow
+
+<Steps>
+
+<Step>
+
+Open **Settings > Approvals** and choose **Create Workflow**.
+
+</Step>
+
+<Step>
+
+Give it a **Name** and pick what it **Applies to**: **Bill**, **Expense**, **Invoice**, **Journal Entry** or **Purchase Order**.
+
+</Step>
+
+<Step>
+
+Under **Conditions**, choose **Add condition** to limit which records it covers. Pick a field, how to compare it and a value, for example **Total**, **greater than**, $5,000.00. Type amounts in dollars and cents as usual. With no conditions, the workflow covers every record of that type.
+
+</Step>
+
+<Step>
+
+Under **Approval Steps**, choose **Add Step** and pick who approves first. Add more steps for more approvers, and use the arrows to put them in order.
+
+</Step>
+
+<Step>
+
+Choose **Create**. The workflow is **Active** straight away.
+
+</Step>
+
+</Steps>
+
+<Shot name="approvals-new" alt="The Create Workflow drawer for invoices over $5,000, with one condition and Demo User as the first approver" narrow />
+
+## Good to know
+
+- You can test **Total**, **Subtotal**, **Tax** and **Currency** on bills, invoices and purchase orders, **Total** and **Currency** on expenses, and **Total** (all the debits added up) on journal entries. Every condition must match.
+- Amounts are compared in the record's own currency. Add a **Currency** condition if you work in more than one.
+- When more than one active workflow matches a record, the one with the most conditions is used. If that's a tie, the oldest one is used. So a general "every bill" workflow and a stricter "bills over $5,000" one can live side by side.
+- Only the approver of the current step can approve or reject. The next approver is asked only after the step before them is done. A rejection at any step ends the request.
+- Bills, expenses and invoices also need the matching permission to approve: **Approve bills you owe**, **Approve expenses** or **Approve invoices**. Admins and the owner have them. For journal entries and purchase orders, being the step's approver is enough.
+- Creating, changing and deleting workflows needs **Manage approval workflows** (admins and the owner).
+
+## How a record gets approved
+
+<ApprovalWorkflowFlow />
+
+<Fold>
+
+## Bills, expenses and invoices
+
+These have their own **Awaiting approval** status:
+
+- **Bills**: tick **Submit for approval instead of posting** when you create one, or choose **Submit for approval** on a draft. After the last approval the bill is added to your books. **Reject** sends it back to a draft with the reason. See [Bills](/docs/guides/bills).
+- **Expenses**: choose **Submit** on the claim. After the last approval the claim is approved and booked, ready to pay back. **Recall to edit** takes it out of the approvers' queue. See [Expenses](/docs/guides/expenses).
+- **Invoices**: tick **Submit for approval instead of sending**, or choose **Submit for approval** on a draft. After the last approval the invoice goes back to draft, ready to send. A rejection marks it **Rejected**. Submitting an invoice that no workflow covers gives an error. See [Invoices](/docs/guides/invoices).
+
+If no workflow covers a bill or an expense claim, it still waits as **Awaiting approval**, and anyone with permission to approve can approve it in one go.
+
+Approvers open the record from the bell and choose **Approve**, or **Reject** with a reason. A box on the record shows who has approved and whose turn it is.
+
+</Fold>
+
+<Fold>
+
+## Journal entries and purchase orders
+
+These have no approval status of their own. Instead, when a workflow covers a draft, it can't be finalized (journal entry) or sent (purchase order) until it's approved:
+
+1. Open the draft. A box says it **Needs approval**. Choose **Submit for approval**.
+2. Each approver opens it from the bell and chooses **Approve**, or **Reject** with a reason.
+3. Once the last approver says yes, **Finalize** or **Send** works as usual.
+
+Editing the draft cancels its approval, so it has to be submitted again. After a rejection, fix it if needed and choose **Submit for approval** again.
+
+</Fold>
+
+<Fold>
+
+## Pause or change a workflow
+
+Open the menu on a workflow's row. **Edit** changes its conditions or steps, **Deactivate** stops it applying to new records, and **Delete** removes it. Records already waiting keep going, with the approvers the workflow has now.
+
+</Fold>
+
+<Fold>
+
+## Other approvals
+
+- **Requisitions**: requests to buy are approved by someone who can approve purchases. See [Requisitions](/docs/guides/requisitions).
+- **Payroll, timesheets and time off** have their own approve buttons. See [Payroll](/docs/guides/payroll) and [Time and leave](/docs/guides/time-and-leave).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bills" href="/docs/guides/bills" description="Approve bills before they reach your books." />
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Give people the right to approve." />
+  <Card title="Notifications" href="/docs/guides/notifications" description="How approvers find out something is waiting." />
+</Cards>

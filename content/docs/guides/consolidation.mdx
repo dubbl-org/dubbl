@@ -1,0 +1,110 @@
+---
+title: Consolidation
+description: Add several of your businesses together into one profit and loss and one balance sheet, with trading between them taken out.
+icon: Building2
+---
+
+If you run more than one business in dubbl, consolidation shows them as one group. **Combined company reports** adds up their profit and loss and balance sheets, converts everything into one currency, and takes out sales and balances between the businesses so nothing is counted twice.
+
+<Shot name="consolidation" alt="Combined company reports, with the Company groups box for creating a group" pins />
+
+## Combine your businesses
+
+<Steps>
+
+<Step>
+
+Open **Reports** and choose **Combined view across companies** under **For your accountant**.
+
+</Step>
+
+<Step>
+
+Under **Company groups**, type a **New group name** (for example "Northwind group") and choose **Create**.
+
+</Step>
+
+<Step>
+
+With the group selected, choose **Add a business** and pick each business to include. The list shows every organization you're a member of, and the one you're working in is marked **(this business)**.
+
+</Step>
+
+<Step>
+
+Under **Report currency**, pick the currency to show the combined figures in. It starts as your business's base currency.
+
+</Step>
+
+<Step>
+
+Pick the dates, then choose **Profit & Loss** or **Balance Sheet**.
+
+</Step>
+
+<Step>
+
+Read the totals at the top (**Total Revenue**, **Total Expenses** and **Net Income**, or **Total Assets**, **Total Liabilities** and **Total Equity**), then **Each business** and **Account breakdown** underneath.
+
+</Step>
+
+<Step>
+
+Choose **Export CSV** to take the combined figures with you.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Each business keeps its own books. Consolidation only reads them, every time you open the report, and posts nothing to any of them.
+- You can only add businesses you're a member of. The business you're working in owns the group, and you can add it to the group too.
+- Figures are shown in the group's **Report currency**. Assets and debts are converted at the rate on the end date, income and costs at the average rate for the period.
+- The totals at the top have trading between the businesses taken out. The **Each business** rows show each business as it is, before anything is taken out.
+- On dubbl's hosted plans, consolidation comes with Premium (up to 3 businesses per group) and Ultimate (no limit). See [Billing](/docs/guides/billing).
+
+## How the combined figures are built
+
+<ConsolidationSteps />
+
+## What gets taken out
+
+When one of your businesses sells to another, the group as a whole hasn't earned anything: money just moved between your own pockets. Left in, the sale would show twice (once as one business's sales, once as the other's costs), and any unpaid amount would appear as both money owed to you and money you owe.
+
+<ConsolidationRollup />
+
+<Fold>
+
+## Setting up what to take out
+
+dubbl takes out trading between your businesses using rules that say which accounts hold the sales and costs between them, or the amounts they owe each other. Set them up under **Amounts to remove between your businesses**, below **Report currency**:
+
+1. Give the rule a **Rule name**, for example "Owed between companies".
+2. Under **What it removes**, pick **Money they owe each other (receivables vs payables)**, **Sales between them (income vs costs)** or **Custom accounts**.
+3. Enter the **First account code** and **Second account code**, for example 1200 and 2000 for money owed, or 4010 and 5130 for sales. You can enter just the start of a code to cover a range.
+4. Choose **Add rule**.
+
+To remove a rule, use the trash icon next to it and confirm. You can also ask [Tilly](/docs/guides/tilly) to add one, for example: "In my Northwind group, eliminate sales between the companies from account 4010 against 5130."
+
+A rule never takes out more than the invoices and bills between the businesses support, so balances with outside customers and suppliers stay put. Without any rules, the report simply adds the businesses together.
+
+</Fold>
+
+<Fold>
+
+## Managing a group
+
+- **Switch group:** click its name under **Company groups**. The badge shows how many businesses are in it.
+- **Remove a business:** use the trash icon next to it in the group's list of businesses.
+- **Delete a group:** use the trash icon on the group's chip and confirm with **Delete group**. The businesses themselves aren't touched.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Multi-currency" href="/docs/guides/multi-currency" description="How exchange rates are stored and used." />
+  <Card title="Profit and loss" href="/docs/guides/profit-and-loss" description="The same report for one business." />
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Join the other businesses you want to combine." />
+</Cards>

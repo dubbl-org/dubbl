@@ -1,0 +1,151 @@
+---
+title: Tilly
+description: Ask questions about your money in plain words, find anything, and have receipts and bills booked for you, with every change waiting for your OK.
+icon: Sparkles
+---
+
+Tilly is the assistant built into dubbl. Ask how the business is doing, who owes you money or where a payment went, and Tilly looks it up in your books and answers in plain words. Drop a receipt, bill or bank statement and Tilly reads it and books it with you. Tilly reads on its own, but anything that would change your books or email someone waits for you to approve it.
+
+<Shot name="tilly-panel" alt="The Tilly panel open beside the invoices list, with the drop card, suggested questions and the message box" pins />
+
+## Ask your first question
+
+<Steps>
+
+<Step>
+
+Choose **Ask Tilly** in the top bar, or press **⌘I** (**Ctrl+I** on Windows and Linux). The panel opens beside the page you're on.
+
+</Step>
+
+<Step>
+
+Pick one of the suggestions under **Or ask**, or type your own question in the box. Press **Enter** to send it; **Shift+Enter** adds a new line.
+
+</Step>
+
+<Step>
+
+Tilly looks things up (you'll see a line like **Ran 3 steps**; open it to see each one) and answers with the numbers, links to the records it used, and what to do next.
+
+</Step>
+
+</Steps>
+
+<Shot name="tilly-prompt" alt="A question about which customers owe the most, typed into the Tilly panel" narrow />
+
+## Good to know
+
+- Tilly only reads until you say otherwise. Booking, editing, linking and deleting wait for **Approve**; emails wait for **Send**.
+- Tilly knows which page you're on, so "this invoice" or "these bills" means what's on your screen.
+- Your chats are your own. Other people in the workspace don't see them.
+- Sending a new message while an action is waiting skips that action.
+- Files you give Tilly are saved to [Documents](/docs/guides/documents), so you never lose the original.
+- Tilly needs an AI key on the server. If you see **Tilly isn't switched on yet**, ask whoever runs your dubbl server to add one (see [Configuration](/docs/self-hosting/configuration)).
+
+## What Tilly asks before doing
+
+<TillyRiskTiers />
+
+When Tilly wants to change something it stops and shows a card with exactly what it will do. **Approve** (or **Send** for emails) runs it, **Skip** doesn't. **All details** shows everything it will send to dubbl.
+
+<TillyApprovalCardPreview />
+
+For changes (not emails), you can tick **Don't ask again for this in this chat** before you approve. Later actions of the same kind in that chat then run on their own and show **auto-approved**. A new chat starts asking again.
+
+<Fold>
+
+## Book a receipt or bill
+
+<Steps>
+
+<Step>
+
+Drag a PDF or photo onto the panel or the full page, or choose the paperclip in the message box. You can add up to 8 files at once.
+
+</Step>
+
+<Step>
+
+Send it, with or without a note like "this was paid with the company card".
+
+</Step>
+
+<Step>
+
+Tilly reads the file and searches your books by supplier and total. If it finds a likely match, it offers to attach the file to that record instead of booking it twice.
+
+</Step>
+
+<Step>
+
+Otherwise it proposes a bill (something you still have to pay) or an expense claim (something already paid). Check the card and choose **Approve**. Tilly then asks to attach the file to the new record.
+
+</Step>
+
+</Steps>
+
+<TillyReceiptFlow />
+
+Tilly reads PNG, JPEG, WebP and GIF images up to 5 MB, and PDF, CSV, TSV, TXT and JSON files up to 15 MB. A bank statement export gets a summary and an offer to import or match it to your bank lines.
+
+</Fold>
+
+<Fold>
+
+## The full page
+
+Choose **Open full page** in the panel header to give Tilly the whole screen. The page has your past chats on the left and shortcuts for the jobs Tilly is best at: **Book receipts and bills**, **Import a bank statement**, **Find anything**, **Chase late payers**, **Month in review** and **Tidy up the books**. Drop files anywhere on the page, or use **Choose files**.
+
+<Shot name="tilly-page" alt="The full Tilly page with a greeting, the message box, a drop area for receipts and six shortcut cards" pins />
+
+</Fold>
+
+<Fold>
+
+## Dock, pop out and keep several chats
+
+The panel docks beside the page by default; drag its left edge to make it wider. **Pop out** turns it into a window you can drag anywhere and resize from any edge; **Dock to the side** puts it back. Each new chat opens in a tab inside the panel.
+
+<Shot name="tilly-floating" alt="Tilly popped out as a floating window over the invoices list" />
+
+| Shortcut | What it does |
+| --- | --- |
+| **⌘I** | Open or close Tilly |
+| **⌥N** | New chat |
+| **⌥P** | Pop out or dock |
+| **⌥M** | Minimise |
+| **⌥[** and **⌥]** | Previous and next chat tab |
+
+In the desktop app, **Go > Tilly** (**⌘J**) opens the full page.
+
+</Fold>
+
+<Fold>
+
+## Past chats
+
+Choose **History** in the panel header to see your earlier chats. **Search chats** finds one by its title, and each chat can be renamed or deleted. A dot next to a chat means an action in it is still waiting for your approval.
+
+<Shot name="tilly-history" alt="Tilly's history list with New chat and Search chats" narrow />
+
+</Fold>
+
+<Fold>
+
+## Limits
+
+- One request can take up to 16 steps. If Tilly stops part way through a big job, ask it to carry on.
+- Tilly remembers the last 60 messages of a chat. Start a new chat for an unrelated question.
+- Up to 8 files per message.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Documents" href="/docs/guides/documents" description="Where every file you give Tilly is kept." />
+  <Card title="Bills" href="/docs/guides/bills" description="What Tilly books when you drop a supplier invoice." />
+  <Card title="Expenses" href="/docs/guides/expenses" description="What Tilly books for things already paid." />
+  <Card title="MCP" href="/docs/developers/mcp" description="The same tools Tilly uses, for your own AI client." />
+</Cards>

@@ -1,0 +1,109 @@
+---
+title: Supplier credits
+description: Record money a supplier owes you back, and take it off the next bill you pay them.
+icon: Undo2
+---
+
+A supplier credit (some suppliers call it a credit note, some accountants call it a debit note) is the supplier admitting they charged you too much: goods sent back, a damaged delivery, a price they got wrong. It reduces what you owe that supplier. You can then use it to pay part or all of one of their bills.
+
+<Shot name="supplier-credits" alt="The supplier credits list with credit to use, credit already used and the list of credits" pins />
+
+## Record a supplier credit
+
+<Steps>
+
+<Step>
+
+Open **Purchases**, then **Supplier credits**, and choose **New supplier credit**.
+
+</Step>
+
+<Step>
+
+Pick the **Supplier**, check the **Issue Date** and **Currency**, and put the original bill's number in **Reference**.
+
+</Step>
+
+<Step>
+
+Add a line for each thing being credited, with the same account and tax rate the bill used, and say why in **Notes**.
+
+</Step>
+
+<Step>
+
+Choose **Create supplier credit**. It's saved as a draft.
+
+</Step>
+
+<Step>
+
+On the credit, choose **Send**, then **Send Email** to confirm it with the supplier, or **Mark as Sent**. The credit becomes **Available** and goes into your books.
+
+</Step>
+
+</Steps>
+
+<Shot name="supplier-credits-detail" alt="An available supplier credit with Use against a bill, Cancel supplier credit and the remaining amount" pins />
+
+## Good to know
+
+- A draft credit isn't in your books. It counts once it's **Available**.
+- A credit can only be used against a bill from the same supplier, in the same currency.
+- You can split one credit across several bills. **Remaining** shows what's left to use.
+- The bill has to be in your books already, and you can't use more than it still owes.
+
+## Using a credit against a bill
+
+<SupplierCreditOffset />
+
+Open an available credit and choose **Use against a bill**. Pick the **Bill** from that supplier's open bills, check the **Amount**, and choose **Reduce the bill**. The bill's amount due drops by that much: it becomes **Part paid**, or **Paid** if the credit covered all of it. Once the whole credit is used, it shows as **Used**.
+
+<Shot name="supplier-credits-apply" alt="The Use this credit against a bill dialog with a bill picker, the amount and the remaining credit" narrow />
+
+<Fold>
+
+## What gets recorded in your books
+
+When the credit becomes available, what you owe the supplier goes down, and the cost (and any reclaimable tax) is taken back out of the accounts on the credit's lines:
+
+<JournalEntry
+  title="Supplier credit from AWS"
+  date="Oct 9, 2026"
+  lines={[
+    { account: "Accounts Payable - Trade", debit: 12000 },
+    { account: "Software & Subscriptions", credit: 12000 },
+  ]}
+  caption="A $120 service credit for an outage, with no tax. Using it against a bill then just settles part of that bill; no money moves."
+/>
+
+</Fold>
+
+<Fold>
+
+## Starting from a bill
+
+On a bill that's in your books, choose **Record a supplier credit**. The **New supplier credit** form opens with the bill's supplier, currency and number (as the **Reference**) filled in, and a line for each of the bill's items with the same account and tax rate. Change the quantities or prices to what's being credited, remove lines that aren't, and choose **Create supplier credit**. dubbl saves it as a draft linked to the bill and opens it, ready to send.
+
+<Shot name="supplier-credits-from-bill" alt="The New supplier credit form filled in from a bill, with the supplier, the bill number as reference and the bill's line with its account" narrow />
+
+</Fold>
+
+<Fold>
+
+## Cancelling a credit
+
+If a credit shouldn't exist, choose **Cancel supplier credit** on it. It shows as **Cancelled** and can't be used against a bill any more. Cancelling undoes everything the credit did:
+
+- If it was **Available** or **Used**, dubbl posts a reversing entry on the credit's issue date, so what you owe the supplier and the costs go back to what they were. That date has to be in an open period.
+- Any amount it took off bills goes back on them. Each bill's amount due goes up again and its status goes back to **To pay**, **Part paid** or **Overdue**, depending on what's still paid and its due date.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bills" href="/docs/guides/bills" description="The supplier invoices a credit reduces." />
+  <Card title="Paying bills" href="/docs/guides/paying-bills" description="Pay what's left after the credit." />
+  <Card title="Statements" href="/docs/guides/statements" description="Everything with one supplier in one place." />
+</Cards>

@@ -1,0 +1,96 @@
+---
+title: General ledger
+description: See every transaction in your books, grouped by account, with a running balance, and trace any report figure back to where it came from.
+icon: BookOpen
+---
+
+The general ledger is the full record behind every other report. In dubbl it's called **Every transaction, by account**. It lists each account that had activity in a period, and under each one every entry that touched it, in date order, with a running balance. When a number on a report looks odd, this is where you find out why.
+
+<Shot name="general-ledger" alt="Every transaction, by account, with the date range, Expand all and the entries for one account" pins />
+
+## Look up an account's transactions
+
+<Steps>
+
+<Step>
+
+Open **Reports** and choose **Every transaction, by account** under **For your accountant**.
+
+</Step>
+
+<Step>
+
+Pick the dates: **This Month**, **Last Month**, **This Quarter**, **Year to Date**, **This Year**, **Last Year** or **Custom**.
+
+</Step>
+
+<Step>
+
+Find the account. Each one shows its code and name, with **In** and **Out** for the period, its **Opening** balance and its **Balance** at the end of the period. Click it to open or close its entries, or use **Expand all** and **Collapse all**.
+
+</Step>
+
+<Step>
+
+Read the entries. The first row is the **Opening balance** on the first day of your range, then each entry with its **Date**, **Entry #**, **Description**, **Reference**, **In (debit)**, **Out (credit)** and **Running balance**.
+
+</Step>
+
+<Step>
+
+If an account had more than 50 entries, choose **Load more** at the bottom to see the next ones.
+
+</Step>
+
+<Step>
+
+Choose **Export CSV** to keep a copy or send it to your accountant.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Only posted entries show. Drafts and anything waiting for approval appear once they post.
+- **In (debit)** and **Out (credit)** are the two sides of double-entry. For money accounts and costs, a debit makes the balance go up; for what you owe, income and equity, a credit does. See [Debits and credits](/docs/learn/debits-and-credits).
+- For bank, asset, liability and equity accounts, the **Running balance** starts from the account's balance the day before your range, so the last balance matches [What you own and owe](/docs/guides/balance-sheet) on the end date. Income and cost accounts start from zero, so they show what you earned or spent in the period.
+- Accounts with no entries in the period are only listed if they have an opening balance.
+- **Export CSV** writes amounts in dollars and cents (12.50). The PDF and spreadsheet downloads include the opening balance and closing balance for each account.
+
+## From a report to the transaction
+
+<LedgerDrilldown />
+
+You rarely need to open the ledger from scratch. Click an account name on **What you own and owe** or **Account balances check** and the ledger opens at that account, from the first day of your financial year up to the date you picked, starting from its opening balance. On **Profit by team or project**, clicking an account shows only the transactions tagged to that department or project, with a note saying so; choose **Show all** to drop the filter.
+
+<Fold>
+
+## Finding the source of an entry
+
+Each line shows the **Entry #** and **Reference**. The reference is usually the document number (an invoice or bill number), so you can search for it. To see the whole entry with all its lines, open **Accounting** and find it by its number. See [Journal entries](/docs/guides/journal-entries).
+
+</Fold>
+
+<Fold>
+
+## Fixing a wrong entry
+
+The ledger is read-only. To change a number, fix the thing that caused it:
+
+- An invoice, bill or expense with the wrong account or amount: edit or credit the document.
+- A bank transaction in the wrong category: recategorize it. See [Categorizing transactions](/docs/guides/categorizing-transactions).
+- A manual journal: open it, choose **Cancel** to reverse it, and post a corrected one.
+
+The ledger updates on its own as soon as the fix posts.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Journal entries" href="/docs/guides/journal-entries" description="Post an adjustment by hand." />
+  <Card title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="The accounts the ledger is grouped by." />
+  <Card title="Balance sheet" href="/docs/guides/balance-sheet" description="Click any balance to land here." />
+  <Card title="Double-entry, explained" href="/docs/learn/double-entry" description="Why every entry has two sides." />
+</Cards>

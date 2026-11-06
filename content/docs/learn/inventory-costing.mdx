@@ -1,0 +1,90 @@
+---
+title: Inventory costing
+description: What the stock you sold cost you when you bought it at different prices, and how dubbl works it out.
+icon: Boxes
+---
+
+If you sell physical things, you buy them in batches, and each batch can cost a different amount. When you sell one, which price did it cost you? The answer decides your **cost of goods sold** (and so your profit) and the value of the stock still on your shelves. The rule you use to answer it is your **costing method**.
+
+<ShortVersion>
+
+- Stock you buy is an **asset** (inventory) until it sells. Then its cost becomes an expense: **cost of goods sold**.
+- **First in, first out (FIFO)**: the oldest units are assumed to sell first, at their old price.
+- **Average cost**: every unit costs the average of what you paid. dubbl recalculates it with each purchase.
+- When prices rise, FIFO shows lower costs and higher profit now; average cost smooths the change.
+- dubbl values stock at **average cost** by default, and you can switch an item to **first in, first out**. Cost of goods sold is posted automatically when you send an invoice.
+
+</ShortVersion>
+
+## Stock's journey through the books
+
+Buying stock doesn't make a loss. The money turns into an asset on your shelves. Only when you sell does its cost hit the profit and loss, right next to the sale it made possible:
+
+<StockJourney />
+
+<JournalEntry
+  title="Bill for 20 units"
+  date="Feb 10, 2026"
+  lines={[
+    { account: "Inventory", debit: 10000 },
+    { account: "Accounts payable", credit: 10000 },
+  ]}
+  caption="10 units at $4 and 10 at $6, $100 in total. Inventory goes up, not expenses."
+/>
+
+<JournalEntry
+  title="Cost of sales INV-00063"
+  date="Mar 2, 2026"
+  lines={[
+    { account: "Cost of goods sold", debit: 6000 },
+    { account: "Inventory", credit: 6000 },
+  ]}
+  caption="Sending the invoice for 12 units also records what they cost you: here at the $5 average."
+/>
+
+## FIFO against average cost
+
+Same purchases, same sale, two methods:
+
+<FifoVsAverage />
+
+- **First in, first out** assumes you sell your oldest stock first, which is usually what physically happens. The 12 units sold cost $52 and the 8 left are worth $48, all at the newest price.
+- **Average cost** blends every unit into one price, $5. The 12 sold cost $60 and the 8 left are worth $40.
+
+Either way, the $100 you spent is fully accounted for: cost of goods sold plus stock left always equals what you paid. The methods only split it differently between this period's profit and next period's stock.
+
+When prices are rising, FIFO gives lower cost of goods sold (older, cheaper units go first) and so higher profit today. Average cost sits in the middle and changes slowly, which makes month-to-month margins easier to read.
+
+## How dubbl values stock
+
+By default dubbl uses a **moving weighted average**. Each time stock comes in, the average cost is recalculated from what you already had and what you just bought. Each sale goes out at the current average, which doesn't change the average for what's left.
+
+You can switch any item to **First in, first out** under **Costing and accounts** on its **Details** tab. dubbl then keeps a layer for each batch you buy and sells the oldest first. Switching keeps the item's book value: the units on hand become one layer at today's cost per unit, and new purchases add layers from there.
+
+Your items are in **Inventory**, under **Items**:
+
+<Shot name="learn-inventory" alt="The inventory items list with stock value, what it could sell for, and each item's cost and sale price" pins />
+
+The **Cost** column is what you pay for one (the item's purchase price). **Stock value** is the book value: what the units on hand cost you, after write-downs and landed costs. To see the average cost dubbl uses for cost of goods sold, show the **Average cost** column from **View**, along with **Costing**, which names each item's costing method.
+
+## Things that change cost
+
+- **Landed costs.** Freight, duty and insurance on a shipment are part of what the stock cost you. [Landed costs](/docs/guides/landed-costs) spread them over the items in a purchase order, which raises their average cost. The share for units you've already sold goes straight to cost of goods sold.
+- **Stocktakes.** If a count finds fewer units than the books say, the missing units are written off as **inventory shrinkage**, an expense, at their cost. See [stocktakes](/docs/guides/stock-takes).
+- **Write-downs.** Stock is carried at the lower of what it cost and what you can sell it for. When it's worth less (damaged, out of date), a write-down lowers its value as an expense; a later revaluation upward reverses it. See [inventory](/docs/guides/inventory).
+- **Assemblies.** Building a product from parts moves the parts' cost into the finished item. See [assemblies](/docs/guides/assemblies).
+
+## Good to know
+
+- Cost of goods sold is recorded when the invoice is sent, not when it's paid, matching the cost to the sale (that's [accrual](/docs/learn/accrual-vs-cash) at work).
+- A stock line on a bill adds to Inventory, not to an expense. If a purchase is something you'll use rather than sell, put it on an expense account instead.
+- Gross profit (sales minus cost of goods sold) is the clearest measure of whether your pricing works. The executive summary report shows it as "Profit after direct costs".
+
+## Related
+
+<Cards>
+  <Card title="Inventory guide" href="/docs/guides/inventory" description="Items, stock levels and valuation in dubbl." />
+  <Card title="Landed costs" href="/docs/guides/landed-costs" description="Add freight and duty to what stock cost." />
+  <Card title="Stocktakes" href="/docs/guides/stock-takes" description="Count your stock and fix differences." />
+  <Card title="Accrual vs cash" href="/docs/learn/accrual-vs-cash" description="Why costs are matched to the sales they made." />
+</Cards>

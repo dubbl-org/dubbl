@@ -1,0 +1,83 @@
+---
+title: Payroll basics
+description: Gross pay, take-home pay, the taxes in between, and what a pay run records in your books.
+icon: Users
+---
+
+Paying an employee is more than sending them their salary. Part of their pay is held back for taxes and sent to the government on their behalf, and on top of their pay you owe employer taxes of your own. Payroll is the process of working all of that out, every pay period, and recording where each dollar went.
+
+<ShortVersion>
+
+- **Gross pay** (in dubbl, *Before deductions*) is the salary or wages before anything is taken off.
+- **Withholding** is tax taken from the employee's pay and passed to the tax office for them.
+- **Take-home pay** (net pay) is what's left and lands in their bank account.
+- **Employer taxes** are extra costs you pay on top of gross pay. The employee never sees them.
+- A finished pay run records the full cost as expenses, the taxes as liabilities, and the take-home pay leaving your bank.
+
+</ShortVersion>
+
+## From gross to take-home
+
+One month for one employee earning $60,000 a year, paid monthly:
+
+<GrossToNet />
+
+dubbl's payroll works out US payroll taxes:
+
+- **Federal income tax**, from the federal tax brackets you set up and the employee's filing details. Without brackets, it uses the employee's flat tax rate.
+- **State and local income tax**, from the brackets you set up for each state or city, for employees with that state or local code.
+- **Social Security**, 6.2% of pay up to the yearly wage base, and **Medicare**, 1.45%, plus an extra 0.9% on pay above $200,000 a year. These are withheld even from employees who are exempt from income tax.
+- **Pre-tax deductions** reduce the pay that taxes are worked out on. Post-tax deductions come off afterwards.
+
+## What it really costs you
+
+The employer pays its own share of Social Security and Medicare, matching the employee's, plus federal unemployment tax (**FUTA**) and, where you set a rate, state unemployment tax (**SUTA**). So the true cost of an employee is more than their salary:
+
+<PayrollWhoGetsWhat />
+
+When you budget for a hire, budget for the bottom bar, not the salary.
+
+## What a pay run records
+
+Finishing a pay run records everything in one journal entry, dated the end of the pay period. The full cost becomes expenses. The withheld taxes and employer taxes become liabilities, because you owe them to the tax office. The take-home pay leaves the bank.
+
+<JournalEntry
+  title="Payroll Mar 1 to Mar 31"
+  date="Mar 31, 2026"
+  lines={[
+    { account: "Wages and salaries", debit: 500000, note: "gross pay" },
+    { account: "Employer payroll taxes", debit: 41250, note: "Social Security, Medicare, FUTA" },
+    { account: "Income tax payable", credit: 52000, note: "withheld" },
+    { account: "Payroll taxes payable", credit: 79500, note: "both halves of FICA, and FUTA" },
+    { account: "Checking account", credit: 409750, note: "take-home pay" },
+  ]}
+  caption="The two liabilities stay on your balance sheet until you pay the tax office."
+/>
+
+## Pay runs in dubbl
+
+Your pay runs are in **Payroll**, under **Pay runs**. Each run covers a pay period (weekly, every two weeks or monthly) and shows gross pay, taxes and deductions, and take-home pay:
+
+<Shot name="learn-payroll-runs" alt="The payroll runs list with Before deductions, Taxes & deductions and Take-home columns for each pay period" pins />
+
+Start one with **New payroll run**. dubbl fills in each employee's pay for the period; hourly staff are paid from their approved timesheets. If your workspace needs sign-off, **Send for sign-off** routes it to an approver. When it's right, **Finish & record payroll** posts the entry above and the run shows as **Finished & recorded**.
+
+## Employees and contractors
+
+Contractors aren't on payroll. You pay their invoices, with no tax withheld, and the cost goes to a subcontractor expense. In the US, anyone you paid $600 or more in a year gets a 1099-NEC, which dubbl can generate from **Payroll**, under **Tax forms**. See [Form 1099](/docs/guides/form-1099).
+
+## Good to know
+
+- Withheld tax is the employee's money held in trust. Pay it over on time: penalties for late payroll tax are steep.
+- Overtime for hourly employees is paid at a multiple (1.5 by default) of their rate for hours above a weekly threshold you set (40 hours a week by default). Each week is counted on its own, so a short week doesn't cancel out a long one.
+- Leave is tracked under **Time & leave**. Balances build up under each leave policy, and approved leave comes off them. Unpaid leave also reduces pay.
+- Payroll rules differ by country and state and change every year. Have an accountant check your setup before your first real pay run.
+
+## Related
+
+<Cards>
+  <Card title="Payroll guide" href="/docs/guides/payroll" description="Employees, pay runs and tax forms in dubbl." />
+  <Card title="Time and leave" href="/docs/guides/time-and-leave" description="Timesheets, leave requests and balances." />
+  <Card title="Form 1099" href="/docs/guides/form-1099" description="Year-end forms for contractors." />
+  <Card title="Debits and credits" href="/docs/learn/debits-and-credits" description="Read the pay run entry line by line." />
+</Cards>

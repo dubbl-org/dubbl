@@ -1,0 +1,216 @@
+---
+title: Inventory
+description: Track the products you buy and sell, how many you have, and what your stock is worth.
+icon: Package
+---
+
+Inventory is the stock you hold to sell or use: boxes on a shelf, parts in a bin, products in a warehouse. dubbl keeps a count of each item, values it at what it cost you, warns you when it's running low, and records every change to the count in your books.
+
+<Shot name="inventory" alt="The Items list with stock value, what it could sell for, items running low, and a table of every item with its stock level" pins />
+
+## Add an item
+
+<Steps>
+
+<Step>
+
+Open **Inventory** and choose **New Item** in the top bar.
+
+</Step>
+
+<Step>
+
+Give it a **Code** (your own short reference, such as `FURN-004`) and a **Name**. A **Category** and **SKU** are optional.
+
+</Step>
+
+<Step>
+
+Enter the **Purchase Price** (what one costs you) and the **Sale Price** (what you sell one for).
+
+</Step>
+
+<Step>
+
+If you already have some, enter the **Initial Quantity**. Opening stock needs a **Purchase Price**, and it goes into your default [location](/docs/guides/warehouses). Set a **Reorder Point**: the number of units at which you want to hear that it's running low.
+
+</Step>
+
+<Step>
+
+Choose **Create Item**. dubbl opens the item's page.
+
+</Step>
+
+</Steps>
+
+<Shot name="inventory-new" alt="The New Inventory Item drawer with a code, name, SKU, prices, initial quantity and reorder point filled in" narrow />
+
+## Good to know
+
+- Opening stock is valued at the purchase price, so an **Initial Quantity** needs a **Purchase Price**. dubbl won't create the item until you enter one.
+- An item is **Running low** when units on hand reach its reorder point, and **Out of stock** at zero. **Reorder alerts** lists them all.
+- Items are valued at average cost unless you switch them to first in, first out under **Costing and accounts** on the **Details** tab.
+- When you change the count, the new count can't go below zero. Every change needs a reason, and it shows on the item's **History** tab.
+- Item codes are unique. Two items can't share one.
+- **Hide item** takes an item out of the way without losing its history. Hidden items are under the **Hidden** tab.
+
+## Stock levels at a glance
+
+The reorder point is the line between **In stock** and **Running low**. Set it to how many you sell in the time it takes to restock, and you'll hear in time to reorder.
+
+<InventoryStockLevels />
+
+## The item page
+
+Open any item to see its units on hand, what that stock is worth, its price and its margin. **Value of stock** is the book value, so write-downs and landed costs are included. **Profit margin** is profit as a share of the selling price. **Details** holds everything you entered and can change; **History** lists every movement in and out, with the count before and after and the reason. **Variants** holds sizes, colors and other versions of the item.
+
+<Shot name="inventory-item" alt="An item page with units on hand, value of stock, selling price, profit margin, and the Details, History and Suppliers tabs" pins />
+
+## What your stock is worth
+
+Each item carries a book value: the units you have at what they cost you. When you buy more at a different price, the new units blend into an average, and that average is what each unit costs when it leaves.
+
+<InventoryAverageCost />
+
+New to stock valuation? [Inventory costing](/docs/learn/inventory-costing) explains average cost and the alternatives with pictures.
+
+<Fold>
+
+## What gets recorded in your books
+
+Stock is an asset: money you've spent that's sitting on a shelf. Opening stock you enter on a new item is recorded against opening balance equity, so the balance sheet starts with what you already own.
+
+<JournalEntry
+  title="Opening stock for FURN-004 Laptop Stand"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Inventory", debit: 112000 },
+    { account: "Opening balance equity", credit: 112000 },
+  ]}
+  caption="40 units at $28.00."
+/>
+
+Removing units with **Change the count** writes them off at their cost as inventory shrinkage. Adding units you found puts them back at the current average cost.
+
+<JournalEntry
+  title="Count changed for FURN-002 Monitor Stand: two damaged"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Inventory Shrinkage", debit: 4400 },
+    { account: "Inventory", credit: 4400 },
+  ]}
+  caption="2 units at $22.00. Nothing is posted for an item with no cost."
+/>
+
+When an invoice line is linked to a stock item, sending the invoice also records what those units cost you, as cost of goods sold. To link a line, pick the item in **Stock item (optional)** under the line's description on an invoice, sales receipt, bill or purchase order. Picking it fills in the description and price, and on sales lines the item's **Sales account**.
+
+<JournalEntry
+  title="Cost of sales for an invoice of 10 Laptop Stands"
+  date="Oct 20, 2026"
+  lines={[
+    { account: "Cost of Goods Sold", debit: 29000 },
+    { account: "Inventory", credit: 29000 },
+  ]}
+  caption="10 units at the $29.00 average. The sale itself is recorded by the invoice."
+/>
+
+</Fold>
+
+<Fold>
+
+## Changing the count
+
+When what's on the shelf doesn't match what dubbl shows, open the item and choose **Change the count**. Enter how many to add or remove (`10` to add, `-5` to remove), check the **New count**, and give a **Reason**. **Save new count** records it.
+
+<Shot name="inventory-count" alt="The Change the count sheet: 35 units on hand, minus 2, a new count of 33 and a reason" narrow />
+
+To change several items at once, select them in the list and choose **Change count**. For a full count of everything, use a [stocktake](/docs/guides/stock-takes) instead.
+
+</Fold>
+
+<Fold>
+
+## Writing down or revaluing stock
+
+Sometimes the units are all there but they're worth less: damaged packaging, an old model, a price drop. On the item page:
+
+- **Write down value** lowers the book value by an amount you enter, with a reason. The count stays the same, and the amount is recorded as an inventory write-down. You can't write off more than the stock is worth.
+- **Revalue stock** (on the **Details** tab) sets the book value to a new figure directly. A decrease is recorded as a write-down; an increase reverses one. Both post to Inventory Write-Down, because stock is carried at the lower of what it cost and what it can be sold for. Tilly and the API post revaluations the same way.
+
+</Fold>
+
+<Fold>
+
+## Reorder alerts
+
+**Reorder alerts** lists every shown item at or below its reorder point, with a suggested quantity to order (twice the reorder point, minus what you have) and the item's preferred supplier. **Create PO** starts a new [purchase order](/docs/guides/purchase-orders) to that supplier, with the item and the suggested quantity already on it.
+
+</Fold>
+
+<Fold>
+
+## Categories
+
+**Categories** groups items so they're easier to find and report on. Choose **New Category** and give it a **Name**, a **Color** and, if you like, a **Parent Category** and a **Description**. Categories go one level deep. Pick a category on an item's **Details** tab, or when you create it; the list's **Category** column and filter show the same category.
+
+Renaming a category renames it on every item in it. Deleting one leaves its items uncategorised, and any sub-categories move to the top level.
+
+</Fold>
+
+<Fold>
+
+## Suppliers for an item
+
+On an item's **Suppliers** tab, **Link Supplier** records who you buy it from: the supplier, their own code for it, the lead time in days, their price, and whether they're your **Preferred supplier**. An item has one preferred supplier at a time, and it's the one **Reorder alerts** orders from. Suppliers come from your [contacts](/docs/guides/contacts).
+
+</Fold>
+
+<Fold>
+
+## Costing method and accounts
+
+On an item's **Details** tab, **Costing and accounts** sets:
+
+- **Costing method**: **Average cost** or **First in, first out**. Switching keeps the book value; the units on hand carry over at today's cost per unit.
+- **Unit**: what you count in, such as each, box or kg.
+- **Inventory account**, **Cost of sales account** and **Sales account**: where this item posts. Leave the first two empty to use Inventory and Cost of Goods Sold. The sales account is filled in on invoice lines when you pick the item.
+
+</Fold>
+
+<Fold>
+
+## Variants
+
+An item's **Variants** tab lists its sizes, colors and other versions. **Add Variant** takes a **Name**, an optional **SKU**, **Options** such as `Color: Red, Size: Large`, prices and a **Quantity on Hand**. Variant counts are for reference: they don't change the item's stock or your books.
+
+</Fold>
+
+<Fold>
+
+## Importing items
+
+To bring in a catalogue, choose **Import items** on the list and upload a CSV with the columns `code`, `name`, `description`, `category`, `sku`, `purchasePrice`, `salePrice`, `quantityOnHand` and `reorderPoint`. Prices are in dollars and cents (`28.00`). A row whose code matches an item you already have updates that item; every other row creates a new one.
+
+- A new item's quantity is opening stock: it goes into your default location at the purchase price and is recorded against opening balance equity, just like adding the item by hand. A row with a quantity but no price creates the item with no stock, and the import results say so.
+- For an existing item, a different quantity is recorded as a count change, with a history entry and the matching shrinkage entry. Leave `quantityOnHand` empty to keep the count as it is.
+- A `category` that doesn't exist yet is created.
+
+</Fold>
+
+<Fold>
+
+## Hiding and deleting
+
+**Hide item** keeps an item and its history but moves it to the **Hidden** tab and out of reorder alerts; **Show item** brings it back. To remove an item, open its **Details** tab and choose **Delete Item** in the danger zone. Deleted items go to [Trash](/docs/guides/trash).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Locations and transfers" href="/docs/guides/warehouses" description="Keep stock in more than one place and move it between them." />
+  <Card title="Stocktakes" href="/docs/guides/stock-takes" description="Count what's on the shelf and fix any differences." />
+  <Card title="Landed costs" href="/docs/guides/landed-costs" description="Add freight and duty to what your stock cost." />
+  <Card title="Inventory costing" href="/docs/learn/inventory-costing" description="How stock is valued, with pictures." />
+</Cards>

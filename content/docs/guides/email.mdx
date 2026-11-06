@@ -1,0 +1,109 @@
+---
+title: Email sending
+description: Send invoices, quotes and other documents from your own business address by connecting your mail server.
+icon: Mail
+---
+
+When you send an invoice, quote, credit note or purchase order, or a payment reminder goes out, dubbl emails it for you. Out of the box it goes from dubbl's address, with replies going to your workspace email. Connect your own mail server and documents come from your business address instead, and land in your own Sent folder. It's under **Settings > Email sending**.
+
+<Shot name="email" alt="The Email sending page with the current sender, mail server details and the sender name" pins />
+
+## Send from your own address
+
+<Steps>
+
+<Step>
+
+Find the outgoing (SMTP) details from your email provider: the server, port, username and password. Gmail and Outlook need an app password rather than your normal one.
+
+</Step>
+
+<Step>
+
+Open **Settings > Email sending** and fill in **Server**, **Port**, **Username** and **Password**. Leave **Encrypted connection** on unless your provider says otherwise.
+
+</Step>
+
+<Step>
+
+Under **Sender**, enter the **From address** and **From name** your customers should see. Add **Replies go to (optional)** if replies should go somewhere else.
+
+</Step>
+
+<Step>
+
+Choose **Connect and check**. dubbl logs in to your mail server to make sure the details work. When it does, the card at the top changes to **Sending from** your address.
+
+</Step>
+
+<Step>
+
+Choose **Send test email** to send one to your from address and see how it looks.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- dubbl only switches to your mail server once the login check passes. Until then, emails still go out from dubbl.
+- [Payment reminders](/docs/guides/payment-reminders) follow the same rule: through your mail server once it's checked, otherwise from dubbl's address with replies going to your workspace email. You don't need your own server for reminders to go out.
+- Each plan has a monthly email allowance, whichever server sends them. See [Billing](/docs/guides/billing).
+- The owner, admins and anyone whose role includes **Manage integrations & email sending** can change these settings. Your password is stored encrypted and never shown again; the field says **Saved. Type to replace**.
+- Notification emails (low balance, failed payments and so on) always come from dubbl, not from your server.
+
+## Which address an email comes from
+
+<Frame caption="Every document email is also logged under Documents > Sent emails, with whether it was delivered.">
+  <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center">
+    <Box title="An email goes out">An invoice, quote, credit note, debit note, purchase order or payment reminder.</Box>
+    <Arrow />
+    <Box title="Mail server checked?">dubbl looks at Settings &gt; Email sending.</Box>
+    <Arrow />
+    <div className="space-y-2">
+      <Box title="Yes: your address" active>From your from address, through your server.</Box>
+      <Box title="No: dubbl's address">From dubbl &lt;invoices@dubbl.dev&gt;, replies to your workspace email.</Box>
+    </div>
+  </div>
+</Frame>
+
+<Fold>
+
+## Check what's been sent
+
+Choose **See what's been sent** on the status card, or open **Documents > Sent emails**. Each email shows who it went to, when, and whether it was sent or failed. A failed email can be resent from there once you've fixed the problem.
+
+<Shot name="documents-emails" alt="The Sent emails view in Documents" />
+
+</Fold>
+
+<Fold>
+
+## When the check fails
+
+If you see **Saved, but your mail server didn't accept the login**, the details are kept but not used. Check, in order:
+
+- the password: Gmail and Outlook need an app password;
+- the port: usually 587 with **Encrypted connection** on;
+- the username: often your full email address.
+
+Change what's wrong and choose **Save and check** again.
+
+</Fold>
+
+<Fold>
+
+## Go back to sending from dubbl
+
+Choose **Stop using my mail server**. Your details are removed and invoices and other documents go out from dubbl's address again, with replies going to your workspace email.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="Send invoices by email with the PDF attached." />
+  <Card title="Payment reminders" href="/docs/guides/payment-reminders" description="Chase overdue invoices automatically." />
+  <Card title="Document templates" href="/docs/guides/document-templates" description="Change how the attached PDFs look." />
+  <Card title="Self-hosting: email" href="/docs/self-hosting/email" description="Set up dubbl's own sender on your server." />
+</Cards>

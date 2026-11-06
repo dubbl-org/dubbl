@@ -1,0 +1,126 @@
+---
+title: Loans
+description: Track money you've borrowed, see each payment split into what comes off the loan and what's interest, and record payments in a click.
+icon: Landmark
+---
+
+A loan in dubbl is a schedule of repayments for money you've borrowed: a bank loan, equipment finance, a car loan. Tell dubbl the amount, the yearly interest rate and how many months it runs, and it works out the fixed monthly payment and how much of each one is interest. Each payment you record reduces what you owe and books the interest as a cost.
+
+<Shot name="loans" alt="The loans list with the Equipment Financing loan: what you still owe, the monthly payment, payments made out of 36, and a payment that's due" pins />
+
+## Add a loan
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Loans**, and choose **New loan**.
+
+</Step>
+
+<Step>
+
+Give it a **Name**, then enter the **Loan amount**, the yearly **Interest rate (%)**, the **Term (months)** and the **Start Date**.
+
+</Step>
+
+<Step>
+
+Under **Where the money landed**, pick the bank account in **Paid into**. Repayments are taken from this account too.
+
+</Step>
+
+<Step>
+
+Choose the **Loan account** (a liability, such as Long-Term Debt) and the **Interest account** (an expense, such as Interest Expense), then **Create loan**.
+
+</Step>
+
+</Steps>
+
+<Shot name="loan-new" alt="The New loan drawer: a $30,000 van loan at 6% over 36 months" narrow />
+
+## Good to know
+
+- Adding a loan doesn't record the money you received. When it lands in your bank, categorize that deposit to the loan account (see below).
+- Pick **Paid into** now if you can. Payments can't be recorded without it, but you can add or change it later on the loan's page.
+- The first payment falls one month after the start date. The last payment is adjusted by a few cents so the loan ends at exactly zero.
+- With a bank account chosen, dubbl records each payment for you on its due date. You can also record the next one yourself at any time.
+- **Payment due** means a payment date has passed and nothing was recorded for it. The list shows how many days late it is.
+
+## Where each payment goes
+
+The payment stays the same every month, but the split changes. At first most of it is interest; by the end almost all of it comes off the loan.
+
+<LoanAmortizationSplit />
+
+<Fold>
+
+## What gets recorded in your books
+
+When the loan money arrives, record the deposit in [banking](/docs/guides/categorizing-transactions) and code it to the loan account:
+
+<JournalEntry
+  title="Van loan received"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "1100 Checking Account", debit: 3000000 },
+    { account: "2700 Long-Term Debt", credit: 3000000 },
+  ]}
+  caption="Your bank balance goes up, and so does what you owe."
+/>
+
+Each payment then posts one entry, dated the payment's due date:
+
+<JournalEntry
+  title="Loan payment #1 for Van loan"
+  date="Nov 13, 2026"
+  lines={[
+    { account: "2700 Long-Term Debt", debit: 76266, note: "off the loan" },
+    { account: "5910 Interest Expense", debit: 15000, note: "interest" },
+    { account: "1100 Checking Account", credit: 91266 },
+  ]}
+  caption="$30,000 at 6% a year: half a percent a month, so the first month's interest is $150.00."
+/>
+
+When the payment shows up in your bank feed, match it to this entry when you [reconcile](/docs/guides/reconciliation), so it isn't counted twice.
+
+</Fold>
+
+<Fold>
+
+## Record a payment yourself
+
+Open the loan and choose **Record this month's payment**. dubbl shows which payment it is and how it splits; choose **Record payment** to post it. From the list, the same action is **Record next payment** in the side panel.
+
+<Shot name="loan" alt="A loan's page with its schedule: date, what comes off the loan, interest, payment, what's still owed and whether it's recorded" pins />
+
+Payments are always recorded in order, oldest first, each dated on its schedule date. A payment dated on or before your [lock date](/docs/guides/periods-and-closing#lock-past-dates) can't be recorded, and the nightly run skips it. The schedule's **Recorded** column ticks off each one. When the last one is recorded, the loan becomes **Paid off**.
+
+The **Paid into** box on the loan's page shows the bank account repayments come out of. Pick a different one at any time; it's saved straight away.
+
+</Fold>
+
+<Fold>
+
+## Loan statuses
+
+<Lifecycle
+  steps={[
+    { name: "Paying off", t: "info", note: "Payments are up to date." },
+    { name: "Payment due", t: "watch", note: "A payment date passed without a payment recorded." },
+    { name: "Paid off", t: "good", note: "Every payment has been made." },
+  ]}
+  caption="A loan can also be marked Defaulted when it's no longer being repaid."
+/>
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Fixed assets" href="/docs/guides/fixed-assets" description="Track the van or equipment the loan paid for." />
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Code the loan deposit to the right account." />
+  <Card title="Balance sheet" href="/docs/guides/balance-sheet" description="See what you still owe." />
+  <Card title="Journal entries" href="/docs/guides/journal-entries" description="Every payment's entry, in one list." />
+</Cards>

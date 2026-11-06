@@ -1,0 +1,262 @@
+---
+title: Payroll
+description: Pay your employees, work out the tax on every payslip, and record each payroll in your books in one step.
+icon: Banknote
+---
+
+Payroll is how you pay the people who work for you. You add your employees once, with what they earn and how often they're paid. Each payday you run payroll: dubbl works out everyone's pay before deductions, the tax held back and their take-home pay, then records the whole run in your books when you finish it.
+
+<Shot name="payroll" alt="The Payroll overview with active employees, monthly payroll cost, paid this year, recent runs and the payroll breakdown" pins />
+
+## Run payroll
+
+<Steps>
+
+<Step>
+
+Open **Payroll**, then **Pay runs**, and choose **New payroll run**.
+
+</Step>
+
+<Step>
+
+Set the **Pay Period Start** and **Pay Period End**, and choose **Create Run**. Every active employee is added with their pay for the period.
+
+</Step>
+
+<Step>
+
+Open the run and check each person's **Before deductions**, **Tax**, **Other deductions** and **Take-home**. Click a person to see each tax and deduction on its own line. To pay someone a bonus in this run, choose **Add Bonus**.
+
+</Step>
+
+<Step>
+
+Choose **Finish & record payroll**, then **Finish and record**. The run becomes **Finished & recorded** and its journal entry is posted.
+
+</Step>
+
+<Step>
+
+Choose **Generate Payslips** so everyone has a payslip for the period.
+
+</Step>
+
+</Steps>
+
+<Shot name="payroll-run-new" alt="The New Payroll Run dialog with a pay period from October 1 to October 31, 2026" narrow />
+
+## Good to know
+
+- Nothing reaches your books until you finish the run. A run that isn't finished can be checked as many times as you like.
+- Only active employees who had started by the end of the period, and hadn't left before it began, are paid. Employees paid by milestone or commission aren't included in pay runs.
+- Salaried employees get their annual salary divided by their pay frequency: 52 for weekly, 26 for every two weeks, 12 for monthly.
+- Hourly employees are paid for the hours on their approved [timesheets](/docs/guides/time-and-leave) that fall inside the period. Overtime is worked out week by week. With no approved timesheet, they're paid standard hours: 40 a week, 80 every two weeks or 173.33 a month, all at the normal rate.
+- Approved **Unpaid** leave in the period is taken off the pay.
+- Each employee's [deductions](#deductions) are taken from every run, before or after tax depending on the deduction type.
+- Income tax uses your tax brackets if you've set them up in **Settings**; otherwise federal income tax uses each employee's own **Tax Rate (%)**. Social Security and Medicare are always withheld.
+- New employees get your **Default Tax Rate (%)** from **Settings** unless you enter one.
+
+## The pay runs list
+
+**Pay runs** shows what you've paid this year, what you've held back in tax, your last payroll, your next pay date, and anything waiting for sign-off or not finished.
+
+<Shot name="payroll-runs" alt="The Payroll runs list with paid this year, held back, last payroll, next pay date, a chart by month and the list of runs" pins />
+
+<Lifecycle
+  steps={[
+    { name: "Not finished", note: "Created. Check everyone's pay." },
+    { name: "Waiting for sign-off", t: "watch", note: "Optional. An approver signs it off." },
+    { name: "Finished & recorded", t: "good", note: "Posted to your books. Payslips ready." },
+  ]}
+  caption="A run sent back by an approver shows as Sent back; a signed-off run shows as Signed off until you finish it."
+/>
+
+Open a run to see everyone on it, with their pay before deductions, tax, other deductions and take-home pay. **Tax** is everything withheld as tax; **Other deductions** is everything else, such as a 401(k) or union dues. Click a person to list each tax (for example **Federal income tax**, **State income tax (CA)**, **Social Security** and **Medicare**) and each deduction.
+
+<Shot name="payroll-run" alt="A finished pay run listing four employees, each with pay before deductions, tax, other deductions and take-home" />
+
+## From pay to take-home
+
+Each person's pay is worked out the same way: their pay before deductions, less income tax and their share of Social Security and Medicare, is their take-home pay. On top of that, you pay the employer's share of payroll taxes.
+
+<PayslipGrossToNet />
+
+Social Security is 6.2% of pay up to the year's wage base ($168,100), Medicare is 1.45%, with an extra 0.9% on pay above $200,000. These rates live in your payroll settings. New to payroll? [Payroll basics](/docs/learn/payroll-basics) walks through it from the start.
+
+## What gets recorded in your books
+
+Finishing a run posts one journal entry, dated the end of the pay period. Wages and the employer's taxes are expenses; the tax you held back and the employer's taxes are owed to the tax office until you pay them; deductions are owed to whoever they're for (pension and benefits go to **Pension & Benefits Payable**, anything else to **Other Statutory Deductions Payable**); only the take-home pay leaves your bank.
+
+<JournalEntry
+  title="Payroll 2026-10-01 to 2026-10-31"
+  date="Oct 31, 2026"
+  lines={[
+    { account: "Wages & Salaries Expense", debit: 1000000 },
+    { account: "Employer Payroll Taxes", debit: 80700 },
+    { account: "Income Tax Payable", credit: 220000 },
+    { account: "Payroll Taxes Payable", credit: 157200 },
+    { account: "Checking Account", credit: 703500 },
+  ]}
+  caption="One employee on $10,000.00 a month, as in the payslip above. Payroll taxes payable holds both the employee's and the employer's Social Security, Medicare and FUTA."
+/>
+
+<PayRunInputsOutputs />
+
+<Fold>
+
+## Adding an employee
+
+Choose **New Employee** on **Employees**. Enter their **Full Name**, an **Employee Number**, their **Email**, **Position** and **Department**. Pick the **Pay Type**: **Salary** with an **Annual Salary**, or **Hourly** with an **Hourly Rate**. Then set the **Pay Frequency** (**Weekly**, **Biweekly** or **Monthly**), their **Tax Rate (%)** (your **Default Tax Rate (%)** if you leave it) and **Currency**, their **Bank Account Number** and **Start Date**. Choose **Add Employee**.
+
+<Shot name="payroll-employee-new" alt="The New Employee drawer with personal info, compensation and details" narrow />
+
+Your [plan](/docs/guides/billing) sets how many active employees you can have.
+
+</Fold>
+
+<Fold>
+
+## An employee's page
+
+Open an employee to change their department, position, compensation type, salary or hourly rate, pay frequency, tax rate, currency and **Pay band**, then choose **Save Changes**. **Per-Period Pay** is their salary divided by their pay frequency, or for hourly staff their rate times the standard hours for the period. The pay band shows its range so you can compare their salary with it. **Self-service login** links them to their workspace login, so they can see their own payslips and timesheets in **Employee self-service**.
+
+Under **Tax Configuration**, set their **Filing Status**, **Federal Allowances** and **State Allowances**, any **Extra federal withholding** or **Extra state withholding** per pay run, their **State code** and **Local code** (see [State and local income tax](#state-and-local-income-tax)), and **Exempt from income tax** if they've claimed it. Exempt employees still pay Social Security and Medicare. Choose **Save Tax Config**.
+
+**Leave Balances** shows what they have left under each leave policy this year.
+
+<Shot name="payroll-employee" alt="An employee page with annual salary, per-period pay, tax rate and compensation type, and their personal and compensation details" />
+
+**Deactivate**, then **Save Changes**, stops paying someone; they stay in your records and past runs. **Activate** brings them back. Removing an employee under **Danger zone** takes them off payroll for good, but their past pay runs and payslips keep their record.
+
+## Deductions
+
+Deductions are amounts taken from an employee's pay every pay run, such as a 401(k), health insurance or union dues. First add a deduction type in **Settings**, **Deduction Types**: **Pre-tax** types come off before taxes are worked out; **Post-tax** ones come off after.
+
+On the employee's page, choose **Add deduction** under **Deductions**. Pick the **Deduction type**, then **Calculate as** **Fixed amount** (with the **Amount per pay run**) or **Percent of gross pay** (with the **Percent (%)**). Leave it empty to use the type's default. Choose **How often**: **Recurring** is taken every pay run between the **Start date (optional)** and **End date (optional)**; **One-time** is taken in the next finished pay run, then switches off. The trash button removes a deduction from future runs.
+
+Deductions show on each person's pay in a run, on their payslip, and in your books as money owed to whoever they're for.
+
+</Fold>
+
+<Fold>
+
+## Sign-off before finishing
+
+If someone should approve payroll before it's recorded, set up an approval chain in **Payroll**, **Settings**, **Approval Chains**. Choose **Add Chain**, give it a **Name**, add people under **Approvers, in order**, keep **Active** on, and choose **Create**. While a chain is active, every run has to be signed off before it can be finished, unless **Auto-approve payroll runs** is on.
+
+Choose **Send for sign-off** on a run. Each approver opens it and chooses **Approve**, or **Send back** with a reason. A run that's sent back goes back to **Not finished** with the reason shown under **Sign-off**, so it can be fixed and sent again. Once it's **Signed off**, choose **Finish & record payroll** as usual. Changing a signed-off run, for example adding a bonus, clears the sign-off. See [Approvals](/docs/guides/approvals).
+
+</Fold>
+
+<Fold>
+
+## Bonuses
+
+On a run that isn't finished, choose **Add Bonus**, pick the **Employee**, the **Bonus Type** and the **Amount**. Their pay is worked out again with the bonus included, so it's taxed along with the rest of their pay, and the run's totals update. The trash button next to a bonus removes it. Bonuses can't be added once a run is finished; pay them with a **Bonus only** payment instead.
+
+</Fold>
+
+<Fold>
+
+## One-off payments
+
+**One-off payment** on **Pay runs** pays people outside your normal payday:
+
+- **Final pay (someone leaving)**: pick the **Employee**, the **Final period start** and **Last day worked**. They're paid for the days worked (salary at a daily rate, or hourly from approved timesheets, otherwise 8 hours a weekday). **Pay out unused time off** adds their remaining vacation and personal leave. They're marked as no longer active, with that last day as their end date. Deleting the run before it's finished makes them active again.
+- **Bonus only**: pick the dates, then one line per bonus with the **Employee**, amount and kind of bonus. Bonuses are taxed; regular deductions aren't taken.
+- **Fix a past payroll**: pick the **Payroll to fix**, then one line per person with the change to their pay before deductions. A negative amount takes pay back. Tax is adjusted in proportion to that payroll.
+
+<Shot name="payroll-run-offcycle" alt="The Bonus only dialog with pay period dates and a bonus line with employee, amount and kind of bonus" narrow />
+
+The payment is finished and recorded straight away and opens when it's done. If your payroll needs sign-off, it stays **Not finished** so you can send it for sign-off first.
+
+</Fold>
+
+<Fold>
+
+## Deleting or voiding a run
+
+A run that isn't finished can be removed with **Delete**. Nothing has reached your books yet.
+
+A finished run can't be deleted, but **Void run** cancels it. dubbl posts a reversing journal entry, dated the same day as the run's entry, that undoes the wages, taxes, deductions and bank payment, marks the original entry as voided, and shows the run as **Cancelled**. Add a **Reason** if you like. If that date is in a [locked period](/docs/guides/periods-and-closing), voiding is refused. Pay any corrected amounts with a new run.
+
+</Fold>
+
+<Fold>
+
+## State and local income tax
+
+Add brackets for each state or city under **Tax Brackets** in **Settings**, with the jurisdiction set to the state or local code (for example **CA** or **NYC**). Then set each employee's **State code** and **Local code** in their tax setup. Their state and local income tax is worked out from those brackets, like federal tax, and shows on their pay as **State income tax (CA)** and so on. If all your state brackets are for one state, employees without a state code use that state.
+
+</Fold>
+
+<Fold>
+
+## Payslips
+
+On a finished run, **Generate Payslips** creates a payslip for each person, then **View Payslips** lists them. Open one to see the pay before deductions, the tax withheld, other deductions, the take-home pay, and their totals for the year so far.
+
+Generating again only adds payslips for anyone who doesn't have one yet, so you never get duplicates.
+
+An open payslip lists each tax under **Taxes** (for example **Federal income tax**, **State income tax (CA)**, **Social Security** and **Medicare**) and each deduction under **Deductions**.
+
+Choose **Download PDF** on an open payslip to save it as a PDF to hand to the employee. Employees can download their own from **Employee self-service**. The PDF uses your default Payslip [document template](/docs/guides/document-templates).
+
+**Email Payslips** on a finished run emails each employee their payslip with the PDF attached. Payslips already sent aren't sent again, and anyone without an email address is skipped; the message says how many went out.
+
+</Fold>
+
+<Fold>
+
+## Paying the tax you owe
+
+**Tax liabilities** shows what your pay runs say you owe, what you've paid and what's still outstanding, grouped by who you pay: the tax authority for income tax, the tax authority for payroll taxes, and your pension and benefits provider. When you pay one, choose **Record payment** and enter **Who you're paying**, the **Amount paid**, the period it covers, the date and a reference. dubbl records the payment against what you owe and takes it out of your bank account.
+
+</Fold>
+
+<Fold>
+
+## Year-end tax forms
+
+**Tax forms** creates the year's forms. Pick the year and choose **Generate W-2** for your employees, or **Generate 1099-NEC** for contractors you paid $600 or more. Open a form set to see each person's figures.
+
+</Fold>
+
+<Fold>
+
+## Contractors
+
+Freelancers you pay without running payroll go under **Contractors**. Choose **Add Contractor** and enter their **Name**, and if you have them their **Email**, **Company**, **Tax ID**, **Hourly Rate** and **Currency**. On a contractor's page, **Add Payment** records what you owe them; **Process** pays it, recording it as a contractor expense paid from your payroll bank account (or **Checking Account** if none is set).
+
+</Fold>
+
+<Fold>
+
+## Reports and forecasts
+
+**Reports & forecast** has payroll reports (**Payroll Summary**, **Tax Liability**, **Labor Cost by Department** and **Year over Year**), a 12-month cost forecast, and a **What-If Analysis**: change salaries by a percentage, add new hires or remove people, and choose **Run Scenario** to see the monthly cost before and after.
+
+</Fold>
+
+<Fold>
+
+## Payroll settings
+
+**Settings** holds:
+
+- **General**: the accounts payroll posts to (**Salary Expense Account** and **Bank Account**), the **Default Tax Rate (%)** for new employees, **Overtime after (hours per week)** and the **Overtime multiplier**, and **Auto-approve payroll runs**.
+- **Payroll taxes**: the **Social Security rate (%)** and **Social Security wage base**, the **Medicare rate (%)**, the **Additional Medicare rate (%)** and **Additional Medicare threshold**, whether the **Employer pays matching Social Security and Medicare**, the **FUTA rate (%)** and **FUTA wage base**, the **SUTA rate (%)** and **SUTA wage base**, and the **Tax year for brackets**. Choose **Save Payroll Taxes**.
+- **Tax Brackets** for federal, state and local income tax. **Add Bracket** takes the level, a **State code** or **Local code**, the **Filing Status** (or **All filing statuses**) and the **Tax Year** (or any year).
+- **Deduction Types**, **Shifts** and their extra pay, the [leave policies](/docs/guides/time-and-leave) your employees take time off under, and **Approval Chains**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Time and leave" href="/docs/guides/time-and-leave" description="Timesheets for hourly staff and time off." />
+  <Card title="Payroll basics" href="/docs/learn/payroll-basics" description="Gross, net and payroll taxes, explained." />
+  <Card title="Form 1099" href="/docs/guides/form-1099" description="Year-end forms for contractors." />
+  <Card title="Approvals" href="/docs/guides/approvals" description="Who signs off what." />
+</Cards>

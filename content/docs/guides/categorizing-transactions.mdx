@@ -1,0 +1,178 @@
+---
+title: Categorizing transactions
+description: Say what each bank line was for, link it to a bill, invoice or transfer, and let rules do the repeat work.
+icon: Tags
+---
+
+An imported bank line only says that money moved: "AWS EMEA, -$480.00". Categorizing it tells dubbl what it was (a software cost, a customer paying, money you moved to savings) and records it in your books. Lines start as **to do** and move to **Done** once they're dealt with.
+
+<Shot name="categorizing-transactions" alt="A bank account's Transactions tab with To do, Done and Ignored tabs and lines with Categorize buttons" pins />
+
+## Categorize a line
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Bank accounts**, pick the account and open the **Transactions** tab. Choose **To do** to see only what's left.
+
+</Step>
+
+<Step>
+
+Choose **Categorize** on a line.
+
+</Step>
+
+<Step>
+
+Under **What was this?**, pick the closest match. For an everyday cost that's **A business cost**; for a customer paying you, **A sale / income**.
+
+</Step>
+
+<Step>
+
+Pick the **Category**: the account it belongs to. Its usual tax rate fills in, and you can change the **Tax**. Add the **Contact** you paid or were paid by, and a **Memo** if it helps.
+
+</Step>
+
+<Step>
+
+Choose **Assign to category**. The line is posted to your books and moves to **Done**.
+
+</Step>
+
+</Steps>
+
+<Shot name="categorizing-transactions-sheet" alt="The Assign to a category sheet for a $15 monthly bank service fee, with What was this? choices and the category picker" narrow />
+
+## Good to know
+
+- The bank line's amount includes tax. If you pick a tax rate, dubbl splits it into the net cost and the tax for you.
+- Already recorded the bill or invoice in dubbl? Don't categorize the payment as a cost again. Use **Find a match…** so it pays off that bill or invoice instead.
+- Choices like **Money you took out** and **Money you put in** go to the owner's accounts, not your profit, so you don't need to know which account to pick.
+- Made a mistake? On a done line choose **Edit** to change it, or **Undo** to reverse what it recorded and put it back in **To do**.
+- **Ignore this transaction** keeps a line out of your books entirely, for things like a duplicate the bank showed twice. **Stop ignoring** brings it back.
+
+## What happens to a line
+
+<BankLineToLedger />
+
+<Fold>
+
+## Linking a line to a bill, invoice or earlier entry
+
+Open the line's **⋯** menu and choose **Find a match…**. dubbl looks for things already in your books that fit:
+
+- **Already in your books**: a payment or entry you recorded yourself, such as a bill you paid with **Record Payment**. Each suggestion shows a match percentage and why, for example "Exact amount match, Same date". Linking it just connects the line, it doesn't record the money twice.
+- **Open Bills** (money out) or **Open Invoices** (money in): pick one and check the amount. Linking records the payment against that bill or invoice.
+
+Choose **Link** to finish.
+
+<Shot name="categorizing-transactions-menu" alt="A transaction's menu with Find a match, Split across categories, Record a transfer between accounts, Mark as cleared and Ignore" />
+
+<Shot name="categorizing-transactions-match" alt="The Find a match sheet for a $1,800 payment to Freelancer Jane, with a 75% match already in your books and two open bills" narrow />
+
+</Fold>
+
+<Fold>
+
+## Splitting one line across categories
+
+One payment can cover several things, like a shop order that was partly office supplies and partly a client gift. Choose **Split across categories** from the line's menu. Give each part a **Category**, **Amount**, **Tax** and **Memo**; choose **Add another part** for more. The parts must add up to the whole line before you can choose **Save split**.
+
+<Shot name="categorizing-transactions-split" alt="The Split across categories sheet for a $2,500 ConsultCo payment with two parts" narrow />
+
+</Fold>
+
+<Fold>
+
+## Transfers between your own accounts
+
+Money moved to savings or to pay off the company card isn't a cost. Choose **Record a transfer between accounts** from the line's menu and pick the other account. If that account already has the matching line imported, pick it under **Matching line in that account** so the two are linked; if not, dubbl adds the other side for you. Choose **Record Transfer**.
+
+</Fold>
+
+<Fold>
+
+## Lots of lines at once
+
+- **Lines a rule should have caught**: choose **Apply rules** on the **Transactions** tab (see [Bank rules](#bank-rules-let-dubbl-remember) below).
+- **Same category for many lines**: tick the lines in the list, choose the account under **Categorize all as**, then **Apply to** them. **Ignore** and **Clear** work on the selection too.
+- **A different category per line**: switch the Transactions tab from **List** to **Assign in bulk**. Each to-do line gets a row with **Category**, **Tax** and **Contact**. Fill in one row and **Fill down** copies its category, tax and contact to every blank row. Choose **Assign** to post them all.
+
+<Shot name="categorizing-transactions-bulk" alt="The Assign in bulk grid with category, tax and contact for each line" />
+
+</Fold>
+
+<Fold>
+
+## Bank rules: let dubbl remember
+
+If the same payee shows up every month, make a rule once. Open **Settings**, then **Bank Rules**, and choose **Add Rule**:
+
+1. Name it, and under **When a transaction matches** add conditions on the **Description**, **Reference**, **Amount**, **Payee** or **Other party**: contains, is exactly, starts with, ends with, or for amounts, is more than, less than or between. Choose whether **all conditions** or **any condition** must match.
+2. Under **Then do this**, pick the category in **Assign to category / account**, or turn on **Split across several categories** to divide it by percent or fixed amount. Add a **Tax rate** and **Link to a contact** if you like.
+3. Set a **Priority**. Higher priority rules are checked first, and the first one that matches wins.
+4. Decide whether to turn on **Categorize matching transactions automatically**.
+
+<BankRuleMatch />
+
+Rules run every time you import a statement. What they do to a matching line depends on that last switch:
+
+- **Off** (the default): the rule fills in the category, tax and contact, and the line stays in **To do** with **Suggested:** and the category next to it. Choose **Categorize** to check it; the sheet opens with the rule's choices filled in, and **Assign to category** records it.
+- **On**: the rule records the line in your books straight away, exactly as if you'd chosen **Categorize** yourself, and the line moves to **Done**. Use it for payments you're sure about, like rent or a fixed subscription.
+
+Rules that split always record the line straight away. A line dated in a [locked period](/docs/guides/periods-and-closing), or in a foreign currency with no exchange rate for that day, is never recorded automatically: it keeps the suggestion and waits in **To do**.
+
+<Shot name="categorizing-transactions-rules" alt="The New Bank Rule sheet with a condition, what to do, and the Categorize matching transactions automatically option" narrow />
+
+### Run rules on lines you already have
+
+Made a rule after importing? Open the account's **Transactions** tab and choose **Apply rules**. Your rules run on every line still in **To do** that has no category yet, the same way they do on import, and a message tells you how many were categorized and how many got a suggested category.
+
+### Let dubbl suggest rules
+
+On **Bank Rules**, choose **Get Suggestions**. dubbl looks for payees you've categorized the same way at least twice that no rule covers yet, and lists them under **Suggested rules** with the word to match, the category, and how often you've used it. Choose **Create rule** to open a new rule with those filled in, check it, and choose **Create**.
+
+<Shot name="categorizing-transactions-suggestions" alt="Bank Rules with a Suggested rules list above the existing rules: Description contains Roasters, Office Supplies, with a Create rule button" pins />
+
+</Fold>
+
+<Fold>
+
+## Mark as cleared
+
+**Mark as cleared** only notes that a line went through your bank. It moves no money and adds nothing to your books, so the line still isn't counted in your profit or balance sheet. It's meant for lines that are already covered some other way. To record what a line was for, categorize it or find a match instead. Bank rules never mark lines as cleared: they either suggest a category or record the line properly.
+
+</Fold>
+
+<Fold>
+
+## What gets recorded in your books
+
+Categorizing a payment out of the account posts the cost against the bank:
+
+<JournalEntry
+  title="AWS EMEA, categorized"
+  date="Oct 2, 2026"
+  lines={[
+    { account: "Software & Subscriptions", debit: 40000 },
+    { account: "Input VAT / GST Receivable", debit: 8000 },
+    { account: "Checking Account", credit: 48000 },
+  ]}
+  caption="A $480 line with 20% tax included. Money in works the other way round: the bank is debited, the category credited."
+/>
+
+New to debits and credits? [Double-entry bookkeeping](/docs/learn/double-entry) explains them.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Importing transactions" href="/docs/guides/importing-transactions" description="Bring the lines in from your bank." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="Check your categorized lines against the statement." />
+  <Card title="Bills" href="/docs/guides/bills" description="Supplier invoices a payment can pay off." />
+  <Card title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="The categories you choose from." />
+</Cards>

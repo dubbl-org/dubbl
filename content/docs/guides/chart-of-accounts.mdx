@@ -1,0 +1,127 @@
+---
+title: Chart of accounts
+description: Find your way around the list of accounts your books are sorted into, add your own, and tidy up the ones you don't use.
+icon: ListTree
+---
+
+Your chart of accounts is the list of buckets every amount in your books lands in: your bank account, what customers owe you, rent, sales and so on. dubbl sets one up for you when you create your organization, based on your country, so you can start recording straight away. You add your own accounts on top when you need more detail.
+
+<Shot name="accounts" alt="The chart of accounts with a bar showing the split by type, type tabs, search, and accounts grouped by type" pins />
+
+## Add an account
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Accounts**, and choose **New Account** in the top bar.
+
+</Step>
+
+<Step>
+
+Enter a **Code** and a **Name**. The code decides where the account sorts in the list, so pick one near similar accounts (for example a new expense next to the other 5000s).
+
+</Step>
+
+<Step>
+
+Choose the **Type**: Asset, Liability, Equity, Revenue or Expense. Check the **Currency**, and add a **Description** if others will use the account.
+
+</Step>
+
+<Step>
+
+Choose **Create Account**. It's ready to pick on invoices, bills, bank lines and journal entries.
+
+</Step>
+
+</Steps>
+
+<Shot name="accounts-new" alt="The New Account drawer with code 6150, the name Software subscriptions and the type Expense" narrow />
+
+## Good to know
+
+- Each code can only be used once. If it's taken you'll see "Account code already exists".
+- **Type** and **Currency** can't be changed after the account is created, so check them before you save.
+- Accounts marked **Built-in** come from your country's standard chart. dubbl keeps them up to date, so their name and code are fixed and they can't be deleted. You can still mark them inactive.
+- An account that has entries can't be deleted. Mark it **Inactive** instead: it disappears from dropdowns, and its history stays in your reports.
+- Changing a code doesn't touch existing entries. They follow the account, not the code.
+
+## Five types, two reports
+
+Every account is one of five types. Assets, liabilities and equity make up the [balance sheet](/docs/guides/balance-sheet). Revenue and expenses make up the [profit and loss](/docs/guides/profit-and-loss). The type also decides which side makes the balance go up.
+
+<AccountTypeTree />
+
+<Fold>
+
+## Find an account
+
+- The coloured bar at the top shows how your accounts split across the five types.
+- The tabs (**All**, **Asset**, **Liability**, **Equity**, **Revenue**, **Expense**) show one type at a time.
+- **Search by name or code...** narrows the list as you type.
+- The sort menu orders the list by code, name or type, in either direction.
+
+Inactive accounts stay in the list with an **Inactive** badge, so you can always find and reactivate them.
+
+</Fold>
+
+<Fold>
+
+## See what's in an account
+
+Click an account to open its **Ledger**: every posted line that touched it, with search, **From** and **To** dates, a filter for debits or credits, and sorting by date, entry number or amount. Click a line to open the journal entry it belongs to. Above the list, the account's **Balance**, **Total Debits**, **Total Credits** and number of **Entries**; the **Balance** column shows the running balance after each line.
+
+<Shot name="account-ledger" alt="The Checking Account ledger: balance, total debits and credits, the debit and credit filter, and each line with its running balance" pins />
+
+For the same view across all your accounts at once, use the [general ledger](/docs/guides/general-ledger) report.
+
+</Fold>
+
+<Fold>
+
+## Rename, deactivate or delete
+
+Open the account and choose the **Settings** tab.
+
+<Shot name="account-settings" alt="Account settings for the built-in Checking Account: code and name fixed, sub type, description, status, default tax rate and the danger zone" />
+
+- **General**: change the **Account Code**, **Account Name**, **Sub Type** and **Description**. For built-in accounts only the sub type and description can change.
+- **Status**: switch between **Active** and **Inactive**.
+- **Default tax rate**: the tax rate filled in for you when you categorize a bank transaction to this account. Built-in accounts can set it too.
+- **Info**: the type and currency, shown for reference.
+- **Danger zone**: **Deactivate** hides the account from dropdowns. **Delete** removes it for good, and only works for your own accounts that have never been used.
+
+Choose **Save changes** after editing the general fields, status or default tax rate.
+
+</Fold>
+
+<Fold>
+
+## Where the starting chart comes from
+
+The chart you start with depends on the country you chose when you [set up](/docs/guides/setup) your organization. The UK, Australia, New Zealand and the US get a Xero-style chart with 3-digit codes, which accountants coming from Xero will recognise. Countries with an official or standard chart get that one, such as SKR03 in Germany, the PCG in France or BAS in Sweden. Everywhere else gets a general Xero-style chart.
+
+The screenshots and examples in these docs come from a demo company that uses 4-digit codes (1100 Checking Account, 5200 Rent Expense). Your codes may differ; the ideas are the same.
+
+Many features look for a particular built-in account. Selling something posts to Accounts Receivable, disposing of an asset uses Gain or Loss on Asset Disposal, and closing a year moves profit into Retained Earnings. That's why built-in accounts can't be deleted.
+
+</Fold>
+
+<Fold>
+
+## Merging two accounts
+
+If you end up with two accounts for the same thing, they can be merged: every entry, default and setting that points at one moves to the other, and the first one is removed. Both must be the same type, and a merge can't be undone. Merging isn't in the app's screens yet. Ask [Tilly](/docs/guides/tilly) to do it, or use the [API](/docs/developers/api-reference).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Journal entries" href="/docs/guides/journal-entries" description="Post amounts to your accounts by hand." />
+  <Card title="Opening balances" href="/docs/guides/opening-balances" description="Bring in what each account held when you started." />
+  <Card title="General ledger" href="/docs/guides/general-ledger" description="Every line in every account." />
+  <Card title="What a chart of accounts is" href="/docs/learn/chart-of-accounts" description="The idea behind it, from scratch." />
+</Cards>

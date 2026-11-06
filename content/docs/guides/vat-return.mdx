@@ -1,0 +1,175 @@
+---
+title: VAT return
+description: See the boxes of your VAT return worked out from your books, check the transactions behind them, then file and settle the period.
+icon: Landmark
+---
+
+The VAT return adds up the tax you charged on sales and the tax you can claim back on purchases for a period, and shows the difference: what you owe the tax office, or what it owes you. dubbl fills in all nine boxes from what's already in your books, so there's nothing to type.
+
+<Shot name="vat-return" alt="The VAT Return page with the period, the Count VAT switch, the flat rate option and the Box 5 amount due" pins />
+
+## Prepare your return
+
+<Steps>
+
+<Step>
+
+Open **Tax** in the sidebar and choose **VAT Return**. The tab shows for companies in the UK and EU countries.
+
+</Step>
+
+<Step>
+
+Pick the period at the top: **This Month**, **This Quarter**, another preset, or **Custom** dates that match your VAT quarter. The highlighted button always matches the dates the return is showing.
+
+</Step>
+
+<Step>
+
+Under **Count VAT**, choose **When you record it** (the usual invoice basis) or **When money moves** if you're on cash accounting. It starts on the scheme your company is set up with.
+
+</Step>
+
+<Step>
+
+Read the result. **Output vs Input VAT** compares the two sides, and the large figure is **Box 5**: **Amount Due to HMRC**, or **Refund Due to You** when you paid more VAT than you charged.
+
+</Step>
+
+<Step>
+
+Check the figures under **All Boxes**. Click **Box 1**, **Box 2** or **Box 4** to see every transaction behind it.
+
+</Step>
+
+<Step>
+
+Choose **Print** for a paper copy or **Export CSV** to keep the numbers. Then copy the boxes into your filing software or the tax office's website.
+
+</Step>
+
+</Steps>
+
+<Shot name="vat-return-boxes" alt="All nine VAT boxes, with Box 1 opened to show the transactions behind it" />
+
+Amounts show in your company's currency, and **Export CSV** writes them as plain amounts (1250.00) so they add up in a spreadsheet.
+
+## Good to know
+
+- dubbl works out the return; it doesn't send it to the tax office for you. You file it yourself, then mark the period submitted here.
+- The return reads two accounts in your books: **Output VAT / GST Payable** and **Input VAT / GST Receivable**. Tax on any **US sales tax** rate, which goes to **Sales Tax Payable**, counts as output tax too. Tax recorded any way (invoices, bills, categorized bank transactions, manual journals) shows up. Only posted entries count, never drafts.
+- **When money moves** counts an invoice or bill in the period it's paid. A part payment counts its share: pay 60% of an invoice and 60% of its VAT and net amount land on the payment date, the rest when the remainder is paid. Credit notes applied to a document count the same way. Payments, categorized bank transactions and cash sales count on their own date.
+- Boxes 6 and 7 come from your invoices, bills and cash sales before tax, minus credit notes and supplier credits, in your company's currency. Drafts and voided documents are left out. On **When money moves** they follow the payments too.
+- Box 2 is VAT you account for yourself on reverse charge purchases (the entry adds the same VAT to both tax accounts). Box 1 leaves it out, so Box 3 is all the VAT due on the period.
+- Boxes 8 and 9 count sales and purchases with contacts that have a **Tax number / VAT** and a billing country different from yours.
+- **Use a flat rate** turns on the flat rate scheme: Box 1 becomes your percentage of your gross sales (tax included), and Boxes 2 and 4 drop to 0.
+- If a contact is set to **Don't charge tax**, their sales carry no VAT and count in Box 6 at their net amount.
+
+## Where each box comes from
+
+<TaxReturnMap
+  rows={[
+    { box: "1", label: "VAT due on sales", from: "Output VAT account, minus reverse charge VAT", source: "ledger" },
+    { box: "2", label: "VAT due on EU acquisitions", from: "Reverse charge VAT on your purchases", source: "ledger" },
+    { box: "3", label: "Total VAT due", from: "Box 1 + Box 2", source: "sum" },
+    { box: "4", label: "VAT reclaimed on purchases", from: "Input VAT account", source: "ledger" },
+    { box: "5", label: "Net VAT to pay or reclaim", from: "Box 3 - Box 4", source: "sum", key: true },
+    { box: "6", label: "Total sales ex-VAT", from: "Invoices and cash sales, minus credit notes", source: "documents" },
+    { box: "7", label: "Total purchases ex-VAT", from: "Bills, minus supplier credits", source: "documents" },
+    { box: "8", label: "Supplies to the EU ex-VAT", from: "Invoices to VAT-registered contacts abroad", source: "contacts" },
+    { box: "9", label: "Acquisitions from the EU ex-VAT", from: "Bills from VAT-registered contacts abroad", source: "contacts" },
+  ]}
+  caption="Box 5 is the one you pay or get back. Boxes 1, 2 and 4 can be opened to see each transaction."
+/>
+
+The whole return comes down to one subtraction: the tax you collected for the tax office, minus the tax you paid that you're allowed back.
+
+<TaxNetFlow collected={450000} paid={120000} taxName="VAT" authority="HMRC" />
+
+<Fold>
+
+## The plain-language version of the return
+
+**Reports** has the same return with plain names on every box: **Sales tax / VAT / GST return**, under **Tax time**. It's there for every company, whatever its country. Each box reads like **Tax you charged on sales**; click one to see what it means, its official label, and **See what's behind this number**, which opens the tax collected and paid by rate. The basis switch here reads **When invoiced or billed** and **When money moves**.
+
+<Shot name="vat-return-plain" alt="The plain-language return in Reports with Box 1 opened to explain what it means" pins />
+
+</Fold>
+
+<Fold>
+
+## Tax periods, filing and paying
+
+A tax period is one return: a name, the dates it covers and whether you've filed it. Keep them under **Tax** then **Tax Periods**.
+
+<Shot name="vat-return-periods" alt="The Tax Periods page before any period has been added" />
+
+Each period shows when its return is due under **Due / Submitted**. The due date comes from your company's country: in the UK one month and seven days after the period ends, in Australia the 28th of the month after the quarter (28 February for the December quarter) or the 21st for monthly returns, in the US the 20th of the next month, and elsewhere the end of the following month.
+
+To add one, choose **New Tax Period**, give it a **Name** (for example "Q3 2026"), a **Start Date** and **End Date**, pick the **Type** (**Monthly**, **Quarterly** or **Annual**) and choose **Create**.
+
+<Shot name="vat-return-period-new" alt="The New Tax Period drawer filled in for the third quarter of 2026" narrow />
+
+<Lifecycle
+  steps={[
+    { name: "Open", t: "info", note: "Added, not filed yet." },
+    { name: "Due Soon", t: "watch", note: "The return is due within 14 days." },
+    { name: "Overdue", t: "bad", note: "The due date has passed and it isn't filed." },
+    { name: "Submitted", t: "good", note: "Filed. The box figures are frozen." },
+  ]}
+  caption="Due Soon and Overdue are worked out from the filing deadline shown under Due / Submitted."
+/>
+
+Once you've filed with the tax office, choose **Mark submitted** on the period, add the **Reference number (optional)** you got back, and confirm with **Mark as submitted**. This can't be undone. dubbl then:
+
+- freezes all nine box figures, using the basis your company is set up with (invoice or cash), and
+- moves the period's VAT out of the two tax accounts into **VAT / GST Suspense**, dated the last day of the period. On cash accounting only the VAT on payments made in the period moves; VAT on unpaid invoices and bills waits for the period they're paid in.
+
+Open a submitted period to see the frozen boxes, in your company's currency.
+
+<JournalEntry
+  title="Filing a quarter: $4,500 charged, $1,200 to reclaim"
+  date="Sep 30, 2026"
+  lines={[
+    { account: "Output VAT / GST Payable", debit: 450000 },
+    { account: "Input VAT / GST Receivable", credit: 120000 },
+    { account: "VAT / GST Suspense", credit: 330000, note: "What you owe for the quarter" },
+  ]}
+  caption="The two tax accounts start the next quarter clean. The $3,300 waits in VAT / GST Suspense until you pay."
+/>
+
+When the money actually moves, open the period, find **Settle this return** and choose **Record payment / refund**. Pick **I paid the tax office** or **I received a refund from the tax office**, the bank account, the **Amount** (filled in from Box 5), the **Date** and an optional reference, then **Record payment** or **Record refund**.
+
+<JournalEntry
+  title="Paying the quarter"
+  date="Nov 7, 2026"
+  lines={[
+    { account: "VAT / GST Suspense", debit: 330000 },
+    { account: "Business checking", credit: 330000 },
+  ]}
+  caption="A refund does the opposite: money into the bank, and VAT / GST Suspense goes back to zero."
+/>
+
+Open periods can be removed with the bin icon on the list, after you confirm. Submitted periods can't be deleted.
+
+</Fold>
+
+<Fold>
+
+## Checking a figure that looks wrong
+
+- Click **Box 1**, **Box 2** or **Box 4** and read the list. Each line shows the date, entry number, description, reference and amount. On **When money moves**, a part-paid invoice shows its settled share with the payment number.
+- If something is missing, check it's posted and dated inside the period, and that its line has a tax rate.
+- A wrong rate on a bill? Fix the bill; the return updates on its own. See [Tax rates](/docs/guides/tax-rates) for how each treatment splits the tax.
+- Comparing with another basis? Flip **Count VAT**. The numbers change, the books don't.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Tax rates" href="/docs/guides/tax-rates" description="The rates and treatments behind every box." />
+  <Card title="BAS" href="/docs/guides/bas" description="The Australian GST return." />
+  <Card title="Reports" href="/docs/guides/reports" description="Every report dubbl has, and how to use them." />
+  <Card title="Sales tax and VAT, explained" href="/docs/learn/sales-tax-and-vat" description="Why the tax you collect isn't your money." />
+</Cards>

@@ -1,0 +1,122 @@
+---
+title: Purchase orders
+description: Tell suppliers what you're buying before they bill you, record what arrives, and turn the order into a bill.
+icon: ClipboardList
+---
+
+A purchase order (PO) is what you send a supplier to say "we'll buy these, at this price". It isn't in your books: no money is owed until the supplier bills you. What it gives you is a record of what you agreed to spend, what's still to arrive, and a ready-made bill when the invoice comes.
+
+<Shot name="purchase-orders" alt="The purchase orders list with open commitments, late deliveries, top suppliers and the list of orders" pins />
+
+## Raise a purchase order
+
+<Steps>
+
+<Step>
+
+Open **Purchases**, then **Purchase orders**, and choose **New PO**.
+
+</Step>
+
+<Step>
+
+Pick the **Supplier**. Add a **Reference** if you need one, check the **Issue Date**, and set the **Delivery Date** you expect.
+
+</Step>
+
+<Step>
+
+Add a **line** for each item: description, quantity and the price you agreed. Pick the account and tax rate now, and the bill made from this order will have them too.
+
+</Step>
+
+<Step>
+
+Choose **Create purchase order**. It's saved as a draft you can still **Edit** or **Delete**.
+
+</Step>
+
+<Step>
+
+Choose **Send**, then **Send Email** to email it to the supplier, or **Mark as Sent** if you ordered by phone or on their website. The order becomes **Ordered**.
+
+</Step>
+
+</Steps>
+
+<Shot name="purchase-orders-new" alt="The New Purchase Order drawer with a supplier and a line for six ergonomic chairs" narrow />
+
+## Good to know
+
+- A purchase order never touches your books. The bill does that.
+- Orders past their **Delivery Date** that haven't fully arrived count toward **Late deliveries**, so you know who to chase.
+- **Open commitments** is money you've promised but haven't been billed for yet.
+- Once an order is sent, you can't edit it. Only drafts can be changed or deleted.
+- If an [approval workflow](/docs/guides/approvals) covers purchase orders, a matching draft can't be sent until it's approved. Choose **Submit for approval** on the order; **Send** works once every approver has said yes.
+- You don't have to bill everything at once. Each bill from the order picks up only what hasn't been billed yet.
+
+## From order to payment
+
+<PurchaseToPayFlow />
+
+<Shot name="purchase-orders-detail" alt="An ordered purchase order for monitors and HDMI cables from Tech Hardware Ltd, with Mark items as received and Create a bill from this order" pins />
+
+<Fold>
+
+## Recording what arrived
+
+When a delivery comes in, open the order and choose **Mark items as received**. Each item starts at what's **Still to come**. If only part of the order arrived, lower **Received now** to what you actually got, or set it to 0 for items that haven't come. Set the **Date received**, add a note such as the delivery note number if you like, and choose **Mark as received**.
+
+Anything you track as stock is added to your [inventory](/docs/guides/inventory) straight away, valued at the order price. Each line on the order then shows how much has come in, for example "2 of 5 received". After a part delivery the order shows that some items are in, and you can choose **Mark items as received** again for the next delivery. Once everything has arrived, the order becomes **All items in**.
+
+<Shot name="purchase-orders-receive" alt="The Mark items as received dialog with what's still to come and how many arrived for each item" narrow />
+
+Each delivery is kept under **Purchases**, then **Goods received**, where it waits as **Waiting for bill** until a bill is made from it. From a receipt you can choose **Create a bill from this**, **View order**, or **View bookkeeping entry**.
+
+<Shot name="purchase-orders-received" alt="The Goods received list with the value received, what is waiting for a bill, and one delivery from Tech Hardware Ltd" />
+
+</Fold>
+
+<Fold>
+
+## Turning the order into a bill
+
+When the supplier's invoice arrives, open the order and choose **Create a bill from this order**. dubbl makes a draft [bill](/docs/guides/bills) with the lines still to be billed, at the order prices, dated with the order's issue date and due on its delivery date. Check it against the supplier's invoice, change what's different, then add it to your books.
+
+If you marked the items as received first, the bill's lines are tied to that delivery. When the bill goes into your books, dubbl checks it against what you ordered and what arrived, using your **Bill Matching** settings. See [Bills from a purchase order](/docs/guides/bills).
+
+Bills made from a delivery of this order count too. While only some of it is billed, the order shows as **Partly done**. When every line has been billed, the order is **Fully billed** and drops out of your open commitments. If you void or delete one of those bills, its amounts go back on the order as still to be billed.
+
+</Fold>
+
+<Fold>
+
+## What the statuses mean
+
+| Status | What it means |
+| --- | --- |
+| **Draft** | Not sent yet. Edit or delete it. |
+| **Ordered** | Sent to the supplier. Waiting for delivery. |
+| **Partly done** | Some of it has arrived or been billed, not all. |
+| **All items in** | Everything arrived. Waiting for the bill. |
+| **Fully billed** | Everything on it has been billed. |
+| **Cancelled** | No longer going ahead. |
+
+</Fold>
+
+<Fold>
+
+## Starting from a request
+
+If people need approval before anyone orders, start with a [requisition](/docs/guides/requisitions). Once it's approved, **Create a purchase order** turns it into a PO with the same lines.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bills" href="/docs/guides/bills" description="Record the supplier's invoice and pay it." />
+  <Card title="Requisitions" href="/docs/guides/requisitions" description="Ask for approval before you order." />
+  <Card title="Inventory" href="/docs/guides/inventory" description="Stock that goes up when deliveries arrive." />
+  <Card title="Landed costs" href="/docs/guides/landed-costs" description="Add freight and duty to what stock cost you." />
+</Cards>

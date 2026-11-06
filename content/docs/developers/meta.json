@@ -1,0 +1,5 @@
+{
+  "title": "Developers",
+  "root": true,
+  "pages": ["index", "authentication", "conventions", "api-reference", "mcp", "webhooks", "import-export", "contributing"]
+}

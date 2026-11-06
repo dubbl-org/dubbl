@@ -1,0 +1,124 @@
+---
+title: Stocktakes
+description: Count what's really on the shelf, compare it with your records and correct the difference in one step.
+icon: ClipboardCheck
+---
+
+A stocktake is a physical count. You walk the shelves, enter what you find, and dubbl compares it with what it expected. Breakage, theft and miscounts show up as differences, and finishing the count corrects your stock and your books together.
+
+<Shot name="stock-takes" alt="The Stocktakes page with counts in progress and done, status tabs, and a cycle count at the east location still counting beside a finished quarterly count at the main warehouse" pins />
+
+## Count your stock
+
+<Steps>
+
+<Step>
+
+Open **Inventory**, then **Stocktakes**, and choose **New Stock Take**.
+
+</Step>
+
+<Step>
+
+Give the count a **Name**, such as `October 2026 full count`. Pick a **Warehouse** to count just that location, or leave it empty to count every item across all your locations. Choose **Create Stock Take**.
+
+</Step>
+
+<Step>
+
+Open the count from the list and choose **Start Count**. Every shown item has a line with the quantity dubbl expects, refreshed from your stock at that moment: that location's stock for a location count, or everything you have for a full count.
+
+</Step>
+
+<Step>
+
+Enter what you count on each line. The check mark confirms that a line matches what was expected; the minus and plus buttons, or typing a number, record something different. **Confirm All Remaining** matches every line you haven't counted yet.
+
+</Step>
+
+<Step>
+
+When you're done, choose **Finalize & post adjustment**. Every counted line is set to what you counted, each difference is recorded, and the count is **Done**.
+
+</Step>
+
+</Steps>
+
+<Shot name="stock-takes-new" alt="The New Stock Take drawer with a name, an optional warehouse and notes" narrow />
+
+## Good to know
+
+- Only the differences are posted. Lines that match change nothing, and lines you didn't count are left alone.
+- A count for one location only corrects that location. Its differences are measured against that location's stock, not everything you own.
+- Differences are worked out when you finalize, against the stock at that moment, so the result always matches what you counted.
+- You can only enter counts while the stocktake is **Counting**. Once it's finalized, it can't be changed.
+- **Blind Count** hides the expected quantities, so whoever counts isn't nudged towards the number on screen.
+- A count that hasn't started yet can be deleted. One in progress can be cancelled; cancelling posts nothing.
+- Stock keeps moving while you count. Count when it's quiet, or finish quickly, so sales and deliveries during the count don't show up as differences.
+
+## How a stocktake moves
+
+<Lifecycle
+  steps={[
+    { name: "Not started", note: "Created. Start the count when you're ready." },
+    { name: "Counting", t: "info", note: "Enter what you find on each line." },
+    { name: "Done", t: "good", note: "Finalized. Differences posted." },
+  ]}
+  caption="A count can be cancelled before it's finalized. Cancelling posts nothing."
+/>
+
+<StockTakeCountSheet />
+
+<Fold>
+
+## What gets recorded in your books
+
+Each item with a difference posts its own entry. Units you're short are written off at their cost as inventory shrinkage:
+
+<JournalEntry
+  title="Stock take October 2026 full count shortage"
+  date="Oct 31, 2026"
+  lines={[
+    { account: "Inventory Shrinkage", debit: 5400 },
+    { account: "Inventory", credit: 5400 },
+  ]}
+  caption="3 Desk Organizer Sets missing, at $18.00 each."
+/>
+
+Units you find are added back at the item's current average cost, the other way round:
+
+<JournalEntry
+  title="Stock take October 2026 full count overage"
+  date="Oct 31, 2026"
+  lines={[
+    { account: "Inventory", debit: 1400 },
+    { account: "Inventory Shrinkage", credit: 1400 },
+  ]}
+  caption="4 extra packs of sticky notes, at $3.50 each."
+/>
+
+</Fold>
+
+<Fold>
+
+## Following a count's progress
+
+While a count is in progress, its page shows **Counting progress** with how many lines match, how many differ and how many are uncounted. The **All**, **Uncounted**, **Matched** and **Discrepancies** tabs filter the lines, so you can go back to the ones that need a recount. After it's finalized, the page sums up the items counted, how many were accurate, the discrepancies, and your accuracy.
+
+</Fold>
+
+<Fold>
+
+## The stocktakes list
+
+**Stocktakes** lists each count with its location, status, how many items it covers and when it started and finished. Above the list you see how many counts are in progress, not started and done, when the last one finished and how long counts take. Click a row to preview the expected, counted and difference for each item, and to **Start counting** or **Continue counting**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Inventory" href="/docs/guides/inventory" description="Change one item's count, with a reason." />
+  <Card title="Locations and transfers" href="/docs/guides/warehouses" description="Where your stock is kept." />
+  <Card title="Inventory costing" href="/docs/learn/inventory-costing" description="Why shrinkage is valued at cost." />
+</Cards>

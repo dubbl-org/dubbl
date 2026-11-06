@@ -1,0 +1,7 @@
+/* The docs' Tailwind build: the app's styles and Fumadocs' preset compiled
+   together, so every utility on a docs page (Fumadocs' layout, diagrams, app
+   components) is ordered by one build. Loading Fumadocs' prebuilt style.css
+   instead lets its plain utilities override the app's responsive ones. */
+@import "../globals.css";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";

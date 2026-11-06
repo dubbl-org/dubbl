@@ -1,0 +1,86 @@
+---
+title: Recurring invoices
+description: Bill the same customer on a schedule, weekly to yearly, as drafts to check or emailed automatically.
+icon: Repeat
+---
+
+Retainers, subscriptions, rent: if you bill the same thing on a schedule, set it up once as a recurring template. dubbl creates each invoice on its date, either as a draft for you to check or finished and emailed to the customer, and keeps going until the end date you set or until you pause it.
+
+<Shot name="recurring-invoices" alt="The recurring invoices list with the next invoices coming up, totals and each template's invoices made" pins />
+
+## Set up a recurring invoice
+
+<Steps>
+
+<Step>
+
+Open **Sales › Recurring invoices** and choose **New Recurring** in the top bar.
+
+</Step>
+
+<Step>
+
+Give it a **Template Name** you'll recognise, such as "Monthly retainer", and pick the **Customer**.
+
+</Step>
+
+<Step>
+
+Choose the **Frequency**: **Weekly**, **Fortnightly**, **Monthly**, **Quarterly**, **Semi-Annual** or **Annual**. Set the **Start Date**, which is the date of the first invoice, and an **End Date** if it should stop.
+
+</Step>
+
+<Step>
+
+Tick **Email it automatically each time** if each invoice should go straight to the customer. Leave it off to get drafts you check and send yourself.
+
+</Step>
+
+<Step>
+
+Add the **Line Items** each invoice should carry, and any **Notes**. Choose **Create Template**.
+
+</Step>
+
+</Steps>
+
+<Shot name="recurring-invoices-new" alt="The New Recurring Invoice drawer with a monthly retainer for Metro Services and one line" narrow />
+
+## Good to know
+
+- Invoices are created once a day. Each one is dated its scheduled day, even when it's created late, and is due after the customer's payment terms, or your default **Payment terms** (**Settings**, under **Financials**) if the customer has none, or 30 days.
+- Lines without an account or tax rate get the customer's defaults from **Bookkeeping**, and a customer marked **Don't charge tax to this contact** is never charged tax.
+- If the start date is in the past, the first run catches up and creates every invoice that's come due since.
+- With **Email it automatically each time** on, each invoice is put in your books and emailed. If the email fails, the invoice is still recorded.
+- Dates that pass while a template is paused are skipped. When you resume, it carries on from the next scheduled date from today, and doesn't create the invoices you missed. If that date is after the end date, the template is **Finished**.
+- The template stops on its own after its end date and shows as **Finished**.
+
+## How the schedule runs
+
+<RecurringScheduleStrip />
+
+<Shot name="recurring-invoices-preview" alt="The preview of a monthly retainer template showing frequency, next invoice, invoices made, delivery and the next invoice dates" narrow />
+
+<Fold>
+
+## Pause, resume or delete
+
+Open a template and choose **Pause** to stop new invoices for a while, and **Resume** to start again. You can also select several templates in the list and pause or resume them together. **Delete** removes the template for good; invoices it already created aren't touched.
+
+</Fold>
+
+<Fold>
+
+## Keeping an eye on the schedule
+
+The **Coming up next** strip shows the next invoices due across all templates. The tiles count **Active** templates, invoices **Going out this week**, **Paused** templates, **Invoices created** so far and templates **Ending soon**. Each template's preview lists its **Next invoices**, so you can see exactly when the customer will be billed.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="What each run creates." />
+  <Card title="Payment reminders" href="/docs/guides/payment-reminders" description="Chase the ones that aren't paid on time." />
+  <Card title="Revenue schedules" href="/docs/guides/revenue-schedules" description="Spread one invoice's income over months." />
+</Cards>

@@ -1,0 +1,105 @@
+---
+title: Document templates
+description: Change how your invoice, quote, receipt, payslip and purchase order PDFs look, with your logo, colour, bank details and payment instructions.
+icon: LayoutTemplate
+---
+
+Templates decide what the PDFs you send look like: your logo, the accent colour along the top, a line of header and footer text, whether the tax row and payment terms show, and the bank details and payment instructions your customers need to pay you. Each type of document has one default template, and every PDF of that type uses it. They're under **Settings > Templates**.
+
+<Shot name="document-templates" alt="The Document Templates page with four default templates" pins />
+
+## Make your invoices your own
+
+<Steps>
+
+<Step>
+
+Open **Settings > Templates** and choose **New Template**.
+
+</Step>
+
+<Step>
+
+Give it a **Name**, set **Type** to **Invoice**, and switch on **Default Template** so every invoice PDF uses it. Under **Type** you can see which documents that type is used for.
+
+</Step>
+
+<Step>
+
+Pick an **Accent Color** for the bar along the top of the PDF, and paste a link to your logo into **Logo URL**.
+
+</Step>
+
+<Step>
+
+Fill in **Bank Details** and **Payment Instructions**. They print as their own sections below the totals.
+
+</Step>
+
+<Step>
+
+Choose **Create**. Open the template's menu and choose **Preview** to see it on a sample document, or **Download Sample PDF** to check the real thing.
+
+</Step>
+
+</Steps>
+
+<Shot name="document-templates-new" alt="The New Template drawer with name, type, accent colour, display options and bank details" narrow />
+
+## Good to know
+
+- Each type has one default. Switching on **Default Template**, on a new template or when you edit one, takes over from the old default.
+- Deleting the default template leaves that type with no default, so its PDFs use the plain built-in look until you make another template the default.
+- A template's **Type** can't be changed after you create it. Make a new template instead.
+- **Notes** on a template replace the notes on every document that uses it. Leave it empty to keep each invoice's own notes.
+- **Logo URL** must be a link anyone can open to a PNG or JPEG image. If dubbl can't load it, the PDF is made without the logo.
+- **Header Text** prints above the title and **Footer Text** at the bottom of every page. They're printed as plain text: line breaks are kept and any HTML tags are removed.
+- Invoices emailed with **Send** keep the company details they went out with, but use the current template when you download the PDF again.
+
+## Which template each PDF uses
+
+<TemplateDocumentMap />
+
+<Fold>
+
+## Fill in details automatically
+
+In **Bank Details**, **Payment Instructions**, **Notes**, **Header Text** and **Footer Text** you can use variables in double braces. dubbl swaps them for the real value on each document, for example:
+
+```text
+Please quote {{invoiceNumber}} with your payment.
+Questions? Email {{orgEmail}} or call {{orgPhone}}.
+```
+
+The variables are `{{orgName}}`, `{{orgAddress}}`, `{{orgTaxId}}`, `{{orgPhone}}`, `{{orgEmail}}`, `{{orgRegistrationNumber}}`, `{{invoiceNumber}}`, `{{issueDate}}`, `{{dueDate}}`, `{{reference}}`, `{{contactName}}`, `{{contactEmail}}`, `{{contactAddress}}`, `{{contactTaxNumber}}`, `{{subtotal}}`, `{{taxTotal}}`, `{{total}}` and `{{currency}}`. On quotes, receipts and other documents, `{{invoiceNumber}}` is that document's number.
+
+Payslip templates have their own: `{{employeeName}}`, `{{employeeNumber}}`, `{{payPeriodStart}}`, `{{payPeriodEnd}}`, `{{payDate}}`, `{{grossPay}}`, `{{netPay}}` and `{{currency}}`, plus the `{{org...}}` ones. The drawer lists the right set for the type you pick.
+
+</Fold>
+
+<Fold>
+
+## Preview a template
+
+Open the menu on a template's card and choose **Preview**. It shows the template on a sample document of its type (a sample invoice, quote, receipt, payslip or purchase order) using your company details. **Download Sample PDF** gives you the actual PDF.
+
+<Shot name="document-templates-preview" alt="The Template Preview dialog showing a sample invoice with a green accent bar" narrow />
+
+</Fold>
+
+<Fold>
+
+## Display options
+
+- **Show Tax Breakdown** adds the tax row to the totals. Turn it off if you don't charge tax. On a payslip it lists each tax (income tax, Social Security, Medicare and so on) instead of one **Tax withheld** line.
+- **Show Payment Terms** is only on invoice templates. When it's on, the invoice shows the **Date due**, the amount due with its date at the top, and a **Payment terms** line under the totals such as "Net 30. Please pay by 2026-04-09." Turn it off to leave all of those out and show just the amount due.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="Create and send the invoices these templates style." />
+  <Card title="Organization" href="/docs/guides/organization" description="The company details printed on every PDF." />
+  <Card title="Email sending" href="/docs/guides/email" description="Send the PDFs from your own address." />
+</Cards>

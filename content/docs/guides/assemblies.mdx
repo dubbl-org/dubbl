@@ -1,0 +1,140 @@
+---
+title: Assemblies
+description: Build finished products from parts, with the parts' stock used up and the finished item costed for you.
+icon: Boxes
+---
+
+If you make what you sell, a bill of materials is the recipe: which parts go into one finished item, how many of each, and what labour and overhead it takes. An assembly order builds a batch from that recipe. Completing it takes the parts out of stock, adds the finished items, and works out what each one cost.
+
+<Shot name="assemblies-bom" alt="The Workstation Starter Kit bill of materials: five parts, each with its quantity, cost and stock on hand, and the cost to build one kit" pins />
+
+## Set up a bill of materials
+
+<Steps>
+
+<Step>
+
+Open **Inventory**, then **Bills of materials**, and choose **New bill of materials**.
+
+</Step>
+
+<Step>
+
+Under **Makes**, pick the finished item. Give the recipe a **Name**, and enter the **Labour per unit** and **Overhead per unit** if building one costs you more than its parts. Choose **Create**.
+
+</Step>
+
+<Step>
+
+dubbl opens the new bill of materials. Choose **Add part**, pick the **Part**, and enter the **Quantity per unit** (decimals are fine) and any **Wastage %**. Repeat for every part.
+
+</Step>
+
+</Steps>
+
+<Shot name="assemblies-bom-new" alt="The New bill of materials drawer making a Monitor Stand, with a name and labour per unit" narrow />
+
+The finished item and every part must already be [inventory items](/docs/guides/inventory). **Edit details** changes the name, labour, overhead or whether the recipe is **Active**; the pencil on a part changes its quantity or wastage.
+
+## Build a batch
+
+<Steps>
+
+<Step>
+
+On the bill of materials, choose **New assembly order**, or open **Assembly orders** and choose **New assembly order** there.
+
+</Step>
+
+<Step>
+
+Enter the **Quantity to build**. **Parts this build uses** shows how many of each part you need against what's on hand. Choose **Create order**.
+
+</Step>
+
+<Step>
+
+Choose **Start** when work begins, if you want to track it as **Building**.
+
+</Step>
+
+<Step>
+
+When the batch is built, choose **Complete** and confirm. The parts leave stock, the finished items arrive, and the cost is recorded.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Completing an order checks that every part is in stock first. If one is short, nothing happens and you see which part and how many you need.
+- Wastage is added to what's used and rounded up to whole units: 8 bolts with 10% wastage for 10 desks uses 88 bolts.
+- Parts are taken out at their current cost (average or first in, first out) when you complete the order, so the finished item's cost reflects what you actually paid.
+- **Start** only marks the order as **Building**. It doesn't set any stock aside.
+- **Cancel** calls off a planned or building order. Nothing has been used yet, so stock doesn't change. A built order can't be cancelled.
+- **Cost to build one** on a bill of materials is an estimate from the parts' current cost. The real cost is worked out when you build.
+- An item can't be a part of itself, and each part appears once per recipe.
+
+## How the cost adds up
+
+<AssemblyBomRollup />
+
+<AssemblyBuildFlow />
+
+<Lifecycle
+  steps={[
+    { name: "Planned", note: "Created. Nothing has moved." },
+    { name: "Building", t: "info", note: "Optional. Work has started." },
+    { name: "Built", t: "good", note: "Parts used, finished items in stock." },
+  ]}
+  caption="An order can be completed straight from Planned, or cancelled before it's built."
+/>
+
+<Fold>
+
+## What gets recorded in your books
+
+Completing an order posts one entry. The finished items arrive in inventory at the total cost, the parts' value leaves inventory, and the labour and overhead are credited to a manufacturing clearing account.
+
+<JournalEntry
+  title="Assembly build: Standing Desk x10"
+  date="Oct 20, 2026"
+  lines={[
+    { account: "Inventory", debit: 174400, note: "finished desks" },
+    { account: "Inventory", credit: 149400, note: "parts" },
+    { account: "Manufacturing/WIP Clearing", credit: 25000, note: "labour and overhead" },
+  ]}
+  caption="10 desks at $174.40 each. Items with their own inventory account use it instead of Inventory, for the finished item and for each part."
+/>
+
+The finished items go to the same Inventory account that sales and count changes take them out of, so the value always leaves the account it arrived in.
+
+</Fold>
+
+<Fold>
+
+## With the API or Tilly
+
+Everything here is also available through the [API](/docs/developers/api-reference) (amounts in cents) and [Tilly](/docs/guides/tilly):
+
+```http
+POST /api/v1/inventory/bom
+{ "assemblyItemId": "<finished item id>", "name": "Standing Desk", "laborCostCents": 2000, "overheadCostCents": 500,
+  "components": [{ "componentItemId": "<part id>", "quantity": 8, "wastagePercent": 10 }] }
+
+POST /api/v1/inventory/assembly-orders
+{ "bomId": "<bom id>", "quantity": 10 }
+
+POST /api/v1/inventory/assembly-orders/<order id>/complete
+```
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Inventory" href="/docs/guides/inventory" description="The parts and finished items you build with." />
+  <Card title="Inventory costing" href="/docs/learn/inventory-costing" description="How average cost works." />
+  <Card title="API reference" href="/docs/developers/api-reference" description="Create bills of materials and assembly orders." />
+</Cards>

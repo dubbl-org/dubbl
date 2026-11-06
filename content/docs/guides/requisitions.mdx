@@ -1,0 +1,108 @@
+---
+title: Requisitions
+description: Let people ask to buy something, get a manager's yes, and turn the approved request into a purchase order.
+icon: ClipboardCheck
+---
+
+A requisition is an internal request to spend money: "we need three laptops for the new hires by the 1st". It isn't sent to a supplier and never touches your books. It gives whoever holds the budget a chance to say yes or no before anyone places an order.
+
+<Shot name="requisitions" alt="The requisitions list with what is waiting for approval, approved and ordered, top suppliers, and three requests with their status" pins />
+
+## Ask to buy something
+
+<Steps>
+
+<Step>
+
+Open **Purchases**, then **Requisitions**, and choose **New requisition**.
+
+</Step>
+
+<Step>
+
+Pick the **Supplier** if you know who to buy from. You can leave it empty and choose it later, but it's needed before the request becomes a purchase order.
+
+</Step>
+
+<Step>
+
+Check the **Request Date** and set **Required By**, the date you need it. Add a **Reference** and **Notes** to explain why.
+
+</Step>
+
+<Step>
+
+Add a line for each thing you need: a description, **Qty**, an estimated **Unit Price** and, if you like, the **Account** it should be booked to. Choose **Add Line** for more.
+
+</Step>
+
+<Step>
+
+Choose **Create Requisition**. It's saved as a draft.
+
+</Step>
+
+<Step>
+
+Open it and choose **Submit**. It waits as **Waiting for approval**.
+
+</Step>
+
+</Steps>
+
+<Shot name="requisitions-new" alt="The New Purchase Requisition sheet with a supplier, dates and one line for laptops" narrow />
+
+## Change a request
+
+While a requisition is a draft, open it and choose **Edit**. You can change the supplier, the dates, the reference, the notes and every line. Choose **Save Changes** and the total is worked out again. Once it's submitted it can't be changed, unless a manager rejects it.
+
+<Shot name="requisitions-detail" alt="A draft requisition for USB-C chargers with its supplier, one line and the Edit and Submit buttons" pins />
+
+<Shot name="requisitions-edit" alt="The Edit Requisition sheet with the supplier, dates and lines filled in" narrow />
+
+## Good to know
+
+- A requisition is only a request. Nothing is ordered and nothing is recorded in your books.
+- The unit prices are estimates. The real prices go on the purchase order and the bill.
+- A requisition needs a supplier before it can become a purchase order. If it doesn't have one yet, dubbl asks for it when you order.
+- **Required By** becomes the expected delivery date on the purchase order.
+
+## How a request moves
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Being written. Not sent for approval yet." },
+    { name: "Waiting for approval", t: "info", note: "Submitted. A manager decides." },
+    { name: "Approved", t: "good", note: "Yes. Ready to order." },
+    { name: "Ordered", t: "good", note: "Turned into a purchase order." },
+  ]}
+  caption="A rejected request shows as Rejected, with the reason the approver gave. Edit it and choose Resubmit to ask again."
+/>
+
+<Fold>
+
+## Approving or rejecting
+
+Open a requisition that's **Waiting for approval**. Choose **Approve** to say yes, or **Reject** and give a reason so the person knows what to change. The list's **Waiting for approval** and **Needed this week** totals show what needs a decision first.
+
+A rejected requisition shows the reason at the top. The person who asked can choose **Edit** to change it, then **Resubmit** to send it for approval again. The old reason is cleared.
+
+</Fold>
+
+<Fold>
+
+## Turning it into a purchase order
+
+On an approved requisition, choose **Create a purchase order**. If the requisition has no supplier yet, dubbl asks **Who are you ordering from?** first: pick the **Supplier** and choose **Create a purchase order** again. dubbl makes a draft [purchase order](/docs/guides/purchase-orders) for the supplier, dated today, with the same lines, quantities, accounts and totals, and the delivery date set to **Required By**. The requisition becomes **Ordered**, with a **View PO** link. Check the prices with the supplier, then send the order as usual.
+
+<PurchaseToPayFlow />
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Purchase orders" href="/docs/guides/purchase-orders" description="Order from the supplier once the request is approved." />
+  <Card title="Bills" href="/docs/guides/bills" description="Record the supplier's invoice when it comes." />
+  <Card title="Approvals" href="/docs/guides/approvals" description="Set up who signs off on what." />
+</Cards>

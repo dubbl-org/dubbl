@@ -1,0 +1,67 @@
+---
+title: The chart of accounts
+description: The list of categories every amount in your books is sorted into, and how it's organized.
+icon: ListTree
+---
+
+The chart of accounts is the list of buckets your business sorts money into: one for the bank, one for sales, one for rent, one for each loan, and so on. Every line of every journal entry points at one of these accounts. Add the lines up per account and you get your reports. dubbl gives you a ready-made chart when you set up, so most people never build one from scratch.
+
+<ShortVersion>
+
+- An **account** is a named, numbered category, like "Rent" or "Accounts Receivable".
+- Every account is one of five types: asset, liability, equity, revenue or expense.
+- The code tells you the type at a glance: in dubbl's US chart, 0xx and 1xx are assets, 2xx liabilities, 3xx equity, 4xx revenue and 5xx to 8xx expenses.
+- Asset, liability and equity accounts make the balance sheet. Revenue and expense accounts make the profit and loss.
+
+</ShortVersion>
+
+## What an account is
+
+Think of each account as a running total with a name. "Checking Account" is the running total of your bank balance. "Sales" is the running total of everything you've earned. "Office Expenses" is everything you've spent on the office. Each account has:
+
+- a **code**, a short number that keeps related accounts together,
+- a **name**, in plain words,
+- a **type**, one of the five that decide how it behaves and which report it appears on,
+- a **currency**, normally your base currency.
+
+## The five types, and how codes group them
+
+Codes are just numbers, but they follow a pattern so you can tell an account's type without looking it up. Here's the layout of the chart dubbl creates for a new US business:
+
+<ChartCodeRanges />
+
+Charts for other countries follow their own local conventions (the UK chart, for example, puts sales in the 200s), so don't worry if your numbers look different. The five types are the same everywhere.
+
+## Which accounts make which report
+
+The types split neatly between the two main reports. Three describe what you have and owe on a given day; two describe how you did over a period.
+
+<ChartToReports />
+
+Profit doesn't stay on the profit and loss forever. At the end of each financial year it moves into equity (as retained earnings), which is how the two reports stay linked. [Financial statements](/docs/learn/financial-statements) shows the full picture.
+
+## Your chart in dubbl
+
+Find it in **Accounting**, under **Accounts**. The coloured bar shows how many accounts you have of each type, and you can filter by type or search by name or code.
+
+<Shot name="learn-accounts" alt="The Chart of Accounts: a bar of account types, type tabs, and the asset accounts with codes, names and currency" pins />
+
+The demo company in these screenshots uses dubbl's older four-digit chart (1000 Cash, 1200 Accounts Receivable). New organizations get a three-digit chart based on their country.
+
+Accounts marked **Built-in** are the ones dubbl's automatic entries rely on: Accounts Receivable for invoices, Accounts Payable for bills, the tax accounts, Retained Earnings and so on. You can't rename or delete them, but you can mark one inactive to hide it. Add as many accounts of your own as you like with **New Account**.
+
+## Good to know
+
+- Keep the chart short. A handful of expense accounts you actually look at beats eighty you never read. You can always split one later.
+- An account that already has transactions can't be deleted. Mark it inactive instead; its history stays in your reports.
+- Use [tags and cost centers](/docs/guides/tags-and-cost-centers) to slice spending by project or department, rather than making an account for each.
+- Bank accounts you add under **Bank accounts** get their own asset account in the chart automatically.
+
+## Related
+
+<Cards>
+  <Card title="Chart of accounts guide" href="/docs/guides/chart-of-accounts" description="Add, edit and organize accounts in dubbl." />
+  <Card title="Debits and credits" href="/docs/learn/debits-and-credits" description="How each account type grows and shrinks." />
+  <Card title="Financial statements" href="/docs/learn/financial-statements" description="How the accounts add up into reports." />
+  <Card title="Set up your business" href="/docs/guides/setup" description="Pick your country and get the right chart." />
+</Cards>

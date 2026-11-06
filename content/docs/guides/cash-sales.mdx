@@ -1,0 +1,93 @@
+---
+title: Cash sales
+description: Record a sale that's paid for on the spot, with no invoice, straight into your till or bank account.
+icon: Store
+---
+
+A cash sale is a sale and its payment in one go: a walk-in customer, a market stall, a job paid for the moment it's done. There's nothing to chase, so there's no invoice. You record what was sold and where the money went, and dubbl books the income and the cash together.
+
+<Shot name="cash-sales" alt="The cash sales page, empty, explaining how a cash sale works and when to use one" />
+
+## Record a cash sale
+
+<Steps>
+
+<Step>
+
+Open **Sales › Cash sales** and choose **New cash sale** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **Customer**, check the **Date**, and add a **Reference** such as the till receipt number. Change the **Currency** if they paid in another one.
+
+</Step>
+
+<Step>
+
+Under **What was sold**, add a line for each item: description, quantity, price, income account and tax rate.
+
+</Step>
+
+<Step>
+
+Under **Payment**, choose where the money landed in **Paid into**: your till, a cash account or a bank account.
+
+</Step>
+
+<Step>
+
+Choose **Record cash sale**. It's saved as a draft. Open it and choose **Record sale** to put it in your books. It's now **Paid**.
+
+</Step>
+
+</Steps>
+
+<Shot name="cash-sales-new" alt="The New Cash Sale drawer with Riverdale Co as the customer and a workshop ticket line" narrow />
+
+## Good to know
+
+- A draft cash sale doesn't count yet. **Record sale** is what puts it in your books.
+- Use an [invoice](/docs/guides/invoices) instead when the customer will pay you later.
+- Every cash sale needs a customer. For walk-in sales, keep one contact such as "Walk-in customer" and use it each time.
+- Selling stock you track in inventory also records what those items cost you, and your stock goes down.
+- **Cancel sale** on a recorded sale reverses its entries. On a draft it just stops it counting.
+- **Download PDF** on a cash sale gives you a receipt to send the customer. It uses your default Receipt [document template](/docs/guides/document-templates).
+
+## What gets recorded in your books
+
+<JournalEntry
+  title="Cash sale to Riverdale Co"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Cash on hand", debit: 4950 },
+    { account: "Sales", credit: 4500 },
+    { account: "Sales tax payable", credit: 450 },
+  ]}
+  caption="A $45 workshop ticket with 10% tax, paid in cash. The income and the money arrive together, so no one owes anyone anything."
+/>
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Saved, not counted yet." },
+    { name: "Paid", t: "good", note: "In your books, money received." },
+  ]}
+  caption="Either can be cancelled. Cancelling a paid sale reverses what it recorded."
+/>
+
+<Fold>
+
+## The cash sales list
+
+Once you've recorded some, the tiles show **Taken this month**, **Last month**, your **Average sale**, the **Total taken** and any **Drafts** still waiting to be recorded. The tabs split sales into **Draft**, **Paid** and **Cancelled**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Payments received" href="/docs/guides/payments-received" description="When a customer pays an invoice later." />
+  <Card title="Invoices" href="/docs/guides/invoices" description="Bill now, get paid later." />
+  <Card title="Bank accounts" href="/docs/guides/bank-accounts" description="Add the till or account money goes into." />
+</Cards>

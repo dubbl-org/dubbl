@@ -1,0 +1,90 @@
+---
+title: Recurring bills
+description: Have the same supplier bill created for you every week, month or year, ready to check and post.
+icon: Repeat
+---
+
+Rent, software, insurance: some bills arrive with the same amount on the same day every period. A recurring bill is a template that creates that bill for you on a schedule, so you don't key it in again each month.
+
+<Shot name="recurring-bills" alt="The Recurring Bills list with two monthly schedules, their suppliers and next bill dates" pins />
+
+## Set up a recurring bill
+
+<Steps>
+
+<Step>
+
+Open **Purchases**, then **Recurring bills**, and choose **New Recurring Bill**.
+
+</Step>
+
+<Step>
+
+Give it a **Name** you'll recognize, like "Office internet", and pick the **Supplier**. Add a **Reference** if you want one on every bill.
+
+</Step>
+
+<Step>
+
+Choose the **Frequency**: **Weekly**, **Fortnightly**, **Monthly**, **Quarterly**, **Semi-Annual** or **Annual**.
+
+</Step>
+
+<Step>
+
+Set the **Start Date**, the date of the first bill. To stop it later, set an **End Date** or a number of **Max Occurrences**; leave both empty to keep going.
+
+</Step>
+
+<Step>
+
+Add the **Line Items** (description, quantity, price, account and tax rate) and choose **Create Recurring Bill**. It shows up in the list straight away.
+
+</Step>
+
+</Steps>
+
+<Shot name="recurring-bills-new" alt="The New Recurring Bill sheet with a name, monthly frequency and one line" narrow />
+
+## Good to know
+
+- Each bill is created as a **draft**. Check it against the supplier's real invoice, then choose **Add to my books**.
+- Bills are created once a day. If dubbl missed some dates, the next run catches up and creates each missing bill.
+- Each bill is dated on its scheduled date and is due after the supplier's payment terms, or 30 days if the supplier has none.
+- When the last occurrence is created or the end date passes, the schedule shows **Finished**.
+
+## Change, pause or stop a schedule
+
+Each row in the list has three buttons on the right:
+
+- **Edit** (or click the row) opens the schedule. You can change the name, supplier, reference, frequency, **Next Bill Date**, end date, max occurrences and every line. Choose **Save Changes**. Bills already created stay as they are; the changes apply from the next one.
+- **Pause** stops new bills until you choose **Resume**. Dates that pass while it's paused are skipped, not caught up: when you resume, the next bill is the next scheduled date from today.
+- **Delete** removes the schedule. Bills it already created stay.
+
+## How the schedule runs
+
+<RecurringBillTimeline />
+
+<Fold>
+
+## When the amount changes
+
+A recurring bill always uses the amounts on its lines. If this month's invoice is different, open the draft it created and choose **Edit** to change the amount before you add it to your books. If the price has changed for good, **Edit** the schedule instead so every bill from now on uses the new amount. If the amount is never the same twice, a utility bill for example, skip the schedule and record each bill as it arrives.
+
+</Fold>
+
+<Fold>
+
+## Recurring costs someone claims back
+
+Repeating costs that an employee pays and claims back go under **Recurring expenses** instead, which creates draft [expense claims](/docs/guides/expenses) on a schedule.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bills" href="/docs/guides/bills" description="Check, post and pay the drafts it creates." />
+  <Card title="Recurring invoices" href="/docs/guides/recurring-invoices" description="The same thing for bills you send." />
+  <Card title="Contacts" href="/docs/guides/contacts" description="Set a supplier's payment terms." />
+</Cards>

@@ -1,0 +1,113 @@
+---
+title: Credit notes
+description: Reduce what a customer owes for a refund, a return or a billing mistake, and use the credit against their invoices.
+icon: FileMinus
+---
+
+A credit note is the opposite of an invoice: it takes money off what a customer owes you. Use one when you've overcharged, when goods come back, or when you agree to a discount after the fact. Once it's sent, the credit sits on the customer's account until you use it against one of their invoices.
+
+<Shot name="credit-notes" alt="The credit notes list with credit left to use, totals and each note's remaining credit" pins />
+
+## Issue a credit note
+
+<Steps>
+
+<Step>
+
+Open **Sales › Credit notes** and choose **New Credit Note** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **Customer** and the **Issue Date**. Put the original invoice number in **Reference** so everyone knows what it's for.
+
+</Step>
+
+<Step>
+
+Add a line for what you're crediting, with the same income account and tax rate as the original sale. Explain why in **Notes**.
+
+</Step>
+
+<Step>
+
+Choose **Create Credit Note**. It's saved as a draft.
+
+</Step>
+
+<Step>
+
+On the credit note, choose **Send**. **Send Email** emails it to the customer; **Mark as Sent** records it without an email. Either way it's now **Sent** and in your books.
+
+</Step>
+
+</Steps>
+
+<Shot name="credit-notes-new" alt="The New Credit Note drawer for Acme Corp with reference INV-00004, one line and a reason in the notes" narrow />
+
+## Good to know
+
+- A credit note does nothing to your books while it's a draft. Sending it is what reduces your income and what the customer owes.
+- Credit can only be used against invoices for the same customer, in the same currency.
+- You can split one credit note across several invoices. Each use takes from what's left.
+- No money moves when you use a credit. To hand money back, record the refund from your bank as well.
+- **Cancel credit note** reverses it in your books and puts back any invoices it was used against. You can't undo it.
+
+## Use the credit against an invoice
+
+<CreditNoteOffset />
+
+Open the sent credit note and choose **Use against an invoice**. Pick the **Invoice** from the customer's open invoices in the same currency, check the **Amount** (it can't be more than the credit left or what the invoice still owes) and choose **Reduce the invoice**. The invoice's balance drops; if the credit covers it all, the invoice is paid.
+
+<Shot name="credit-notes-apply" alt="The Use this credit against an invoice dialog with an invoice picker, amount and remaining credit" narrow />
+
+You can also start from the invoice. When a customer has credit on account, their open invoices show an **Available credit** box listing each credit, prepayment and overpayment, with a button to apply it.
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Saved, not in your books yet." },
+    { name: "Sent", t: "info", note: "In your books. Credit is waiting to be used." },
+    { name: "Used", t: "good", note: "Every cent has been used against invoices." },
+  ]}
+  caption="A credit note can be cancelled at any point. Cancelled credit can't be used."
+/>
+
+<Shot name="credit-notes-sent" alt="A sent credit note with Use against an invoice, the remaining credit and Cancel credit note" pins />
+
+<Fold>
+
+## What gets recorded in your books
+
+Sending a credit note undoes part of a sale. Your income goes down, the tax you'd have passed on goes down, and so does what the customer owes.
+
+<JournalEntry
+  title="Credit note CN-00003 sent to Acme Corp"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Sales", debit: 30000 },
+    { account: "Sales tax payable", debit: 3000 },
+    { account: "Accounts receivable", credit: 33000 },
+  ]}
+  caption="A $300 credit with 10% tax."
+/>
+
+Using the credit against an invoice doesn't post anything new. The credit and the invoice cancel each other out inside what the customer owes.
+
+</Fold>
+
+<Fold>
+
+## Seeing what's left to use
+
+The **Credit left to use** tile totals unused credit across all customers, and the **Left to use** column shows it per note. Each credit note's page shows its **Total**, how much has been **Applied** and what's **Remaining**. Customer [statements](/docs/guides/statements) list credit notes alongside invoices and payments.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="The invoices a credit note reduces." />
+  <Card title="Customer prepayments" href="/docs/guides/customer-prepayments" description="Money paid in advance, used the same way." />
+  <Card title="Statements" href="/docs/guides/statements" description="Show the customer where they stand." />
+</Cards>

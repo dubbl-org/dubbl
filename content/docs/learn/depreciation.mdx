@@ -1,0 +1,114 @@
+---
+title: Depreciation
+description: Why equipment is expensed over the years you use it, the methods for spreading the cost, and how dubbl records it.
+icon: TrendingDown
+---
+
+When you buy a $3,500 laptop you'll use for three years, it would be odd to say your business lost $3,500 the month you bought it and nothing for the next 35 months. **Depreciation** spreads the cost of long-lasting things (equipment, vehicles, furniture) over the time you use them, a little each month, so each month carries its fair share.
+
+<ShortVersion>
+
+- Equipment you'll use for more than a year is an **asset**, not an expense, when you buy it.
+- Depreciation turns that asset into an expense gradually, over its **useful life**.
+- **Residual value** is what it's still worth at the end. That part is never depreciated.
+- **Straight line** spreads the cost evenly. **Declining balance** and **sum of years' digits** charge more early on.
+- In dubbl, **Record value drops** posts the month's depreciation for all your assets at once.
+
+</ShortVersion>
+
+## Value used up, value left
+
+Every asset has three numbers that matter: what you paid, what you've used up so far (the **accumulated depreciation**), and what's left (the **book value**, or in dubbl, the **Current value**). Here's that laptop a year in:
+
+<BookValueSplit />
+
+The cost stays on the books as it was. The value used up grows each month in a separate account, so you can always see both the original cost and how much of it is gone.
+
+## Each month's entry
+
+Each month, the month's share moves from the asset to an expense:
+
+<JournalEntry
+  title="Value drop: FA-001 MacBook Pro"
+  date="Jan 31, 2026"
+  lines={[
+    { account: "Depreciation expense", debit: 8333 },
+    { account: "Accumulated depreciation", credit: 8333 },
+  ]}
+  caption="$83.33 a month: ($3,500 - $500) / 36. The expense lowers profit; the credit lowers the asset's book value."
+/>
+
+No money moves. You paid for the laptop when you bought it; depreciation only decides which months the cost belongs to.
+
+## Ways to spread the cost
+
+The total depreciated is always the same: cost minus residual value. The methods differ in how fast:
+
+<DepreciationCurves />
+
+<Tabs items={["Straight line", "Declining balance", "Sum of years' digits", "Units of production"]}>
+<Tab value="Straight line">
+
+The same amount every month: (cost - residual value) / useful life in months. Simple, predictable, and right for most things that wear out evenly, like furniture. In dubbl it shows as **Straight line**.
+
+</Tab>
+<Tab value="Declining balance">
+
+A fixed percentage of whatever book value is left. You can set the yearly rate yourself (20% is common); if you don't, dubbl uses double the straight-line rate: for a 5-year asset, 40% a year (charged monthly) on the remaining value. The charge is large at first and shrinks over time, which suits things that lose value fast, like computers and vehicles. It never goes below the residual value, and the last month takes whatever is left so the asset lands exactly on it.
+
+</Tab>
+<Tab value="Sum of years' digits">
+
+Also front-loaded, but on a fixed schedule: each month's share is the months remaining divided by the sum of all the month numbers. It's faster than straight line, gentler than declining balance at the start.
+
+</Tab>
+<Tab value="Units of production">
+
+Depreciation follows use, not time: (cost - residual value) × units used this period / total units expected. A machine that ran twice as many hours this month depreciates twice as much. You enter the usage each month when you record the value drop.
+
+</Tab>
+</Tabs>
+
+## Depreciation in dubbl
+
+Your assets live in **Accounting**, under **Fixed assets**. The list shows each asset's method, what you paid, the value used up and the current value:
+
+<Shot name="learn-fixed-assets" alt="The fixed assets list with How value is spread, Value used up and the Record value drops button" pins />
+
+Once a month, choose **Record value drops**, or let the nightly run do it. dubbl posts that month's depreciation for every asset that hasn't had it yet, one per asset per month. Open an asset to see its numbers and every month's value drop:
+
+<Shot name="learn-fixed-asset" alt="Fixed asset FA-001 MacBook Pro: Straight Line over 36 months, what you paid, value used up, current value, value left at the end, its bookkeeping accounts and value drops over time" pins />
+
+The **New Asset** form offers all four methods. **Asset categories** hold the defaults for a kind of asset (method, yearly rate, useful life, residual value and accounts); pick one under **Category** on the New Asset form to fill them in.
+
+## Selling or scrapping an asset
+
+When an asset leaves the business, choose **Record as sold or written off** and enter what you got for it. dubbl catches up any depreciation still due, removes the asset's cost and accumulated depreciation from your books, and records the difference between the price and the book value as a gain or a loss.
+
+<JournalEntry
+  title="Office furniture sold for $1,200"
+  date="Jun 30, 2028"
+  lines={[
+    { account: "Undeposited funds", debit: 120000, note: "what you got for it" },
+    { account: "Accumulated depreciation", debit: 150000 },
+    { account: "Furniture", credit: 250000, note: "original cost" },
+    { account: "Gain on asset disposal", credit: 20000, note: "price above book value" },
+  ]}
+  caption="Book value was $2,500 - $1,500 = $1,000. Selling for $1,200 is a $200 gain."
+/>
+
+## Good to know
+
+- The asset's depreciation entries only post if it has both a depreciation expense account and an accumulated depreciation account set. Check the **Bookkeeping accounts** box on the asset.
+- Tax rules for depreciation (allowances, bonus depreciation, write-off limits) are often different from your books. Your accountant handles those on the tax return.
+- Small purchases below a few hundred dollars are usually just expensed straight away. Ask your accountant where your threshold is.
+- Land isn't depreciated: it doesn't wear out.
+
+## Related
+
+<Cards>
+  <Card title="Fixed assets guide" href="/docs/guides/fixed-assets" description="Add assets, run depreciation, dispose of them." />
+  <Card title="Closing the books" href="/docs/learn/closing-the-books" description="Depreciation is part of every month-end." />
+  <Card title="Financial statements" href="/docs/learn/financial-statements" description="Where book value and depreciation show up." />
+  <Card title="Loans" href="/docs/guides/loans" description="If you borrowed to buy the asset." />
+</Cards>

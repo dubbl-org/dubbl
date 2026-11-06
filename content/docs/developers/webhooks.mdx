@@ -1,0 +1,223 @@
+---
+title: Webhooks
+description: "Register an endpoint, pick events, and receive signed POSTs from dubbl with a delivery log and automatic retries."
+icon: Webhook
+---
+
+A webhook is dubbl calling you: when something happens, dubbl sends a `POST` with a JSON body to a URL you choose. Every delivery is signed so you can prove it came from dubbl, logged so you can see what your endpoint answered, and retried if your endpoint was down.
+
+<Shot name="dev-webhooks" alt="The Webhooks settings page with the Add Webhook button" pins />
+
+## Add a webhook
+
+<Steps>
+
+<Step>
+
+Open **Settings** and choose **Webhooks** under **Automation**. You need to be an owner or admin.
+
+</Step>
+
+<Step>
+
+Choose **Add Webhook**. Enter the **Endpoint URL** (it must start with `http://` or `https://`) and, if you like, a **Description**.
+
+</Step>
+
+<Step>
+
+Tick the **Events** you want, at least one, and choose **Create**.
+
+</Step>
+
+<Step>
+
+Open the webhook's **...** menu and choose **Send Test**. Click the webhook's row to see **Recent Deliveries**: the event, your endpoint's HTTP status, the result and how many attempts it took.
+
+</Step>
+
+</Steps>
+
+<Shot name="dev-webhooks-new" alt="The New Webhook drawer with an endpoint URL, a description and two events ticked" narrow />
+
+## What your endpoint receives
+
+A `POST` with a JSON body and four headers:
+
+| Header | Value |
+| --- | --- |
+| `Content-Type` | `application/json` |
+| `X-Dubbl-Event` | The event name, such as `test` |
+| `X-Dubbl-Delivery-Id` | The delivery's ID. It stays the same on every retry, so use it to ignore duplicates |
+| `X-Dubbl-Signature` | HMAC-SHA256 of the raw body, keyed with the webhook's secret, as lowercase hex |
+
+A real event's body has the event name, your organization's ID, when it was sent, and the record it's about in `data`, with the same fields the API returns (amounts in cents):
+
+```json
+{
+  "event": "invoice.paid",
+  "organizationId": "5e0b7c2a-4d1f-4a8e-9b3c-71f2d6a0e914",
+  "timestamp": "2026-10-13T09:41:07.212Z",
+  "data": {
+    "id": "b2c9e4f1-7a3d-4e60-8c15-9f0a2d6b3e71",
+    "invoiceNumber": "INV-0042",
+    "status": "paid",
+    "total": 504000,
+    "amountPaid": 504000,
+    "amountDue": 0,
+    "currencyCode": "GBP"
+  }
+}
+```
+
+A test delivery looks like this:
+
+```http
+POST /dubbl HTTP/1.1
+Host: hooks.example.com
+Content-Type: application/json
+X-Dubbl-Event: test
+X-Dubbl-Delivery-Id: 7c0f3e5a-91b2-4d6e-a8c4-25f1b9e0d743
+X-Dubbl-Signature: 3b9f2c0e8d1a7f64c5e2b0a9d8f7e6c5b4a3928170f6e5d4c3b2a1908f7e6d5c
+
+{"event":"test","data":{"message":"This is a test webhook delivery from dubbl","webhookId":"a1d4c7e2-5b83-4f09-9e6a-0c2b8d7f3e41","timestamp":"2026-10-13T09:41:07.212Z"}}
+```
+
+Answer with any `2xx` status within 10 seconds and the delivery is marked **success**. Anything else, including a timeout, counts as a failure and is tried again.
+
+## Check the signature
+
+Each webhook has its own secret: 64 hex characters, made when you create it. The settings page doesn't show it; read it from the API, where it's the `secret` field of the webhook:
+
+```bash
+curl "https://dubbl.dev/api/v1/webhooks/a1d4c7e2-5b83-4f09-9e6a-0c2b8d7f3e41" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE"
+```
+
+Then, in your receiver, compute the HMAC of the body exactly as it arrived and compare:
+
+<Tabs items={["Node.js", "Python"]}>
+
+<Tab value="Node.js">
+
+```js
+import crypto from "node:crypto";
+import express from "express";
+
+const app = express();
+
+app.post("/dubbl", express.raw({ type: "application/json" }), (req, res) => {
+  const expected = crypto
+    .createHmac("sha256", process.env.DUBBL_WEBHOOK_SECRET)
+    .update(req.body) // the raw bytes, before JSON.parse
+    .digest("hex");
+  const given = req.get("X-Dubbl-Signature") ?? "";
+
+  const ok =
+    given.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  if (!ok) return res.sendStatus(401);
+
+  const event = JSON.parse(req.body.toString("utf8"));
+  // Handle it, or queue it and answer straight away.
+  res.sendStatus(200);
+});
+```
+
+</Tab>
+
+<Tab value="Python">
+
+```python
+import hashlib, hmac, os
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+SECRET = os.environ["DUBBL_WEBHOOK_SECRET"].encode()
+
+@app.post("/dubbl")
+def dubbl_webhook():
+    body = request.get_data()  # the raw bytes
+    expected = hmac.new(SECRET, body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, request.headers.get("X-Dubbl-Signature", "")):
+        abort(401)
+    event = request.get_json()
+    return "", 200
+```
+
+</Tab>
+
+</Tabs>
+
+<WebhookSignatureCheck />
+
+## Retries
+
+<WebhookRetryTimeline />
+
+## Good to know
+
+- Answer fast. If the work takes a while, put the event on a queue and return `200` first; dubbl waits 10 seconds at most.
+- The same delivery can arrive twice (for example, if your endpoint did the work but answered too late). De-duplicate on `X-Dubbl-Delivery-Id`.
+- **Disable** in the menu pauses a webhook. A delivery that is waiting to be retried is marked failed instead.
+- Retries are scheduled by background jobs. On a self-hosted dubbl without [Trigger.dev](/docs/self-hosting/background-jobs), a failed delivery stays **retrying** and isn't tried again.
+- **Delete** removes the webhook from the list straight away. It's kept for the audit trail but never called again.
+
+<Fold>
+
+## The events you can choose
+
+| Event | Sent when | `data` |
+| --- | --- | --- |
+| `invoice.created` | An invoice is created: in the app, over the API or MCP, from a quote, a project, a recurring invoice, interest or an import | The invoice with its `lines` |
+| `invoice.paid` | An invoice is paid in full: by a payment, a card payment through its payment link, a credit note or customer credit, or **Mark as paid** | The invoice |
+| `invoice.overdue` | The nightly job marks an invoice overdue | The invoice |
+| `payment.received` | Money from a customer is recorded, including a matched bank transaction or a card payment | The payment with its `allocations` |
+| `expense.created` | An expense claim is created | The claim with its `items` |
+| `bill.created` | A bill is created, including from a purchase order, a goods receipt, a recurring bill or an import | The bill with its `lines` |
+| `bill.due` | The nightly job finds an unpaid bill due that day | The bill |
+| `contact.created` | A customer or supplier is created, imported or synced from Stripe | The contact |
+| `journal.posted` | Any journal entry is posted to the ledger, by hand or by dubbl (invoices, bills, payments, depreciation and the rest) | The entry with its `lines` |
+| `approval.requested` | Something is submitted for approval | The approval request |
+| `approval.completed` | An approval request is approved or rejected | The approval request (`status` says which) |
+
+Events are sent once the change is saved: if it fails and is rolled back, nothing is sent. `invoice.overdue` and `bill.due` come from [background jobs](/docs/self-hosting/background-jobs), so a self-hosted dubbl needs those running to send them.
+
+</Fold>
+
+<Fold>
+
+## Managing webhooks over the API
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/api/v1/webhooks` | List webhooks (paged), including each one's `secret` |
+| `POST` | `/api/v1/webhooks` | Create one: `url`, `events` (at least one), and optionally `description`, `isActive`, `metadata` |
+| `GET` `PATCH` `DELETE` | `/api/v1/webhooks/{id}` | Read, change or delete one |
+| `POST` | `/api/v1/webhooks/{id}/test` | Send a test delivery and return its result |
+| `GET` | `/api/v1/webhooks/{id}/deliveries` | The delivery log, newest first (paged) |
+| `POST` | `/api/v1/webhooks/subscribe` | For automation tools: `hookUrl` and `events`; returns the new `id` |
+| `POST` | `/api/v1/webhooks/unsubscribe` | Remove a subscription by `id` |
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/webhooks" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://hooks.example.com/dubbl", "events": ["invoice.paid", "payment.received"], "description": "Sync paid invoices to the CRM"}'
+```
+
+The response is `201` with `{"webhook": {...}}`, secret included. Each delivery in the log has `status` (`pending`, `retrying`, `success` or `failed`), `attempts`, `responseStatus`, `responseBody`, `nextRetryAt` and `deliveredAt`.
+
+Every one of these, including `subscribe` and `unsubscribe` and reading the list, needs the **Manage webhooks** permission (owners and admins have it), because a webhook's secret and the data it receives are sensitive.
+
+The same operations are MCP tools, with the same permission: `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `list_webhook_deliveries` and `test_webhook`.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="API reference" href="/docs/developers/api-reference" description="Read the records an event is about." />
+  <Card title="Background jobs" href="/docs/self-hosting/background-jobs" description="What runs retries on a self-hosted dubbl." />
+  <Card title="Authentication" href="/docs/developers/authentication" description="The API key the examples use." />
+</Cards>

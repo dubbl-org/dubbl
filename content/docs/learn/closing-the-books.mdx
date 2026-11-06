@@ -1,0 +1,82 @@
+---
+title: Closing the books
+description: The month-end checklist, what closing a financial year does, and why locking finished periods matters.
+icon: CalendarCheck
+---
+
+"Closing the books" means finishing a period properly: making sure everything that happened in it is recorded, checked against the bank, adjusted, and then locked so it can't quietly change later. Do it every month and your reports are always trustworthy. At the end of the year, one extra step carries the year's profit forward and starts the next year fresh.
+
+<ShortVersion>
+
+- **Month-end**: get every transaction in, reconcile the bank, check receivables and payables, record adjustments, read the reports, lock the month.
+- **Year-end**: the year's revenue and expenses are moved into **Retained Earnings**, and they start the new year at zero.
+- **Locking** stops anyone (including you) from adding or changing entries in a period you've finished.
+- In dubbl, closing a financial year does the year-end entry and the lock in one step: **Close year**.
+
+</ShortVersion>
+
+## The month-end checklist
+
+Six steps, in this order. Each one builds on the one before:
+
+<MonthEndChecklist />
+
+1. **Get every bank line in.** Import the month's statements and categorize everything, so the books know about every dollar that moved. See [categorizing transactions](/docs/guides/categorizing-transactions).
+2. **Match the statement.** [Reconcile](/docs/learn/bank-reconciliation) each bank and card account. A difference of $0.00 proves nothing is missing or doubled.
+3. **Check who owes what.** Look at [aged receivables and payables](/docs/learn/receivables-and-payables). Chase late customers; make sure every supplier bill for the month is entered, even unpaid ones.
+4. **Record the adjustments.** The entries no document creates: **Record value drops** on [fixed assets](/docs/learn/depreciation), **Record next month** on each [accrual](/docs/guides/accruals), and this month's loan payment.
+5. **Read the reports.** Does the profit and loss look like the month you remember? Anything odd on the balance sheet, like a negative bank balance or a supplier you don't recognise?
+6. **Lock the month.** Once you're happy, lock it.
+
+## Locking a period
+
+A locked period is read-only. Nothing dated on or before the lock date can be added, changed or deleted, so the numbers you reported (or filed with the tax office) stay exactly as they were.
+
+In dubbl, set it in **Settings**, under **Lock past dates**: choose **Lock everything up to and including** a date. Move the date forward each month after you finish your checklist. If you really need to change something in a locked period, move the lock date back, fix it, and lock again.
+
+## Closing the year
+
+Revenue and expense accounts measure one year at a time. At year-end, their totals (the year's profit) move into **Retained Earnings**, the equity account that holds all the profit the business has kept over its life. Then they start the new year at zero.
+
+<YearEndClose />
+
+The closing entry does it in one go: it empties every revenue and expense account and puts the difference into Retained Earnings.
+
+<JournalEntry
+  title="Year-end closing entry for FY 2026"
+  date="Dec 31, 2026"
+  lines={[
+    { account: "Sales", debit: 12000000 },
+    { account: "Rent", credit: 2400000 },
+    { account: "Wages and salaries", credit: 4800000 },
+    { account: "Other expenses", credit: 1300000 },
+    { account: "Retained Earnings", credit: 3500000, note: "the year's profit" },
+  ]}
+  caption="Each line is the opposite of the account's balance, which brings it back to zero."
+/>
+
+Until the year is closed, the balance sheet shows its profit as **Current year earnings**. After closing, it's part of Retained Earnings.
+
+## Closing a year in dubbl
+
+Financial years are in **Accounting**, under **Financial years**. When the year is over and its last month is done, choose **Close year**:
+
+<Shot name="learn-fiscal-years" alt="Financial years: FY 2026, Jan 1 to Dec 31, open, with the Close year button" pins />
+
+dubbl posts the closing entry dated the last day of the year, then locks everything up to that date (a lock date you already set later than that stays put). The year shows as **Closed and locked**. If you find a mistake later, **Reopen** removes the closing entry and the lock so you can fix it, then close it again.
+
+## Good to know
+
+- dubbl won't close a year that still has draft entries dated inside it. Finalize or delete them first.
+- Close the year after your accountant has made their year-end adjustments, not before. Reopening works, but it's tidier to close once.
+- Closing the year doesn't file anything with the tax office. It only finalizes your books.
+- Retained Earnings is the running total of every year's profit, less what owners have taken out as dividends or distributions.
+
+## Related
+
+<Cards>
+  <Card title="Periods and closing" href="/docs/guides/periods-and-closing" description="Lock dates and financial years, step by step." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="The heart of every month-end." />
+  <Card title="Accruals" href="/docs/guides/accruals" description="Spread costs across months." />
+  <Card title="Financial statements" href="/docs/learn/financial-statements" description="The reports you check before you lock." />
+</Cards>

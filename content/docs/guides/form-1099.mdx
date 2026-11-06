@@ -1,0 +1,94 @@
+---
+title: 1099 forms
+description: Mark the US contractors you pay, then see at year end who you paid enough to need a 1099.
+icon: FileUser
+---
+
+In the US, when you pay a contractor $600 or more in a year, you send them (and the IRS) a 1099. dubbl keeps a running total for every supplier you mark as a 1099 contractor and, at year end, tells you who crossed the line.
+
+<Shot name="form-1099" alt="The 1099 vendor totals report for this year: two contractors, both paid over the $600 threshold and needing a form" pins />
+
+## Track a contractor for a 1099
+
+<Steps>
+
+<Step>
+
+Open the contractor in **Contacts**.
+
+</Step>
+
+<Step>
+
+Under **Payment**, find **US tax reporting** and tick **Track this supplier for a 1099**.
+
+</Step>
+
+<Step>
+
+Fill in the details from their W-9 that appear underneath: **W-9 tax classification**, **Tax ID (SSN or EIN from their W-9)**, and tick **Backup withholding** if you have to hold back 24% of their payments.
+
+</Step>
+
+<Step>
+
+Choose **Save changes**.
+
+</Step>
+
+<Step>
+
+At year end, open **Reports** and choose **1099 vendor totals (US)** under **Tax time**.
+
+</Step>
+
+<Step>
+
+Pick the year next to **Tax year:**. It starts on last year, which is usually the one you're filing for.
+
+</Step>
+
+<Step>
+
+Read the table. **Needs a form?** says yes for everyone paid at or above the threshold. Choose **Export CSV** to take the list to your 1099 filing service.
+
+</Step>
+
+</Steps>
+
+<Shot name="form-1099-contact" alt="The US tax reporting checkbox ticked on Freelancer Jane's payment settings, with the W-9 fields underneath" pins />
+
+## Good to know
+
+- Only payments you record as paid out to the contractor count, such as paying their bills, dated inside the calendar year. Spending you categorize straight from the bank feed isn't a payment record, so it isn't added.
+- Card payments are left out, because the card company reports those itself.
+- The threshold is $600 for the whole year. **Reporting threshold** at the top shows the one in use.
+- A contractor you track but didn't pay still shows, with $0, so you can see your whole list.
+- **Tax ID** uses the W-9 tax ID on the contact, or the contact's **Tax number** when that's empty. It shows **missing** when neither is filled in.
+- **Export CSV** writes the totals as plain amounts (1250.00).
+- dubbl doesn't print or e-file the 1099 forms themselves. Use the exported list with your filing service.
+
+## Who needs a form
+
+<Form1099Threshold />
+
+The summary cards add it up for you: **Need a 1099 form** counts the contractors at or above the threshold, and **Total paid to those contractors** is what you'll report across all of them. Anyone flagged for backup withholding gets a warning next to their name.
+
+<Fold>
+
+## Getting ready before January
+
+- Mark contractors when you first add them, not at year end. Totals are worked out from payments, so marking someone late still counts the whole year.
+- Collect a W-9 from each contractor before you pay them, and save the details on their contact.
+- Pay contractors through their bills or as payments in dubbl, not only from the bank feed, so the payments are counted.
+- Check the list again after the year's last payments clear.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Contacts" href="/docs/guides/contacts" description="Where you mark a supplier as a 1099 contractor." />
+  <Card title="Paying bills" href="/docs/guides/paying-bills" description="Record the payments that count toward the total." />
+  <Card title="Schedule C" href="/docs/guides/schedule-c" description="Your business profit, lined up for your tax return." />
+</Cards>

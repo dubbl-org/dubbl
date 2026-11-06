@@ -1,0 +1,114 @@
+---
+title: Reconciliation
+description: Check your books against a bank statement, find what's missing, and close the period when the difference is zero.
+icon: Scale
+---
+
+Reconciling means proving that your books agree with the bank. You take a statement, enter its closing balance, and dubbl compares it with the balance of that account in your books on the same date. Anything that doesn't line up is a payment you haven't recorded, one you recorded twice, or one you got wrong. When the difference is zero, you tick off the lines and the period is done.
+
+<Shot name="reconciliation" alt="The Match statement to your books page with account balance, statement and book balances, the difference and the lines matched and not yet matched" pins />
+
+## Check a statement
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Bank accounts**, pick the account, and choose **Match statement to your books**.
+
+</Step>
+
+<Step>
+
+Choose **Check a statement**. Enter the **Start Date** and **End Date** printed on the statement, and its **Opening Balance** and **Closing Balance**. Choose **Start checking**.
+
+</Step>
+
+<Step>
+
+Look at the three numbers: **Bank statement balance**, **Balance in your books** and the **Difference**. If they already agree, you'll see **Your books match the statement.**
+
+</Step>
+
+<Step>
+
+If they don't, work through the lines below. Any marked **Add to your books first** isn't recorded yet: go back to the account and [categorize](/docs/guides/categorizing-transactions) it, or link it to the bill or invoice it paid.
+
+</Step>
+
+<Step>
+
+When the difference is zero, choose **Finish statement check**. Every line in your books for that period is marked as on the statement, and the check moves to **Past statement checks** as **Completed**.
+
+</Step>
+
+</Steps>
+
+<Shot name="reconciliation-lines" alt="The lines still to match, each marked Add to your books first, and past statement checks below" />
+
+## Good to know
+
+- Only lines that are in your books can be matched to a statement. A line you've only marked as cleared doesn't count.
+- **Balance in your books** is the balance of the account in your chart on the statement's end date, so entries dated after it don't get in the way.
+- While a check is open, the page shows **Finish statement check** instead of **Check a statement**, so finish one before starting the next.
+- To match only some lines, tick them and choose **Mark 3 on statement & finish** (with your count) in the bar that appears. **Ignore** leaves the ticked lines out of your books.
+- Reconcile every month, as soon as the statement arrives. A month of differences is much easier to find than a year's.
+
+## Closing the gap
+
+<StatementConvergence />
+
+<Fold>
+
+## Finding a difference
+
+The message under the balances tells you which way to look:
+
+- **The statement shows more than your books.** Money came in that you haven't recorded, or you recorded a payment out that never happened (or recorded it twice).
+- **Your books show more than the statement.** A payment went out that you haven't recorded, like a bank fee or a card charge, or you recorded money in that never arrived.
+
+Common causes, in the order to check them:
+
+1. Lines still marked **Add to your books first**. Categorize them.
+2. A bill or invoice payment recorded with **Record Payment** and also categorized from the bank line, so it's in twice. Undo the categorized line and use **Find a match…** instead.
+3. Wrong dates. An entry dated after the statement's end date doesn't count toward it.
+4. A typo in the statement balances you entered.
+
+**Matched to statement** and **Not yet matched** list the period's lines that are and aren't ticked off yet, so you can compare them with the statement line by line. Why books and bank differ in the first place is explained in [Bank reconciliation](/docs/learn/bank-reconciliation).
+
+</Fold>
+
+<Fold>
+
+## Writing off a small leftover
+
+Sometimes a few cents won't go away: rounding on a foreign payment, an interest credit the bank didn't itemize. Choose **Write off the difference** under the balances, add a description like "Bank rounding difference", and choose **Write off the difference** again to confirm.
+
+dubbl posts the difference, dated on the statement's end date, to its own accounts in your chart: **Bank Reconciliation Adjustments (Income)** when the statement shows more than your books, or **Bank Reconciliation Adjustments (Expense)** when your books show more. They're created the first time you need them, so they never mix with other income or costs and are easy to review later. The write-off is added to the open statement check and the difference becomes zero.
+
+Only do this for small amounts you've given up tracing. A large difference means something's missing, and writing it off hides it. The dialog warns you when lines in the period still aren't in your books, or when the difference is large: categorize those lines first and see what's left.
+
+<Shot name="reconciliation-writeoff" alt="The Write off the difference dialog with the adjustment amount, the account it goes to, and a warning that 9 lines in the period aren't in your books yet" narrow />
+
+You can't write off into a locked period. Move the [lock date](/docs/guides/periods-and-closing#lock-past-dates) first if the statement is in one.
+
+</Fold>
+
+<Fold>
+
+## What a finished check means
+
+Each line you finish is stamped with that statement check, and shows as **matched to statement** on the account. The check keeps its period and balances under **Past statement checks**, so you, or your accountant, can see which months have been proven and with which balances.
+
+Nothing new is posted when you finish a check. The only entry reconciliation ever posts is a write-off, if you choose one. Bank rules that categorize automatically post their entries when you import or choose **Apply rules**, never during a check.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Get every line into your books first." />
+  <Card title="Importing transactions" href="/docs/guides/importing-transactions" description="Bring in the statement you're checking." />
+  <Card title="Bank reconciliation, explained" href="/docs/learn/bank-reconciliation" description="Why books and bank differ, with examples." />
+  <Card title="Periods and closing" href="/docs/guides/periods-and-closing" description="Lock a month once it's reconciled." />
+</Cards>

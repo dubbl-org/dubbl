@@ -1,0 +1,107 @@
+---
+title: Opening balances
+description: Bring in what each account held on the day you started using dubbl, so your reports start from the right numbers.
+icon: Scale
+---
+
+Opening balances are how much was in each of your accounts on the day you started using dubbl: money in the bank, invoices customers hadn't paid yet, bills you still owed, what the owner had put in. Enter them once and your balance sheet starts from where your old books left off, instead of from zero.
+
+<Shot name="opening-balances" alt="The opening balances page with the starting date, each account's starting balance in Money in (debit) or Money owed (credit), and matching totals" pins />
+
+## Set your opening balances
+
+<Steps>
+
+<Step>
+
+Get a trial balance from your old system or your accountant, dated the day before you start in dubbl (often the last day of your previous financial year).
+
+</Step>
+
+<Step>
+
+Open **Accounting**, then **Opening balances**, and choose **Set opening balances**.
+
+</Step>
+
+<Step>
+
+Set the **As of date** to the date of that trial balance.
+
+</Step>
+
+<Step>
+
+Under **Account balances**, add a line for each account with a balance and put it in **Debit** or **Credit**, just as it appears on the trial balance. Use **Add line** for more.
+
+</Step>
+
+<Step>
+
+When both columns add up to the same total, choose **Set opening balances**.
+
+</Step>
+
+</Steps>
+
+<Shot name="opening-balances-new" alt="The Set opening balances drawer: $24,500 in Checking, $4,500 owed to suppliers and $20,000 of owner's equity" narrow />
+
+## Good to know
+
+- The two columns must match before you can save. dubbl won't add a balancing line for you, so if your figures don't balance, find the difference before you start (often it belongs in equity or retained earnings).
+- Assets usually go in **Debit**. Liabilities and equity usually go in **Credit**.
+- Saving posts a single journal entry called "Opening balances", with source **Opening balances**, dated the **As of date**.
+- You can change them later. **Replace opening balances** posts a new set and cancels the old entry, so there's only ever one.
+- Amounts are in your base currency, shown on the page.
+- The **As of date** can't be on or before your [lock date](/docs/guides/periods-and-closing#lock-past-dates). Replacing a set also needs the old set's date to be unlocked.
+- Revenue and expense accounts don't usually need an opening balance if you start at the beginning of a financial year. Last year's profit is already part of retained earnings.
+
+## From your old books to dubbl
+
+<OpeningBalanceCutover />
+
+<Fold>
+
+## What gets recorded in your books
+
+The balances you enter become one entry. With the figures in the drawer above:
+
+<JournalEntry
+  title="Opening balances"
+  date="Dec 31, 2025"
+  lines={[
+    { account: "1100 Checking Account", debit: 2450000 },
+    { account: "2000 Accounts Payable", credit: 450000 },
+    { account: "3000 Owner's Equity", credit: 2000000 },
+  ]}
+  caption="$24,500 in the bank, $4,500 still owed to suppliers, and the $20,000 difference belongs to the owner."
+/>
+
+Once set, the page lists each account with **Money in (debit)** and **Money owed (credit)**, the totals, and the date your books start from.
+
+</Fold>
+
+<Fold>
+
+## Customers and suppliers who owed you money
+
+An opening balance on Accounts Receivable or Accounts Payable is a single total for the account. It doesn't say which customer or supplier it belongs to, so it won't appear on their statements or in the [aged receivables and payables](/docs/guides/aged-receivables-and-payables) report. Ask your accountant how they'd like old unpaid invoices and bills handled before you enter them.
+
+</Fold>
+
+<Fold>
+
+## Bringing in a lot of data
+
+If you're moving from another system, the [import guide](/docs/guides/import-data) covers contacts, invoices, bills and bank history. Opening balances are usually the last step: they fill in whatever the imported documents don't.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Import your data" href="/docs/guides/import-data" description="Move contacts and documents in from another system." />
+  <Card title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="Add any account you need before you start." />
+  <Card title="Balance sheet" href="/docs/guides/balance-sheet" description="Check your starting position." />
+  <Card title="Periods and closing" href="/docs/guides/periods-and-closing" description="Lock the past once you're set up." />
+</Cards>

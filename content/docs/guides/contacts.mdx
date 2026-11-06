@@ -1,0 +1,107 @@
+---
+title: Contacts
+description: Keep one record for every customer and supplier, with their terms, tax details, people and full history.
+icon: Users
+---
+
+A contact is anyone you sell to or buy from. Every invoice, quote, bill and payment belongs to one, so a contact's page is where you see the whole relationship: what they owe you, what you owe them, every document between you, and the people you deal with there.
+
+<Shot name="contacts" alt="The contacts list with what customers owe and what you owe suppliers, the customer and supplier filter, and each contact's balance" pins />
+
+## Add a contact
+
+<Steps>
+
+<Step>
+
+Open **Contacts** and choose **New Contact** in the top bar.
+
+</Step>
+
+<Step>
+
+Enter the **Name**, and their **Email** and **Phone**. The email is where invoices, statements and reminders go, so it's worth adding now.
+
+</Step>
+
+<Step>
+
+Choose the **Type**: **Customer**, **Supplier** or **Both**. Set **Payment Terms (days)**, which starts at 30, and their **Tax Number** if they gave you one.
+
+</Step>
+
+<Step>
+
+Add any **Notes** for your team and choose **Create Contact**.
+
+</Step>
+
+</Steps>
+
+<Shot name="contacts-new" alt="The New Contact drawer for Northwind Studio with an email, type Customer and 30 day payment terms" narrow />
+
+You can also choose **Create new contact** in the contact picker while you write an invoice or quote, or bring in a whole list with [Import your data](/docs/guides/import-data).
+
+## Good to know
+
+- Payment terms set the due date of new invoices and bills for this contact, and of invoices made from their quotes and recurring templates. You can still change the due date on each one.
+- A contact can be both a customer and a supplier. Their page then shows what each side owes.
+- Contacts without an email can't be sent invoices, statements or reminders by email. The **Missing email** tile finds them.
+- **Credit limit** is for keeping an eye on how much a customer owes. It doesn't stop you invoicing them, but when a new invoice takes them over the limit you get a warning saying by how much.
+- Deleting a contact moves it to [Trash](/docs/guides/trash), where it can be restored.
+
+## Everything about one contact
+
+<ContactRecordMap />
+
+## A contact's page
+
+<Shot name="contacts-detail" alt="The details page for Sterling Enterprises with tabs, payment terms, currency, credit limit and Merge duplicates" pins />
+
+The tabs along the top show everything about one contact:
+
+| Tab | What's on it |
+| --- | --- |
+| **Details** | Name, email, phone, type, tax number, payment terms, currency, credit limit, tax status and notes. Choose **Save changes** after editing. |
+| **Activity** | Every invoice, quote, credit note, payment and bill, filtered by type. |
+| **Statement** | Their balance over any period, with a PDF to download or email. See [Statements](/docs/guides/statements). |
+| **Bookkeeping** | Default income and spending accounts and a default tax rate for this contact. They're filled in for you on new invoices, quotes, credit notes, cash sales and bills, and when you categorize a bank transaction to them. |
+| **People** | The people you deal with there, each with their own email. |
+| **Files** | Contracts, W-9s and anything else you keep on file. |
+
+<Fold>
+
+## Quick actions from the list
+
+Click a contact in the list to preview them on the right: what they owe, overdue amounts, terms and recent activity. From there you can **Email statement**, download a **Statement PDF**, open the **Full statement**, **Invite to portal**, **Add opportunity** in the CRM, or **Delete** them.
+
+<Shot name="contacts-preview" alt="The preview of Sterling Enterprises with Email statement, Statement PDF, Full statement, Invite to portal, Add opportunity and Delete" narrow />
+
+</Fold>
+
+<Fold>
+
+## Tax settings
+
+- **Tax number / VAT** keeps their tax ID on file, and search finds contacts by it.
+- **Don't charge tax to this contact** marks them as tax-exempt, shown as **No tax charged** in the list. Their invoices, quotes, credit notes and cash sales then carry no tax: the tax column is set to **No tax** and shows **This contact isn't charged tax**. Bills from them are not affected.
+- **US tax reporting** tracks a supplier for a 1099, so payments to them appear in your [1099 totals](/docs/guides/form-1099).
+
+</Fold>
+
+<Fold>
+
+## People at a company
+
+On the **People** tab, add each person you deal with: accounts payable, the owner, a project lead. A reminder rule set to **Contact persons** emails every one of them that has an email address. All people across all contacts are listed under **Contacts › People**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Statements" href="/docs/guides/statements" description="Show a customer everything in one document." />
+  <Card title="Customer portal" href="/docs/guides/customer-portal" description="Give customers their own page." />
+  <Card title="Duplicate contacts" href="/docs/guides/duplicate-contacts" description="Find and merge contacts entered twice." />
+  <Card title="CRM" href="/docs/guides/crm" description="Track deals before they become invoices." />
+</Cards>

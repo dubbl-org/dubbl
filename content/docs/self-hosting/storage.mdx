@@ -1,0 +1,110 @@
+---
+title: Storage
+description: "Connect an S3-compatible bucket (AWS S3, Cloudflare R2 or MinIO) for attachments, documents, receipts and backups."
+icon: HardDrive
+---
+
+dubbl keeps files in an S3-compatible bucket, not on the app server: bill and receipt attachments, the document library, contact files, files you give Tilly, and backup snapshots. Any service that speaks the S3 API works. Without a bucket the rest of dubbl runs fine, but uploads and backups fail.
+
+<StorageUploadFlow />
+
+## Connect a bucket
+
+<Tabs items={["AWS S3", "Cloudflare R2", "MinIO"]}>
+
+<Tab value="AWS S3">
+
+Create a private bucket and an IAM user that can `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on it. Leave `S3_ENDPOINT` unset.
+
+```bash
+S3_REGION=eu-west-1
+S3_BUCKET=acme-dubbl-files
+S3_ACCESS_KEY_ID=your_access_key_id
+S3_SECRET_ACCESS_KEY=your_secret_access_key
+```
+
+</Tab>
+
+<Tab value="Cloudflare R2">
+
+Create a bucket and an R2 API token with **Object Read & Write** on it. The endpoint is your account's S3 API address.
+
+```bash
+S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=dubbl-files
+S3_ACCESS_KEY_ID=8c2f1e9a7b3d4c5e6f0a1b2c3d4e5f60
+S3_SECRET_ACCESS_KEY=your_secret_access_key
+```
+
+</Tab>
+
+<Tab value="MinIO">
+
+Run MinIO next to dubbl and give it its own HTTPS address through your reverse proxy (here `files.example.com` in front of port 9000):
+
+```bash
+docker run -d --name minio --restart unless-stopped \
+  -p 9000:9000 -p 9001:9001 -v minio_data:/data \
+  -e MINIO_ROOT_USER=dubbl-admin -e MINIO_ROOT_PASSWORD=change-me-to-something-long \
+  minio/minio server /data --console-address ":9001"
+```
+
+Create a bucket called `dubbl` in the console on port 9001, then:
+
+```bash
+S3_ENDPOINT=https://files.example.com
+S3_REGION=us-east-1
+S3_BUCKET=dubbl
+S3_ACCESS_KEY_ID=dubbl-admin
+S3_SECRET_ACCESS_KEY=your_secret_access_key
+```
+
+For local development, `docker compose up -d` already starts MinIO on `localhost:9000` with a `dubbl` bucket, matching `.env.example`. When the app runs in Docker too (`--profile web`), it talks to MinIO at `http://minio:9000` and sends browsers to `http://localhost:9000`.
+
+</Tab>
+
+</Tabs>
+
+Then allow your app to upload from the browser. Add a CORS rule to the bucket (AWS and R2 take this JSON; MinIO allows all origins unless you've restricted it):
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://books.example.com"],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Restart dubbl and upload a file in **Documents** to check it works.
+
+## Good to know
+
+- Your users' browsers upload and download straight from the bucket, using `S3_ENDPOINT`, so that address must be reachable from their computers, not just from the server, and served over HTTPS if dubbl is. If the app reaches the bucket at an internal address (such as `http://minio:9000` inside Docker), set `S3_PUBLIC_ENDPOINT` to the address browsers should use; links are signed for that one.
+- The bucket can (and should) stay private. Every upload and download uses a signed link: one hour to upload, and short-lived links (five minutes by default) to download.
+- dubbl uses path-style addresses (`https://files.example.com/dubbl/...`), which every S3-compatible service supports.
+- Self-hosted without Stripe, organizations have no storage limit. With Stripe, each plan's limit is checked before an upload starts.
+- The bucket is half of your data. Back it up with the database; see [Backups](/docs/self-hosting/backups).
+
+<Fold>
+
+## What's in the bucket
+
+| Path | What it holds |
+| --- | --- |
+| `<organization-id>/<random>/<file>` | Attachments on records, such as expense receipts and journal entry files |
+| `documents/<organization-id>/...` | The document library and contact files; Tilly's uploads under `tilly/` |
+| `backups/<organization-id>/<backup-id>.json` | Backup snapshots made in **Settings**, **Backups** or by the nightly job |
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Backups" href="/docs/self-hosting/backups" description="Keep the bucket and the database safe." />
+  <Card title="Documents" href="/docs/guides/documents" description="The document library people use." />
+  <Card title="Configuration" href="/docs/self-hosting/configuration" description="Every environment variable." />
+</Cards>

@@ -1,0 +1,107 @@
+---
+title: BAS
+description: Get the GST figures for your Australian Business Activity Statement from your books, then lodge and settle the period.
+icon: FileSpreadsheet
+---
+
+If your business is in Australia, you report GST to the ATO on a Business Activity Statement. dubbl works out the GST fields for any period from the invoices, bills and transactions already in your books: the GST you charged (1A), the GST you can claim back (1B), and the difference.
+
+<Shot name="bas" alt="The Business Activity Statement with GST on sales and purchases, the amount payable to the ATO and the G fields" pins />
+
+## Prepare your BAS
+
+<Steps>
+
+<Step>
+
+Open **Tax** in the sidebar and choose **BAS**. The tab shows for companies based in Australia.
+
+</Step>
+
+<Step>
+
+Pick the period at the top. For a quarterly BAS, choose **This Quarter** or set **Custom** dates for the quarter you're lodging.
+
+</Step>
+
+<Step>
+
+Under **Count GST**, choose **When you record it** (invoice basis) or **When money moves** (cash basis, which most small businesses use). It starts on the basis your company is set up with.
+
+</Step>
+
+<Step>
+
+Compare **GST on Sales (1A)** and **GST on Purchases (1B)**. The big figure underneath is **Amount Payable to ATO**, or **Refund Due from ATO** when you paid more GST than you charged.
+
+</Step>
+
+<Step>
+
+Copy the fields under **GST Information** into your BAS on the ATO's online services or your agent's software.
+
+</Step>
+
+<Step>
+
+Choose **Export CSV** or **Print** to keep a copy with your records.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- dubbl works out the figures; it doesn't lodge with the ATO. Lodge yourself, then mark the period submitted under **Tax Periods**.
+- 1A and 1B come from your GST accounts in the ledger, so GST recorded any way (invoices, bills, categorized bank transactions, manual journals) is included. Only posted entries count.
+- On **When money moves**, an invoice or bill counts in the period it's paid. A part payment counts its share of the GST and the G figures on the payment date.
+- G1 is sales including GST, from invoices and cash sales minus credit notes, in your company's currency. Drafts and voided documents are left out.
+- **G3** is sales lines with no GST that aren't exports, such as GST-free items or a customer set to **Don't charge tax**.
+- **G10** is bill lines coded to a fixed asset account, including GST. **G11** is the rest of your purchases, including GST.
+- The figures show in your company's currency. **Export CSV** writes plain amounts (1250.00).
+
+## Where each field comes from
+
+<TaxReturnMap
+  rows={[
+    { box: "G1", label: "Total sales (including GST)", from: "Invoices and cash sales, minus credit notes", source: "documents" },
+    { box: "G2", label: "Export sales", from: "Invoices to tax-registered contacts abroad", source: "contacts" },
+    { box: "G3", label: "Other GST-free sales", from: "Sales lines with no GST, not exports", source: "documents" },
+    { box: "G10", label: "Capital purchases", from: "Bill lines on fixed asset accounts", source: "documents" },
+    { box: "G11", label: "Non-capital purchases", from: "Other bill lines, minus supplier credits", source: "documents" },
+    { box: "1A", label: "GST on sales", from: "Output VAT / GST Payable account", source: "ledger" },
+    { box: "1B", label: "GST on purchases", from: "Input VAT / GST Receivable account", source: "ledger" },
+    { box: "NET", label: "Net GST (1A - 1B)", from: "1A minus 1B", source: "sum", key: true },
+  ]}
+  caption="NET is what you pay the ATO, or get back when it's negative."
+/>
+
+<TaxNetFlow collected={385000} paid={142000} taxName="GST" authority="the ATO" />
+
+<Fold>
+
+## Lodging and paying
+
+BAS periods are tracked the same way as any other return. Under **Tax** then **Tax Periods**, add the quarter with **New Tax Period**. After you lodge, choose **Mark submitted** to freeze the G fields, 1A, 1B and NET and move the GST out of the two GST accounts into **VAT / GST Suspense**. When the money moves, open the period and choose **Record payment / refund**.
+
+The full walk-through, with the entries dubbl records, is in [VAT return](/docs/guides/vat-return#tax-periods-filing-and-paying).
+
+</Fold>
+
+<Fold>
+
+## Checking the figures
+
+- **GST on Sales (1A)** looks low? Check the invoices are posted (not drafts) and dated inside the period, and that their lines use a GST rate.
+- **Export sales** only counts invoices to contacts with a **Tax number / VAT** and a billing country outside Australia.
+- To see the GST on your invoices and bills rate by rate, open **Reports**, then **Tax collected vs tax paid**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Tax rates" href="/docs/guides/tax-rates" description="GST 10%, GST-free and the other rates you use." />
+  <Card title="VAT return" href="/docs/guides/vat-return" description="Tax periods, filing and paying, step by step." />
+  <Card title="Sales tax and VAT, explained" href="/docs/learn/sales-tax-and-vat" description="Why the GST you collect isn't your money." />
+</Cards>

@@ -1,0 +1,146 @@
+---
+title: Time and leave
+description: Record the hours your employees work, approve them for payroll, and handle requests for time off.
+icon: CalendarClock
+---
+
+Timesheets record the hours each employee works in a period. Once a timesheet is approved, payroll pays hourly employees for those hours. Leave requests are how time off is asked for and approved, so everyone knows who's away and when.
+
+<Shot name="time-and-leave" alt="Time and leave with active timesheets, pending approvals, approved this month and leave hours used, and the timesheets list" pins />
+
+## Record a timesheet
+
+<Steps>
+
+<Step>
+
+Open **Payroll**, then **Time & leave**, and choose **New Timesheet**.
+
+</Step>
+
+<Step>
+
+Pick the **Employee** and the **Period Start** and **Period End**, then choose **Create Timesheet**. It starts as a **Draft**.
+
+</Step>
+
+<Step>
+
+Open the timesheet and add each day worked: the **Date**, the **Hours**, the **Type** (**Regular**, **Overtime**, **Night**, **Weekend** or **Holiday**) and a **Description**. Choose **Add Entry** for each.
+
+</Step>
+
+<Step>
+
+When the period is complete, choose **Submit**.
+
+</Step>
+
+<Step>
+
+An admin reviews it and chooses **Approve**, or **Reject** with an optional reason. Approved hours are paid in the pay run whose period they fall in.
+
+</Step>
+
+</Steps>
+
+<Shot name="time-and-leave-timesheet-new" alt="The New Timesheet sheet with an employee and a period start and end" narrow />
+
+## Good to know
+
+- Only approved timesheets count toward pay, and only the days inside a pay run's period. Draft and submitted ones are ignored by pay runs.
+- Overtime is worked out week by week: hours above **Overtime after (hours per week)** in a week are paid at the overtime rate. Hours marked **Overtime** always are. **Night**, **Weekend** and **Holiday** hours earn that shift's extra pay on top.
+- Entries can be added while a timesheet is a **Draft** or after it was rejected. A rejected timesheet shows **Sent back** with the reason; fix the entries and choose **Resubmit**.
+- Approving and rejecting timesheets and leave needs an admin. See [Members and roles](/docs/guides/members-and-roles).
+- Approved leave on an **Unpaid** policy is taken off the employee's pay in the run covering those days. Other leave is paid as normal and comes off their leave balance.
+- Time logged on a [project](/docs/guides/projects) is separate from timesheets. Project time is for billing clients; timesheets are for paying employees.
+
+## How timesheets feed payroll
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Add the hours worked." },
+    { name: "Submitted", t: "info", note: "Waiting for approval." },
+    { name: "Approved", t: "good", note: "Counted in the next pay run." },
+  ]}
+  caption="A rejected timesheet shows as Rejected, with the reason, and can be changed and submitted again."
+/>
+
+<TimesheetToPay />
+
+## Request time off
+
+<Steps>
+
+<Step>
+
+On **Time & leave**, switch to **Leave Requests** and choose **New Request**.
+
+</Step>
+
+<Step>
+
+Pick the **Employee** and the **Policy** (the kind of leave), then the **Start Date**, **End Date** and how many **Hours** off in total. Add a **Reason** if you like.
+
+</Step>
+
+<Step>
+
+Choose **Submit Request**. It waits as **Pending** until an admin chooses **Approve** or **Reject**. Open a request from the list to see it on its own page. **Cancel** on a pending or approved request (then **Cancel leave**) withdraws it; cancelling approved leave gives the hours back.
+
+</Step>
+
+</Steps>
+
+<Shot name="time-and-leave-request-new" alt="The New Leave Request sheet with employee, policy, start and end dates, hours and reason" narrow />
+
+<Lifecycle
+  steps={[
+    { name: "Pending", t: "watch", note: "Waiting for a decision." },
+    { name: "Approved", t: "good", note: "Time off agreed." },
+  ]}
+  caption="A request can be rejected instead, and a pending or approved one can be cancelled, which gives the hours back. The Pending, Approved and Rejected tabs filter the list."
+/>
+
+<Fold>
+
+## Leave policies
+
+The **Policy** on a leave request comes from your leave policies. Add them under **Payroll**, **Settings**, **Leave Policies**: choose **Add Policy**, give it a **Name** and pick the **Leave Type** (**Vacation**, **Sick**, **Personal**, **Parental**, **Bereavement**, **Unpaid** or **Other**).
+
+**How time off builds up** and **Hours earned** set how leave accrues:
+
+- **Per Pay Period**: the hours earned for every finished regular pay run the employee was paid in this year.
+- **Monthly**: the hours earned each month, from the month they started.
+- **Annually**: the hours earned a year, built up day by day.
+- **Front Loaded**: all the hours from January 1, or from their start date if they joined this year.
+
+**Max Balance (hours)** caps what can be banked, and **Carry over to next year (hours)** caps what rolls into the next year (leave it empty for no limit).
+
+An employee's balance for each policy is what they carried over from last year, plus what they've built up this year, less approved leave that starts this year, and never more than the policy's maximum. Balances are worked out again whenever they're shown, so approving or cancelling leave and finishing a pay run update them straight away. Vacation and personal leave together make up the time off an employee can have paid out in their final pay.
+
+</Fold>
+
+<Fold>
+
+## Timesheets and leave on their own pages
+
+**Time & leave** shows both lists together, with counts of timesheets in progress, waiting for approval and approved this month, and the leave hours used. **Open timesheets on their own page** and **Open leave on its own page** give each list a full page. Use the status tabs and the employee search to find what needs approving.
+
+</Fold>
+
+<Fold>
+
+## Employees seeing their own time
+
+An employee linked to their workspace login (on their page under **Payroll**, **Employees**) sees their own timesheets, payslips and leave balances in **Employee self-service**, and can ask for time off there with **Request time off** once you have at least one leave policy.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Payroll" href="/docs/guides/payroll" description="Run payroll with the approved hours." />
+  <Card title="Projects" href="/docs/guides/projects" description="Track time you bill to clients." />
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Who can approve." />
+</Cards>

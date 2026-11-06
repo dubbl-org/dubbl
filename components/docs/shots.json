@@ -1,0 +1,4430 @@
+{
+  "account-ledger": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 22.51,
+        "w": 75.14,
+        "h": 5.97,
+        "label": "Balance, total debits and credits, and how many entries"
+      },
+      {
+        "x": 22.29,
+        "y": 40.87,
+        "w": 12.13,
+        "h": 4.89,
+        "label": "Show only debits or only credits"
+      },
+      {
+        "x": 89.03,
+        "y": 51.65,
+        "w": 8.33,
+        "h": 5.33,
+        "label": "The running balance after each entry"
+      }
+    ]
+  },
+  "account-settings": {
+    "width": 1600,
+    "height": 1557
+  },
+  "accounts": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 18.22,
+        "w": 75.14,
+        "h": 4.44,
+        "label": "How your accounts split across the five types"
+      },
+      {
+        "x": 22.29,
+        "y": 24.44,
+        "w": 26.47,
+        "h": 4.89,
+        "label": "Show one type at a time"
+      },
+      {
+        "x": 22.29,
+        "y": 29.78,
+        "w": 22.78,
+        "h": 4.89,
+        "label": "Search by name or code, and change the sort"
+      },
+      {
+        "x": 31.35,
+        "y": 42.43,
+        "w": 4.65,
+        "h": 2.92,
+        "label": "Built-in accounts: name and code are fixed"
+      },
+      {
+        "x": 88.45,
+        "y": 1.89,
+        "w": 8.98,
+        "h": 4.44,
+        "label": "Add an account of your own"
+      }
+    ]
+  },
+  "accounts-new": {
+    "width": 1024,
+    "height": 1120
+  },
+  "accrual-new": {
+    "width": 1024,
+    "height": 1400
+  },
+  "accruals": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "What's running, this month's share, what's left to spread and anything behind"
+      },
+      {
+        "x": 22.36,
+        "y": 75.82,
+        "w": 76.21,
+        "h": 5.33,
+        "label": "Each accrual: the total, each month's share, months recorded and the next one"
+      },
+      {
+        "x": 88.84,
+        "y": 1.89,
+        "w": 8.59,
+        "h": 4.44,
+        "label": "Add an accrual"
+      }
+    ]
+  },
+  "aged-payables": {
+    "width": 1600,
+    "height": 1000
+  },
+  "aged-receivables": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 23.19,
+        "y": 26.06,
+        "w": 16.67,
+        "h": 4.44,
+        "label": "Age everything as of any date"
+      },
+      {
+        "x": 22.29,
+        "y": 33.73,
+        "w": 75.14,
+        "h": 14.72,
+        "label": "A total per bucket, with how many invoices"
+      },
+      {
+        "x": 22.29,
+        "y": 49.34,
+        "w": 75.14,
+        "h": 10.89,
+        "label": "Everything still owed to you"
+      },
+      {
+        "x": 88.35,
+        "y": 14.73,
+        "w": 9.08,
+        "h": 4.44,
+        "label": "Export the list"
+      }
+    ]
+  },
+  "approvals": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 86.05,
+        "y": 10.92,
+        "w": 11.38,
+        "h": 4.44,
+        "label": "Add a workflow"
+      }
+    ]
+  },
+  "approvals-new": {
+    "width": 1024,
+    "height": 1280
+  },
+  "assemblies-bom": {
+    "width": 1600,
+    "height": 822,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 12.16,
+        "w": 22.6,
+        "h": 10.81,
+        "label": "The recipe's name and the finished item it makes"
+      },
+      {
+        "x": 22.29,
+        "y": 25.14,
+        "w": 75.14,
+        "h": 17.03,
+        "label": "Parts, labour and overhead add up to an estimated cost per item"
+      },
+      {
+        "x": 22.29,
+        "y": 44.32,
+        "w": 75.14,
+        "h": 51.08,
+        "label": "Each part, how many go into one item, its cost and what's on hand"
+      },
+      {
+        "x": 84.39,
+        "y": 12.16,
+        "w": 13.04,
+        "h": 5.41,
+        "label": "Build a batch from this recipe"
+      }
+    ]
+  },
+  "assemblies-bom-new": {
+    "width": 768,
+    "height": 1280
+  },
+  "asset-categories": {
+    "width": 1600,
+    "height": 1000
+  },
+  "asset-categories-new": {
+    "width": 1344,
+    "height": 1570
+  },
+  "audit-log": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 77.71,
+        "h": 4.89,
+        "label": "Filter by what happened: created, updated, deleted and more"
+      },
+      {
+        "x": 22.29,
+        "y": 16.22,
+        "w": 75.14,
+        "h": 4.89,
+        "label": "Search by person or record, by type and by date"
+      },
+      {
+        "x": 24.93,
+        "y": 27.97,
+        "w": 71.67,
+        "h": 7.98,
+        "label": "Who did it, to what, and when"
+      }
+    ]
+  },
+  "backups": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 66.33,
+        "y": 10,
+        "w": 11.72,
+        "h": 4.44,
+        "label": "Download everything now as a JSON file"
+      },
+      {
+        "x": 78.05,
+        "y": 10,
+        "w": 9.84,
+        "h": 4.44,
+        "label": "Bring in a backup file you downloaded"
+      },
+      {
+        "x": 87.9,
+        "y": 10,
+        "w": 9.53,
+        "h": 4.44,
+        "label": "Take a backup now and keep it here"
+      }
+    ]
+  },
+  "backups-create": {
+    "width": 1024,
+    "height": 336
+  },
+  "balance-sheet": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 23.19,
+        "y": 35.87,
+        "w": 14.59,
+        "h": 4.44,
+        "label": "The day you want the snapshot for"
+      },
+      {
+        "x": 38.34,
+        "y": 35.87,
+        "w": 14.45,
+        "h": 4.44,
+        "label": "Add a second date to compare"
+      },
+      {
+        "x": 88.38,
+        "y": 14.73,
+        "w": 9.05,
+        "h": 4.44,
+        "label": "Download it as a PDF"
+      },
+      {
+        "x": 22.36,
+        "y": 67.65,
+        "w": 75,
+        "h": 5,
+        "label": "Click any account to see its transactions"
+      }
+    ]
+  },
+  "bank-accounts": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 5.97,
+        "label": "Your total balance across every account"
+      },
+      {
+        "x": 22.36,
+        "y": 32.86,
+        "w": 75,
+        "h": 8.44,
+        "label": "Each account with its bank, last digits and balance"
+      },
+      {
+        "x": 77.39,
+        "y": 22.63,
+        "w": 9.93,
+        "h": 4.44,
+        "label": "Record money moving between your accounts"
+      },
+      {
+        "x": 88.45,
+        "y": 1.89,
+        "w": 8.98,
+        "h": 4.44,
+        "label": "Add a bank, card or cash account"
+      }
+    ]
+  },
+  "bank-accounts-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "bank-accounts-overview": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 22.51,
+        "w": 75.14,
+        "h": 5.97,
+        "label": "Balance, money in and out, and how much is done"
+      },
+      {
+        "x": 72.31,
+        "y": 15.73,
+        "w": 18.22,
+        "h": 4.44,
+        "label": "Check your books against a bank statement"
+      },
+      {
+        "x": 90.54,
+        "y": 15.73,
+        "w": 6.89,
+        "h": 4.44,
+        "label": "Bring in a statement"
+      },
+      {
+        "x": 22.29,
+        "y": 45.38,
+        "w": 75.14,
+        "h": 54.62,
+        "label": "The latest lines, ready to categorize"
+      }
+    ]
+  },
+  "bank-accounts-settings": {
+    "width": 1600,
+    "height": 1000
+  },
+  "bank-accounts-transfer": {
+    "width": 1024,
+    "height": 1800
+  },
+  "bank-low-balance-alert": {
+    "width": 1600,
+    "height": 181
+  },
+  "bas": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 41.32,
+        "w": 75.14,
+        "h": 23.13,
+        "label": "GST on sales (1A) against GST on purchases (1B)"
+      },
+      {
+        "x": 22.29,
+        "y": 66.22,
+        "w": 75.14,
+        "h": 11.68,
+        "label": "What you pay the ATO, or get back"
+      },
+      {
+        "x": 22.29,
+        "y": 79.68,
+        "w": 75.14,
+        "h": 20.32,
+        "label": "Every G field and 1A, 1B"
+      }
+    ]
+  },
+  "billing": {
+    "width": 1600,
+    "height": 351
+  },
+  "bills": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "What you owe, what's overdue and what falls due soon"
+      },
+      {
+        "x": 73.26,
+        "y": 30.31,
+        "w": 24.17,
+        "h": 36.55,
+        "label": "Who bills you most, by month and by supplier"
+      },
+      {
+        "x": 22.29,
+        "y": 67.75,
+        "w": 75.14,
+        "h": 32.25,
+        "label": "Status tabs, search, filters, grouping and columns"
+      },
+      {
+        "x": 90.63,
+        "y": 1.89,
+        "w": 6.8,
+        "h": 4.44,
+        "label": "Record a new bill"
+      }
+    ]
+  },
+  "bills-draft": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 58.37,
+        "y": 12.67,
+        "w": 5.79,
+        "h": 4.44,
+        "label": "Change anything while it's a draft"
+      },
+      {
+        "x": 77.14,
+        "y": 12.67,
+        "w": 11.5,
+        "h": 4.44,
+        "label": "Post it to your books so it counts toward what you owe"
+      },
+      {
+        "x": 88.64,
+        "y": 12.67,
+        "w": 8.79,
+        "h": 4.44,
+        "label": "Cancel a bill that shouldn't exist"
+      },
+      {
+        "x": 22.29,
+        "y": 60.08,
+        "w": 37.29,
+        "h": 21.93,
+        "label": "What's been paid and what's still owed"
+      },
+      {
+        "x": 22.29,
+        "y": 83.79,
+        "w": 75.14,
+        "h": 16.21,
+        "label": "Keep the supplier's PDF and receipts with the bill"
+      }
+    ]
+  },
+  "bills-edit": {
+    "width": 1344,
+    "height": 1800
+  },
+  "bills-matching": {
+    "width": 1600,
+    "height": 580
+  },
+  "bills-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "bills-open": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 62.47,
+        "y": 12.67,
+        "w": 11.35,
+        "h": 4.44,
+        "label": "Record money you paid against it"
+      },
+      {
+        "x": 73.81,
+        "y": 12.67,
+        "w": 14.83,
+        "h": 4.44,
+        "label": "The supplier owes you money back"
+      },
+      {
+        "x": 49.74,
+        "y": 12.67,
+        "w": 12.73,
+        "h": 4.44,
+        "label": "Everything with this supplier on one statement"
+      }
+    ]
+  },
+  "bills-payment": {
+    "width": 1024,
+    "height": 730
+  },
+  "budget": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 22.51,
+        "w": 75.14,
+        "h": 7.55,
+        "label": "Budget, actual, variance, burn rate and days left"
+      },
+      {
+        "x": 22.29,
+        "y": 38.9,
+        "w": 75.14,
+        "h": 39.33,
+        "label": "Budgeted against actual, period by period"
+      }
+    ]
+  },
+  "budget-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "budget-spending-alert": {
+    "width": 1600,
+    "height": 204
+  },
+  "budgets": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 24.11,
+        "w": 75,
+        "h": 9.08,
+        "label": "Spent so far against the whole budget, and days left"
+      },
+      {
+        "x": 22.36,
+        "y": 42.85,
+        "w": 75,
+        "h": 6.11,
+        "label": "Each account: left this month, spent and budgeted"
+      },
+      {
+        "x": 88.9,
+        "y": 1.89,
+        "w": 8.53,
+        "h": 4.44,
+        "label": "Plan a new budget"
+      }
+    ]
+  },
+  "cash-flow": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 40.65,
+        "w": 75.14,
+        "h": 12.5,
+        "label": "Trading, buying and selling things, funding"
+      },
+      {
+        "x": 22.29,
+        "y": 40.65,
+        "w": 75.14,
+        "h": 12.5,
+        "label": "How much your cash changed"
+      }
+    ]
+  },
+  "cash-flow-forecast": {
+    "width": 1600,
+    "height": 1000
+  },
+  "cash-sales": {
+    "width": 1600,
+    "height": 1000
+  },
+  "cash-sales-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "categorizing-transactions": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 42.87,
+        "w": 16.73,
+        "h": 4.89,
+        "label": "To do, done and ignored lines"
+      },
+      {
+        "x": 26.97,
+        "y": 37.65,
+        "w": 9.09,
+        "h": 4,
+        "label": "Assign many lines at once in a grid"
+      },
+      {
+        "x": 88.43,
+        "y": 37.43,
+        "w": 9,
+        "h": 4.44,
+        "label": "Run your bank rules on the lines still to do"
+      },
+      {
+        "x": 75.22,
+        "y": 60.28,
+        "w": 8.12,
+        "h": 4,
+        "label": "Say what a line was for"
+      },
+      {
+        "x": 43.42,
+        "y": 59.71,
+        "w": 3.48,
+        "h": 3.14,
+        "label": "Where each line stands"
+      }
+    ]
+  },
+  "categorizing-transactions-bulk": {
+    "width": 1600,
+    "height": 1000
+  },
+  "categorizing-transactions-match": {
+    "width": 1024,
+    "height": 1800
+  },
+  "categorizing-transactions-menu": {
+    "width": 928,
+    "height": 878
+  },
+  "categorizing-transactions-rules": {
+    "width": 1024,
+    "height": 1800
+  },
+  "categorizing-transactions-sheet": {
+    "width": 1024,
+    "height": 1800
+  },
+  "categorizing-transactions-split": {
+    "width": 1152,
+    "height": 1800
+  },
+  "categorizing-transactions-suggestions": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 80.64,
+        "y": 10.94,
+        "w": 9.93,
+        "h": 4.44,
+        "label": "Look for payees you keep categorizing the same way"
+      },
+      {
+        "x": 88.46,
+        "y": 26.44,
+        "w": 7.79,
+        "h": 4.44,
+        "label": "Turn a suggestion into a rule"
+      }
+    ]
+  },
+  "consolidation": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 26.84,
+        "w": 75.14,
+        "h": 20.44,
+        "label": "Create a group for the businesses you report on together"
+      }
+    ]
+  },
+  "contacts": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "What customers owe and what you owe suppliers"
+      },
+      {
+        "x": 22.36,
+        "y": 30.43,
+        "w": 75,
+        "h": 6.22,
+        "label": "Filter by customers, suppliers or both"
+      },
+      {
+        "x": 66.05,
+        "y": 47,
+        "w": 5.75,
+        "h": 2.79,
+        "label": "Each contact's open balance"
+      },
+      {
+        "x": 78.53,
+        "y": 1.89,
+        "w": 8.84,
+        "h": 4.44,
+        "label": "Add a contact"
+      }
+    ]
+  },
+  "contacts-detail": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 14.89,
+        "w": 75.14,
+        "h": 4.4,
+        "label": "Activity, statement, bookkeeping, people and files"
+      },
+      {
+        "x": 38.96,
+        "y": 61.4,
+        "w": 28.96,
+        "h": 7.33,
+        "label": "Payment terms, currency and credit limit"
+      },
+      {
+        "x": 74.78,
+        "y": 10,
+        "w": 10.08,
+        "h": 4,
+        "label": "Fold a duplicate into this contact"
+      }
+    ]
+  },
+  "contacts-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "contacts-preview": {
+    "width": 1080,
+    "height": 1800
+  },
+  "credit-notes": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Credit customers can still use"
+      },
+      {
+        "x": 87.57,
+        "y": 72.61,
+        "w": 6.18,
+        "h": 2.79,
+        "label": "What's left on each credit note"
+      },
+      {
+        "x": 87.14,
+        "y": 1.89,
+        "w": 10.29,
+        "h": 4.44,
+        "label": "Issue a new credit note"
+      }
+    ]
+  },
+  "credit-notes-apply": {
+    "width": 1024,
+    "height": 584
+  },
+  "credit-notes-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "credit-notes-sent": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 70.76,
+        "y": 10,
+        "w": 14.2,
+        "h": 4.44,
+        "label": "Use the credit to reduce an invoice"
+      },
+      {
+        "x": 72.75,
+        "y": 25,
+        "w": 24.68,
+        "h": 9.56,
+        "label": "Credit still left on this note"
+      },
+      {
+        "x": 84.96,
+        "y": 10,
+        "w": 12.47,
+        "h": 4.44,
+        "label": "Cancel it so it can't be used"
+      }
+    ]
+  },
+  "crm": {
+    "width": 1600,
+    "height": 689,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 14.52,
+        "w": 24.83,
+        "h": 10.11,
+        "label": "What's open, and what it's worth weighted by its chance of closing"
+      },
+      {
+        "x": 84.59,
+        "y": 18.18,
+        "w": 5.29,
+        "h": 6.45,
+        "label": "Every deal as a list, won and lost included"
+      },
+      {
+        "x": 22.01,
+        "y": 25.92,
+        "w": 75.69,
+        "h": 54.84,
+        "label": "A column per stage; drag a card to move it on"
+      },
+      {
+        "x": 89.87,
+        "y": 18.18,
+        "w": 7.56,
+        "h": 6.45,
+        "label": "Add a deal"
+      }
+    ]
+  },
+  "crm-analytics": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 66.05,
+        "label": "The reasons deals were lost, most common first"
+      }
+    ]
+  },
+  "crm-deal": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 90.27,
+        "y": 14.73,
+        "w": 7.16,
+        "h": 4.44,
+        "label": "Close the deal as won"
+      },
+      {
+        "x": 83.02,
+        "y": 14.73,
+        "w": 7.25,
+        "h": 4.44,
+        "label": "Or as lost"
+      },
+      {
+        "x": 77.43,
+        "y": 40.13,
+        "w": 20,
+        "h": 18.06,
+        "label": "Value, chance of closing and weighted value"
+      },
+      {
+        "x": 22.29,
+        "y": 62.5,
+        "w": 54.58,
+        "h": 12.89,
+        "label": "Calls, emails and notes logged on the deal"
+      }
+    ]
+  },
+  "crm-new-deal": {
+    "width": 1024,
+    "height": 1800
+  },
+  "crm-pipelines": {
+    "width": 1600,
+    "height": 511
+  },
+  "currencies": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 19.89,
+        "w": 75.14,
+        "h": 12.76,
+        "label": "Your base currency: every report adds up in it"
+      },
+      {
+        "x": 22.29,
+        "y": 46.62,
+        "w": 75.14,
+        "h": 19.65,
+        "label": "What open foreign invoices and bills have gained or lost"
+      },
+      {
+        "x": 22.29,
+        "y": 60.27,
+        "w": 75.14,
+        "h": 6,
+        "label": "Your rates, by date: Manual or Auto"
+      },
+      {
+        "x": 89.52,
+        "y": 10,
+        "w": 7.91,
+        "h": 4.44,
+        "label": "Enter a rate yourself"
+      }
+    ]
+  },
+  "currencies-rate": {
+    "width": 768,
+    "height": 1040
+  },
+  "custom-reports": {
+    "width": 1600,
+    "height": 1000
+  },
+  "custom-reports-builder": {
+    "width": 1024,
+    "height": 1292
+  },
+  "custom-reports-saved": {
+    "width": 1600,
+    "height": 1000
+  },
+  "custom-reports-schedule": {
+    "width": 896,
+    "height": 1092
+  },
+  "customer-portal": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 34.78,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Who has opened their link"
+      },
+      {
+        "x": 72.92,
+        "y": 41.76,
+        "w": 12.78,
+        "h": 4.89,
+        "label": "When each link stops working"
+      },
+      {
+        "x": 22.29,
+        "y": 68.2,
+        "w": 75.14,
+        "h": 15.71,
+        "label": "What customers looked at and did"
+      },
+      {
+        "x": 86.53,
+        "y": 12.52,
+        "w": 10.9,
+        "h": 4.44,
+        "label": "Send a customer their link"
+      }
+    ]
+  },
+  "customer-portal-invite": {
+    "width": 896,
+    "height": 962
+  },
+  "customer-prepayments": {
+    "width": 1600,
+    "height": 1000
+  },
+  "customer-prepayments-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "desktop-app-connect": {
+    "width": 1222,
+    "height": 800
+  },
+  "dev-api-keys": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 89.73,
+        "y": 11.11,
+        "w": 7.7,
+        "h": 4.44,
+        "label": "Create a key for a script or integration"
+      },
+      {
+        "x": 22.29,
+        "y": 89.56,
+        "w": 75.14,
+        "h": 10.44,
+        "label": "The header every request sends"
+      }
+    ]
+  },
+  "dev-api-keys-new": {
+    "width": 768,
+    "height": 840
+  },
+  "dev-export": {
+    "width": 1600,
+    "height": 1195
+  },
+  "dev-mcp-authorize": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 61.65,
+        "y": 40.81,
+        "w": 27.22,
+        "h": 18.22,
+        "label": "What the client will be able to do"
+      },
+      {
+        "x": 61.65,
+        "y": 60.37,
+        "w": 27.22,
+        "h": 6,
+        "label": "The organization it connects to (pick one if you have several)"
+      },
+      {
+        "x": 75.2,
+        "y": 67.7,
+        "w": 13.68,
+        "h": 5.78,
+        "label": "Approve, or Deny to send the client away"
+      }
+    ]
+  },
+  "dev-webhooks": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 87.31,
+        "y": 11.17,
+        "w": 10.12,
+        "h": 4.44,
+        "label": "Add an endpoint and choose its events"
+      }
+    ]
+  },
+  "dev-webhooks-new": {
+    "width": 768,
+    "height": 1800
+  },
+  "document-templates": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 18,
+        "w": 24.86,
+        "h": 12.03,
+        "label": "One card per template, with its type and colour"
+      },
+      {
+        "x": 31.68,
+        "y": 19.89,
+        "w": 5.44,
+        "h": 3.14,
+        "label": "The default is used for every new PDF of that type"
+      },
+      {
+        "x": 88.83,
+        "y": 11.11,
+        "w": 8.6,
+        "h": 4,
+        "label": "Make a new template"
+      }
+    ]
+  },
+  "document-templates-new": {
+    "width": 1024,
+    "height": 2000
+  },
+  "document-templates-preview": {
+    "width": 1024,
+    "height": 1396
+  },
+  "documents": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 21.74,
+        "y": 8.31,
+        "w": 5.03,
+        "h": 4.16,
+        "label": "Quick views: recent, starred, not attached, attached, private and trash"
+      },
+      {
+        "x": 4.58,
+        "y": 34,
+        "w": 15.28,
+        "h": 3.78,
+        "label": "Your folders. Drag files onto one to move them"
+      },
+      {
+        "x": 74.13,
+        "y": 8.17,
+        "w": 18.33,
+        "h": 4.44,
+        "label": "Search every file by name"
+      },
+      {
+        "x": 92.47,
+        "y": 8.17,
+        "w": 5.52,
+        "h": 4.44,
+        "label": "Upload files or make a folder"
+      },
+      {
+        "x": 4.58,
+        "y": 52.57,
+        "w": 15.28,
+        "h": 4.44,
+        "label": "Every document emailed from dubbl"
+      }
+    ]
+  },
+  "documents-emails": {
+    "width": 1600,
+    "height": 1000
+  },
+  "documents-new": {
+    "width": 464,
+    "height": 278
+  },
+  "duplicate-contacts": {
+    "width": 1600,
+    "height": 1000
+  },
+  "duplicate-contacts-merge": {
+    "width": 1024,
+    "height": 976
+  },
+  "email": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 19.25,
+        "w": 75.14,
+        "h": 8.57,
+        "label": "Who your documents come from right now"
+      },
+      {
+        "x": 38.96,
+        "y": 30.49,
+        "w": 58.47,
+        "h": 23.74,
+        "label": "Your mail server's outgoing (SMTP) details"
+      },
+      {
+        "x": 38.96,
+        "y": 60.57,
+        "w": 58.47,
+        "h": 15.56,
+        "label": "The name and address your customers see"
+      },
+      {
+        "x": 86.42,
+        "y": 81.12,
+        "w": 11.01,
+        "h": 4.44,
+        "label": "Save, and check the login works"
+      }
+    ]
+  },
+  "expenses": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "Claims to review, to pay back and already paid"
+      },
+      {
+        "x": 73.26,
+        "y": 30.31,
+        "w": 24.17,
+        "h": 28.73,
+        "label": "Who claims what, by month and by person"
+      },
+      {
+        "x": 22.36,
+        "y": 80.26,
+        "w": 75,
+        "h": 5.33,
+        "label": "Each claim with its person, status and amount"
+      },
+      {
+        "x": 88.37,
+        "y": 1.89,
+        "w": 9.06,
+        "h": 4.44,
+        "label": "Start a new expense claim"
+      }
+    ]
+  },
+  "expenses-claim": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 82.81,
+        "y": 12.67,
+        "w": 7.67,
+        "h": 4.44,
+        "label": "Approve it: the costs go into your books"
+      },
+      {
+        "x": 90.48,
+        "y": 12.67,
+        "w": 6.95,
+        "h": 4.44,
+        "label": "Or send it back with a reason"
+      },
+      {
+        "x": 72.79,
+        "y": 12.67,
+        "w": 10.02,
+        "h": 4.44,
+        "label": "Pull it back to a draft to change it"
+      },
+      {
+        "x": 22.36,
+        "y": 52,
+        "w": 75,
+        "h": 23.41,
+        "label": "Each item with its category, account, receipt and tax"
+      }
+    ]
+  },
+  "expenses-new": {
+    "width": 1536,
+    "height": 1800
+  },
+  "financial-years": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 19.89,
+        "w": 75.14,
+        "h": 19.4,
+        "label": "Add a year: dubbl suggests the next one"
+      },
+      {
+        "x": 22.36,
+        "y": 41.17,
+        "w": 75,
+        "h": 7.68,
+        "label": "Each year, its dates and whether it's open or closed"
+      },
+      {
+        "x": 89.06,
+        "y": 42.79,
+        "w": 7.19,
+        "h": 4.44,
+        "label": "Close the year when the numbers are final"
+      }
+    ]
+  },
+  "financial-years-close": {
+    "width": 896,
+    "height": 428
+  },
+  "finding-your-way-org": {
+    "width": 480,
+    "height": 318
+  },
+  "finding-your-way-sales": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 4.58,
+        "y": 1.11,
+        "w": 15.28,
+        "h": 4.44,
+        "label": "Switch organization, see your plan and members"
+      },
+      {
+        "x": 4.58,
+        "y": 8.79,
+        "w": 15.28,
+        "h": 4.44,
+        "label": "Pages inside Sales"
+      },
+      {
+        "x": 88.96,
+        "y": 1.89,
+        "w": 8.47,
+        "h": 4.44,
+        "label": "The create button changes with the page"
+      },
+      {
+        "x": 23.19,
+        "y": 74.86,
+        "w": 22.78,
+        "h": 4.44,
+        "label": "Search, filter and group the list"
+      }
+    ]
+  },
+  "finding-your-way-search": {
+    "width": 1024,
+    "height": 292
+  },
+  "finding-your-way-tilly": {
+    "width": 1600,
+    "height": 1000
+  },
+  "fixed-asset": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 69.89,
+        "y": 10,
+        "w": 12.27,
+        "h": 4.44,
+        "label": "Record this month's depreciation for this asset"
+      },
+      {
+        "x": 82.16,
+        "y": 10,
+        "w": 9.92,
+        "h": 4.44,
+        "label": "Revalue, write down, undo, or record it as sold"
+      },
+      {
+        "x": 22.29,
+        "y": 22.78,
+        "w": 75.14,
+        "h": 11.78,
+        "label": "Cost, current value and how much is used up"
+      },
+      {
+        "x": 22.29,
+        "y": 36.33,
+        "w": 75.14,
+        "h": 15.33,
+        "label": "The accounts its entries post to"
+      }
+    ]
+  },
+  "fixed-asset-dispose": {
+    "width": 1024,
+    "height": 680
+  },
+  "fixed-asset-more": {
+    "width": 560,
+    "height": 342
+  },
+  "fixed-asset-new": {
+    "width": 1152,
+    "height": 2360
+  },
+  "fixed-assets": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 71.82,
+        "w": 77.64,
+        "h": 4.89,
+        "label": "What you paid, what it's worth now, and what's been written off"
+      },
+      {
+        "x": 74.99,
+        "y": 71.82,
+        "w": 7.98,
+        "h": 4.89,
+        "label": "How much of each item's cost is used up"
+      },
+      {
+        "x": 85.83,
+        "y": 1.89,
+        "w": 11.6,
+        "h": 4.44,
+        "label": "Record this month's depreciation for every asset"
+      },
+      {
+        "x": 77.81,
+        "y": 1.89,
+        "w": 7.88,
+        "h": 4.44,
+        "label": "Add an asset"
+      }
+    ]
+  },
+  "form-1099": {
+    "width": 1600,
+    "height": 800,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 43.03,
+        "w": 75.14,
+        "h": 5.56,
+        "label": "Pick the tax year"
+      },
+      {
+        "x": 22.29,
+        "y": 50.81,
+        "w": 75.14,
+        "h": 14.72,
+        "label": "Who needs a form, what you paid them, and the threshold"
+      },
+      {
+        "x": 22.36,
+        "y": 66.78,
+        "w": 75,
+        "h": 17.15,
+        "label": "Each contractor you track: payments, total paid and whether they need a form"
+      },
+      {
+        "x": 88.35,
+        "y": 18.41,
+        "w": 9.08,
+        "h": 5.56,
+        "label": "Take the list to your filing service"
+      }
+    ]
+  },
+  "form-1099-contact": {
+    "width": 1600,
+    "height": 512,
+    "marks": [
+      {
+        "x": 22.78,
+        "y": 51.34,
+        "w": 76.13,
+        "h": 7.69,
+        "label": "Tick this for each US contractor"
+      }
+    ]
+  },
+  "general-ledger": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 34.42,
+        "w": 75.14,
+        "h": 4.44,
+        "label": "The period to list"
+      },
+      {
+        "x": 84.11,
+        "y": 40.65,
+        "w": 13.32,
+        "h": 4,
+        "label": "Open or close every account at once"
+      },
+      {
+        "x": 22.43,
+        "y": 332.98,
+        "w": 74.86,
+        "h": -232.98,
+        "label": "Each entry and the running balance"
+      }
+    ]
+  },
+  "import-data": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 23.33,
+        "w": 75.14,
+        "h": 11.78,
+        "label": "Where your data comes from"
+      },
+      {
+        "x": 22.29,
+        "y": 36.44,
+        "w": 18.78,
+        "h": 9.93,
+        "label": "Start with accounts, then contacts"
+      },
+      {
+        "x": 22.29,
+        "y": 57.65,
+        "w": 75.14,
+        "h": 10.72,
+        "label": "Bank statements have their own importer"
+      }
+    ]
+  },
+  "import-data-map": {
+    "width": 1024,
+    "height": 1280
+  },
+  "import-data-wizard": {
+    "width": 1024,
+    "height": 1280
+  },
+  "importing-transactions-history": {
+    "width": 1600,
+    "height": 1000
+  },
+  "importing-transactions-sheet": {
+    "width": 1344,
+    "height": 2720,
+    "marks": [
+      {
+        "x": 3.13,
+        "y": 8.9,
+        "w": 93.9,
+        "h": 16.45,
+        "label": "Drop the file from your bank"
+      },
+      {
+        "x": 3.13,
+        "y": 30.69,
+        "w": 93.9,
+        "h": 10.74,
+        "label": "Or paste the lines"
+      },
+      {
+        "x": 3.13,
+        "y": 46.77,
+        "w": 93.9,
+        "h": 3.24,
+        "label": "Leave on Auto Detect, or pick the format"
+      },
+      {
+        "x": 3.13,
+        "y": 53.02,
+        "w": 93.9,
+        "h": 30.41,
+        "label": "Check rows, duplicates and the lines before importing"
+      }
+    ]
+  },
+  "integrations-stripe": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 24.03,
+        "y": 27,
+        "w": 71.67,
+        "h": 16.89,
+        "label": "What dubbl records once Stripe is connected"
+      },
+      {
+        "x": 24.03,
+        "y": 44.78,
+        "w": 15.31,
+        "h": 4.89,
+        "label": "Sign in to Stripe and allow dubbl to read it"
+      }
+    ]
+  },
+  "inventory": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 42.2,
+        "w": 77.64,
+        "h": 4.89,
+        "label": "What your stock cost, what it could sell for, and what's running low"
+      },
+      {
+        "x": 22.36,
+        "y": 46.2,
+        "w": 77.64,
+        "h": 5.33,
+        "label": "Filter by stock level: in stock, running low, out of stock, hidden"
+      },
+      {
+        "x": 66.63,
+        "y": 43,
+        "w": 6.05,
+        "h": 2.79,
+        "label": "Units on hand and the level that counts as running low"
+      },
+      {
+        "x": 88.47,
+        "y": 12.52,
+        "w": 8.96,
+        "h": 4.44,
+        "label": "Bring in items from a CSV"
+      },
+      {
+        "x": 90.08,
+        "y": 1.89,
+        "w": 7.35,
+        "h": 4.44,
+        "label": "Add one item"
+      }
+    ]
+  },
+  "inventory-count": {
+    "width": 768,
+    "height": 1280
+  },
+  "inventory-item": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 85.45,
+        "y": 15.62,
+        "w": 11.98,
+        "h": 4.44,
+        "label": "Add or remove units, with a reason"
+      },
+      {
+        "x": 73.74,
+        "y": 15.62,
+        "w": 11.71,
+        "h": 4.44,
+        "label": "Lower what the stock is worth without changing the count"
+      },
+      {
+        "x": 22.29,
+        "y": 22.28,
+        "w": 18.58,
+        "h": 13.11,
+        "label": "Units, value, price and margin at a glance"
+      },
+      {
+        "x": 22.29,
+        "y": 37.17,
+        "w": 75.14,
+        "h": 4.4,
+        "label": "Every stock change, and the suppliers you buy it from"
+      }
+    ]
+  },
+  "inventory-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "invoice": {
+    "width": 1600,
+    "height": 1000
+  },
+  "invoice-draft": {
+    "width": 1600,
+    "height": 1222,
+    "marks": [
+      {
+        "x": 59.66,
+        "y": 9.45,
+        "w": 6.38,
+        "h": 3.64,
+        "label": "Send it by email, or mark it as sent"
+      },
+      {
+        "x": 46.54,
+        "y": 9.45,
+        "w": 13.12,
+        "h": 3.64,
+        "label": "Or route it to someone for approval first"
+      },
+      {
+        "x": 66.04,
+        "y": 9.45,
+        "w": 10.85,
+        "h": 3.64,
+        "label": "The PDF your customer gets"
+      },
+      {
+        "x": 22.29,
+        "y": 78.19,
+        "w": 37.29,
+        "h": 15.04,
+        "label": "What's been paid and what's still owed"
+      }
+    ]
+  },
+  "invoice-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "invoice-payment": {
+    "width": 1024,
+    "height": 878
+  },
+  "invoices": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Totals at a glance; click one to filter the list"
+      },
+      {
+        "x": 73.26,
+        "y": 30.31,
+        "w": 24.17,
+        "h": 36.55,
+        "label": "Who you bill most, by month and by customer"
+      },
+      {
+        "x": 22.29,
+        "y": 67.75,
+        "w": 75.14,
+        "h": 32.25,
+        "label": "Status tabs, search, filters, grouping and columns"
+      },
+      {
+        "x": 88.96,
+        "y": 1.89,
+        "w": 8.47,
+        "h": 4.44,
+        "label": "Start a new invoice"
+      }
+    ]
+  },
+  "journal-entries": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "This month, drafts waiting, and what's been reversed"
+      },
+      {
+        "x": 22.36,
+        "y": 65.93,
+        "w": 75,
+        "h": 6.78,
+        "label": "Search, filter by date, source and how it was made"
+      },
+      {
+        "x": 68.39,
+        "y": 71.82,
+        "w": 10.75,
+        "h": 4.89,
+        "label": "Source: typed in by hand, or made by an invoice, bill or payment"
+      },
+      {
+        "x": 89.71,
+        "y": 1.89,
+        "w": 7.72,
+        "h": 4.44,
+        "label": "Start a new manual entry"
+      }
+    ]
+  },
+  "journal-entry-new": {
+    "width": 1536,
+    "height": 1280
+  },
+  "journal-entry-preview": {
+    "width": 1080,
+    "height": 1440,
+    "marks": [
+      {
+        "x": 3.15,
+        "y": 55.15,
+        "w": 93.89,
+        "h": 37.64,
+        "label": "Every line of the entry: account, debit and credit"
+      },
+      {
+        "x": 3.15,
+        "y": 20.83,
+        "w": 25.58,
+        "h": 5.56,
+        "label": "Undo a posted entry with a matching opposite one"
+      }
+    ]
+  },
+  "journal-entry-reverse": {
+    "width": 896,
+    "height": 536
+  },
+  "landed-costs": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 4.58,
+        "y": 47.49,
+        "w": 15.28,
+        "h": 4.44,
+        "label": "Landed costs live under Purchases"
+      },
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 50.89,
+        "label": "Each landed cost is listed here once you add one"
+      },
+      {
+        "x": 53.83,
+        "y": 41.11,
+        "w": 12.07,
+        "h": 4.89,
+        "label": "Add freight, duty or other costs"
+      }
+    ]
+  },
+  "landed-costs-new": {
+    "width": 1152,
+    "height": 1560
+  },
+  "learn-accounts": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 20,
+        "w": 75.14,
+        "h": 2.67,
+        "label": "How many accounts of each type you have"
+      },
+      {
+        "x": 22.29,
+        "y": 24.44,
+        "w": 26.47,
+        "h": 4.89,
+        "label": "Filter by type"
+      },
+      {
+        "x": 22.36,
+        "y": 51,
+        "w": 75,
+        "h": 5.89,
+        "label": "Each account has a code, a name and a currency"
+      }
+    ]
+  },
+  "learn-accruals": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 75.82,
+        "w": 76.21,
+        "h": 5.33,
+        "label": "One $4,800 premium, spread over 12 months at $400 a month"
+      },
+      {
+        "x": 72.04,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "How much has reached your profit and loss so far"
+      },
+      {
+        "x": 88.84,
+        "y": 1.89,
+        "w": 8.59,
+        "h": 4.44,
+        "label": "Set one up"
+      }
+    ]
+  },
+  "learn-aged-receivables": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 33.73,
+        "w": 14.8,
+        "h": 14.72,
+        "label": "Not due yet"
+      },
+      {
+        "x": 82.62,
+        "y": 33.73,
+        "w": 14.8,
+        "h": 14.72,
+        "label": "The longer it waits, the further right it moves"
+      },
+      {
+        "x": 80.14,
+        "y": 61.23,
+        "w": 8.33,
+        "h": 5.33,
+        "label": "Counted from the due date"
+      }
+    ]
+  },
+  "learn-balance-sheet": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 23.19,
+        "y": 35.87,
+        "w": 14.59,
+        "h": 4.44,
+        "label": "One date, not a period"
+      },
+      {
+        "x": 38.34,
+        "y": 35.87,
+        "w": 14.45,
+        "h": 4.44,
+        "label": "Put two dates side by side"
+      },
+      {
+        "x": 22.36,
+        "y": 67.65,
+        "w": 75,
+        "h": 5,
+        "label": "Customers who haven't paid yet"
+      }
+    ]
+  },
+  "learn-bank-account": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 37.31,
+        "w": 75.14,
+        "h": 2.95,
+        "label": "Lines still to sort, lines done, lines ignored"
+      },
+      {
+        "x": 75.22,
+        "y": 51.39,
+        "w": 8.12,
+        "h": 4,
+        "label": "Put a bank line in your books"
+      },
+      {
+        "x": 72.31,
+        "y": 15.73,
+        "w": 18.22,
+        "h": 4.44,
+        "label": "Reconcile against a statement"
+      }
+    ]
+  },
+  "learn-cash-flow": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 40.65,
+        "w": 18.37,
+        "h": 12.5,
+        "label": "Running the business"
+      },
+      {
+        "x": 41.22,
+        "y": 40.65,
+        "w": 18.37,
+        "h": 12.5,
+        "label": "Equipment and other long-term things"
+      },
+      {
+        "x": 60.14,
+        "y": 40.65,
+        "w": 18.37,
+        "h": 12.5,
+        "label": "Loans and money from owners"
+      },
+      {
+        "x": 79.06,
+        "y": 40.65,
+        "w": 18.37,
+        "h": 12.5,
+        "label": "The bottom line: how much your cash changed"
+      }
+    ]
+  },
+  "learn-currencies": {
+    "width": 1600,
+    "height": 633,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 31.4,
+        "w": 75.14,
+        "h": 20.15,
+        "label": "Your base currency: every report is in this"
+      },
+      {
+        "x": 22.29,
+        "y": 73.6,
+        "w": 75.14,
+        "h": 4.41,
+        "label": "Open foreign invoices and bills, valued at today's rate"
+      },
+      {
+        "x": 89.52,
+        "y": 15.79,
+        "w": 7.91,
+        "h": 7.02,
+        "label": "Add a rate by hand"
+      }
+    ]
+  },
+  "learn-fiscal-years": {
+    "width": 1600,
+    "height": 622,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 32.14,
+        "w": 75,
+        "h": 12.34,
+        "label": "A financial year and its dates"
+      },
+      {
+        "x": 89.06,
+        "y": 34.74,
+        "w": 7.19,
+        "h": 7.14,
+        "label": "Move the year's profit into retained earnings and lock it"
+      }
+    ]
+  },
+  "learn-fixed-asset": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.67,
+        "w": 75.14,
+        "h": 3.33,
+        "label": "Method and useful life"
+      },
+      {
+        "x": 79.06,
+        "y": 22.78,
+        "w": 18.37,
+        "h": 11.78,
+        "label": "Residual value"
+      },
+      {
+        "x": 22.29,
+        "y": 36.33,
+        "w": 75.14,
+        "h": 15.33,
+        "label": "The accounts each value drop posts to"
+      },
+      {
+        "x": 22.36,
+        "y": 53.56,
+        "w": 75,
+        "h": 5.89,
+        "label": "Every month's depreciation"
+      }
+    ]
+  },
+  "learn-fixed-assets": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 64.8,
+        "y": 72.81,
+        "w": 8.66,
+        "h": 2.79,
+        "label": "The depreciation method"
+      },
+      {
+        "x": 83.25,
+        "y": 72.81,
+        "w": 7.5,
+        "h": 2.79,
+        "label": "Accumulated depreciation so far"
+      },
+      {
+        "x": 85.83,
+        "y": 1.89,
+        "w": 11.6,
+        "h": 4.44,
+        "label": "Record this month's depreciation for every asset"
+      }
+    ]
+  },
+  "learn-inventory": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 34.78,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "What it would all sell for"
+      },
+      {
+        "x": 75.34,
+        "y": 43,
+        "w": 2.46,
+        "h": 2.79,
+        "label": "What you pay for one"
+      },
+      {
+        "x": 80.16,
+        "y": 43,
+        "w": 3.96,
+        "h": 2.79,
+        "label": "What you sell it for"
+      }
+    ]
+  },
+  "learn-journal": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 47.2,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Everything posted to your books"
+      },
+      {
+        "x": 59.62,
+        "y": 17.97,
+        "w": 12.91,
+        "h": 11.35,
+        "label": "How many entries you typed and how many dubbl made for you"
+      },
+      {
+        "x": 89.71,
+        "y": 1.89,
+        "w": 7.72,
+        "h": 4.44,
+        "label": "Write your own entry"
+      }
+    ]
+  },
+  "learn-journal-entry": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 39.58,
+        "w": 75,
+        "h": 5.89,
+        "label": "One account takes the debit"
+      },
+      {
+        "x": 22.36,
+        "y": 44.58,
+        "w": 75,
+        "h": 5.83,
+        "label": "Another takes the credit"
+      },
+      {
+        "x": 72.92,
+        "y": 51.41,
+        "w": 22.78,
+        "h": 9.44,
+        "label": "Debits equal credits, so the difference is $0.00"
+      }
+    ]
+  },
+  "learn-new-entry": {
+    "width": 1536,
+    "height": 1320
+  },
+  "learn-overview": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 27.48,
+        "w": 24.68,
+        "h": 13.82,
+        "label": "Cash in your bank accounts"
+      },
+      {
+        "x": 22.29,
+        "y": 42.19,
+        "w": 24.68,
+        "h": 13.82,
+        "label": "Money in minus money out"
+      },
+      {
+        "x": 47.52,
+        "y": 42.19,
+        "w": 24.68,
+        "h": 13.82,
+        "label": "Customers who haven't paid"
+      },
+      {
+        "x": 70.49,
+        "y": 56.9,
+        "w": 26.94,
+        "h": 39.38,
+        "label": "What needs you this week"
+      }
+    ]
+  },
+  "learn-payroll-runs": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 60.53,
+        "y": 72.61,
+        "w": 7.96,
+        "h": 2.79,
+        "label": "Gross pay"
+      },
+      {
+        "x": 70.85,
+        "y": 72.61,
+        "w": 8.37,
+        "h": 2.79,
+        "label": "Withheld from employees"
+      },
+      {
+        "x": 81.78,
+        "y": 72.61,
+        "w": 5.04,
+        "h": 2.79,
+        "label": "What lands in their accounts"
+      },
+      {
+        "x": 87.21,
+        "y": 12.52,
+        "w": 10.22,
+        "h": 4.44,
+        "label": "Start a pay run"
+      }
+    ]
+  },
+  "learn-pnl": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 66.18,
+        "y": 36.97,
+        "w": 31.25,
+        "h": 7.4,
+        "label": "Accrual (when invoiced or billed) or cash (when money moves)"
+      },
+      {
+        "x": 22.29,
+        "y": 33.77,
+        "w": 43.61,
+        "h": 8.89,
+        "label": "The period it covers"
+      },
+      {
+        "x": 22.29,
+        "y": 52.36,
+        "w": 75.14,
+        "h": 12.5,
+        "label": "Money in minus money out"
+      }
+    ]
+  },
+  "learn-reconcile": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 29.86,
+        "w": 75,
+        "h": 9.74,
+        "label": "The statement, your books, and the gap between them"
+      },
+      {
+        "x": 60,
+        "y": 46.49,
+        "w": 37.43,
+        "h": 36.78,
+        "label": "Tick the lines that appear on the statement"
+      },
+      {
+        "x": 81.94,
+        "y": 39.93,
+        "w": 14.31,
+        "h": 4.44,
+        "label": "Last resort for a small leftover gap"
+      },
+      {
+        "x": 83.06,
+        "y": 10.89,
+        "w": 14.37,
+        "h": 4.44,
+        "label": "Done"
+      }
+    ]
+  },
+  "learn-tax-rates": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 47.43,
+        "y": 19.89,
+        "w": 24.86,
+        "h": 12.41,
+        "label": "Rates you charge customers"
+      },
+      {
+        "x": 72.57,
+        "y": 19.89,
+        "w": 24.86,
+        "h": 12.41,
+        "label": "Rates suppliers charge you"
+      },
+      {
+        "x": 22.29,
+        "y": 68.08,
+        "w": 75.14,
+        "h": 11.11,
+        "label": "Each rate applies to sales, purchases or both"
+      }
+    ]
+  },
+  "learn-trial-balance": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 81.25,
+        "y": 48.09,
+        "w": 8.33,
+        "h": 5.33,
+        "label": "Debit balances"
+      },
+      {
+        "x": 89.03,
+        "y": 48.09,
+        "w": 8.33,
+        "h": 5.33,
+        "label": "Credit balances"
+      },
+      {
+        "x": 23.19,
+        "y": 35.87,
+        "w": 14.59,
+        "h": 4.44,
+        "label": "Any date you like"
+      }
+    ]
+  },
+  "learn-vat-return": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 23.47,
+        "y": 28.05,
+        "w": 19.42,
+        "h": 9.65,
+        "label": "Count VAT when you record it, or when money moves"
+      },
+      {
+        "x": 22.29,
+        "y": 41.41,
+        "w": 75.14,
+        "h": 23.13,
+        "label": "VAT you charged against VAT you paid"
+      },
+      {
+        "x": 23.82,
+        "y": 68.76,
+        "w": 72.08,
+        "h": 6.79,
+        "label": "What you owe the tax office"
+      }
+    ]
+  },
+  "loan": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 80.18,
+        "y": 10,
+        "w": 17.25,
+        "h": 4.44,
+        "label": "Record the next scheduled payment"
+      },
+      {
+        "x": 22.29,
+        "y": 25,
+        "w": 75.14,
+        "h": 9.56,
+        "label": "Borrowed, rate, length and monthly payment"
+      },
+      {
+        "x": 22.36,
+        "y": 46.89,
+        "w": 75,
+        "h": 4.56,
+        "label": "Each payment split into principal and interest"
+      }
+    ]
+  },
+  "loan-new": {
+    "width": 1024,
+    "height": 1720
+  },
+  "loans": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "What you owe, the next payment, interest so far and payments due"
+      },
+      {
+        "x": 65.8,
+        "y": 71.82,
+        "w": 8.9,
+        "h": 4.89,
+        "label": "Payments made out of the total"
+      },
+      {
+        "x": 74.15,
+        "y": 75.82,
+        "w": 11.86,
+        "h": 5.33,
+        "label": "The next payment date, marked late once it passes without a payment recorded"
+      },
+      {
+        "x": 90.15,
+        "y": 1.89,
+        "w": 7.28,
+        "h": 4.44,
+        "label": "Add a loan"
+      }
+    ]
+  },
+  "lock-dates": {
+    "width": 1600,
+    "height": 270
+  },
+  "members-and-roles": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 80.61,
+        "label": "Seats used, and how many owners, admins and members"
+      },
+      {
+        "x": 87.16,
+        "y": 18.89,
+        "w": 10.27,
+        "h": 4.44,
+        "label": "Invite someone by email"
+      },
+      {
+        "x": 22.29,
+        "y": 26.03,
+        "w": 75.14,
+        "h": 7.78,
+        "label": "Everyone with access, their role and when they joined"
+      },
+      {
+        "x": 89.35,
+        "y": 35.59,
+        "w": 8.08,
+        "h": 4.44,
+        "label": "Or share a link anyone can join with"
+      }
+    ]
+  },
+  "members-and-roles-custom": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 88.36,
+        "y": 10.92,
+        "w": 9.07,
+        "h": 4.44,
+        "label": "Build your own role"
+      },
+      {
+        "x": 22.36,
+        "y": 18.17,
+        "w": 75,
+        "h": 10.11,
+        "label": "Your custom roles: edit or delete them from the menu"
+      },
+      {
+        "x": 22.36,
+        "y": 36.61,
+        "w": 75,
+        "h": 10.11,
+        "label": "Ready-made roles marked System can't be changed"
+      }
+    ]
+  },
+  "members-and-roles-invite": {
+    "width": 768,
+    "height": 1120
+  },
+  "members-and-roles-new-role": {
+    "width": 768,
+    "height": 2000
+  },
+  "mobile-app-sign-in": {
+    "width": 960,
+    "height": 830
+  },
+  "notifications": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 95.42,
+        "y": 29.99,
+        "w": 1.11,
+        "h": 1.67,
+        "label": "All or unread, then one category at a time"
+      },
+      {
+        "x": 41.39,
+        "y": 19.38,
+        "w": 24.17,
+        "h": 4.44,
+        "label": "Search, or tick several to mark read or remove"
+      },
+      {
+        "x": 38.47,
+        "y": 47.82,
+        "w": 58.89,
+        "h": 7.67,
+        "label": "Click one to open what it's about"
+      },
+      {
+        "x": 89.01,
+        "y": 12.6,
+        "w": 8.42,
+        "h": 4.44,
+        "label": "Choose what reaches your inbox and email"
+      }
+    ]
+  },
+  "notifications-preferences": {
+    "width": 920,
+    "height": 2460
+  },
+  "opening-balances": {
+    "width": 1600,
+    "height": 711,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 27.97,
+        "w": 75.14,
+        "h": 12.81,
+        "label": "What opening balances are"
+      },
+      {
+        "x": 22.29,
+        "y": 43.28,
+        "w": 12.43,
+        "h": 4.38,
+        "label": "The date your books start from"
+      },
+      {
+        "x": 22.29,
+        "y": 50.16,
+        "w": 75.14,
+        "h": 41.41,
+        "label": "Each account's starting balance, with both columns adding up to the same total"
+      },
+      {
+        "x": 81.44,
+        "y": 14.06,
+        "w": 15.99,
+        "h": 6.25,
+        "label": "Enter a new set: it replaces the old one"
+      }
+    ]
+  },
+  "opening-balances-new": {
+    "width": 1536,
+    "height": 1120
+  },
+  "organization": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 38.96,
+        "y": 10,
+        "w": 58.47,
+        "h": 7.33,
+        "label": "Your business name, as it appears on invoices"
+      },
+      {
+        "x": 38.96,
+        "y": 26,
+        "w": 28.96,
+        "h": 11.49,
+        "label": "Where you're based: picks your tax rules and forms"
+      },
+      {
+        "x": 38.96,
+        "y": 38.38,
+        "w": 28.96,
+        "h": 7.33,
+        "label": "Tax and registration numbers for your documents"
+      },
+      {
+        "x": 38.96,
+        "y": 62.05,
+        "w": 58.47,
+        "h": 23.78,
+        "label": "The address printed on what you send"
+      }
+    ]
+  },
+  "organization-delete": {
+    "width": 1024,
+    "height": 564
+  },
+  "organization-financials": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 38.96,
+        "y": 17.6,
+        "w": 58.47,
+        "h": 7.89,
+        "label": "Currency, fiscal year start and default payment terms"
+      },
+      {
+        "x": 38.96,
+        "y": 33.6,
+        "w": 58.47,
+        "h": 12.22,
+        "label": "What Charge interest bills on overdue invoices"
+      },
+      {
+        "x": 38.96,
+        "y": 53.93,
+        "w": 58.47,
+        "h": 16.56,
+        "label": "Your ID for sending e-invoices over PEPPOL"
+      },
+      {
+        "x": 88.86,
+        "y": 78.6,
+        "w": 8.57,
+        "h": 4.44,
+        "label": "Save everything above"
+      }
+    ]
+  },
+  "organization-lock": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 38.96,
+        "y": 63.71,
+        "w": 58.47,
+        "h": 7.33,
+        "label": "Lock past dates once a period is done"
+      },
+      {
+        "x": 38.96,
+        "y": 63.71,
+        "w": 58.47,
+        "h": 7.33,
+        "label": "An earlier hard lock for your advisors"
+      },
+      {
+        "x": 38.96,
+        "y": 88.38,
+        "w": 58.47,
+        "h": 7.9,
+        "label": "Delete the organization and all its data (owner only)"
+      }
+    ]
+  },
+  "overview": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 0,
+        "y": 0,
+        "w": 4.44,
+        "h": 100,
+        "label": "The rail: every area of dubbl, one click away"
+      },
+      {
+        "x": 3.89,
+        "y": 0,
+        "w": 16.67,
+        "h": 100,
+        "label": "The panel: the pages inside the area you're in"
+      },
+      {
+        "x": 71.81,
+        "y": 1.89,
+        "w": 16.11,
+        "h": 4.44,
+        "label": "Search and jump anywhere (⌘K)"
+      },
+      {
+        "x": 88.06,
+        "y": 1.89,
+        "w": 7.01,
+        "h": 4.44,
+        "label": "Ask Tilly, the AI assistant"
+      }
+    ]
+  },
+  "paying-bills-batch": {
+    "width": 1024,
+    "height": 1014
+  },
+  "paying-bills-schedule": {
+    "width": 1024,
+    "height": 1078
+  },
+  "paying-bills-scheduled": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 77.63,
+        "y": 10.33,
+        "w": 8.77,
+        "h": 4.44,
+        "label": "Pay everything that has come due"
+      },
+      {
+        "x": 86.4,
+        "y": 10.33,
+        "w": 11.03,
+        "h": 4.44,
+        "label": "Set a bill payment for a future date"
+      },
+      {
+        "x": 22.29,
+        "y": 19.56,
+        "w": 75.14,
+        "h": 8.03,
+        "label": "Each payment with its bill, date and status"
+      }
+    ]
+  },
+  "payment-reminders": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 63.4,
+        "w": 75,
+        "h": 5.07,
+        "label": "A rule: when it fires and what it's for"
+      },
+      {
+        "x": 84.65,
+        "y": 25.11,
+        "w": 3.06,
+        "h": 3.11,
+        "label": "Turn a rule on or off"
+      },
+      {
+        "x": 22.29,
+        "y": 47.5,
+        "w": 75.14,
+        "h": 6.22,
+        "label": "Every reminder sent, failed or skipped"
+      },
+      {
+        "x": 90.65,
+        "y": 12.22,
+        "w": 6.78,
+        "h": 4,
+        "label": "Add a rule"
+      }
+    ]
+  },
+  "payment-reminders-rule": {
+    "width": 1024,
+    "height": 1800
+  },
+  "payments-received": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 72.04,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Money not yet put toward an invoice"
+      },
+      {
+        "x": 60.66,
+        "y": 80.63,
+        "w": 5.34,
+        "h": 2.79,
+        "label": "Whether each payment is fully matched"
+      },
+      {
+        "x": 88.79,
+        "y": 80.43,
+        "w": 5.21,
+        "h": 2.79,
+        "label": "Anything not put toward an invoice"
+      }
+    ]
+  },
+  "payments-received-detail": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 36.78,
+        "w": 75.14,
+        "h": 11,
+        "label": "The invoices this payment settled"
+      }
+    ]
+  },
+  "payroll": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.22,
+        "w": 75.14,
+        "h": 10.89,
+        "label": "Headcount, monthly cost and what you've paid"
+      },
+      {
+        "x": 22.29,
+        "y": 29.89,
+        "w": 44.64,
+        "h": 42.89,
+        "label": "Your latest pay runs"
+      },
+      {
+        "x": 68.04,
+        "y": 29.89,
+        "w": 29.39,
+        "h": 42.89,
+        "label": "Take-home pay against taxes and deductions"
+      }
+    ]
+  },
+  "payroll-employee": {
+    "width": 1600,
+    "height": 1000
+  },
+  "payroll-employee-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "payroll-run": {
+    "width": 1600,
+    "height": 561
+  },
+  "payroll-run-new": {
+    "width": 1024,
+    "height": 388
+  },
+  "payroll-run-offcycle": {
+    "width": 1024,
+    "height": 948
+  },
+  "payroll-runs": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "Paid, held back, and what's next"
+      },
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "Runs not finished yet, and runs recorded"
+      },
+      {
+        "x": 80.53,
+        "y": 72.61,
+        "w": 6.29,
+        "h": 2.79,
+        "label": "Pay before deductions, taxes and take-home per run"
+      },
+      {
+        "x": 87.21,
+        "y": 12.52,
+        "w": 10.22,
+        "h": 4.44,
+        "label": "Start a pay run"
+      }
+    ]
+  },
+  "profit-and-loss": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 33.77,
+        "w": 43.61,
+        "h": 8.89,
+        "label": "Pick the period"
+      },
+      {
+        "x": 66.18,
+        "y": 36.97,
+        "w": 31.25,
+        "h": 7.4,
+        "label": "Count on invoice date, or when money moves"
+      },
+      {
+        "x": 22.29,
+        "y": 46.14,
+        "w": 75.14,
+        "h": 4.44,
+        "label": "Compare periods, split by team, or see a yearly summary"
+      },
+      {
+        "x": 79.3,
+        "y": 14.73,
+        "w": 18.13,
+        "h": 4.44,
+        "label": "Download a PDF or export a CSV"
+      },
+      {
+        "x": 22.29,
+        "y": 52.36,
+        "w": 75.14,
+        "h": 12.5,
+        "label": "Money in, money out and the difference"
+      }
+    ]
+  },
+  "profit-and-loss-comparison": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 88.62,
+        "label": "Months, quarters or years, and how many of them"
+      },
+      {
+        "x": 22.36,
+        "y": 68.95,
+        "w": 75,
+        "h": 29.56,
+        "label": "Each period with the change from the one before"
+      }
+    ]
+  },
+  "projects": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 38.96,
+        "y": 10,
+        "w": 58.47,
+        "h": 14.72,
+        "label": "Budgets, what you've billed and hours logged across projects"
+      },
+      {
+        "x": 38.96,
+        "y": 36.39,
+        "w": 29.75,
+        "h": 4.89,
+        "label": "Filter by status"
+      },
+      {
+        "x": 39.03,
+        "y": 52.05,
+        "w": 58.33,
+        "h": 7.06,
+        "label": "Each project with its client, time, budget and billed amount"
+      },
+      {
+        "x": 88.94,
+        "y": 1.89,
+        "w": 8.49,
+        "h": 4.44,
+        "label": "Start a project"
+      }
+    ]
+  },
+  "projects-invoice": {
+    "width": 1152,
+    "height": 1440
+  },
+  "projects-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "projects-overview": {
+    "width": 1600,
+    "height": 1378,
+    "marks": [
+      {
+        "x": 91.04,
+        "y": 7.26,
+        "w": 6.39,
+        "h": 2.9,
+        "label": "Bill time, milestones or the fixed price on a draft invoice"
+      },
+      {
+        "x": 22.29,
+        "y": 11.53,
+        "w": 75.14,
+        "h": 3.19,
+        "label": "Tasks, time, notes, the team and settings"
+      },
+      {
+        "x": 22.29,
+        "y": 16.01,
+        "w": 75.14,
+        "h": 7.95,
+        "label": "Time, tasks, money and budget at a glance"
+      },
+      {
+        "x": 72.75,
+        "y": 67.46,
+        "w": 24.68,
+        "h": 19.05,
+        "label": "Billed, unbilled and what's left of the budget"
+      }
+    ]
+  },
+  "projects-tasks": {
+    "width": 1600,
+    "height": 1000
+  },
+  "projects-team": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 89.16,
+        "y": 22.06,
+        "w": 8.27,
+        "h": 4.44,
+        "label": "Put a whole team on the project"
+      },
+      {
+        "x": 88.26,
+        "y": 47.92,
+        "w": 9.17,
+        "h": 4.44,
+        "label": "Or add one person, with a role and rates"
+      }
+    ]
+  },
+  "projects-time": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 23.75,
+        "y": 39.51,
+        "w": 27.03,
+        "h": 4.89,
+        "label": "Time it as you work"
+      },
+      {
+        "x": 89.99,
+        "y": 59.01,
+        "w": 7.44,
+        "h": 4.44,
+        "label": "Or log hours afterwards"
+      },
+      {
+        "x": 78.85,
+        "y": 47.62,
+        "w": 18.58,
+        "h": 10.51,
+        "label": "Billable time not yet invoiced"
+      }
+    ]
+  },
+  "purchase-orders": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "Money you've agreed to spend, and what's late"
+      },
+      {
+        "x": 22.29,
+        "y": 59.93,
+        "w": 75.14,
+        "h": 40.07,
+        "label": "Status tabs, search and filters"
+      },
+      {
+        "x": 22.36,
+        "y": 84.71,
+        "w": 75,
+        "h": 5.33,
+        "label": "Each order with its expected date and status"
+      },
+      {
+        "x": 90.71,
+        "y": 1.89,
+        "w": 6.72,
+        "h": 4.44,
+        "label": "Raise a new purchase order"
+      }
+    ]
+  },
+  "purchase-orders-detail": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 66.59,
+        "y": 11,
+        "w": 14.55,
+        "h": 4.44,
+        "label": "Record that the goods arrived"
+      },
+      {
+        "x": 81.14,
+        "y": 11,
+        "w": 16.29,
+        "h": 4.44,
+        "label": "Turn the order into a bill when the invoice comes"
+      },
+      {
+        "x": 22.36,
+        "y": 37.78,
+        "w": 75,
+        "h": 23.41,
+        "label": "What you ordered, at the agreed price"
+      }
+    ]
+  },
+  "purchase-orders-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "purchase-orders-receive": {
+    "width": 1024,
+    "height": 1024
+  },
+  "purchase-orders-received": {
+    "width": 1600,
+    "height": 1000
+  },
+  "quotes": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 59.62,
+        "y": 17.97,
+        "w": 12.91,
+        "h": 11.35,
+        "label": "Accepted quotes you haven't billed yet"
+      },
+      {
+        "x": 47.2,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "How many answered quotes you won"
+      },
+      {
+        "x": 22.36,
+        "y": 67.78,
+        "w": 75,
+        "h": 6.78,
+        "label": "Status tabs, search and filters"
+      },
+      {
+        "x": 89.4,
+        "y": 1.89,
+        "w": 8.03,
+        "h": 4.44,
+        "label": "Start a new quote"
+      }
+    ]
+  },
+  "quotes-accepted": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 78.36,
+        "y": 10,
+        "w": 19.07,
+        "h": 4.44,
+        "label": "Turn the accepted quote into an invoice"
+      }
+    ]
+  },
+  "quotes-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "quotes-preview": {
+    "width": 1080,
+    "height": 1560,
+    "marks": [
+      {
+        "x": 3.15,
+        "y": 25.35,
+        "w": 31.8,
+        "h": 5.13,
+        "label": "They said yes: mark it accepted"
+      },
+      {
+        "x": 34.95,
+        "y": 25.35,
+        "w": 19.93,
+        "h": 5.13,
+        "label": "They said no"
+      }
+    ]
+  },
+  "reconciliation": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 18,
+        "w": 75.14,
+        "h": 9.97,
+        "label": "Account balance, lines still to match, and your selection"
+      },
+      {
+        "x": 83.06,
+        "y": 10.89,
+        "w": 14.37,
+        "h": 4.44,
+        "label": "Close the check when everything is ticked off"
+      },
+      {
+        "x": 22.29,
+        "y": 29.74,
+        "w": 75.14,
+        "h": 15.86,
+        "label": "Statement against your books, and the difference"
+      },
+      {
+        "x": 60,
+        "y": 46.49,
+        "w": 37.43,
+        "h": 36.78,
+        "label": "Lines in your books not yet on a statement"
+      }
+    ]
+  },
+  "reconciliation-lines": {
+    "width": 1600,
+    "height": 1222
+  },
+  "reconciliation-writeoff": {
+    "width": 896,
+    "height": 814
+  },
+  "recurring-bills": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 28,
+        "w": 75,
+        "h": 6.28,
+        "label": "Each schedule, its supplier and the next bill date"
+      },
+      {
+        "x": 66.16,
+        "y": 18.11,
+        "w": 12.85,
+        "h": 5.33,
+        "label": "When the next draft bill will be created"
+      },
+      {
+        "x": 88.47,
+        "y": 23.5,
+        "w": 8.33,
+        "h": 4.44,
+        "label": "Edit, pause or delete a schedule"
+      },
+      {
+        "x": 84.6,
+        "y": 10.67,
+        "w": 12.83,
+        "h": 4.89,
+        "label": "Set up a new recurring bill"
+      }
+    ]
+  },
+  "recurring-bills-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "recurring-invoices": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 14.16,
+        "label": "The next invoices each template will create"
+      },
+      {
+        "x": 34.78,
+        "y": 33.9,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Invoices due to be created in the next 7 days"
+      },
+      {
+        "x": 86.24,
+        "y": 58.49,
+        "w": 7.61,
+        "h": 2.79,
+        "label": "How many each template has made so far"
+      },
+      {
+        "x": 87.87,
+        "y": 1.89,
+        "w": 9.56,
+        "h": 4.44,
+        "label": "Set up a new schedule"
+      }
+    ]
+  },
+  "recurring-invoices-new": {
+    "width": 1344,
+    "height": 1800
+  },
+  "recurring-invoices-preview": {
+    "width": 1080,
+    "height": 1560
+  },
+  "recurring-journal-new": {
+    "width": 1536,
+    "height": 1800
+  },
+  "recurring-journals": {
+    "width": 1600,
+    "height": 667,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 26.78,
+        "w": 75.14,
+        "h": 17.35,
+        "label": "What's running, the next entry and what it comes to each month"
+      },
+      {
+        "x": 22.36,
+        "y": 68.64,
+        "w": 75,
+        "h": 8,
+        "label": "Each one: how often, the amount, the next entry and how many are posted"
+      },
+      {
+        "x": 87.29,
+        "y": 2.83,
+        "w": 10.14,
+        "h": 6.67,
+        "label": "Post anything that's due now"
+      },
+      {
+        "x": 74.75,
+        "y": 2.83,
+        "w": 12.4,
+        "h": 6.67,
+        "label": "Set one up"
+      }
+    ]
+  },
+  "reports": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 4.58,
+        "y": 8.79,
+        "w": 15.28,
+        "h": 4.44,
+        "label": "Every report, grouped, in the side panel"
+      },
+      {
+        "x": 38.96,
+        "y": 10,
+        "w": 28.96,
+        "h": 19.78,
+        "label": "Start here: this period against the last"
+      },
+      {
+        "x": 68.47,
+        "y": 10,
+        "w": 28.96,
+        "h": 19.78,
+        "label": "Each card says what the report answers"
+      },
+      {
+        "x": 38.96,
+        "y": 51.33,
+        "w": 28.96,
+        "h": 19.78,
+        "label": "The main reports in one spreadsheet"
+      }
+    ]
+  },
+  "reports-pack": {
+    "width": 1600,
+    "height": 519
+  },
+  "requisitions": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "What's waiting, approved, needed soon and ordered"
+      },
+      {
+        "x": 22.36,
+        "y": 80.26,
+        "w": 75,
+        "h": 5.33,
+        "label": "Each request with its supplier, dates and status"
+      },
+      {
+        "x": 87.26,
+        "y": 12.52,
+        "w": 10.17,
+        "h": 4.44,
+        "label": "Ask to buy something"
+      }
+    ]
+  },
+  "requisitions-detail": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 84.23,
+        "y": 10,
+        "w": 5.93,
+        "h": 4.44,
+        "label": "Change it while it's a draft or after a rejection"
+      },
+      {
+        "x": 90.16,
+        "y": 10,
+        "w": 7.27,
+        "h": 4.44,
+        "label": "Send it for approval"
+      }
+    ]
+  },
+  "requisitions-edit": {
+    "width": 768,
+    "height": 1530
+  },
+  "requisitions-new": {
+    "width": 768,
+    "height": 1530
+  },
+  "revenue-schedules": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Paid for, not yet earned"
+      },
+      {
+        "x": 47.2,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Periods that have passed and can be counted now"
+      },
+      {
+        "x": 73.64,
+        "y": 72.81,
+        "w": 5.42,
+        "h": 2.79,
+        "label": "How much of each schedule is counted"
+      }
+    ]
+  },
+  "revenue-schedules-new": {
+    "width": 1024,
+    "height": 1280
+  },
+  "revenue-schedules-preview": {
+    "width": 1080,
+    "height": 1560
+  },
+  "sales-tax": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 19.89,
+        "w": 75.14,
+        "h": 4.44,
+        "label": "Pick the filing period"
+      },
+      {
+        "x": 22.29,
+        "y": 26.11,
+        "w": 24.86,
+        "h": 13.52,
+        "label": "Tax collected, taxable sales and sales with no tax rate"
+      },
+      {
+        "x": 22.29,
+        "y": 41.41,
+        "w": 75.14,
+        "h": 2.79,
+        "label": "Collected tax, rate by rate"
+      },
+      {
+        "x": 80.37,
+        "y": 10,
+        "w": 9.08,
+        "h": 4.44,
+        "label": "Print it, or export it for your filing"
+      }
+    ]
+  },
+  "schedule-c": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 19.89,
+        "w": 75.14,
+        "h": 7.67,
+        "label": "A worksheet for your preparer, not a filing tool"
+      },
+      {
+        "x": 22.29,
+        "y": 40,
+        "w": 75.14,
+        "h": 23.13,
+        "label": "Gross income against total expenses"
+      },
+      {
+        "x": 22.29,
+        "y": 64.9,
+        "w": 75.14,
+        "h": 11.68,
+        "label": "Line 31: your net profit or loss"
+      }
+    ]
+  },
+  "selfhost-admin-settings": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 27.29,
+        "y": 24.56,
+        "w": 62.08,
+        "h": 10.19,
+        "label": "Who can sign up"
+      },
+      {
+        "x": 27.29,
+        "y": 60.27,
+        "w": 62.08,
+        "h": 4.63,
+        "label": "Whether members can start new organizations"
+      },
+      {
+        "x": 27.29,
+        "y": 76.23,
+        "w": 62.08,
+        "h": 4.63,
+        "label": "Billing is on only when Stripe is configured"
+      }
+    ]
+  },
+  "selfhost-smtp": {
+    "width": 1600,
+    "height": 1000
+  },
+  "setup-country": {
+    "width": 1024,
+    "height": 1242
+  },
+  "setup-organization": {
+    "width": 1024,
+    "height": 722
+  },
+  "setup-review": {
+    "width": 1024,
+    "height": 1630
+  },
+  "setup-settings": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 38.96,
+        "y": 48.49,
+        "w": 19.12,
+        "h": 7.33,
+        "label": "Your base currency"
+      },
+      {
+        "x": 58.63,
+        "y": 48.49,
+        "w": 19.12,
+        "h": 7.33,
+        "label": "When your financial year starts"
+      },
+      {
+        "x": 78.31,
+        "y": 48.49,
+        "w": 19.12,
+        "h": 7.33,
+        "label": "Default days to pay"
+      }
+    ]
+  },
+  "setup-tax": {
+    "width": 1024,
+    "height": 1330
+  },
+  "statements": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 68.07,
+        "y": 12.52,
+        "w": 12.22,
+        "h": 4.44,
+        "label": "Customer or supplier statements"
+      },
+      {
+        "x": 80.29,
+        "y": 12.52,
+        "w": 10.97,
+        "h": 4.44,
+        "label": "The period each statement covers"
+      },
+      {
+        "x": 47.2,
+        "y": 17.97,
+        "w": 12.9,
+        "h": 11.35,
+        "label": "Who owes you, and how late"
+      }
+    ]
+  },
+  "statements-contact": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 28.62,
+        "w": 75.14,
+        "h": 8.03,
+        "label": "What they owed at the start, then charges, payments and the end balance"
+      },
+      {
+        "x": 85.26,
+        "y": 22.17,
+        "w": 5.78,
+        "h": 4.44,
+        "label": "Download the statement as a PDF"
+      },
+      {
+        "x": 91.04,
+        "y": 22.17,
+        "w": 6.39,
+        "h": 4.44,
+        "label": "Email it to the customer"
+      }
+    ]
+  },
+  "statements-preview": {
+    "width": 1080,
+    "height": 1560
+  },
+  "stock-takes": {
+    "width": 1600,
+    "height": 711,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 25.11,
+        "w": 75.14,
+        "h": 16.27,
+        "label": "Counts in progress, not started and done, and how long they take"
+      },
+      {
+        "x": 22.36,
+        "y": 42.79,
+        "w": 75,
+        "h": 8.75,
+        "label": "Filter by status"
+      },
+      {
+        "x": 22.36,
+        "y": 64.35,
+        "w": 75,
+        "h": 13.75,
+        "label": "Each count with its location, status and number of items"
+      },
+      {
+        "x": 87.28,
+        "y": 2.66,
+        "w": 10.15,
+        "h": 6.25,
+        "label": "Start a count"
+      }
+    ]
+  },
+  "stock-takes-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "supplier-credits": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 85.6,
+        "label": "Credit you can still take off a bill"
+      },
+      {
+        "x": 22.36,
+        "y": 80.26,
+        "w": 75,
+        "h": 5.33,
+        "label": "Each credit with what's used and what's left"
+      },
+      {
+        "x": 85.89,
+        "y": 1.89,
+        "w": 11.54,
+        "h": 4.44,
+        "label": "Record a new credit"
+      }
+    ]
+  },
+  "supplier-credits-apply": {
+    "width": 1024,
+    "height": 584
+  },
+  "supplier-credits-detail": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 71.55,
+        "y": 10,
+        "w": 11.77,
+        "h": 4.44,
+        "label": "Take it off a bill you owe this supplier"
+      },
+      {
+        "x": 72.75,
+        "y": 25,
+        "w": 24.68,
+        "h": 9.56,
+        "label": "How much of the credit is left"
+      },
+      {
+        "x": 83.32,
+        "y": 10,
+        "w": 14.11,
+        "h": 4.44,
+        "label": "Cancel it if it shouldn't exist"
+      }
+    ]
+  },
+  "supplier-credits-from-bill": {
+    "width": 1344,
+    "height": 1800
+  },
+  "tags-and-cost-centers": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 90.95,
+        "y": 10.89,
+        "w": 6.48,
+        "h": 4.44,
+        "label": "Add a tag"
+      },
+      {
+        "x": 22.36,
+        "y": 37.56,
+        "w": 75,
+        "h": 5.83,
+        "label": "A colour, a name and a note on what it's for"
+      }
+    ]
+  },
+  "tags-and-cost-centers-list": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 85.92,
+        "y": 11.03,
+        "w": 11.51,
+        "h": 4.44,
+        "label": "Add a department or cost center"
+      },
+      {
+        "x": 22.36,
+        "y": 37.84,
+        "w": 75,
+        "h": 5.83,
+        "label": "Nest one under another with a parent"
+      },
+      {
+        "x": 22.36,
+        "y": 18.4,
+        "w": 75,
+        "h": 5.33,
+        "label": "Each one's code, name, parent and whether it's active"
+      }
+    ]
+  },
+  "tags-and-cost-centers-new": {
+    "width": 768,
+    "height": 1120
+  },
+  "tags-and-cost-centers-picker": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 25.35,
+        "y": 18.44,
+        "w": 6.27,
+        "h": 3.56,
+        "label": "Add a tag, or type a new name to create one"
+      }
+    ]
+  },
+  "tags-and-cost-centers-pnl": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 84.65,
+        "y": 32.08,
+        "w": 12.78,
+        "h": 4.89,
+        "label": "Show only records with this tag"
+      }
+    ]
+  },
+  "tags-and-cost-centers-report": {
+    "width": 1600,
+    "height": 1000
+  },
+  "tax-rates": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 4.58,
+        "y": 8.79,
+        "w": 15.28,
+        "h": 19.11,
+        "label": "Rates, currencies, tax periods and your country's returns"
+      },
+      {
+        "x": 22.29,
+        "y": 19.89,
+        "w": 75.14,
+        "h": 12.41,
+        "label": "How many rates apply to sales and to purchases"
+      },
+      {
+        "x": 22.29,
+        "y": 68.08,
+        "w": 75.14,
+        "h": 11.11,
+        "label": "Each rate, its percentage and where it applies"
+      },
+      {
+        "x": 87.69,
+        "y": 10,
+        "w": 9.75,
+        "h": 4.44,
+        "label": "Add a rate of your own"
+      }
+    ]
+  },
+  "tax-rates-new": {
+    "width": 768,
+    "height": 1360
+  },
+  "teams": {
+    "width": 1600,
+    "height": 578,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.31,
+        "w": 18.84,
+        "h": 11.54,
+        "label": "The team's name, size and description"
+      },
+      {
+        "x": 89.24,
+        "y": 53.85,
+        "w": 8.19,
+        "h": 7.69,
+        "label": "Add people from your workspace"
+      },
+      {
+        "x": 22.36,
+        "y": 62.5,
+        "w": 75,
+        "h": 13.08,
+        "label": "Everyone on the team"
+      },
+      {
+        "x": 86.69,
+        "y": 17.31,
+        "w": 4.84,
+        "h": 7.69,
+        "label": "Rename it, describe it or change its colour"
+      }
+    ]
+  },
+  "teams-list": {
+    "width": 1600,
+    "height": 533,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 18.75,
+        "w": 75.14,
+        "h": 20.42,
+        "label": "Teams, members, average team size and your largest team"
+      },
+      {
+        "x": 22.29,
+        "y": 42.5,
+        "w": 75.14,
+        "h": 9.17,
+        "label": "Search, and sort by name or size"
+      },
+      {
+        "x": 22.29,
+        "y": 55,
+        "w": 75.14,
+        "h": 25.42,
+        "label": "A card per team, with the first few people on it"
+      },
+      {
+        "x": 90.32,
+        "y": 3.96,
+        "w": 7.11,
+        "h": 7.5,
+        "label": "Add a team"
+      }
+    ]
+  },
+  "teams-members": {
+    "width": 1600,
+    "height": 467,
+    "marks": [
+      {
+        "x": 22.36,
+        "y": 56.19,
+        "w": 75,
+        "h": 16.19,
+        "label": "Everyone in your workspace"
+      },
+      {
+        "x": 85.15,
+        "y": 60.75,
+        "w": 11.1,
+        "h": 7.07,
+        "label": "A badge for each team they're on"
+      }
+    ]
+  },
+  "teams-new": {
+    "width": 768,
+    "height": 1040
+  },
+  "tilly-floating": {
+    "width": 1600,
+    "height": 1000
+  },
+  "tilly-history": {
+    "width": 920,
+    "height": 1360
+  },
+  "tilly-page": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 89.83,
+        "y": 1.89,
+        "w": 7.6,
+        "h": 4.44,
+        "label": "Start a new chat; earlier chats are listed below it"
+      },
+      {
+        "x": 20.07,
+        "y": 0,
+        "w": 79.58,
+        "h": 99.4,
+        "label": "Drop files anywhere on the page, or choose them"
+      },
+      {
+        "x": 20.07,
+        "y": 0,
+        "w": 79.58,
+        "h": 99.4,
+        "label": "Shortcuts for the jobs Tilly is best at"
+      },
+      {
+        "x": 34.58,
+        "y": 31.74,
+        "w": 50.56,
+        "h": 6.89,
+        "label": "Ask anything; Enter sends, Shift+Enter adds a line"
+      }
+    ]
+  },
+  "tilly-panel": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 58.34,
+        "y": 1.89,
+        "w": 7.01,
+        "h": 4.44,
+        "label": "Open or close Tilly from anywhere (⌘I)"
+      },
+      {
+        "x": 71.74,
+        "y": 7.67,
+        "w": 26.81,
+        "h": 75.05,
+        "label": "Drop receipts, bills or statements to book them"
+      },
+      {
+        "x": 71.74,
+        "y": 7.67,
+        "w": 26.81,
+        "h": 75.05,
+        "label": "Questions to start with"
+      },
+      {
+        "x": 71.32,
+        "y": 89.48,
+        "w": 27.64,
+        "h": 6.44,
+        "label": "Ask anything in plain words"
+      }
+    ]
+  },
+  "tilly-prompt": {
+    "width": 824,
+    "height": 1768
+  },
+  "time-and-leave": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 10,
+        "w": 75.14,
+        "h": 10.89,
+        "label": "Timesheets in progress, waiting for approval and approved"
+      },
+      {
+        "x": 32.19,
+        "y": 25.83,
+        "w": 11.95,
+        "h": 4.11,
+        "label": "Switch between timesheets and leave requests"
+      },
+      {
+        "x": 22.29,
+        "y": 31.22,
+        "w": 23.84,
+        "h": 4.89,
+        "label": "Filter by status"
+      }
+    ]
+  },
+  "time-and-leave-request-new": {
+    "width": 1024,
+    "height": 1520
+  },
+  "time-and-leave-timesheet-new": {
+    "width": 1024,
+    "height": 1280
+  },
+  "trash": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 18,
+        "w": 75.14,
+        "h": 4.89,
+        "label": "Search, or show one type of record"
+      },
+      {
+        "x": 89.03,
+        "y": 30.17,
+        "w": 2.5,
+        "h": 4,
+        "label": "Put it back where it was"
+      },
+      {
+        "x": 91.25,
+        "y": 30.17,
+        "w": 2.5,
+        "h": 4,
+        "label": "Delete it for good"
+      },
+      {
+        "x": 89.26,
+        "y": 10.89,
+        "w": 8.17,
+        "h": 4.44,
+        "label": "Delete everything in the trash (owners only)"
+      }
+    ]
+  },
+  "vat-return": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 19.89,
+        "w": 75.14,
+        "h": 4.44,
+        "label": "The period the return covers"
+      },
+      {
+        "x": 23.47,
+        "y": 28.05,
+        "w": 19.42,
+        "h": 9.65,
+        "label": "Count VAT when you record it, or when money moves"
+      },
+      {
+        "x": 67.71,
+        "y": 28,
+        "w": 28.54,
+        "h": 9.74,
+        "label": "Optional flat rate scheme"
+      },
+      {
+        "x": 22.29,
+        "y": 66.32,
+        "w": 75.14,
+        "h": 11.68,
+        "label": "What you pay, or get back"
+      }
+    ]
+  },
+  "vat-return-boxes": {
+    "width": 1600,
+    "height": 973
+  },
+  "vat-return-period-new": {
+    "width": 768,
+    "height": 1120
+  },
+  "vat-return-periods": {
+    "width": 1600,
+    "height": 1000
+  },
+  "vat-return-plain": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 66.18,
+        "y": 32.82,
+        "w": 31.25,
+        "h": 7.4,
+        "label": "Accrual or cash basis"
+      },
+      {
+        "x": 22.29,
+        "y": 42.74,
+        "w": 75.14,
+        "h": 19,
+        "label": "Open a box to read what it means"
+      },
+      {
+        "x": 23.47,
+        "y": 55.85,
+        "w": 16.34,
+        "h": 4.44,
+        "label": "Jump to the transactions behind it"
+      }
+    ]
+  },
+  "warehouses": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 60,
+        "y": 35.41,
+        "w": 37.43,
+        "h": 8.86,
+        "label": "Your default location"
+      },
+      {
+        "x": 22.29,
+        "y": 58.05,
+        "w": 24.86,
+        "h": 16.78,
+        "label": "Each location, with its code and address"
+      },
+      {
+        "x": 87.24,
+        "y": 1.89,
+        "w": 10.19,
+        "h": 4.44,
+        "label": "Add a location"
+      }
+    ]
+  },
+  "warehouses-new": {
+    "width": 1024,
+    "height": 1800
+  },
+  "warehouses-transfer-new": {
+    "width": 1024,
+    "height": 1520
+  },
+  "warehouses-transfer-preview": {
+    "width": 1600,
+    "height": 1000
+  },
+  "warehouses-transfers": {
+    "width": 1600,
+    "height": 1000,
+    "marks": [
+      {
+        "x": 22.29,
+        "y": 17.86,
+        "w": 75.14,
+        "h": 11.57,
+        "label": "Units on the way, waiting to be sent, and arrived"
+      },
+      {
+        "x": 73.26,
+        "y": 30.31,
+        "w": 24.17,
+        "h": 28.73,
+        "label": "Where stock moves most"
+      },
+      {
+        "x": 22.36,
+        "y": 60.49,
+        "w": 75,
+        "h": 6.22,
+        "label": "Filter by status"
+      },
+      {
+        "x": 88.49,
+        "y": 1.89,
+        "w": 8.94,
+        "h": 4.44,
+        "label": "Move stock between locations"
+      }
+    ]
+  }
+}

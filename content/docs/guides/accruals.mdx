@@ -1,0 +1,138 @@
+---
+title: Accruals
+description: Spread a cost you paid up front, or income you received early, evenly over the months it covers.
+icon: CalendarClock
+---
+
+An accrual spreads one amount across several months. Pay a year's insurance in November and your books would show a huge cost that month and nothing for the next eleven. An accrual moves one twelfth into each month instead, so every month's profit reflects what that month really cost or earned. It works the same way for income a customer paid you in advance.
+
+<Shot name="accruals" alt="The accruals page with a $4,800 business insurance premium spread at $400 a month, 6 of 12 months recorded and marked Behind" pins />
+
+## Spread an amount over several months
+
+<Steps>
+
+<Step>
+
+Record the payment as usual (the bill or bank payment), coded to a holding account such as **Prepaid Expenses**.
+
+</Step>
+
+<Step>
+
+Open **Accounting**, then **Accruals**, and choose **New accrual**.
+
+</Step>
+
+<Step>
+
+Enter a **Description**, the **Total amount** and the **Number of periods** (months) to spread it over. Set the **Start Date** for the first month and the **End Date** for the last.
+
+</Step>
+
+<Step>
+
+Pick the **Account** the amount is taken out of each month (here, Prepaid Expenses) and the **Reversing account** it moves into (here, Insurance). Choose **Create accrual**.
+
+</Step>
+
+<Step>
+
+Each month, choose **Record next month** to post that month's share.
+
+</Step>
+
+</Steps>
+
+<Shot name="accrual-new" alt="The New accrual drawer spreading a $1,200 insurance premium over 12 months from Prepaid Expenses to Insurance" narrow />
+
+## Good to know
+
+- dubbl doesn't record the months for you. A month that has passed without being recorded turns the accrual **Behind**, so check the list at month end.
+- The amount is split evenly. If it doesn't divide exactly, the last month takes the extra cents.
+- Months are a calendar month apart, counting from the start date.
+- Each month posts against the **Account** (credit) and the **Reversing account** (debit). Pick them the right way round: see the two examples below.
+- A month dated on or before your [lock date](/docs/guides/periods-and-closing#lock-past-dates) can't be recorded. Move the lock date first if you need to record it.
+- Cancelling stops the months still to come. Months already recorded stay, and you can't undo it.
+
+## How the balance moves
+
+<AccrualSpread />
+
+<Fold>
+
+## What gets recorded in your books
+
+Each month you record posts one entry, dated that month's period date and described as "Accrual: Annual insurance premium - Period 1" (then 2, 3 and so on):
+
+<JournalEntry
+  title="Accrual: Annual insurance premium - Period 1"
+  date="Nov 13, 2026"
+  lines={[
+    { account: "5400 Insurance", debit: 10000, note: "Reversing account" },
+    { account: "1400 Prepaid Expenses", credit: 10000, note: "Account" },
+  ]}
+  caption="One twelfth of the premium becomes this month's cost."
+/>
+
+For income a customer paid you up front, flip the roles: the **Account** is your income account and the **Reversing account** is where you parked the payment, such as 2400 Unearned Revenue.
+
+<JournalEntry
+  title="Accrual: Support plan paid in advance - Period 1"
+  date="Nov 1, 2026"
+  lines={[
+    { account: "2400 Unearned Revenue", debit: 50000, note: "Reversing account" },
+    { account: "4010 Service Revenue", credit: 50000, note: "Account" },
+  ]}
+  caption="A $6,000 yearly plan earns $500 of income each month."
+/>
+
+For income tied to invoices, [revenue schedules](/docs/guides/revenue-schedules) do this from the invoice itself.
+
+</Fold>
+
+<Fold>
+
+## Record the months
+
+There are three ways to record:
+
+- Open an accrual from the list and choose **Record** with the month's name, such as **Record November 2026**.
+- Tick several accruals in the list and choose **Record next month** to do them all at once.
+- On an accrual's own page, choose **Record next month**.
+
+Months are always recorded in order. The list's **Recorded** and **Still to record** columns show where each accrual is up to, and **Next month** shows which one comes next.
+
+</Fold>
+
+<Fold>
+
+## Accrual statuses
+
+<Lifecycle
+  steps={[
+    { name: "Running", t: "info", note: "Recording a share each month, and up to date." },
+    { name: "Behind", t: "watch", note: "A month has passed that hasn't been recorded yet." },
+    { name: "Finished", t: "good", note: "Every month has been recorded." },
+  ]}
+  caption="Cancelled accruals stopped early. Months already recorded stay as they are."
+/>
+
+</Fold>
+
+<Fold>
+
+## Accruals or an entry that undoes itself?
+
+Accruals suit an amount spread evenly over months. For a one-off month-end adjustment, like a cost you've had but haven't been billed for yet, use a [journal entry that undoes itself](/docs/guides/journal-entries) on the first of the next month instead.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Accrual vs cash" href="/docs/learn/accrual-vs-cash" description="Why costs belong in the month they cover." />
+  <Card title="Revenue schedules" href="/docs/guides/revenue-schedules" description="Spread invoiced income over time." />
+  <Card title="Recurring journals" href="/docs/guides/recurring-journals" description="Post the same entry every month." />
+  <Card title="Journal entries" href="/docs/guides/journal-entries" description="See every month's entry in one list." />
+</Cards>

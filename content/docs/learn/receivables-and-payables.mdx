@@ -1,0 +1,102 @@
+---
+title: Receivables and payables
+description: Money customers owe you and money you owe suppliers, how they're recorded, and how to keep them under control.
+icon: HandCoins
+---
+
+Most businesses don't get paid the moment they finish the work, and don't pay suppliers the moment a bill arrives. In between, money is *owed*. **Accounts receivable** is the total your customers owe you. **Accounts payable** is the total you owe your suppliers. Keeping an eye on both is how you avoid running out of cash while looking profitable on paper.
+
+<ShortVersion>
+
+- **Receivables**: invoices you've sent that customers haven't paid yet. An asset.
+- **Payables**: bills you've received that you haven't paid yet. A liability.
+- Sending an invoice adds to receivables; the customer's payment clears it. Bills work the same way in reverse.
+- An **aged** report sorts what's owed by how late it is: Current, 1-30, 31-60, 61-90 and 90+ days past due.
+- The older a debt gets, the less likely it is to be paid. Chase early.
+
+</ShortVersion>
+
+## Two sides of the same idea
+
+<ArApMirror />
+
+Receivables are an asset because the money is yours, just not in your bank yet. Payables are a liability because you've agreed to pay; the cost is already counted, only the payment is still to come.
+
+## What gets recorded
+
+An invoice and its payment, with a 30-day wait in between:
+
+<JournalEntry
+  title="Invoice INV-00011 sent to Acme Corp"
+  date="Mar 2, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 450000 },
+    { account: "Sales", credit: 450000 },
+  ]}
+/>
+
+<JournalEntry
+  title="Payment received for INV-00011"
+  date="Apr 1, 2026"
+  lines={[
+    { account: "Checking account", debit: 450000 },
+    { account: "Accounts receivable", credit: 450000 },
+  ]}
+  caption="For those 30 days, the $4,500 sat in Accounts receivable."
+/>
+
+And a supplier's bill, then paying it:
+
+<JournalEntry
+  title="Bill from Northwind Supplies"
+  date="Mar 10, 2026"
+  lines={[
+    { account: "Office expenses", debit: 48000 },
+    { account: "Accounts payable", credit: 48000 },
+  ]}
+/>
+
+<JournalEntry
+  title="Bill paid"
+  date="Apr 9, 2026"
+  lines={[
+    { account: "Accounts payable", debit: 48000 },
+    { account: "Checking account", credit: 48000 },
+  ]}
+  caption="The cost counted in March, when the bill arrived. The cash left in April."
+/>
+
+## Payment terms and due dates
+
+Every invoice and bill has a due date, usually set by **payment terms**: how many days the customer has to pay. dubbl offers **Due on Receipt**, **Net 7**, **Net 15**, **Net 30**, **Net 45**, **Net 60** and **Net 90**. "Net 30" means payment is due 30 days after the invoice date. A customer's own terms (on their contact) win; otherwise your default terms under **Settings › General** are used.
+
+Until the due date, an unpaid invoice is **Current**. The day after, it's overdue, and dubbl marks it **Overdue** on its own.
+
+## Ageing: how late is late?
+
+An aged receivables report puts every unpaid invoice in a bucket by how many days it is past its due date. Each 30 days, an unpaid invoice moves one bucket to the right:
+
+<AgingTimeline />
+
+The shape of this report tells you a lot. Most money in **Current** is healthy. A growing pile in **61-90** and **90+** means customers are paying slowly, or not at all, and your cash is stuck with them.
+
+In dubbl, open **Reports**, then **Aged receivables** (or **Aged payables** for bills):
+
+<Shot name="learn-aged-receivables" alt="Who owes you (and how late): totals for Current, 1-30, 31-60, 61-90 and 90+ days, and the list of unpaid invoices" pins />
+
+## Good to know
+
+- The Overview's to-do list flags overdue invoices and bills, so you don't need to run the report to know something is late.
+- [Payment reminders](/docs/guides/payment-reminders) chase overdue customers by email for you.
+- If a customer will never pay, **Write off** on the invoice records the unpaid amount as a bad-debt loss and removes it from what you're owed.
+- A [customer statement](/docs/guides/statements) lists everything a customer owes in one document. Useful when they've lost track.
+- On the payables side, [paying bills](/docs/guides/paying-bills) in batches helps you pay on time without paying early.
+
+## Related
+
+<Cards>
+  <Card title="Aged receivables and payables" href="/docs/guides/aged-receivables-and-payables" description="Run and read the ageing reports." />
+  <Card title="Invoices" href="/docs/guides/invoices" description="Bill customers and record payments." />
+  <Card title="Bills" href="/docs/guides/bills" description="Record what suppliers charge you." />
+  <Card title="Accrual vs cash" href="/docs/learn/accrual-vs-cash" description="Why unpaid invoices make profit and cash differ." />
+</Cards>

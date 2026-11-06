@@ -1,0 +1,133 @@
+---
+title: CRM
+description: Track every sale you're working on, from first conversation to won or lost, on a pipeline you can drag deals along.
+icon: Target
+---
+
+The CRM is where you keep the sales you haven't made yet. Each deal is a possible sale to a contact, with a value and a chance of closing. Deals sit in the stages of a pipeline, you drag them along as things move, and dubbl tells you what the whole pipeline is worth.
+
+<Shot name="crm" alt="The Pipeline board with one deal each in Lead, Qualified, Proposal and Negotiation, the open and weighted totals, and the List and New deal buttons" pins />
+
+## Add a deal
+
+<Steps>
+
+<Step>
+
+Open **CRM** and choose **New deal**.
+
+</Step>
+
+<Step>
+
+Give it a **Title**, such as `Acme Corp - Annual Support`, and pick the **Stage** it's at. If you have more than one pipeline, pick the **Pipeline** too.
+
+</Step>
+
+<Step>
+
+Choose the **Associated Contact** and the deal's **Owner**, then enter the **Deal Value** and your **Win Probability %**.
+
+</Step>
+
+<Step>
+
+Add the **Expected Close** date, where the deal came from (**Source**) and any **Notes**. Choose **Create Deal**.
+
+</Step>
+
+</Steps>
+
+<Shot name="crm-new-deal" alt="The New Deal drawer with a title, the Proposal stage, Acme Corp as the contact, a $24,000 value and a 60% win probability" narrow />
+
+## Good to know
+
+- Drag a card to another column to move it to that stage. Drop it on **Won** or **Lost**, after the last column, to close it.
+- Won and lost deals leave the board. They're still in **Deals**, under the **Won** and **Lost** tabs.
+- Marking a deal won sets its probability to 100%; lost sets it to 0%. However a deal reaches the Won or Lost stage, it's closed the same way.
+- Changing deals, activities and pipelines needs the workspace permission to manage contacts. Anyone in the workspace can see them.
+- A card shows **late** in red once its expected close date has passed.
+- Deals are separate from your books. Winning one doesn't create a quote or an invoice; you do that in [Sales](/docs/guides/quotes) when you're ready.
+
+## What your pipeline is worth
+
+The board's header adds up your open deals two ways: their full value, and their value weighted by each one's win probability. A $150,000 deal at 75% counts as $112,500. Weighted value is the better forecast, because not every deal closes.
+
+<CrmWeightedPipeline />
+
+## Win or lose a deal
+
+Open a deal to see its value, probability and weighted value, where it is in the pipeline, and its latest activity. **Mark Won** closes it as won. **Mark Lost** closes it as lost and asks why. The reason is optional, but it shows up in **Analytics** so you can spot patterns. The board and the **Deals** list ask the same question.
+
+Clicking a stage in the progress bar or the **Pipeline Stage** list moves the deal there. Clicking **Won** marks it won; clicking **Lost** asks why, like **Mark Lost**. **Reopen** on a closed deal moves it back to the first stage of its pipeline.
+
+<Shot name="crm-deal" alt="The Sterling deal at the Proposal stage, with its value, the stage progress bar, Mark Lost and Mark Won, deal information and recent activity" pins />
+
+<Lifecycle
+  steps={[
+    { name: "Lead", note: "First contact." },
+    { name: "Qualified", t: "info", note: "A real need." },
+    { name: "Proposal", t: "watch", note: "Offer sent." },
+    { name: "Negotiation", t: "watch", note: "Agreeing terms." },
+    { name: "Won", t: "good", note: "Sale made." },
+  ]}
+  caption="The standard stages. A deal can be marked Lost from any stage. You can rename, recolour and reorder stages in Pipelines & stages."
+/>
+
+<Fold>
+
+## Logging activity
+
+On a deal's **Activity** tab, log what happened: pick **note**, **email**, **call**, **meeting** or **task**, write it up and choose **Add Activity**. To plan something instead, such as a call next Tuesday, set **Schedule for** to the date and time and choose **Schedule Activity**. The timeline groups everything by day, shows who logged each entry, and you can search and filter it by type.
+
+**Activities** in the side panel lists everything across all your deals. Planned activities show as **Coming up** until their time passes, then **Overdue** until you mark them done. Click one to preview it, mark it done, or open its deal.
+
+</Fold>
+
+<Fold>
+
+## The deals list
+
+**Deals** shows every deal in one searchable list, including won and lost. The cards along the top show your open pipeline, weighted forecast, won value, win rate, what's closing this month and what's past its close date. Filter by stage, contact, pipeline, owner or source. Select several deals to **Mark won** or **Mark lost** together. **Export** downloads the list as a CSV.
+
+</Fold>
+
+<Fold>
+
+## Pipelines and stages
+
+**Pipelines & stages** holds your pipelines. Choose **New pipeline**, give it a **Name**, and use **Add Stage** to build the path your deals follow. Drag stages into order by their handle, rename them and pick their colours. Every pipeline keeps a **Won** and a **Lost** stage, marked **Outcome**: you can rename and recolour them, but not remove them. If you remove another stage, the deals in it move to the first stage.
+
+One pipeline is the default, the one the board opens on. Tick **Set as default pipeline**, or choose **Set Default** on a pipeline, and the previous default stops being one.
+
+<Shot name="crm-pipelines" alt="Pipelines and stages: the default Sales Pipeline with six stages, from Lead to Won and Lost" />
+
+If you have more than one pipeline, switch between them at the top of the board. Deleting a pipeline doesn't delete its deals: they move to the default pipeline, into the same stage if it has one or its first stage if not. If you delete the default pipeline, the one its deals move to becomes the default. You can't delete your only pipeline while it still has deals.
+
+</Fold>
+
+<Fold>
+
+## Analytics
+
+**Analytics** sums up your pipeline: its total value, the revenue you've won, your conversion rate (won deals out of all decided deals), your average deal size, and how many deals and how much value sit in each stage. **Why deals were lost** groups the reasons given when deals were marked lost, most common first.
+
+<Shot name="crm-analytics" alt="CRM Analytics with pipeline value, won revenue, a 50% conversion rate from one won and one lost deal, the stage distribution and why deals were lost" />
+
+</Fold>
+
+<Fold>
+
+## Editing and deleting a deal
+
+A deal's **Settings** tab lets you change its **Deal Title**, **Probability (%)** (leave it empty if you don't know), **Expected Close Date**, **Value**, **Contact**, **Owner**, **Source** and **Notes**. **Delete Deal** in the danger zone moves it, with its activity, to [Trash](/docs/guides/trash). You can restore it from there within 30 days.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Contacts" href="/docs/guides/contacts" description="The people and companies your deals are with." />
+  <Card title="Quotes" href="/docs/guides/quotes" description="Price the work once a deal is ready." />
+  <Card title="Invoices" href="/docs/guides/invoices" description="Bill the customer when you've won." />
+</Cards>

@@ -1,0 +1,116 @@
+---
+title: Integrations
+description: Connect Stripe so card payments, fees, refunds and payouts are booked for you, and see what else dubbl can plug into.
+icon: Plug
+---
+
+If you take card payments through Stripe, connect it and dubbl books every charge, fee, refund and payout as it happens, adds your Stripe customers to your contacts, and puts each payout in your bank account already reconciled. You'll find it under **Settings > Stripe**.
+
+<Shot name="integrations-stripe" alt="The Stripe Integration page with what dubbl does once connected and the Connect Stripe Account button" pins />
+
+## Connect Stripe
+
+<Steps>
+
+<Step>
+
+Open **Settings > Stripe** and choose **Connect Stripe Account**.
+
+</Step>
+
+<Step>
+
+Sign in to Stripe and allow dubbl to read your account. You come back to dubbl with the account connected, marked **Live** or **Test**.
+
+</Step>
+
+<Step>
+
+Under **Account Mappings**, check where things are booked. dubbl fills in **Clearing Account (Asset)**, **Revenue Account** and **Fees Account (Expense)** for you; change them if you use other accounts.
+
+</Step>
+
+<Step>
+
+Pick the **Payout Bank Account**: the bank account Stripe pays into. Payouts can't be booked until you do.
+
+</Step>
+
+<Step>
+
+dubbl brings in your Stripe customers and the last 30 days of charges and payouts. New ones follow automatically. Choose **Sync** any time to catch up by hand.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Admins and the owner can connect and disconnect Stripe.
+- The defaults are **Undeposited Funds** (1250) for clearing, **Sales Revenue** (4000) and **Bank Fees & Charges** (5900). dubbl creates them if your chart doesn't have them.
+- Stripe payouts are added to your bank account as reconciled lines. Don't also import them from your bank feed, or they'll be there twice.
+- **Disconnect** stops new transactions syncing. Everything already booked stays in your books.
+- You can connect more than one Stripe account with **Connect another account**.
+- If a payment fails, whoever connected Stripe gets a [notification](/docs/guides/notifications).
+
+## How the money moves
+
+<StripeMoneyFlow />
+
+<Fold>
+
+## What gets recorded in your books
+
+Each step is its own journal entry, posted straight away.
+
+<JournalEntry
+  title="Stripe charge ch_3Q8x…"
+  date="Oct 2, 2026"
+  lines={[
+    { account: "Undeposited Funds", debit: 120000 },
+    { account: "Sales Revenue", credit: 120000 },
+  ]}
+/>
+
+<JournalEntry
+  title="Stripe fee for ch_3Q8x…"
+  date="Oct 2, 2026"
+  lines={[
+    { account: "Bank Fees & Charges", debit: 3510 },
+    { account: "Undeposited Funds", credit: 3510 },
+  ]}
+/>
+
+<JournalEntry
+  title="Stripe payout po_1Q9a…"
+  date="Oct 4, 2026"
+  lines={[
+    { account: "Business checking", debit: 116490 },
+    { account: "Undeposited Funds", credit: 116490 },
+  ]}
+  caption="The clearing account is back to zero: everything Stripe held has reached your bank."
+/>
+
+A refund reverses the sale: Sales Revenue is debited and Undeposited Funds credited for the refunded amount.
+
+</Fold>
+
+<Fold>
+
+## Other integrations
+
+- **Email sending**: send invoices from your own mail server. See [Email sending](/docs/guides/email).
+- **Webhooks**: tell your own systems when something changes in dubbl. See [Webhooks](/docs/developers/webhooks).
+- **API keys and MCP**: connect scripts, other apps or your own AI client. See [Authentication](/docs/developers/authentication) and [MCP](/docs/developers/mcp).
+
+dubbl doesn't connect to banks directly. Bring bank transactions in with a file; see [Importing transactions](/docs/guides/importing-transactions).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bank accounts" href="/docs/guides/bank-accounts" description="The account Stripe pays out to." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="Match your books to your bank statement." />
+  <Card title="Self-hosting: payments" href="/docs/self-hosting/payments" description="Set up Stripe on your own server." />
+</Cards>

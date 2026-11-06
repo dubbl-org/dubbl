@@ -1,0 +1,91 @@
+---
+title: Mobile app
+description: Check your numbers, send invoices, approve bills and scan receipts from your iPhone with dubbl for iOS.
+icon: Smartphone
+---
+
+dubbl for iOS is a native iPhone app for the things you do away from your desk: seeing how the business is doing, creating an invoice and recording a payment, approving a bill, and photographing a receipt the moment you get it. It talks to the same server as the web app, so everything you do shows up on both straight away. Tilly is one tap away from every screen.
+
+<Callout title="Build it from the source">
+dubbl for iOS isn't on the App Store yet. It lives in the `ios/` folder of the dubbl repository and needs iOS 26 or later. Open `ios/Dubbl.xcodeproj` in Xcode 26 or later and run the **Dubbl** scheme on your iPhone or the simulator.
+</Callout>
+
+## Sign in
+
+<Steps>
+
+<Step>
+
+Open the app. To use your own server, tap the server button on the sign-in screen and pick **dubbl Cloud** or **Self-hosted**, then type your server's address.
+
+</Step>
+
+<Step>
+
+Tap **Continue**. Your server's sign-in page opens in a browser sheet. Sign in there as you would on the web, with a password, Google or Apple.
+
+</Step>
+
+<Step>
+
+On **Sign in to dubbl for iOS**, check it's your account and tap **Continue**. You're back in the app, signed in.
+
+</Step>
+
+</Steps>
+
+<Shot name="mobile-app-sign-in" alt="The web page that signs in the iPhone app, showing the device name, the account, Cancel and Continue" narrow />
+
+## Good to know
+
+- The app never sees your password: sign-in happens on your server's own page, and the app gets its own keys.
+- It stays signed in for up to 90 days of not being used. After that, sign in again.
+- Turn on **Lock with Face ID** in the app's settings to ask for Face ID (or your passcode) whenever you come back to the app.
+- See and sign out your phones on the web: open your user menu, choose **Account**, then the **Security** tab. **Signed-in apps** lists each one with a **Sign out** button.
+- If your account belongs to several organizations, **Switch organization** in settings changes everything in the app at once.
+
+## Find your way around
+
+<MobileAppTabs />
+
+<Fold>
+
+## Scan a receipt
+
+In **Purchases**, start a new expense and tap **Scan** to photograph the receipt, or **Choose photo** to pick one you took earlier. The app reads the merchant, the total and the date on your phone (shown as **Reading receipt**) and fills them in. Check them, pick a **Category**, then choose **Save draft** or **Save and submit** to send it for approval.
+
+The reading is a best guess. Anything it couldn't find is left for you to fill in.
+
+</Fold>
+
+<Fold>
+
+## Invoices on the go
+
+In **Sales**, create an invoice: pick a customer, add items, and choose **Save draft** or **Save and mark as sent**. Tax is worked out by the server when you save. On an invoice you can **Record payment**, **Share PDF** or **Copy payment link**, and from **More**, **Void** it or **Delete draft**.
+
+</Fold>
+
+<Fold>
+
+## Bills and expenses
+
+Open a bill to **Approve** it, **Mark as received**, **Record payment**, send it back with **Reject**, or **Void bill**. Expenses can be submitted with **Submit for approval**, approved with **Approve**, and closed with **Mark as paid**. What you can do depends on your [role](/docs/guides/members-and-roles), just as on the web.
+
+</Fold>
+
+<Fold>
+
+## Tilly on your phone
+
+Tap the round button beside the tab bar to ask Tilly anything, the same as on the web. Reads run on their own; changes wait for you, under **Needs you**. On some screens the button does that screen's main action instead. See [Tilly](/docs/guides/tilly).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Desktop app" href="/docs/guides/desktop-app" description="dubbl in its own window on your computer." />
+  <Card title="Expenses" href="/docs/guides/expenses" description="What happens after you submit a claim." />
+  <Card title="Tilly" href="/docs/guides/tilly" description="Your money assistant, on every screen." />
+</Cards>

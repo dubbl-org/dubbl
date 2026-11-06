@@ -1,0 +1,131 @@
+---
+title: Authentication
+description: "Create an API key in settings, send it as a bearer token, and know exactly what it can do."
+icon: KeyRound
+---
+
+The REST API uses API keys. A key belongs to one organization and acts as the person who created it, so it can do whatever their role allows in that organization. You make keys in **Settings**, and every request sends one in the `Authorization` header.
+
+<Shot name="dev-api-keys" alt="The API Keys settings page with the New Key button and an example request" pins />
+
+## Create an API key
+
+<Steps>
+
+<Step>
+
+Open **Settings** and choose **API Keys** under **Developer**. You need to be an owner or admin (or have a custom role that can manage API keys).
+
+</Step>
+
+<Step>
+
+Choose **New Key** and give it a **Name** that says where it will live, like "Warehouse sync" or "Zapier".
+
+</Step>
+
+<Step>
+
+Choose **Create Key**. dubbl shows the key once, with **Copy this key now. You won't be able to see it again.** Copy it into your secret store, then choose **Done**.
+
+</Step>
+
+</Steps>
+
+<Shot name="dev-api-keys-new" alt="The New API Key drawer with a name filled in and the Create Key button" narrow />
+
+## Send it with every request
+
+Put the key in the `Authorization` header as a bearer token. That's all: no organization header, no signing.
+
+```bash
+curl "https://dubbl.dev/api/v1/contacts?limit=1" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE"
+```
+
+For requests with a body, add `Content-Type: application/json`:
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/contacts" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Northwind Traders", "email": "ap@northwind.example", "type": "customer"}'
+```
+
+<ApiKeyAnatomy />
+
+## Good to know
+
+- Keys have no scopes of their own. A key acts as the member who created it, with the role they have right now: if their role changes, so does what the key can do.
+- A key only ever works in the organization it was made in. Any `x-organization-id` header is ignored for API keys.
+- An organization can have up to 20 keys. The count shows next to the page title.
+- The trash icon revokes a key at once. Anything still using it gets `401 Invalid API key` from the next request.
+- When someone leaves your organization, the keys they made stop working at once with `401 API key disabled`. The API Keys page marks them **Disabled** and says why. Revoke them and create new ones from a current admin.
+- Keep keys on servers. Never put one in a web page, a mobile app or a public repository.
+
+## What dubbl checks on every call
+
+<ApiRequestLifecycle />
+
+<Fold>
+
+## Managing keys over the API
+
+The same endpoints the settings page uses are open to you. They need a caller who can manage API keys.
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/api/v1/api-keys` | List keys (prefix, last used, expiry), never the secret |
+| `POST` | `/api/v1/api-keys` | Create a key. Body: `name`, and optionally `expiresAt` (ISO 8601) |
+| `DELETE` | `/api/v1/api-keys/{id}` | Revoke a key |
+
+A key with an expiry date stops working after it, with `401 API key expired`. Expiry can only be set over the API.
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/api-keys" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Year-end auditor", "expiresAt": "2027-01-31T23:59:59Z"}'
+```
+
+```json
+{
+  "key": {
+    "id": "c41e9f02-6b7d-4a58-9e13-87d2f05ab6c4",
+    "name": "Year-end auditor",
+    "keyPrefix": "dk_live_Hn4w",
+    "createdAt": "2026-10-13T09:24:11.418Z"
+  },
+  "plainKey": "dk_live_Hn4wZ0pQe7Rk2Vt9mXb5Lc8Ys1Ju6DfA"
+}
+```
+
+`plainKey` is in this response and nowhere else. Creating and revoking keys is recorded in the [audit log](/docs/guides/audit-log).
+
+</Fold>
+
+<Fold>
+
+## Other credentials you may see
+
+dubbl recognises a few kinds of bearer token by their prefix. Only API keys are meant for your code.
+
+| Prefix | What it is | Where it works |
+| --- | --- | --- |
+| `dk_` | API key you created in settings | The REST API, `/api/v1/...` |
+| `mcp_at_` | Access token an AI client got by signing in (1 hour) | The MCP server, `/api/mcp` only |
+| `dat_` | Token the dubbl iOS app uses after you sign in | The REST API, as you |
+
+The web app itself uses your browser session. When a signed-in person belongs to several organizations, the app sends `x-organization-id` to say which one a request is for. See [MCP server](/docs/developers/mcp) for how AI clients sign in.
+
+AI clients that signed in to your organization are listed under **MCP connections** on the API Keys page, where an admin can **Revoke** any of them. Each person can also disconnect their own under **Connected AI assistants** in their profile's **Security** tab, and **Revoke all sessions** there signs out every browser, the iOS app and every AI client at once.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Conventions" href="/docs/developers/conventions" description="Cents, dates, pages and errors." />
+  <Card title="API reference" href="/docs/developers/api-reference" description="What you can call once you have a key." />
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Roles decide what a key can do." />
+</Cards>

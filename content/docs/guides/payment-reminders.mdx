@@ -1,0 +1,110 @@
+---
+title: Payment reminders
+description: Email customers automatically before and after an invoice is due, so you stop chasing payments by hand.
+icon: BellRing
+---
+
+Payment reminders are rules that email a customer about an invoice on a set day: a week before it's due, on the day, a few days late. Set them up once and dubbl checks every open invoice each day and sends the right reminder, once, to the right person. When the invoice is paid, the reminders stop.
+
+<Shot name="payment-reminders" alt="The Payment Reminders settings page with four rules, their triggers and enabled switches, and the reminder log" pins />
+
+## Create a reminder rule
+
+<Steps>
+
+<Step>
+
+Go to **Settings › Reminders** (or **Payment reminders** in the Contacts panel) and choose **New Rule**.
+
+</Step>
+
+<Step>
+
+Give the rule a **Name**, such as "3 days before due".
+
+</Step>
+
+<Step>
+
+Set when it fires. Choose a **Trigger Type** (**Before due date**, **On due date** or **After due date**) and the number of **Days**.
+
+</Step>
+
+<Step>
+
+Leave **Document Type** on **Invoice**, and choose the **Recipient**: the **Contact email**, the email of each of the customer's **Contact persons**, or **Custom emails** you type in.
+
+</Step>
+
+<Step>
+
+Write the **Subject Template** and **Body Template**. Click the buttons under each one, like **Document #** or **Amount Due**, to drop in details that are filled in for each invoice.
+
+</Step>
+
+<Step>
+
+Turn on **Enable rule** and choose **Create**.
+
+</Step>
+
+</Steps>
+
+<Shot name="payment-reminders-rule" alt="The New Reminder Rule form for 3 days before due, with subject and body templates using document number, amount due and due date" narrow />
+
+## Good to know
+
+- Reminders work straight away. They go out through your own mail server if you've connected and checked one under [Email sending](/docs/guides/email), otherwise from dubbl's address with replies going to your workspace email.
+- Reminders count toward your plan's monthly email allowance when they're sent from dubbl's address.
+- New rules start switched off. Nothing goes out until **Enable rule** is on.
+- Each rule sends once per invoice, on the exact day it matches. Add a rule for each step you want.
+- Drafts, cancelled and paid invoices are never chased. If the customer pays before a reminder's day, it doesn't go out.
+- If there's no one to send to (the contact has no email address, none of their people has one, or a custom rule has no addresses), the reminder is skipped and shows in the log as **Skipped** with the reason. Check for blanks with the **Missing email** tile on [Contacts](/docs/guides/contacts).
+- Each invoice shows how many reminders it's had, such as **2 reminders sent**.
+
+## A typical set of reminders
+
+<ReminderTimeline />
+
+<Fold>
+
+## Template details
+
+These are the details you can put in a subject or body. Type them exactly, or use the buttons:
+
+| Button | Placeholder | Becomes |
+| --- | --- | --- |
+| Contact Name | `{{contactName}}` | The customer's name |
+| Document # | `{{documentNumber}}` | The invoice number |
+| Amount Due | `{{amountDue}}` | What's still owed, with the currency |
+| Due Date | `{{dueDate}}` | The due date |
+| Organization | `{{organizationName}}` | Your organization's name |
+| Days Overdue | `{{daysOverdue}}` | Days past the due date, or 0 |
+
+Spaces inside the braces are fine, like `{{ dueDate }}`. Some other common names work too: `{{invoiceNumber}}` and `{{number}}` give the document number, `{{amount}}`, `{{balance}}` and `{{balanceDue}}` the amount due, `{{customerName}}` the contact's name, and `{{orgName}}`, `{{companyName}}` and `{{businessName}}` your organization's name. Anything else in double braces is sent as it is, so check the spelling. A body written as plain text keeps its line breaks.
+
+</Fold>
+
+<Fold>
+
+## The reminder log
+
+Every reminder appears in the **Reminder Log** with the rule, the recipient, the subject and when it went. Filter it with **All statuses** to find ones that **Failed**, for example because the mail server turned them away or the monthly email allowance ran out, or that were **Skipped** because there was no one to send to. A skipped reminder shows **No recipient** and the reason, and is logged once per rule and invoice. When a reminder fails, the owner and admins also get a **System** [notification](/docs/guides/notifications).
+
+</Fold>
+
+<Fold>
+
+## Change or remove a rule
+
+Click a rule to open **Edit Rule**, change it and choose **Update**. Use the **Enabled** switch in the list to pause a rule without losing it, or the bin icon to delete it.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="What reminders are about." />
+  <Card title="Email sending" href="/docs/guides/email" description="Send reminders from your own address." />
+  <Card title="Statements" href="/docs/guides/statements" description="Send the whole picture, not just one invoice." />
+</Cards>

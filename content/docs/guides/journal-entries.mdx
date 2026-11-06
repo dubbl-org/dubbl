@@ -1,0 +1,162 @@
+---
+title: Journal entries
+description: See every entry in your books, add your own adjustments by hand, and undo a posted entry the safe way.
+icon: NotebookPen
+---
+
+A journal entry is one movement of money between accounts: some accounts are debited, others are credited, and the two sides always add up to the same total. Most entries are made for you when you send an invoice, approve a bill or categorize a bank line. You only type one in yourself for things nothing else covers, such as money the owner puts in, a correction, or an end-of-month adjustment.
+
+<Shot name="journal-entries" alt="The journal entries page with monthly totals, filters and the list of entries with their source" pins />
+
+## Add an entry by hand
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Transactions**, and choose **New Entry** in the top bar.
+
+</Step>
+
+<Step>
+
+Set the **Date** the entry belongs to and a **Description** you'll recognise later. Add a **Reference (optional)** if there's a document number to match it to.
+
+</Step>
+
+<Step>
+
+Under **Entry lines**, pick an **Account** for each line and put the amount in **Debit** or **Credit**. Use **Add line** for more than two lines, and a **Line memo** if a line needs its own note.
+
+</Step>
+
+<Step>
+
+When both columns add up to the same total, choose **Create entry**. It's saved as a **Draft** and opens on its own page.
+
+</Step>
+
+<Step>
+
+Check it, then choose **Finalize**. The entry is now **Posted** and counts in your reports.
+
+</Step>
+
+</Steps>
+
+<Shot name="journal-entry-new" alt="The New manual entry drawer: the owner adds $5,000, debit Checking Account and credit Owner's Equity" narrow />
+
+## Good to know
+
+- **Create entry** stays greyed out until debits equal credits. Under the lines you'll see something like "Debits (5000.00) must equal credits (4500.00)". Every entry needs at least two lines.
+- A draft doesn't count anywhere. Your reports only change once the entry is posted.
+- Posted entries can't be edited. To fix one, reverse it and enter it again.
+- If an [approval workflow](/docs/guides/approvals) covers journal entries, a matching draft can't be finalized until it's approved. Choose **Submit for approval** on the entry; **Finalize** works once every approver has said yes.
+- You can't add, post or reverse an entry dated on or before your [lock date](/docs/guides/periods-and-closing), or inside a closed financial year.
+- The **Source** column tells you where an entry came from: **Typed in by hand**, or made for you by **Invoices**, **Bills**, **Payments**, **Banking**, **Fixed assets**, **Loans** and so on. Filter by it to see only your own adjustments.
+
+## How an entry moves
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Saved, not in your books. Edit or delete it freely." },
+    { name: "Posted", t: "good", note: "In your books and reports. Can't be edited." },
+    { name: "Reversed", t: "info", note: "Undone by a matching opposite entry. Both stay on record." },
+  ]}
+  caption="Cancelled entries no longer count. dubbl cancels entries itself when, for example, you replace your opening balances or reopen a year."
+/>
+
+<Fold>
+
+## What gets recorded in your books
+
+The entry you type is exactly what's recorded. Say you put $5,000 of your own money into the business account:
+
+<JournalEntry
+  title="Owner adds money to the business"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "1100 Checking Account", debit: 500000 },
+    { account: "3000 Owner's Equity", credit: 500000 },
+  ]}
+  caption="The bank balance goes up, and so does what the business owes its owner."
+/>
+
+Not sure which side is which? [Debits and credits](/docs/learn/debits-and-credits) explains it without the jargon.
+
+</Fold>
+
+<Fold>
+
+## Check an entry from the list
+
+Click any row to open it in a side panel. **What moved where** lists every line with its account, debit and credit, and the panel shows the date, source, reference, when it was posted and whether it's an original or a reversal. Use the arrows at the top to step through the list, or **Open** for the full page.
+
+<Shot name="journal-entry-preview" alt="A loan payment opened in the side panel: principal and interest debited, Checking Account credited, its source and the Reverse entry button" pins narrow />
+
+From the panel a draft has **Post to books**, **Edit draft** and **Delete**. A posted entry has **Reverse entry**. To post several drafts at once, tick them in the list and choose **Post to books**.
+
+</Fold>
+
+<Fold>
+
+## Undo a posted entry
+
+Posted entries are never deleted or changed. Instead, dubbl posts a matching opposite entry on the same date, so the two cancel out and your reports stop counting it.
+
+<Steps>
+
+<Step>
+
+Open the entry and choose **Reverse entry** (on the entry's own page, the button is **Cancel**).
+
+</Step>
+
+<Step>
+
+Say why. The reason is required and is kept on the entry.
+
+</Step>
+
+<Step>
+
+Choose **Reverse entry** (or **Cancel entry**). The original is marked **Reversed**, and a new entry called "Reversal of entry #11" plus your reason appears in the list.
+
+</Step>
+
+</Steps>
+
+<Shot name="journal-entry-reverse" alt="The Reverse entry dialog asking for a reason" narrow />
+
+An entry can only be reversed once, and only if its date isn't locked. If the mistake was the date, reverse it and enter it again on the right date.
+
+</Fold>
+
+<Fold>
+
+## Entries that undo themselves
+
+Some adjustments are only meant to last a month. A classic one is an accrued expense: at month end you record a cost you've had but haven't been billed for, and on the first of the next month it should come off again so the real bill isn't counted twice.
+
+An entry can carry an **Undoes itself on** date. Once it's posted and that date arrives, dubbl posts the opposite entry for you, dated that day. You can set this date when you ask [Tilly](/docs/guides/tilly) to make the entry, or through the [API](/docs/developers/api-reference); the **New Entry** drawer doesn't have the field. The list's **Undoes itself** filter and the **Will undo themselves** total show which entries are waiting.
+
+<AutoReversalPair />
+
+</Fold>
+
+<Fold>
+
+## Entries in another currency
+
+Entries made in the app are in your base currency. Through Tilly or the API, each line can carry its own currency and exchange rate; dubbl converts every line and checks that the entry balances in your base currency. More in [Multi-currency](/docs/guides/multi-currency).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="The accounts every entry posts to." />
+  <Card title="Recurring journals" href="/docs/guides/recurring-journals" description="Post the same entry on a schedule." />
+  <Card title="General ledger" href="/docs/guides/general-ledger" description="Every line, account by account." />
+  <Card title="Double-entry bookkeeping" href="/docs/learn/double-entry" description="Why every entry has two sides." />
+</Cards>

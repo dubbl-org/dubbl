@@ -1,0 +1,131 @@
+---
+title: Payments
+description: "Connect Stripe to sell plans, let customers pay invoices by card, and let organizations sync their own Stripe account."
+icon: CreditCard
+---
+
+Stripe does three separate jobs in dubbl, and you can stop at any of them. A self-hosted dubbl doesn't need Stripe at all: without `STRIPE_SECRET_KEY` there are no plans and no limits, every organization gets every feature, and **Settings**, **Billing** just says "Every feature unlocked".
+
+<StripeWiring />
+
+<Callout type="warn" title="Setting STRIPE_SECRET_KEY turns on plans">
+By default, the moment `STRIPE_SECRET_KEY` is set, dubbl starts enforcing plan limits, and organizations without a subscription drop to the Free plan's limits. If you only want card payments or the Stripe integration, open the admin area's **Settings** and set **Self-hosted unlimited mode** to **Always on**: every organization keeps every feature with no limits, whatever keys are set. **Auto** (the default) follows `STRIPE_SECRET_KEY`, and **Always off** applies plan limits even without Stripe.
+</Callout>
+
+## Plans and billing
+
+<Steps>
+
+<Step>
+
+In the Stripe dashboard, create a product for each paid plan (**Standard**, **Premium** and **Ultimate**), each with a monthly and a yearly recurring price. dubbl's own prices are $19, $49 and $99 a month, or $15, $39 and $79 a month billed yearly, but you can charge what you like.
+
+</Step>
+
+<Step>
+
+Add a webhook endpoint at `https://books.example.com/api/stripe/webhook` that sends these events:
+
+- `checkout.session.completed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
+</Step>
+
+<Step>
+
+Put the secret key, the endpoint's signing secret and the six price IDs in your environment, then restart dubbl:
+
+```bash
+STRIPE_SECRET_KEY=sk_live_your_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_signing_secret
+STRIPE_STANDARD_PRICE_ID=price_1PstdMonthlyExample
+STRIPE_STANDARD_ANNUAL_PRICE_ID=price_1PstdAnnualExample
+STRIPE_PREMIUM_PRICE_ID=price_1PpremMonthlyExample
+STRIPE_PREMIUM_ANNUAL_PRICE_ID=price_1PpremAnnualExample
+STRIPE_ULTIMATE_PRICE_ID=price_1PultMonthlyExample
+STRIPE_ULTIMATE_ANNUAL_PRICE_ID=price_1PultAnnualExample
+```
+
+A plan whose price ID is missing can't be bought; dubbl says it "isn't available for purchase yet".
+
+</Step>
+
+<Step>
+
+Turn on the **Customer portal** in Stripe's billing settings. The **Invoices & payment** button in dubbl's billing settings opens it, so owners can see their invoices, change their card or cancel.
+
+</Step>
+
+</Steps>
+
+Owners then upgrade in **Settings**, **Billing**; see [Billing](/docs/guides/billing). The first upgrade goes through Stripe Checkout; switching between paid plans afterwards happens straight away, prorated. When Stripe reports a subscription canceled, the organization goes back to Free.
+
+## Invoice payment links
+
+With `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` set, the **Pay Now** button works on the payment page linked from invoice emails and from the customer portal: the customer pays the amount due by card in Stripe Checkout, and the same `/api/stripe/webhook` endpoint records the payment and marks the invoice paid.
+
+Good to know:
+
+- The money goes to the Stripe account whose `STRIPE_SECRET_KEY` you set, the instance's account, not to each organization's own Stripe. That suits a dubbl you run for one business; on a shared instance, every organization's customers would pay you.
+- The customer pays exactly the invoice's amount due. Tax is already in the invoice total, so Stripe Tax isn't used and doesn't need to be set up.
+- Without Stripe, the **Pay Now** button is still shown but answers "Billing not configured".
+- A card payment is recorded as a payment (method card, reference `Stripe: pi_...`) allocated to the invoice, and a journal entry is posted for it: your main bank account is debited and accounts receivable credited. The invoice becomes **Paid**, or **Partial** if something was still owing. If the payment date falls in a locked period, the webhook fails and Stripe tries again.
+- Paying an organization's own Stripe account (through Stripe Connect) isn't supported yet.
+
+## The Stripe integration
+
+This is the one most organizations want: they connect **their own** Stripe account in **Settings**, **Integrations**, and dubbl brings in their charges, refunds, fees and payouts. See [Integrations](/docs/guides/integrations). It uses Stripe Connect, so your instance needs a Connect platform.
+
+<Steps>
+
+<Step>
+
+In the Stripe dashboard, turn on **Connect** and set up OAuth for Standard accounts. Add this redirect URI:
+
+```
+https://books.example.com/api/v1/integrations/stripe/callback
+```
+
+It's `NEXT_PUBLIC_APP_URL` plus `/api/v1/integrations/stripe/callback`, so the two must match exactly.
+
+</Step>
+
+<Step>
+
+Add a second webhook endpoint at `https://books.example.com/api/integrations/stripe/webhook`, set to listen to events on **Connected accounts**. dubbl handles these:
+
+`charge.succeeded`, `charge.refunded`, `charge.expired`, `charge.dispute.created`, `charge.dispute.closed`, `payout.paid`, `payout.failed`, `payout.canceled`, `payout.updated`, `customer.created`, `customer.updated`, `customer.deleted`, `invoice.paid`, `invoice.payment_failed`, `invoice.voided`, `payment_intent.payment_failed`, `transfer.created`, `transfer.reversed`, `credit_note.created`, `credit_note.updated`, `credit_note.voided`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `account.application.deauthorized`.
+
+</Step>
+
+<Step>
+
+Set the Connect client ID and that endpoint's signing secret, alongside `STRIPE_SECRET_KEY`:
+
+```bash
+STRIPE_CONNECT_CLIENT_ID=ca_your_connect_client_id
+STRIPE_CONNECT_WEBHOOK_SECRET=whsec_your_connect_signing_secret
+```
+
+</Step>
+
+</Steps>
+
+Each event is processed once (dubbl remembers the event ID). An event that fails is retried by the hourly `stripe-retry` job, up to three times within seven days, so [background jobs](/docs/self-hosting/background-jobs) should be running. When someone disconnects dubbl from inside Stripe, the `account.application.deauthorized` event marks the connection disconnected.
+
+## Give an organization a plan by hand
+
+Site admins can set any organization's plan without Stripe: in the admin area, open **Organizations**, choose the organization and use the **Plan & Limits** tab. Pick the **Plan Tier**, set **Billing** to **Manual**, change any limit under **Limit Overrides**, and choose **Save Changes**. An organization on manual billing can't change its own plan.
+
+<Shot name="selfhost-admin-settings" alt="The admin Site Settings page, showing whether Stripe is configured" />
+
+**Settings** in the admin area shows **Stripe status**: either "Stripe is configured. Billing features are active." or "Stripe is not configured. All organizations get unlimited features." When **Self-hosted unlimited mode** is **Always on** or **Always off**, it says that instead, since the setting decides.
+
+## Related
+
+<Cards>
+  <Card title="Billing" href="/docs/guides/billing" description="Plans and billing, from an owner's side." />
+  <Card title="Integrations" href="/docs/guides/integrations" description="Connecting a Stripe account to an organization." />
+  <Card title="Configuration" href="/docs/self-hosting/configuration" description="Every Stripe variable." />
+</Cards>

@@ -1,0 +1,65 @@
+---
+title: Bank reconciliation
+description: What reconciling means, why the bank and your books disagree, and how to make them match.
+icon: Landmark
+---
+
+Reconciling means checking your books against your bank statement, line by line, until they agree. The bank is an independent record of every dollar that moved, so if your books match it, you can trust them. If they don't, the difference points you straight at what's missing: a fee you didn't record, a payment entered twice, a check that hasn't cleared.
+
+<ShortVersion>
+
+- Your books and your bank statement should tell the same story, but timing and missing entries make them drift.
+- Reconciling = ticking off every line that appears in both, then explaining what's left.
+- Lines only on the statement (fees, interest) need adding to your books.
+- Lines only in your books (an uncashed check) are usually just waiting to clear.
+- When the difference is $0.00, you're reconciled. Do it every month.
+
+</ShortVersion>
+
+## Why they disagree
+
+Your books and the bank record the same money, but not always at the same time, and not always the same things. At the end of March, one business's statement and books look like this:
+
+<ReconcileMatch />
+
+Three lines appear in both: that's normal. The other two are the interesting part:
+
+- **The bank fee** is on the statement but not in the books. The bank took it; nobody told you. You need to record it.
+- **Check #1042** is in the books but not on the statement. You wrote it on March 28; the supplier hasn't cashed it yet. Nothing to fix: it will appear next month.
+
+## Closing the gap
+
+Start from the balance in your books, account for each unmatched line, and you land exactly on the statement balance:
+
+<ReconcileBridge />
+
+That's what reconciliation proves. Every dollar of difference has a reason. If you can't explain a difference, something is wrong in the books: a missing transaction, a duplicate, or a typo in an amount.
+
+## How it works in dubbl
+
+First, bring the bank's lines in. On a bank account, **Import** a statement file (dubbl reads CSV, OFX, QFX, QIF, CAMT, MT940 and more), then give each line a category so it lands in your books. Lines move from **To do** to **Done** as you go.
+
+<Shot name="learn-bank-account" alt="A bank account with To do, Done and Ignored counts, recent transactions with Categorize buttons, and Match statement to your books" pins />
+
+Then choose **Match statement to your books**. Tell dubbl the statement's dates and its opening and closing balances, and tick each line that appears on the statement. dubbl shows the **Bank statement balance**, the **Balance in your books** and the **Difference** as you go.
+
+<Shot name="learn-reconcile" alt="Match statement to your books: statement balance, balance in your books and the difference, with lines matched and not yet matched" pins />
+
+When the difference reaches $0.00, choose **Finish statement check**. If a small difference remains that you've decided not to chase, **Write off the difference** posts it to a **Bank Reconciliation Adjustments** account (income or expense, whichever way the difference goes) so you can finish. Use it sparingly: an unexplained difference is usually a real mistake.
+
+## Good to know
+
+- Only lines already in your books can be ticked off. Categorize new bank lines first.
+- Reconcile monthly, as soon as the statement is out. A month is easy to untangle; a year is not.
+- Check the opening balance first. If it doesn't match last month's closing balance, something changed in a period you already reconciled.
+- [Bank rules](/docs/guides/categorizing-transactions#bank-rules-let-dubbl-remember) categorize repeating lines (rent, subscriptions) automatically, which makes the monthly check much faster.
+- A business credit card added under **Bank accounts** is reconciled the same way, against its card statement.
+
+## Related
+
+<Cards>
+  <Card title="Reconciliation guide" href="/docs/guides/reconciliation" description="Every step of matching a statement in dubbl." />
+  <Card title="Importing transactions" href="/docs/guides/importing-transactions" description="Bring statement files into dubbl." />
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Put bank lines in your books, and set up rules." />
+  <Card title="Closing the books" href="/docs/learn/closing-the-books" description="Reconciling is step two of the month-end close." />
+</Cards>

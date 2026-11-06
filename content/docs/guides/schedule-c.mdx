@@ -1,0 +1,122 @@
+---
+title: Schedule C
+description: Line up your income and expenses with the lines of IRS Schedule C, ready to hand to your tax preparer.
+icon: Calculator
+---
+
+If you're a US sole proprietor or single-member LLC, your business profit goes on Schedule C of your Form 1040. The **Schedule C Worksheet** adds up a year of your books and puts each total next to the Schedule C line it belongs on. It's a worksheet for you and your preparer, not a filing tool.
+
+<Shot name="schedule-c" alt="The Schedule C Worksheet with the tax prep note, income against expenses and the line 31 net profit" pins />
+
+## Get your Schedule C figures
+
+<Steps>
+
+<Step>
+
+Open **Tax** in the sidebar and choose **Schedule C**. The tab shows for companies based in the US.
+
+</Step>
+
+<Step>
+
+Check the period. It starts on the whole current year; choose **Last Year** when you're preparing last year's return.
+
+</Step>
+
+<Step>
+
+Under **Count income and costs**, choose **When invoiced or billed** (accrual method) or **When money moves** (cash method, which most sole proprietors use). Pick the method you file with.
+
+</Step>
+
+<Step>
+
+Read **Part I · Income** and **Part II · Expenses**. Each line lists the accounts behind it. The large figure is **Line 31 · Net Profit**, or **Net Loss** when costs beat income.
+
+</Step>
+
+<Step>
+
+Choose **Export CSV** and send it to your preparer, or import it into your tax software.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- There's nothing to set up. Each income and expense account goes on a line by its type and name, so the standard chart of accounts works straight away: **Marketing & Advertising** goes on line 8, **Rent Expense** on line 20b, **Wages & Salaries** on line 26, and so on.
+- Costs of goods sold go on line 4. Interest, rental and other non-trading income go on line 6.
+- Anything that doesn't match a line goes on line 27a, other expenses, such as bank fees and software.
+- Income tax, unrealised currency gains and losses, and gains or losses on selling assets are left out. They don't belong on Schedule C.
+- Line 3 is line 1 minus returns and allowances (line 2), and **Gross Income** is line 7: line 3, minus cost of goods sold, plus other income.
+- Several accounts can land on the same line. Their totals are added together.
+- The worksheet reads posted entries in your ledger, so invoices, bills, expenses, bank transactions and journals all count.
+
+## Which accounts go on which line
+
+<TaxReturnMap
+  rows={[
+    { box: "1", label: "Gross receipts or sales", from: "Trading income accounts", source: "ledger" },
+    { box: "2", label: "Returns and allowances", from: "Income accounts named returns, refunds or discounts", source: "ledger" },
+    { box: "3", label: "Line 1 minus line 2", from: "Line 1 - Line 2", source: "sum" },
+    { box: "4", label: "Cost of goods sold", from: "Cost of sales accounts", source: "ledger" },
+    { box: "6", label: "Other income", from: "Non-trading income, such as interest", source: "ledger" },
+    { box: "7", label: "Gross income", from: "Line 3 - Line 4 + Line 6", source: "sum" },
+    { box: "8", label: "Advertising", from: "Advertising, marketing", source: "ledger" },
+    { box: "9", label: "Car and truck expenses", from: "Vehicle, fuel, mileage", source: "ledger" },
+    { box: "10", label: "Commissions and fees", from: "Commissions, payment processing", source: "ledger" },
+    { box: "11", label: "Contract labor", from: "Subcontractors, contractors", source: "ledger" },
+    { box: "13", label: "Depreciation", from: "Depreciation, amortization", source: "ledger" },
+    { box: "14", label: "Employee benefit programs", from: "Employee benefits", source: "ledger" },
+    { box: "15", label: "Insurance (other than health)", from: "Insurance", source: "ledger" },
+    { box: "16b", label: "Other interest", from: "Interest expense", source: "ledger" },
+    { box: "17", label: "Legal and professional services", from: "Legal, accounting, professional fees", source: "ledger" },
+    { box: "18", label: "Office expense", from: "Office supplies, postage", source: "ledger" },
+    { box: "20b", label: "Rent or lease: other business property", from: "Rent", source: "ledger" },
+    { box: "21", label: "Repairs and maintenance", from: "Repairs, maintenance", source: "ledger" },
+    { box: "23", label: "Taxes and licenses", from: "Payroll tax, licenses", source: "ledger" },
+    { box: "24a", label: "Travel", from: "Travel", source: "ledger" },
+    { box: "24b", label: "Meals", from: "Meals, entertainment", source: "ledger" },
+    { box: "25", label: "Utilities", from: "Utilities, internet, phone", source: "ledger" },
+    { box: "26", label: "Wages", from: "Wages, salaries", source: "ledger" },
+    { box: "27a", label: "Other expenses", from: "Every other expense account", source: "ledger" },
+    { box: "31", label: "Net profit or loss", from: "Line 7 - Line 28 (total expenses)", source: "sum", key: true },
+  ]}
+  caption="Accounts are matched by name and type. A sub type such as advertising or travel on an account sends it to that line directly."
+/>
+
+To force an account onto a particular line, open it from **Accounting**, **Chart of Accounts**, go to its settings and set **Sub Type** to a line code: `advertising`, `car_truck`, `commissions`, `contract_labor`, `depreciation`, `employee_benefits`, `insurance`, `interest_mortgage`, `interest_other`, `legal_professional`, `office_expense`, `pension`, `rent_lease_vehicles`, `rent_lease_other`, `repairs_maintenance`, `supplies`, `taxes_licenses`, `travel`, `meals`, `utilities`, `wages`, `other_expenses`, `income` or `returns_allowances`.
+
+<Fold>
+
+## What the worksheet doesn't do
+
+- It doesn't file anything with the IRS, and it doesn't work out your self-employment tax or what you owe.
+- It shows cost of goods sold as one total on line 4, not the Part III breakdown. Home office (line 30) and health insurance aren't filled in. Your preparer handles those.
+- Meals show the full amount booked to the account. Usually only half is deductible; your preparer applies the limit.
+
+</Fold>
+
+<Fold>
+
+## Getting the books ready for tax time
+
+A worksheet is only as good as the books behind it. Before you export:
+
+- Categorize every bank transaction for the year. See [Categorizing transactions](/docs/guides/categorizing-transactions).
+- Reconcile each bank account to its statement. See [Reconciliation](/docs/guides/reconciliation).
+- Read the [Profit and loss](/docs/guides/profit-and-loss) for the same year. Its profit should match line 31, apart from anything left out on purpose (income tax, unrealised currency movements, asset sales).
+- If you paid contractors, check who needs a [1099](/docs/guides/form-1099).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="Account names, types and sub types." />
+  <Card title="Profit and loss" href="/docs/guides/profit-and-loss" description="The same year as money in and money out." />
+  <Card title="1099 forms" href="/docs/guides/form-1099" description="Which contractors you paid enough to report." />
+  <Card title="For solopreneurs" href="/docs/learn/for-solopreneurs" description="Bookkeeping basics when it's just you." />
+</Cards>

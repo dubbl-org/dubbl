@@ -1,0 +1,144 @@
+---
+title: Import and export
+description: "Move data in from QuickBooks, Xero, FreshBooks, Wave or a spreadsheet, and get it out again as CSV or a ZIP, by hand or over the API."
+icon: ArrowLeftRight
+---
+
+Your data is yours. **Import & Export** in settings brings records in from other bookkeeping tools and takes them out again as CSV files, and the same work is open to the API and the MCP server for scripted migrations and regular exports. This page is the developer's view; for a guided move from another tool, start with [Bring your data](/docs/guides/import-data).
+
+<Shot name="dev-export" alt="The Import & Export settings page: source systems, the seven things you can import and the export checklist" />
+
+## Export your data
+
+<Steps>
+
+<Step>
+
+Open **Settings** and choose **Import & Export**.
+
+</Step>
+
+<Step>
+
+Under **Export Data**, tick what you want: **Chart of Accounts**, **Contacts**, **Invoices**, **Bills**, **Journal Entries**, **Products** and **Bank Transactions**. Those marked **date range** can be limited with **From** and **To**.
+
+</Step>
+
+<Step>
+
+Choose **Export Selected** for one CSV per item, or **Export All as ZIP** for every CSV in one file.
+
+</Step>
+
+</Steps>
+
+Over the API, each export is a `GET` that returns the CSV itself:
+
+```bash
+curl "https://dubbl.dev/api/v1/export/invoices?startDate=2026-01-01&endDate=2026-09-30" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -o invoices.csv
+
+curl "https://dubbl.dev/api/v1/export/all" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -o dubbl-export.zip
+```
+
+```csv
+invoiceNumber,contactName,date,dueDate,status,lineDescription,lineQty,lineUnitPrice,lineAmount,lineAccountCode
+INV-00011,Acme Corp,2026-10-13,2026-11-12,sent,Brand refresh,1.00,4500.00,4500.00,4000
+```
+
+## Good to know
+
+- Exported CSVs show money as decimals (`4500.00`), not cents, so they open cleanly in a spreadsheet.
+- Invoices and bills export one row per line, repeating the document's number, customer and dates.
+- `startDate` and `endDate` work on invoices, bills, journal entries and bank transactions. The ZIP always has everything.
+- Imports run in dependency order: bring in the **Chart of Accounts** and **Contacts** first, then the documents that refer to them.
+- Real bank statements (OFX, QFX, CAMT, MT940 and more) don't go through this page. Use **Import statement** on the bank account; see [Importing transactions](/docs/guides/importing-transactions).
+
+## How an import works
+
+<ImportPipeline />
+
+Each kind of record has a `preview` and an `import` endpoint under `/api/v1/bulk/`: `accounts`, `contacts`, `products`, `invoices`, `bills`, `entries` and `bank-transactions`. Both take the rows as JSON objects with dubbl's field names.
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/bulk/contacts/import" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileName": "customers.csv",
+    "rows": [
+      { "name": "Acme Corp", "email": "ap@acme.example", "type": "customer", "billingCity": "Austin", "billingCountry": "US" },
+      { "name": "Pinnacle Group", "email": "finance@pinnacle.example", "type": "both" }
+    ]
+  }'
+```
+
+```json
+{
+  "job": {
+    "id": "b8e2f1a4-3c6d-4e57-9a18-0d4f7c2b9e63",
+    "type": "contacts",
+    "fileName": "customers.csv",
+    "status": "completed",
+    "totalRows": 2,
+    "processedRows": 2,
+    "errorRows": 0,
+    "errorDetails": null
+  }
+}
+```
+
+Rows that fail don't stop the rest: they're counted in `errorRows` and listed in `errorDetails` with their row number. The job is `failed` only if every row failed. `GET /api/v1/bulk/import-jobs` lists past imports, which also show under **Recent Imports** in settings.
+
+<Fold>
+
+## Fields for each import
+
+| Type | Fields (required in bold) |
+| --- | --- |
+| `accounts` | **`code`**, **`name`**, **`type`** (`asset`, `liability`, `equity`, `revenue` or `expense`), `subType`, `description` |
+| `contacts` | **`name`**, `email`, `phone`, `type` (`customer`, `supplier` or `both`), `taxNumber`, `billingLine1`, `billingCity`, `billingState`, `billingPostalCode`, `billingCountry` |
+| `products` | **`name`**, `sku`, `description`, `unitPrice`, `costPrice`, `type`, `quantityOnHand` |
+| `invoices` | `invoiceNumber`, **`contactName`**, `contactEmail` or `contactId` (one is needed), **`issueDate`**, `dueDate`, `reference`, `currencyCode`, **`lineDescription`**, `lineQuantity`, `lineUnitPrice`, `lineAmount`, `lineAccountCode`, `lineTaxRate` (one row per line; rows with the same `invoiceNumber` make one draft invoice) |
+| `bills` | **`contactName`**, **`issueDate`**, **`dueDate`**, `billNumber`, **`lineDescription`**, `lineQuantity`, `lineUnitPrice`, `lineAmount`, `lineAccountCode` |
+| `entries` | **`date`**, **`description`**, **`lineAccountCode`**, `debit`, `credit`, `entryNumber`, `reference` (one row per line; rows with the same `entryNumber` make one entry) |
+| `bank-transactions` | **`date`**, **`description`**, **`amount`**, **`bankAccountCode`**, `reference` |
+
+Prices and amounts in import rows are decimals, like a spreadsheet: `125.50`, not `12550`. Dates are `YYYY-MM-DD`.
+
+Imported invoices come in as drafts with the next dubbl number; the number from your file is kept as the `reference` when there isn't one. The customer must already exist. Without a `dueDate` the customer's payment terms (or your default terms) set it. `lineAccountCode` takes an account code or name and `lineTaxRate` a tax rate's name or percentage; blanks get the customer's default income account and tax rate, then your Sales account. A bad row skips only its own invoice. The older shape with a `lines` array on each row still works.
+
+</Fold>
+
+<Fold>
+
+## Imports from other tools
+
+Pick **QuickBooks**, **Xero**, **FreshBooks** or **Wave** under **Select your source system** and the wizard recognises that tool's export columns (for example Xero's `*ContactName` or QuickBooks' `Display Name`) and maps them to dubbl's fields. **Custom CSV** lets you map every column yourself. The column lists live in `lib/import-export/mappings/`, one file per tool; send a pull request if your tool's export has a column we don't know.
+
+</Fold>
+
+<Fold>
+
+## The same, through MCP
+
+An agent connected to the [MCP server](/docs/developers/mcp) has five tools for this:
+
+- `get_import_template`: the columns (and their aliases) expected for a source and record type.
+- `import_csv_data`: parse CSV text (quoted fields with commas and line breaks are fine), map the columns, validate and import accounts, contacts, products or invoices. Amounts as decimals.
+- `import_journal_entries`: balanced entries from rows, in cents, as drafts or posted.
+- `export_csv_data`: any of the seven exports as CSV text.
+- `list_import_jobs`: past imports, newest first.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bring your data" href="/docs/guides/import-data" description="The step-by-step move from another tool." />
+  <Card title="Backups" href="/docs/guides/backups" description="Snapshots you can restore, not just export." />
+  <Card title="API reference" href="/docs/developers/api-reference" description="Everything else the API can do." />
+</Cards>

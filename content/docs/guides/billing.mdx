@@ -1,0 +1,73 @@
+---
+title: Billing
+description: Compare dubbl Cloud's plans, see what you're using, and upgrade, switch or pay yearly.
+icon: CreditCard
+---
+
+On dubbl Cloud, each organization is on a plan: Free, Standard, Premium or Ultimate. Plans are priced per organization, never per person, and every paid plan includes unlimited users. **Settings > Billing** (or **Plans & billing** in your user menu) shows your plan, how much of it you're using, and lets the owner change it. If you run dubbl on your own server, there's nothing to pay and no limits.
+
+<PlanLimitsTable />
+
+## Change your plan
+
+<Steps>
+
+<Step>
+
+Open **Settings > Billing**. Only the owner can change the plan.
+
+</Step>
+
+<Step>
+
+Under **Plans**, pick **monthly** or **annual**. Paying yearly costs less per month.
+
+</Step>
+
+<Step>
+
+Choose **Upgrade**, **Switch** or **Downgrade** on the plan you want. Upgrading takes you to Stripe's checkout to pay; you come back to dubbl when it's done and see **Thanks! Your plan is active.**
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Invoices, quotes, bills, contacts, journal entries, every report, the API and MCP are unlimited on every plan, including Free.
+- The Free plan is for one person: one user, 3 bank accounts, 3 projects and payroll for 2 employees, in one currency.
+- **Current plan** shows meters for **Users**, **Payroll employees**, **Bank accounts**, **Projects**, **Storage** and **Emails this month**.
+- **Invoices & payment** opens Stripe's billing portal, where you manage your card and see what you've been charged.
+- If a payment fails you'll see **Payment failed**. Choose **Update payment** to fix it; adding members is paused until you do.
+- For more than Ultimate offers, the **Enterprise** card has a **Talk to us** link.
+
+<Fold>
+
+## What the limits mean
+
+- **Audit history** is how far back the [audit log](/docs/guides/audit-log) shows changes.
+- **Backups kept for** is how long automatic daily [backups](/docs/guides/backups) are kept. You can also keep 3, 10, 25 or 50 manual backups, depending on the plan.
+- **Emails a month** counts invoices, quotes and other documents dubbl emails for you.
+- **Consolidation** combines several organizations into one set of reports. See [Consolidation](/docs/guides/consolidation).
+
+When you reach a limit, dubbl refuses just that one thing (another bank account, another upload, another email) with a message saying what your plan includes. Nothing you already have is removed.
+
+</Fold>
+
+<Fold>
+
+## Self-hosted servers
+
+When dubbl runs on your own server without Stripe billing set up, the Billing page says **Every feature unlocked**: every feature is included with no limits and no subscription. See [Self-hosting](/docs/self-hosting).
+
+<Shot name="billing" alt="The Billing page on a self-hosted server, saying every feature is unlocked" />
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Invite the team your plan includes." />
+  <Card title="Backups" href="/docs/guides/backups" description="How long backups are kept on each plan." />
+  <Card title="Self-hosting" href="/docs/self-hosting" description="Run dubbl on your own server." />
+</Cards>

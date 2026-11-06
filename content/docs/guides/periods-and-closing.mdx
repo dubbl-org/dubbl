@@ -1,0 +1,138 @@
+---
+title: Periods and closing
+description: Set up your financial years, lock past dates so finished numbers can't change, and close a year to carry its profit into retained earnings.
+icon: CalendarCheck
+---
+
+Once you've filed a tax return or handed numbers to your accountant, those numbers shouldn't move. dubbl gives you two ways to freeze the past. A **lock date** stops anything dated on or before a day from being added or changed. **Closing a financial year** goes further: it moves the year's profit into retained earnings and locks the whole year.
+
+<Shot name="financial-years" alt="The financial years page with the form to add a year open and the current year with its Close year button" pins />
+
+## Close a financial year
+
+<Steps>
+
+<Step>
+
+Make sure the year is finished: bank accounts [reconciled](/docs/guides/reconciliation), bills and invoices entered, and no drafts left dated inside the year.
+
+</Step>
+
+<Step>
+
+Open **Accounting**, then **Financial years**.
+
+</Step>
+
+<Step>
+
+On the year, choose **Close year**.
+
+</Step>
+
+<Step>
+
+Read the summary and choose **Close the year**. The year shows **Closed and locked**.
+
+</Step>
+
+</Steps>
+
+<Shot name="financial-years-close" alt="The Close FY 2026 confirmation explaining the closing entry and the lock" narrow />
+
+## Good to know
+
+- You can't close a year that still has draft entries dated inside it. Post or delete them first.
+- Closing locks past dates through the last day of that year. If your lock date was already later, it stays where it is.
+- Nothing dated inside a closed year can be added, edited, posted or reversed. That covers invoices, bills, payments, bank lines and journal entries.
+- Made a mistake? **Reopen** removes the closing entry and unlocks the year. Close it again when you've fixed it.
+- Only members allowed to lock past dates (owners, by default) can set the lock date or close a year. See [Members and roles](/docs/guides/members-and-roles).
+
+## Where your books stand
+
+<PeriodLockTimeline />
+
+<Fold>
+
+## What gets recorded in your books
+
+Closing posts one entry, dated the last day of the year and called "Year-end closing entry for FY 2026". It empties every revenue and expense account and moves the difference, your profit or loss for the year, into retained earnings. Next year's profit and loss starts from zero; the balance sheet carries on.
+
+<JournalEntry
+  title="Year-end closing entry for FY 2026"
+  date="Dec 31, 2026"
+  lines={[
+    { account: "4010 Service Revenue", debit: 12000000 },
+    { account: "5100 Wages & Salaries", credit: 6000000 },
+    { account: "5200 Rent Expense", credit: 4200000 },
+    { account: "3100 Retained Earnings", credit: 1800000, note: "the year's profit" },
+  ]}
+  caption="$120,000 earned, $102,000 spent: $18,000 profit stays in the business as retained earnings."
+/>
+
+dubbl uses the retained earnings account set in your organization settings, or else your equity account with the "retained" sub type. The idea is explained in [Closing the books](/docs/learn/closing-the-books).
+
+</Fold>
+
+<Fold>
+
+## Lock past dates
+
+Use a lock date when you've finished a month or quarter, such as after filing a VAT return, but the year isn't over.
+
+<Steps>
+
+<Step>
+
+Open **Settings** and scroll to **Lock past dates**.
+
+</Step>
+
+<Step>
+
+Under **Lock everything up to and including**, pick the last day to lock.
+
+</Step>
+
+<Step>
+
+Choose **Lock dates**. dubbl confirms "Nothing dated on or before" that day "can be added or changed."
+
+</Step>
+
+</Steps>
+
+<Shot name="lock-dates" alt="The Lock past dates setting with a date picked and the Lock dates button" />
+
+To unlock part of the past, pick an earlier date and lock again. Anything blocked by the lock shows an error naming the lock date, so you'll know why a save didn't go through.
+
+The lock covers everything that posts to your books, not just what you type in: accrual months, loan payments, opening balances, value drops on fixed assets and recurring journals. The nightly runs skip anything dated in a locked period instead of posting it.
+
+</Fold>
+
+<Fold>
+
+## Add a financial year
+
+Your organization has a **Fiscal year start** month in **Settings**. On **Financial years**, choose **Add a year**: dubbl fills in the next year's **Name**, **Starts** and **Ends** from that month. Change them if you need to, then choose **Add year**.
+
+Each year shows its dates and where it stands: **Current**, **Open**, **Over, not closed yet** or **Closed and locked**.
+
+</Fold>
+
+<Fold>
+
+## Lock dates for advisors
+
+Under **Lock past dates** in **Settings**, **Advisor lock date (optional)** sets a second, earlier lock date for your [advisors](/docs/guides/members-and-roles#accountants-and-advisors) and anyone whose role includes **Work in dates locked for staff (advisor lock)**. They can still adjust the recent past while everyone else is held at the main lock date. See [Organization](/docs/guides/organization#lock-past-dates).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Closing the books" href="/docs/learn/closing-the-books" description="What month-end and year-end close mean." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="Make sure your bank matches before you close." />
+  <Card title="Opening balances" href="/docs/guides/opening-balances" description="Where your first year starts from." />
+  <Card title="Balance sheet" href="/docs/guides/balance-sheet" description="Retained earnings after the close." />
+</Cards>

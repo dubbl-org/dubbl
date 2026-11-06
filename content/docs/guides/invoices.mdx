@@ -1,0 +1,173 @@
+---
+title: Invoices
+description: Bill your customers, send invoices by email, and track every payment until it's settled.
+icon: FileText
+---
+
+An invoice asks a customer to pay you for work you've done or goods you've sold. dubbl numbers it, sends it with a PDF, records it in your books the moment it goes out, and keeps track of what's still owed until the last payment lands.
+
+<Shot name="invoices" alt="The invoices list with totals, a chart by month, top customers and the list of invoices" pins />
+
+## Send your first invoice
+
+<Steps>
+
+<Step>
+
+Open **Sales** and choose **New Invoice** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **customer**, check the **issue date** and **due date**, and add a **reference** if they gave you a PO number. The due date follows the customer's payment terms.
+
+</Step>
+
+<Step>
+
+Add a **line** for each thing you're billing: a description, quantity, price, the income account it belongs to and a tax rate if one applies. The customer's default income account and tax rate from **Bookkeeping** are filled in for you. A line left without an account is recorded in your Sales account.
+
+</Step>
+
+<Step>
+
+Choose **Create Invoice**. It's saved as a draft you can still change.
+
+</Step>
+
+<Step>
+
+On the invoice, choose **Send**. dubbl emails it with the PDF attached and the invoice becomes **Sent**.
+
+</Step>
+
+</Steps>
+
+<Shot name="invoice-new" alt="The New Invoice drawer with a customer, dates and one line filled in" narrow />
+
+## Good to know
+
+- Nothing reaches your books while an invoice is a draft. Sending it is what records the sale.
+- An unpaid invoice past its due date shows as **Overdue** on its own; you don't have to mark it.
+- Every amount is worked out for you: line amounts, tax per line, the subtotal and the total.
+- You can record part payments. The invoice shows **Part paid** until the rest arrives.
+- If the invoice takes the customer over their **Credit limit**, you get a warning saying by how much. The invoice is still created.
+- You can't send an invoice dated in a period you've [closed or locked](/docs/guides/periods-and-closing).
+- A sent invoice can't be edited. To correct one, cancel it and make a copy, or issue a [credit note](/docs/guides/credit-notes).
+
+## How an invoice moves
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Saved, not sent. Change anything." },
+    { name: "Awaiting approval", t: "info", note: "Optional. Someone approves it first." },
+    { name: "Sent", t: "info", note: "Emailed or marked sent. Recorded in your books." },
+    { name: "Part paid", t: "watch", note: "Some money in, some still owed." },
+    { name: "Paid", t: "good", note: "Settled in full." },
+  ]}
+  caption="Unpaid invoices past their due date show as Overdue. Cancelled invoices stop counting toward what you're owed."
+/>
+
+<Shot name="invoice-draft" alt="A draft invoice to CloudBase Systems with Send, Submit for approval, Download PDF and the payment status" pins />
+
+<Fold>
+
+## What gets recorded in your books
+
+Sending an invoice posts one journal entry: what the customer owes goes up, and so does your income. Any tax you charged is money you'll pass on to the tax office, so it's recorded as a liability, not income.
+
+<JournalEntry
+  title="Invoice INV-00011 sent to Acme Corp"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 495000 },
+    { account: "Sales", credit: 450000 },
+    { account: "Sales tax payable", credit: 45000 },
+  ]}
+  caption="A $4,500 invoice with 10% tax. Debits and credits always match."
+/>
+
+When the customer pays, the money moves from what they owe into your bank account:
+
+<JournalEntry
+  title="Payment received for INV-00011"
+  date="Nov 2, 2026"
+  lines={[
+    { account: "Checking account", debit: 495000 },
+    { account: "Accounts receivable", credit: 495000 },
+  ]}
+/>
+
+New to debits and credits? [Double-entry bookkeeping](/docs/learn/double-entry) explains them in five minutes.
+
+</Fold>
+
+<Fold>
+
+## Recording a payment
+
+When money arrives, open the invoice and choose **Record Payment**. Enter the amount, the date it arrived, how it was paid (bank transfer, cash, check, card or other) and, under **Paid into**, the bank account it went into. A payment smaller than what's owed leaves the invoice **Part paid**.
+
+<Shot name="invoice-payment" alt="The Record Payment dialog with amount, date and method" narrow />
+
+Money a customer already paid you, from a credit note, a prepayment or an earlier overpayment, can be applied to the invoice instead. See [Payments received](/docs/guides/payments-received).
+
+</Fold>
+
+<Fold>
+
+## Sending by email
+
+**Send** opens the email before it goes: who it's to (the customer's email, which you can change), the subject and the message. The PDF is attached unless you untick it. Each email is kept in the invoice's history, so you can see what was sent and when.
+
+To record invoices you delivered another way, by post or in person, select them in the list and choose **Mark as sent**. They're recorded in your books exactly as if you'd sent them, without an email going out.
+
+</Fold>
+
+<Fold>
+
+## Approvals before sending
+
+If someone should check invoices before they go out, tick **Submit for approval instead of sending** when you create one, or choose **Submit for approval** on a draft. The invoice waits as **Awaiting approval** until a member who can approve invoices approves it (it can then be sent) or rejects it with a reason. See [Approvals](/docs/guides/approvals) for who can approve what.
+
+</Fold>
+
+<Fold>
+
+## Deposits and retainers
+
+To bill up front, tick **This is a deposit / retainer invoice** and choose **Deposit** (part of a job, before you start) or **Retainer** (an ongoing amount for future work). You can note the deposit percentage. The customer pays it like any invoice, and the money is held against the work it's for.
+
+</Fold>
+
+<Fold>
+
+## Late fees and customers who won't pay
+
+- **Charge interest** bills the customer for paying late. It creates a separate invoice for the fee, worked out from the rate, method and grace period under **Late payment interest** in [Settings > General](/docs/guides/organization#late-payment-interest). Until a rate is set there, dubbl says "No interest rate configured" instead.
+- **Write off** gives up on the unpaid amount: it's recorded as a bad-debt loss and stops counting toward what you're owed. You can't undo it. If the customer pays after all, the money can still be recorded, as a bad debt recovered.
+- **Cancel invoice** is for invoices that shouldn't exist, such as a mistake. It reverses what the invoice recorded. An invoice with payments or credit applied, or with a [revenue schedule](/docs/guides/revenue-schedules) in progress, can't be cancelled until those are removed.
+
+Automatic reminders for overdue invoices are covered in [Payment reminders](/docs/guides/payment-reminders).
+
+</Fold>
+
+<Fold>
+
+## Copies, PDFs and attachments
+
+- **Make a copy** creates a new draft with the same customer and lines, ready to change and send.
+- **Download PDF** gets the PDF your customer receives. Its layout comes from your [document templates](/docs/guides/document-templates).
+- **Attachments** keeps the customer's PO, a signed copy or timesheets with the invoice.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Recurring invoices" href="/docs/guides/recurring-invoices" description="Bill the same customer on a schedule." />
+  <Card title="Credit notes" href="/docs/guides/credit-notes" description="Refund or reduce what a customer owes." />
+  <Card title="Payment reminders" href="/docs/guides/payment-reminders" description="Chase overdue invoices automatically." />
+  <Card title="Aged receivables" href="/docs/guides/aged-receivables-and-payables" description="See who owes you, and for how long." />
+</Cards>

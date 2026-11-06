@@ -1,0 +1,79 @@
+---
+title: For solopreneurs
+description: A simple bookkeeping system for running your own business, and the parts of dubbl you'll actually use.
+icon: Briefcase
+---
+
+If you work for yourself, you don't need to become an accountant. You need a simple system you'll actually keep up with: one bank account for the business, invoices for everything you earn, a receipt for everything you spend, and ten minutes a week. This page sets that system up, using only the parts of dubbl a one-person business needs.
+
+<ShortVersion>
+
+- Keep business money in its own bank account. Never mix it with personal spending.
+- Invoice for every job, and attach a receipt to every business expense.
+- Pay yourself by moving money to your personal account: an **owner's draw**, not a salary or an expense.
+- Set money aside for tax as it comes in, so the bill is never a shock.
+- Categorize weekly, reconcile monthly, close the year once.
+
+</ShortVersion>
+
+<Callout type="warn" title="Not tax advice">
+Tax rules depend on where you live, how your business is set up and how much you earn. dubbl keeps the records and does the arithmetic; a tax professional can tell you what to file and what you can deduct.
+</Callout>
+
+## Your money map
+
+Every dollar in a small business should travel a short, visible path:
+
+<SoloMoneyMap />
+
+**One business bank account** is the single most useful habit. When everything business goes through it and nothing personal does, your bank statement *is* your bookkeeping, and reconciling takes minutes.
+
+## Paying yourself
+
+As a sole owner, you usually don't pay yourself a salary through payroll. You simply move money from the business account to your personal one. In the books that's an **owner's draw**: it reduces your equity in the business, but it isn't an expense, so it doesn't lower your profit.
+
+<JournalEntry
+  title="Owner's draw, March"
+  date="Mar 31, 2026"
+  lines={[
+    { account: "Owner's draw", debit: 400000 },
+    { account: "Checking account", credit: 400000 },
+  ]}
+  caption="Taking money out isn't a cost of doing business, so it doesn't appear on the profit and loss."
+/>
+
+Putting your own money into the business works the other way round: debit the bank, credit **Owner's contribution**. In dubbl's US chart both are equity accounts (310 and 300); other countries' charts have their own equivalents.
+
+## A routine that sticks
+
+<SoloRhythm />
+
+## What to use in dubbl
+
+You can ignore most of dubbl's menus. These are the ones that matter for a business of one:
+
+- **[Invoices](/docs/guides/invoices)** for everything you earn. Use [recurring invoices](/docs/guides/recurring-invoices) for retainers.
+- **[Bank accounts](/docs/guides/bank-accounts)**: import your statements and categorize each line. [Bank rules](/docs/guides/categorizing-transactions) handle the repeats (software subscriptions, rent) for you.
+- **[Expenses](/docs/guides/expenses)** for things you paid personally that the business owes you back.
+- **[Documents](/docs/guides/documents)** to keep receipts with the transactions they belong to.
+- **[Reports](/docs/guides/reports)**: the profit and loss for how you're doing, and, in the US, [Schedule C](/docs/guides/schedule-c) to prepare your tax return.
+
+Your Overview pulls it together: cash in the bank, profit so far, who owes you, and a to-do list of what needs you.
+
+<Shot name="learn-overview" alt="The dubbl Overview: cash in bank, money in and out, profit, owed to you, you owe, and a to-do list" pins />
+
+## Good to know
+
+- Cash or accrual? As a solo business you can read your profit either way. [Accrual vs cash](/docs/learn/accrual-vs-cash) explains the difference.
+- If you bought equipment (a computer, a camera), it may need to be [depreciated](/docs/learn/depreciation) rather than expensed at once. Ask your accountant.
+- If you're registered for VAT, GST or sales tax, the tax you charge isn't yours. Keep it apart until the return is filed. See [sales tax and VAT](/docs/learn/sales-tax-and-vat).
+- Ask [Tilly](/docs/guides/tilly), dubbl's assistant, "How did this month go?" for a plain-English summary.
+
+## Related
+
+<Cards>
+  <Card title="Set up your business" href="/docs/guides/setup" description="Your company, currency and tax in a few minutes." />
+  <Card title="Double-entry bookkeeping" href="/docs/learn/double-entry" description="The one idea behind it all." />
+  <Card title="Closing the books" href="/docs/learn/closing-the-books" description="The monthly checklist, in full." />
+  <Card title="Schedule C" href="/docs/guides/schedule-c" description="US sole proprietors' tax summary." />
+</Cards>

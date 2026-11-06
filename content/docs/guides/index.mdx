@@ -1,18 +1,58 @@
 ---
-title: Guides
-description: Step-by-step tutorials for common workflows and setups.
+title: dubbl guides
+description: Everything dubbl does, screen by screen. Start with the basics or jump to the part of the business you're working on.
+icon: BookOpen
 ---
 
-import { Cards, Card } from "fumadocs-ui/components/card";
+dubbl is accounting software for the whole business: invoices and bills, the bank, tax, payroll, stock, projects and reports, on one set of books. Every screen below is from the demo company, so what you see here is what you'll see in the app.
 
-Practical guides covering common workflows in dubbl.
+<Shot name="overview" alt="The dubbl Overview: cash in the bank, money in and out, profit, what you're owed, and a to-do list" pins />
+
+## Start here
 
 <Cards>
-  <Card title="Developer Guide" description="Architecture, conventions, and how to contribute" href="/docs/guides/developer-guide" />
-  <Card title="API Integration" description="Build integrations using the REST API" href="/docs/guides/api-integration" />
-  <Card title="MCP Server" description="Connect AI agents via Model Context Protocol" href="/docs/guides/mcp" />
-  <Card title="Solopreneur Setup" description="Setting up dubbl as a solo business owner" href="/docs/guides/solopreneur-setup" />
-  <Card title="Tax Filing Prep" description="Using dubbl reports to prepare for tax filing" href="/docs/guides/tax-filing-prep" />
-  <Card title="Multi-Currency" description="Working with multiple currencies" href="/docs/guides/multi-currency" />
-  <Card title="Jurisdiction Guides" description="Compare jurisdictions for business formation" href="/docs/guides/jurisdictions" />
+  <Card icon={<Rocket />} title="Set up your business" href="/docs/guides/setup" description="Your company, currency, tax and opening numbers, in a few minutes." />
+  <Card icon={<Compass />} title="Finding your way" href="/docs/guides/finding-your-way" description="The rail, the panel, search and the create button." />
+  <Card icon={<Upload />} title="Bring your data" href="/docs/guides/import-data" description="Import contacts, invoices and balances from another tool." />
+  <Card icon={<Sparkles />} title="Ask Tilly" href="/docs/guides/tilly" description="An assistant that reads and works in your books." />
 </Cards>
+
+## Money in
+
+<Cards>
+  <Card icon={<FileText />} title="Invoices" href="/docs/guides/invoices" description="Bill customers and track every payment." />
+  <Card icon={<FilePen />} title="Quotes" href="/docs/guides/quotes" description="Price the work, then turn the quote into an invoice." />
+  <Card icon={<Repeat />} title="Recurring invoices" href="/docs/guides/recurring-invoices" description="Bill the same customer on a schedule." />
+  <Card icon={<BellRing />} title="Payment reminders" href="/docs/guides/payment-reminders" description="Chase overdue invoices without writing the emails." />
+</Cards>
+
+## Money out
+
+<Cards>
+  <Card icon={<Receipt />} title="Bills" href="/docs/guides/bills" description="Record what suppliers charge you and pay on time." />
+  <Card icon={<Wallet />} title="Expenses" href="/docs/guides/expenses" description="Receipts, claims and paying people back." />
+  <Card icon={<ClipboardList />} title="Purchase orders" href="/docs/guides/purchase-orders" description="Order from suppliers and match what arrives." />
+  <Card icon={<Banknote />} title="Paying bills" href="/docs/guides/paying-bills" description="Pay several bills at once, in batches." />
+</Cards>
+
+## The bank and the books
+
+<Cards>
+  <Card icon={<Landmark />} title="Bank accounts" href="/docs/guides/bank-accounts" description="Bring in transactions and keep balances right." />
+  <Card icon={<CheckCheck />} title="Reconciliation" href="/docs/guides/reconciliation" description="Match the bank statement to your books." />
+  <Card icon={<BookOpenCheck />} title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="The categories every amount is sorted into." />
+  <Card icon={<Percent />} title="Tax" href="/docs/guides/tax-rates" description="Tax rates, VAT and sales tax returns." />
+</Cards>
+
+## Running the business
+
+<Cards>
+  <Card icon={<ChartLine />} title="Reports" href="/docs/guides/reports" description="Profit and loss, balance sheet, cash flow and 40 more." />
+  <Card icon={<Package />} title="Inventory" href="/docs/guides/inventory" description="Stock levels, warehouses and what it's all worth." />
+  <Card icon={<Layers />} title="Projects" href="/docs/guides/projects" description="Tasks, time and billing for client work." />
+  <Card icon={<Users />} title="Payroll" href="/docs/guides/payroll" description="Employees, pay runs, leave and timesheets." />
+</Cards>
+
+## New to bookkeeping?
+
+[Learn](/docs/learn) explains the ideas behind the screens, with pictures: debits and credits, the chart of accounts, VAT, depreciation and closing the books. No accounting background needed.

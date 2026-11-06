@@ -1,0 +1,105 @@
+---
+title: Debits and credits
+description: What debit and credit really mean, and which one makes each kind of account go up.
+icon: ArrowLeftRight
+---
+
+"Debit" and "credit" are the two most confusing words in accounting, mostly because banks use them differently from bookkeepers. In bookkeeping they mean something very simple: **debit is the left side of an entry, credit is the right side.** That's all. Whether a side adds or subtracts depends on the kind of account it lands in.
+
+<ShortVersion>
+
+- Debit = left column. Credit = right column. Neither means good or bad.
+- Assets and expenses go **up** with a debit.
+- Liabilities, equity and revenue go **up** with a credit.
+- Every journal entry has equal debits and credits, so the books stay balanced.
+- In dubbl's reports, debits are sometimes labelled "money in side" and credits "money out side".
+
+</ShortVersion>
+
+## Left and right
+
+Remember from [double-entry bookkeeping](/docs/learn/double-entry) that every transaction has two sides. Accountants put one side in a left column and the other in a right column, and gave the columns names:
+
+<JournalEntry
+  title="Office rent for March, paid from the bank"
+  date="Mar 5, 2026"
+  lines={[
+    { account: "Rent", debit: 350000, note: "left: the expense goes up" },
+    { account: "Checking account", credit: 350000, note: "right: the bank goes down" },
+  ]}
+  caption="The debit column and the credit column always add up to the same total."
+/>
+
+Notice the rent line *increases* (you spent more on rent) while the bank line *decreases* (less money in the bank). One debit went up, one credit went down. So the side alone doesn't tell you up or down. The account type does.
+
+## Which side makes an account grow
+
+There are five types of account, and each one has a "home" side: the side that makes it bigger.
+
+<AccountTypeSides />
+
+Here's an easy way to remember it. Assets and expenses are things the business **has or uses**, and they grow on the left. Liabilities, equity and revenue are **where the money came from** (borrowed, invested, or earned), and they grow on the right. When you buy something, the thing you got (left) is paid for by where the money came from (right).
+
+<Callout type="info" title="Why your bank statement says the opposite">
+Your bank keeps *its* books, not yours. Your deposit is money the bank owes you, a liability for them, so they "credit" your account when you put money in. In your own books the same deposit is a debit to your bank account, because it's an asset to you.
+</Callout>
+
+## The everyday entries
+
+Most small businesses only ever need a handful of patterns. Learn these and you can read almost any entry in dubbl:
+
+<EverydayDebitsCredits />
+
+## A sale, followed through
+
+Here's one invoice and its payment, step by step. Watch Accounts receivable fill up and empty again:
+
+<SaleTAccounts />
+
+<JournalEntry
+  title="Invoice INV-00011 sent to Acme Corp"
+  date="Mar 2, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 450000 },
+    { account: "Sales", credit: 450000 },
+  ]}
+/>
+
+<JournalEntry
+  title="Payment received for INV-00011"
+  date="Mar 20, 2026"
+  lines={[
+    { account: "Checking account", debit: 450000 },
+    { account: "Accounts receivable", credit: 450000 },
+  ]}
+  caption="After both entries: the bank is up, sales are up, and Acme owes you nothing."
+/>
+
+## Writing an entry yourself
+
+You'll seldom need to, but when you do (a correction, a year-end adjustment) open **Accounting**, choose **New Entry**, and add one line per account. Put each amount in the **Debit** or **Credit** column. dubbl keeps a running total under each column and won't let you create the entry until they match.
+
+<Shot name="learn-new-entry" alt="The New manual entry drawer: Rent Expense debited 3500 and Checking Account credited 3500, with matching totals" narrow />
+
+The form's hint describes debits as "money in" and credits as "money out". That's true for a bank account line, but not in general: in the entry above, the debit to Rent is money going *out* of the business. Go by the account type, using the picture above.
+
+## Checking the balance: the trial balance
+
+Because every entry balances, the total of all debit balances across all your accounts must equal the total of all credit balances. dubbl's **Account balances check** report (accountants call it a trial balance) lists every account with its balance in the **Money in side** (debit) or **Money out side** (credit) column, and the two columns add up to the same total.
+
+<Shot name="learn-trial-balance" alt="The Account balances check report with Money in side and Money out side columns" pins />
+
+## Good to know
+
+- A positive balance in an account means it's on its home side: an asset with a debit balance, a liability with a credit balance. A balance on the "wrong" side (a bank account with a credit balance, for example) usually means an overdraft or a mistake.
+- Expenses and revenue start each financial year at zero. [Closing the books](/docs/learn/closing-the-books) explains why.
+- You can't save an unbalanced entry in dubbl, so you'll never have to hunt for a missing half of a transaction.
+
+## Related
+
+<Cards>
+  <Card title="Double-entry bookkeeping" href="/docs/learn/double-entry" description="Why there are always two sides." />
+  <Card title="The chart of accounts" href="/docs/learn/chart-of-accounts" description="The accounts, grouped by type." />
+  <Card title="Journal entries" href="/docs/guides/journal-entries" description="Write and fix entries in dubbl." />
+  <Card title="Glossary" href="/docs/learn/glossary" description="Every term in one place." />
+</Cards>

@@ -1,0 +1,225 @@
+---
+title: API reference
+description: "Every resource in the REST API, the endpoints that work on it, and a worked example from draft invoice to paid."
+icon: Braces
+---
+
+The REST API covers everything the app does: more than 500 endpoints under `/api/v1`, grouped by resource. This page maps them, so you can find the one you need and see how the main ones fit together. dubbl doesn't publish an OpenAPI file yet; each endpoint's exact fields are in its route file, and the path tells you where.
+
+<Frame caption="Every path matches a folder in the repository. Open route.ts to see the fields an endpoint accepts (its Zod schema) and what it returns.">
+  <div className="flex items-center gap-3 max-md:flex-col max-md:items-stretch">
+    <Box title="POST /api/v1/invoices/{id}/send" className="flex-1">The URL you call</Box>
+    <Arrow label="lives in" />
+    <Box title="app/api/v1/invoices/[id]/send/route.ts" className="flex-1">The handler, exporting POST</Box>
+  </div>
+</Frame>
+
+Base URL: `https://dubbl.dev/api/v1` (or your own domain if you self-host). Send your [API key](/docs/developers/authentication) on every request, and see [Conventions](/docs/developers/conventions) for cents, dates, pages and errors.
+
+## From draft invoice to paid
+
+The calls behind the most common job, in order.
+
+<Steps>
+
+<Step>
+
+**Create a draft.** Line prices are decimals here; everything that comes back is in cents.
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/invoices" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contactId": "5f2c8e14-7a3b-4c19-8d62-1e9b0a7c4f35",
+    "issueDate": "2026-10-13",
+    "reference": "PO-7781",
+    "lines": [
+      { "description": "Brand refresh", "quantity": 1, "unitPrice": 4500, "taxRateId": "9d0e5c7a-2b41-4f3e-8a6d-3c5b1e7f9a20" }
+    ]
+  }'
+```
+
+```json
+{
+  "invoice": {
+    "id": "0b7d3a62-58f1-4b8e-9a35-2f6c1d4e8a90",
+    "invoiceNumber": "INV-00011",
+    "status": "draft",
+    "issueDate": "2026-10-13",
+    "dueDate": "2026-11-12",
+    "subtotal": 450000,
+    "taxTotal": 45000,
+    "total": 495000,
+    "amountDue": 495000,
+    "currencyCode": "USD"
+  },
+  "creditLimitWarning": null
+}
+```
+
+Leave out `dueDate` and dubbl works it out from the customer's payment terms (or your organization's default).
+
+</Step>
+
+<Step>
+
+**Send it.** With no body, the invoice is marked as sent and recorded in your books, without an email. To email it, send `sendEmail: true` with `recipientEmail`, `subject` and the email's `templateProps`.
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/invoices/0b7d3a62-58f1-4b8e-9a35-2f6c1d4e8a90/send" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE"
+```
+
+</Step>
+
+<Step>
+
+**Record the payment** when the money arrives. This amount is in cents.
+
+```bash
+curl -X POST "https://dubbl.dev/api/v1/invoices/0b7d3a62-58f1-4b8e-9a35-2f6c1d4e8a90/pay" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE" \
+  -H "Content-Type: application/json" \
+  -d '{ "amount": 495000, "date": "2026-11-02", "method": "bank_transfer", "reference": "Wire 88213" }'
+```
+
+```json
+{
+  "invoice": { "id": "0b7d3a62-58f1-4b8e-9a35-2f6c1d4e8a90", "status": "paid", "amountPaid": 495000, "amountDue": 0 },
+  "payment": { "id": "e2a91c3d-...", "paymentNumber": "PAY-00007", "date": "2026-11-02", "amount": 495000, "method": "bank_transfer" }
+}
+```
+
+`method` is one of `bank_transfer`, `cash`, `check`, `card` or `other`. A smaller amount leaves the invoice `partial`; more than is due is refused.
+
+</Step>
+
+</Steps>
+
+## Sales
+
+| Resource | Endpoints |
+| --- | --- |
+| Invoices | `GET POST /invoices`, `GET PATCH DELETE /invoices/{id}`, and actions on `/invoices/{id}/`: `send`, `pay`, `void`, `write-off`, `charge-interest`, `submit-for-approval`, `approve`, `reject`, `payment-link`, `pdf`, `ubl`, `signature`, `compliance`, `available-credits`. Also `GET /invoices/summary` and `POST /invoices/bulk` |
+| Quotes | `GET POST /quotes`, `GET PATCH DELETE /quotes/{id}`, `/quotes/{id}/send`, `accept`, `decline`, `convert` (to an invoice), `pdf` |
+| Credit notes | `GET POST /credit-notes`, `GET PATCH DELETE /credit-notes/{id}`, `/credit-notes/{id}/send`, `apply`, `void`, `pdf` |
+| Sales receipts | `GET POST /sales-receipts`, `GET /sales-receipts/{id}`, `/sales-receipts/{id}/post`, `void`, `pdf` |
+| Customer credits | `GET POST /customer-credits`, `GET /customer-credits/{id}`, `POST /customer-credits/{id}/apply` |
+| Recurring templates | `GET POST /recurring`, `GET PATCH DELETE /recurring/{id}`, `/recurring/{id}/pause`, `preview`, `GET /recurring/summary`. Used for recurring invoices, bills and expenses |
+| Revenue schedules | `GET POST /revenue-schedules`, `GET DELETE /revenue-schedules/{id}`, `POST /revenue-schedules/{id}/recognize` |
+| Reminders | `GET POST /reminder-rules`, `GET PATCH DELETE /reminder-rules/{id}`, `GET /reminders/logs` |
+
+## Purchases
+
+| Resource | Endpoints |
+| --- | --- |
+| Bills | `GET POST /bills`, `GET PATCH DELETE /bills/{id}`, `/bills/{id}/approve`, `reject`, `receive`, `pay`, `void`, `GET /bills/counts` |
+| Expenses | `GET POST /expenses`, `GET PATCH DELETE /expenses/{id}`, `/expenses/{id}/submit`, `recall`, `approve`, `reject`, `pay`, `reverse` |
+| Purchase orders | `GET POST /purchase-orders`, `GET PATCH DELETE /purchase-orders/{id}`, `/purchase-orders/{id}/send`, `convert`, `pdf` |
+| Goods receipts | `GET POST /goods-receipts`, `GET /goods-receipts/{id}`, `POST /goods-receipts/{id}/create-bill` |
+| Requisitions | `GET POST /purchase-requisitions`, `GET PUT DELETE /purchase-requisitions/{id}`, `/purchase-requisitions/{id}/submit`, `approve`, `reject`, `convert` |
+| Debit notes | `GET POST /debit-notes`, `GET PATCH DELETE /debit-notes/{id}`, `/debit-notes/{id}/send`, `apply`, `void`, `pdf` |
+| Landed costs | `GET POST /landed-costs`, `GET PUT DELETE /landed-costs/{id}`, `POST /landed-costs/{id}/allocate` |
+| Payment batches | `GET POST /payment-batches`, `GET PATCH /payment-batches/{id}`, `/payment-batches/{id}/submit`, `remittance` |
+
+## Contacts and payments
+
+| Resource | Endpoints |
+| --- | --- |
+| Contacts | `GET POST /contacts`, `GET PATCH DELETE /contacts/{id}`, `/contacts/{id}/people`, `files`, `activity`, `merge`, `statement`, `statement/pdf`, `statement/email`, `supplier-statement`. Also `GET /contacts/balances` and `GET /contacts/duplicates` |
+| Payments | `GET POST /payments` (one payment allocated across invoices or bills), `GET DELETE /payments/{id}`, `POST /payments/batch` |
+| Customer portal | `GET /portal/access`, `POST /portal/invite`, `DELETE /portal/access/{id}`, `GET /portal/activity` |
+
+## Banking
+
+| Resource | Endpoints |
+| --- | --- |
+| Bank accounts | `GET POST /bank-accounts`, `GET PATCH DELETE /bank-accounts/{id}`, `/bank-accounts/{id}/transactions`, `transactions/import`, `imports`, `duplicates`, `apply-rules`, `reconciliation`, `reconciliations`, `validate-balance` |
+| Bank transactions | Actions on `/bank-transactions/{id}/`: `categorize`, `match`, `match-invoice`, `match-transfer`, `split`, `split-account`, `create-expense`, `exclude`, `reconcile`, `unreconcile`, `suggestions`, `activity` |
+| Bank rules | `GET POST /bank-rules`, `GET PATCH DELETE /bank-rules/{id}`, `GET /bank-rules/suggestions` |
+| Transfers and schedules | `POST /bank-transfers`, `GET POST /scheduled-payments`, `PATCH DELETE /scheduled-payments/{id}` |
+
+## Accounting
+
+| Resource | Endpoints |
+| --- | --- |
+| Chart of accounts | `GET POST /accounts`, `GET PATCH DELETE /accounts/{id}`, `POST /accounts/{id}/merge`, `GET POST /chart-templates` |
+| Journal entries | `GET POST /entries`, `GET PUT PATCH DELETE /entries/{id}`, `POST /entries/{id}/post`, `POST /entries/{id}/void`, `POST /entries/recode` |
+| Recurring journals | `GET POST /recurring-journals`, `GET PATCH DELETE /recurring-journals/{id}`, `POST /recurring-journals/{id}/pause`, `POST /recurring-journals/run` |
+| Accruals | `GET POST /accrual-schedules`, `GET DELETE /accrual-schedules/{id}`, `POST /accrual-schedules/{id}/post` |
+| Fixed assets | `GET POST /fixed-assets`, `GET PATCH DELETE /fixed-assets/{id}`, `/fixed-assets/{id}/depreciate`, `dispose`, `revalue`, `impair`, `capitalize`, `rollback-depreciation`. Also `POST /fixed-assets/run-depreciation` and `/asset-categories` |
+| Loans | `GET POST /loans`, `GET PATCH DELETE /loans/{id}`, `POST /loans/{id}/post-payment` |
+| Budgets | `GET POST /budgets`, `GET PATCH DELETE /budgets/{id}` |
+| Periods | `GET POST /fiscal-years`, `/fiscal-years/{id}/close`, `reopen`, `GET PUT /period-lock`, `GET POST /opening-balances` |
+| Currencies | `GET POST /exchange-rates`, `PUT DELETE /exchange-rates/{id}` |
+| Tracking | `/cost-centers` (add `?active=true` for the ones to offer in a picker), `/tags` with `POST /tags/attach`, `POST /tags/detach` and `GET /tags/record?entityType=&entityId=` for a record's tags |
+
+## Tax
+
+| Resource | Endpoints |
+| --- | --- |
+| Tax rates | `GET POST /tax-rates`, `GET PATCH DELETE /tax-rates/{id}` |
+| Tax profiles | `GET POST /tax-profiles`, `GET POST DELETE /tax-lookup` |
+| Tax periods | `GET POST /tax-periods`, `GET PUT DELETE /tax-periods/{id}`, `POST /tax-periods/{id}/file` |
+| Tax reports | `GET /reports/vat-return`, `/reports/sales-tax`, `/reports/bas`, `/reports/schedule-c`, `/reports/1099`, `/reports/tax-summary` |
+
+## Reports
+
+Every report is a `GET` under `/reports/` that takes `startDate` and `endDate` (or an as-at date), and many take `basis=cash` or `basis=accrual`. The main statements (profit and loss, balance sheet, cash flow, trial balance, general ledger, aged receivables and payables, sales by customer and by item, tracking categories, executive summary) also take `format=pdf` or `format=xlsx` for a file instead of JSON.
+
+```bash
+curl "https://dubbl.dev/api/v1/reports/profit-and-loss?startDate=2026-01-01&endDate=2026-09-30&basis=accrual" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE"
+```
+
+```json
+{
+  "startDate": "2026-01-01",
+  "endDate": "2026-09-30",
+  "basis": "accrual",
+  "revenue": [{ "accountId": "3c1a...", "accountCode": "4000", "accountName": "Sales", "balance": 6285000 }],
+  "totalRevenue": 6285000,
+  "expenses": [{ "accountId": "7e42...", "accountCode": "6100", "accountName": "Rent", "balance": 1350000 }],
+  "totalExpenses": 2914000,
+  "netIncome": 3371000
+}
+```
+
+The response above is trimmed to one account per section.
+
+The reports: `profit-and-loss`, `income-statement`, `pnl-comparison`, `balance-sheet`, `cash-flow`, `cash-flow-forecast`, `bank-cash-flow`, `trial-balance`, `general-ledger`, `account-transactions`, `aged-receivables`, `aged-payables`, `sales-by-customer`, `sales-by-item`, `vendor-spend`, `expense-analytics`, `budget-vs-actual`, `profitability`, `tracking-category`, `inventory-valuation`, `unrealized-gains-losses`, `financial-ratios`, `executive-summary`, `monthly-trends`, `payment-performance`, `recurring-transactions`, `duplicate-detection`, `financial-calendar`, `bank-reconciliation-status` and `pack`. Saved custom reports live at `/reports/saved` and `POST /reports/run`; schedules at `/report-schedules`.
+
+## Operations
+
+| Area | Paths |
+| --- | --- |
+| Inventory | `/inventory` with `categories`, `movements`, `transfers`, `bom`, `assembly-orders`, `reorder-suggestions`, `import`, `bulk`; plus `/warehouses`, `/stock-takes` and `/price-lists` |
+| Projects | `/projects`, and under each project: `tasks`, `milestones`, `time-entries`, `timer`, `billable-items`, `invoice`, `progress-invoice`, `members`, `notes` |
+| Payroll | `/payroll` with `employees`, `contractors`, `runs`, `payslips`, `timesheets`, `shifts`, `leave`, `compensation`, `deductions`, `tax`, `tax-forms`, `tax-payments`, `reports` and `settings` |
+| CRM | `/crm/pipelines`, `/crm/deals`, `/crm/activities`, `/crm/analytics` |
+| Consolidation | `/consolidation/groups`, with `members` and `report` under each group |
+
+## Documents, data and settings
+
+| Area | Paths |
+| --- | --- |
+| Documents | `/documents`, `/documents/folders`, `/documents/{id}/download`; uploads go through `POST /attachments/presign` |
+| Bulk and import | `/bulk/<type>/preview` and `/bulk/<type>/import`, `GET /bulk/import-jobs`. See [Import and export](/docs/developers/import-export) |
+| Export | `GET /export/accounts`, `contacts`, `invoices`, `bills`, `entries`, `products`, `bank-transactions` (CSV) and `GET /export/all` (ZIP) |
+| Backups | `GET POST /backups`, `GET DELETE /backups/{id}`, `/backups/{id}/download`, `/backups/{id}/restore` |
+| Webhooks | `/webhooks`, see [Webhooks](/docs/developers/webhooks) |
+| Organization | `GET PATCH /organization`, `/members`, `/roles`, `/teams`, `/invitations`, `/approval-workflows`, `/approval-requests`, `/document-templates`, `/email-config`, `/notifications`, `/audit-log`, `/trash` |
+| Search | `GET /search?q=...` across the organization |
+
+<Callout title="Prefer tools to raw endpoints for agents">
+If you're wiring dubbl into an AI agent, use the [MCP server](/docs/developers/mcp) instead. Its tools wrap these endpoints with descriptions that say which fields are cents, and it handles sign-in.
+</Callout>
+
+## Related
+
+<Cards>
+  <Card title="Conventions" href="/docs/developers/conventions" description="Cents, dates, pages and errors." />
+  <Card title="Webhooks" href="/docs/developers/webhooks" description="Hear about changes instead of polling." />
+  <Card title="Invoices guide" href="/docs/guides/invoices" description="What each invoice status means in the app." />
+</Cards>

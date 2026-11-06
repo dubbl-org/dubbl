@@ -1,0 +1,108 @@
+---
+title: Sales tax and VAT
+description: Tax you collect for the government and tax you can claim back, how it moves through your books, and how a return is worked out.
+icon: Percent
+---
+
+When you charge sales tax, VAT or GST, the extra on your invoice was never your money. You're collecting it for the tax office and passing it on later. That's why tax on sales is recorded as a **liability**, something you owe, not as income. With VAT and GST you can also claim back the tax you paid to your own suppliers, so you only hand over the difference.
+
+<ShortVersion>
+
+- Tax you charge customers is **output tax**. It's owed to the tax office, so it's a liability.
+- Tax suppliers charge you is **input tax**. Where you can reclaim it (VAT, GST), it's an asset.
+- A VAT or GST return is roughly: output tax minus input tax. Positive means you pay; negative means a refund.
+- US sales tax is simpler: you collect it on sales and pay it over. There's nothing to reclaim.
+- On invoices and bills, dubbl adds tax on top of the price. On bank lines and expense claims, the amount already includes it.
+
+</ShortVersion>
+
+## How VAT flows along a chain
+
+VAT (and GST) is charged at every step from raw materials to the final customer, but each business only pays over the tax on the value it added. Follow a product through:
+
+<VatChain />
+
+The tax office ends up with exactly 20% of what the final customer paid, collected in slices from each business along the way. Each slice is the business's output tax minus its input tax.
+
+## What gets recorded
+
+When you send the $3,000 invoice with 20% VAT, the customer owes you $3,600. Only $3,000 is income; the $600 is owed to the tax office:
+
+<JournalEntry
+  title="Invoice INV-00042, $3,000 + 20% VAT"
+  date="Mar 14, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 360000 },
+    { account: "Sales", credit: 300000 },
+    { account: "Output VAT / GST payable", credit: 60000 },
+  ]}
+/>
+
+When your supplier's bill arrives, the VAT on it is money the tax office will give back (by letting you subtract it), so it's recorded separately from the cost:
+
+<JournalEntry
+  title="Bill from your supplier, $1,000 + 20% VAT"
+  date="Mar 3, 2026"
+  lines={[
+    { account: "Materials", debit: 100000 },
+    { account: "Input VAT / GST receivable", debit: 20000 },
+    { account: "Accounts payable", credit: 120000 },
+  ]}
+  caption="If only part of the VAT can be reclaimed, the rest is added to the cost instead."
+/>
+
+## On top, or already inside?
+
+A price can be quoted before tax or with tax included. dubbl handles both, depending on where the number comes from:
+
+<TaxOnTopOrInside />
+
+On invoice and bill lines, you enter the price before tax and dubbl adds the tax. On a bank transaction or an expense claim, you enter what actually left the bank, and dubbl works out how much of it was tax.
+
+## Tax rates in dubbl
+
+Each rate has a percentage, and applies to **Sales**, **Purchase** or **Both**. Pick a rate on each invoice or bill line and the tax is worked out per line.
+
+<Shot name="learn-tax-rates" alt="Tax Rates: totals of sales and purchase rates, and the demo company's rates: Tax Exempt, No Tax, Sales Tax and Texas Sales Tax 8.25%, each applying to Both" pins />
+
+A rate also has a **Tax treatment** that decides what happens to the tax: **Standard (fully reclaimable)**, **Partly reclaimable**, **Not reclaimable**, **Reverse charge**, **Exempt**, **No tax** or **US sales tax**. For most businesses the defaults dubbl sets up for your country are right.
+
+## The return
+
+At the end of each tax period you tell the tax office what you collected and what you paid. For UK and EU businesses, dubbl's **VAT Return** works out the boxes from your books:
+
+<Shot name="learn-vat-return" alt="The VAT Return with Count VAT toggle, output vs input VAT, and Box 5, the amount due" pins />
+
+- **Output VAT (Sales)** is everything you charged.
+- **Input VAT (Purchases)** is everything you can reclaim.
+- **Box 5** is the difference: what you pay, or get back if it's negative.
+
+Australian businesses get a **BAS** instead, US businesses a **Sales Tax** report. When you've filed with the tax office, choose **Mark as submitted** on the tax period. dubbl freezes the figures and moves the period's tax into a single amount owed, ready for you to record the payment.
+
+<JournalEntry
+  title="VAT return for Q1 marked as submitted"
+  date="Apr 7, 2026"
+  lines={[
+    { account: "Output VAT / GST payable", debit: 60000 },
+    { account: "Input VAT / GST receivable", credit: 20000 },
+    { account: "VAT / GST suspense", credit: 40000, note: "owed to the tax office" },
+  ]}
+  caption="The $400 sits in suspense until you record paying it."
+/>
+
+## Good to know
+
+- US sales tax works the same way on sales, but there's nothing to claim back, and it's recorded in **Sales Tax Payable** rather than **Output VAT / GST Payable**.
+- Tax collected isn't yours to spend. Many people keep it in a separate savings account until the return is due.
+- **Count VAT** on the VAT return can follow invoice and bill dates (**When you record it**) or payment dates (**When money moves**), for businesses on a cash accounting scheme. On the cash view, a part-paid invoice counts that share of its VAT.
+- Exempt and zero-rated sales still go on the return as sales; they just carry no tax.
+- Tax rules vary by country and change often. dubbl does the arithmetic; your accountant or tax office decides what applies to you.
+
+## Related
+
+<Cards>
+  <Card title="Tax rates" href="/docs/guides/tax-rates" description="Set up and manage your rates." />
+  <Card title="VAT return" href="/docs/guides/vat-return" description="Prepare and submit a UK or EU return." />
+  <Card title="Sales tax" href="/docs/guides/sales-tax" description="US sales tax reports." />
+  <Card title="BAS" href="/docs/guides/bas" description="Australian business activity statements." />
+</Cards>

@@ -1,0 +1,102 @@
+---
+title: Payments received
+description: Record money customers pay you against their invoices, and see every payment in one place.
+icon: HandCoins
+---
+
+When a customer pays an invoice, you record the payment on that invoice. dubbl moves the money from what they owe into your bank account and keeps a list of every payment, which invoices it covered and anything left over. Payments made online through a payment link are recorded for you.
+
+<Shot name="payments-received" alt="The payments list with money received this month, most used method, not matched yet, and each payment's matched status and leftover" pins />
+
+## Record a payment
+
+<Steps>
+
+<Step>
+
+Open the invoice the customer paid, from **Sales › Invoices**.
+
+</Step>
+
+<Step>
+
+Choose **Record Payment**.
+
+</Step>
+
+<Step>
+
+Enter the **Amount** and the **Date** the money arrived, pick the **Method** (Bank Transfer, Cash, Check, Card or Other), and under **Paid into** the bank account it went into. Leave it on **Default bank account** if you only have one.
+
+</Step>
+
+<Step>
+
+Choose **Record Payment**. The invoice becomes **Paid**, or **Part paid** if there's still something owed.
+
+</Step>
+
+</Steps>
+
+<Shot name="invoice-payment" alt="The Record Payment dialog with amount, date and method" narrow />
+
+## Good to know
+
+- A payment can't be more than the invoice still owes. Record the right amount, or see the options below for money paid in advance.
+- Pick the bank account the money really went into. That's what lets the payment match the line on your bank feed when you [reconcile](/docs/guides/reconciliation).
+- You can't record a payment dated in a period you've [closed or locked](/docs/guides/periods-and-closing).
+- Customer credit, from a credit note, a prepayment or an earlier overpayment, is applied from the invoice's **Available credit** box instead. Using credit isn't money received, so it doesn't appear in the payments list.
+- Paying several invoices with one payment is possible through the [API](/docs/developers/api-reference). In the app you record a payment on each invoice.
+
+## Which one do I use?
+
+<MoneyInChooser />
+
+## What gets recorded in your books
+
+<JournalEntry
+  title="Payment received for INV-00011"
+  date="Nov 2, 2026"
+  lines={[
+    { account: "Checking account", debit: 495000 },
+    { account: "Accounts receivable", credit: 495000 },
+  ]}
+  caption="The customer owes less, and your bank has more. Your income was already counted when you sent the invoice."
+/>
+
+<Fold>
+
+## The payments list
+
+**Sales › Payments** lists every payment from customers. The tiles show what came in **this month** and **last month**, the **Average payment**, the **Most used method** and anything **Not matched yet**. Each payment shows whether it's **Matched**, **Part matched** or **Not matched** to invoices, how much was put toward invoices and any **Leftover**. Turn on the **Came in via** column to tell payments made online (**Online (Stripe)**) from the ones you **Recorded by hand**.
+
+</Fold>
+
+<Fold>
+
+## A single payment
+
+Open a payment to see the **Payment amount**, the bank account it went **Into**, how much was **Put toward invoices**, what's **Not yet used**, and the **Invoices this payment covers**, each linking to its invoice.
+
+If part of a payment is **Not yet used**, choose **Put leftover toward an invoice**, pick one of the customer's open invoices and the **Amount**, and choose **Put toward the invoice**. This uses the money you already recorded: it doesn't add a new payment, and nothing new goes through your bank or your books, because the whole payment was counted when it came in.
+
+<Shot name="payments-received-detail" alt="Payment PAY-00027 from ConsultCo, fully put toward invoice INV-00011" pins />
+
+</Fold>
+
+<Fold>
+
+## Getting paid online
+
+If you've connected Stripe, invoices can carry a payment link. Customers pay by card from the email or from their [portal](/docs/guides/customer-portal) with **Pay now**, and the payment is recorded against the invoice for you. See [Integrations](/docs/guides/integrations) to connect it.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="What a payment settles." />
+  <Card title="Cash sales" href="/docs/guides/cash-sales" description="Paid on the spot, no invoice needed." />
+  <Card title="Customer prepayments" href="/docs/guides/customer-prepayments" description="Money paid before you invoice." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="Match payments to your bank statement." />
+</Cards>

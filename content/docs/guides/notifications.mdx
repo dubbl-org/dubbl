@@ -1,0 +1,118 @@
+---
+title: Notifications
+description: See what needs your attention in one inbox, and choose what also reaches you by email and how often.
+icon: Bell
+---
+
+Notifications tell you when something needs a look: a customer paid, an invoice went overdue, something is waiting for your approval, a bank balance dropped below the level you set. They collect in your inbox, behind the bell in the top bar, and you decide which ones also arrive by email.
+
+<Shot name="notifications" alt="The notifications inbox with the Unread filter, categories, search and the Preferences button" pins />
+
+## Choose what reaches you
+
+<Steps>
+
+<Step>
+
+Open the bell in the top bar and choose **View all notifications**, then choose **Preferences**. **Settings > Notifications** opens the same panel.
+
+</Step>
+
+<Step>
+
+For each kind of notification, switch **Inbox** and **Email** on or off. Changes save as you go.
+
+</Step>
+
+<Step>
+
+Under **Email timing**, pick how often emails come: **Right away**, **Every 30 min** or **Every 2 hours**. Anything that happens in between is bundled into one email.
+
+</Step>
+
+</Steps>
+
+<Shot name="notifications-preferences" alt="The Notification preferences drawer with Inbox and Email switches for each kind of notification" narrow />
+
+## Good to know
+
+- Every kind starts with **Inbox** on and **Email** off.
+- Preferences are yours alone. Each person in the workspace sets their own.
+- You aren't notified about things you did yourself. If you record a payment or assign yourself a task, the notification goes to the others it concerns.
+- Anything waiting for your approval also shows at the top of the bell under **Waiting for you to approve**, whatever your preferences.
+- Notification emails come from dubbl itself, not from your own [mail server](/docs/guides/email).
+
+## Where a notification goes
+
+<NotificationChannels />
+
+<Fold>
+
+## Work through your inbox
+
+- **Unread** shows only what you haven't read. The categories (**Invoices & payments**, **Approvals**, **Banking & budgets**, **Integrations** and more) narrow the list.
+- **Search notifications** finds one by its text.
+- **Mark all as read** clears the unread count.
+- The keyboard is quickest: **j** and **k** move, **Enter** opens, **e** marks as read, **x** selects and **#** removes.
+
+Opening a notification takes you to the record or page it's about.
+
+</Fold>
+
+## What you're notified about
+
+| Notification | When it's sent | Who gets it |
+| --- | --- | --- |
+| **Invoice overdue** | The night an invoice passes its due date unpaid. Once per invoice. | Owners, admins and whoever created the invoice |
+| **Payment received** | A customer payment is recorded against an invoice: by hand, by matching a bank transaction, or when the customer pays online. | Owners, admins and whoever created the invoice |
+| **Approval needed** | Something is sent for approval, and again each time it moves on to the next approver. | The approver for that step |
+| **Task assigned** | Someone gives you a project task, when it's created or reassigned. | The person assigned |
+| **Low bank balance** | Once a day while an account's balance is below its alert amount. | Owners and admins |
+| **Budget exceeded** | The day an account's spending in a budget period reaches the budget's alert level. Once per account and period. | Owners and admins |
+| **Payroll due** | A draft pay run (or one waiting for approval) has a pay period ending within 3 days, or already ended. Once per pay run. | Owners and admins |
+| **Low stock** | An item's quantity on hand is at or below its reorder point. At most once a week per item. | Owners and admins |
+| **Stripe payment failed** | A Stripe charge or invoice payment fails. | Whoever connected Stripe |
+| **Sync events failed** | Stripe events still fail after every retry. | Whoever connected Stripe |
+| **System** | A scheduled backup, a scheduled report or a payment reminder couldn't be sent. At most once a day for the same problem. | Owners and admins |
+
+The checks for overdue invoices, bank balances, budgets, pay runs and stock run once a day, overnight.
+
+## Set the alert levels
+
+**Low bank balance** and **Budget exceeded** only fire once you've said where the line is.
+
+<Steps>
+
+<Step>
+
+For a bank account, open it under **Accounting > Banking**, go to **Settings** and enter an amount under **Low balance alert**. Leave it empty to turn the alert off.
+
+<Shot name="bank-low-balance-alert" alt="The Low balance alert field on a bank account's Settings tab" />
+
+</Step>
+
+<Step>
+
+For a budget, open it under **Accounting > Budgets**, go to **Settings** and set **Spending alert** to a percent of each period's budget, for example 90 to hear about it before the money runs out. New budgets start at 100. Leave it empty to turn the alert off.
+
+<Shot name="budget-spending-alert" alt="The Spending alert field on a budget's Settings tab" />
+
+</Step>
+
+<Step>
+
+Choose **Save changes**.
+
+</Step>
+
+</Steps>
+
+[Tilly](/docs/guides/tilly) can set these for you too ("warn me when Checking drops below $5,000").
+
+## Related
+
+<Cards>
+  <Card title="Approvals" href="/docs/guides/approvals" description="What lands in the bell when something needs your sign-off." />
+  <Card title="Budgets" href="/docs/guides/budgets" description="Set a budget and get told when it runs over." />
+  <Card title="Integrations" href="/docs/guides/integrations" description="Stripe, and what happens when a payment fails." />
+</Cards>

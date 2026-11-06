@@ -1,0 +1,97 @@
+---
+title: Email
+description: "How a self-hosted dubbl sends email: Resend for account messages, and each organization's own SMTP server for invoices and reminders."
+icon: Mail
+---
+
+dubbl sends two kinds of email. **Account email** (welcome messages, invitations, sign-in alerts and notification digests) goes through [Resend](https://resend.com) with your `RESEND_API_KEY`. **Business email** (invoices, quotes, credit notes, purchase orders and payment reminders) goes through each organization's own mail server when it has one set up in **Email sending**, and through Resend when it doesn't.
+
+<EmailRouting />
+
+## Set up Resend
+
+<Steps>
+
+<Step>
+
+Create a Resend account, add and verify the domain you'll send from, and make an API key with sending access.
+
+</Step>
+
+<Step>
+
+Add it to your environment and restart dubbl:
+
+```bash
+RESEND_API_KEY=re_9xTq2LmV_4KpWz8sYc1HbJ3fDg6QaEr
+```
+
+</Step>
+
+<Step>
+
+Set the sender addresses (see the note below), then sign up a test account and look for the welcome email.
+
+</Step>
+
+</Steps>
+
+<Callout type="warn" title="Send from your own domain">
+By default, account email is sent from `dubbl <noreply@dubbl.dev>` and documents from `dubbl <invoices@dubbl.dev>`. Resend only sends from domains verified in your account, so on your own Resend account set both to an address on your domain:
+
+```bash
+RESEND_FROM="Acme Books <noreply@books.example.com>"
+RESEND_DOCUMENTS_FROM="Acme Books <invoices@books.example.com>"
+```
+
+Organizations that set up their own mail server aren't affected. The **Email sending** page shows the address documents go out from until they do.
+</Callout>
+
+## Let each organization use its own mail server
+
+Most businesses want invoices to come from their own address and land in their own Sent folder. Any organization can do this in **Settings**, **Email sending**:
+
+<Shot name="selfhost-smtp" alt="The Email sending settings: mail server, port, username, password, encrypted connection and the sender's address" />
+
+<Steps>
+
+<Step>
+
+Make sure `EMAIL_ENCRYPTION_KEY` is set on the server. dubbl encrypts each mail server password with it (AES-256-GCM) before saving, and refuses to save without it:
+
+```bash
+EMAIL_ENCRYPTION_KEY=$(openssl rand -hex 32)
+```
+
+</Step>
+
+<Step>
+
+In **Email sending**, fill in the **Server**, **Port**, **Username** and **Password** from the email provider, and the **From address**, **From name** and, if replies should go elsewhere, **Replies go to (optional)**.
+
+</Step>
+
+<Step>
+
+Choose **Connect and check**. dubbl logs in to the server; if it accepts, the banner changes to **Sending from** your address. Use **Send test email** to send one to the from address.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Keep `EMAIL_ENCRYPTION_KEY` safe and never change it: saved passwords can only be read with the key they were saved with. If it changes, every organization has to enter its password again.
+- Payment reminders follow documents: the organization's own mail server once it's verified, otherwise Resend from `RESEND_DOCUMENTS_FROM` (`invoices@dubbl.dev` unless you change it) with replies going to the organization's contact email. Scheduled reports still go out only through the organization's own mail server and fail until one is set up.
+- Port `465` connects with TLS from the start; other ports (usually `587`) are upgraded with STARTTLS. With **Encrypted connection** on, dubbl refuses to send unless the connection is encrypted. The server's certificate is always checked, so a self-signed or expired certificate fails with a certificate error. Gmail and Outlook need an app password, not the account password.
+- Account email is sent in the background and a failure is only logged, so a missing or wrong `RESEND_API_KEY` doesn't stop sign-ups. A document email that fails shows an error and is logged as failed.
+- Every document email, sent or failed, is listed under **See what's been sent** with the recipient, subject and any error.
+- Without Stripe, or with **Self-hosted unlimited mode** set to **Always on**, organizations have no monthly email limit.
+
+## Related
+
+<Cards>
+  <Card title="Email settings" href="/docs/guides/email" description="The same page, from an organization's side." />
+  <Card title="Configuration" href="/docs/self-hosting/configuration" description="Every environment variable." />
+  <Card title="Background jobs" href="/docs/self-hosting/background-jobs" description="What sends reminders and digests." />
+</Cards>

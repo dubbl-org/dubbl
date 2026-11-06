@@ -1,0 +1,107 @@
+---
+title: Backups
+description: "What to back up on a self-hosted dubbl, how to do it with pg_dump, and how to restore."
+icon: DatabaseBackup
+---
+
+Everything dubbl knows lives in two places: the PostgreSQL database and the file bucket. Back up both, regularly, somewhere other than the server they run on. Before you rely on your backups, restore one to a spare machine once and sign in to it.
+
+<BackupLayers />
+
+## Back up the database
+
+With the production Compose file, dump the database from inside the `postgres` container. The custom format (`-Fc`) is compressed and lets you restore selectively:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec -T postgres pg_dump -U dubbl -d dubbl -Fc > dubbl-$(date +%F).dump
+```
+
+Run it every night from cron and copy the file off the server, for example:
+
+```bash
+# crontab -e, in the dubbl folder
+15 0 * * * cd /srv/dubbl && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_dump -U dubbl -d dubbl -Fc > backups/dubbl-$(date +\%F).dump
+```
+
+If you use a managed PostgreSQL instead, its point-in-time recovery does the same job; keep it switched on.
+
+## Back up the files
+
+The bucket holds attachments, the document library and in-app backup files. Pick one:
+
+- Turn on **versioning** for the bucket, so overwritten or deleted files can be brought back.
+- Copy it every night to a bucket with another provider, with any S3 tool, such as `rclone sync dubbl:dubbl-files offsite:dubbl-files`.
+
+## Keep the secrets
+
+Some data can't be read without the key it was saved with. Keep these in your password manager, not only in `.env.production`:
+
+| Secret | Without it |
+| --- | --- |
+| `AUTH_SECRET` | Everyone is signed out of the web app |
+| `EMAIL_ENCRYPTION_KEY` | Every organization's mail server password is lost and must be entered again |
+| `POSTGRES_PASSWORD` | You can't connect to the restored database with your existing settings |
+| Stripe and storage keys | Billing and files stop until you create new keys |
+
+## Restore
+
+<Steps>
+
+<Step>
+
+Stop the app so nothing writes while you restore:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production stop web
+```
+
+</Step>
+
+<Step>
+
+Load the dump. `--clean --if-exists` drops what's there first:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec -T postgres pg_restore -U dubbl -d dubbl \
+  --clean --if-exists --no-owner < dubbl-2026-10-12.dump
+```
+
+</Step>
+
+<Step>
+
+Bring the bucket back to the same point in time, from versioning or your copy.
+
+</Step>
+
+<Step>
+
+If the dump is from an older version of dubbl than the code you're running, apply the newer migrations with `pnpm db:migrate` (see [Updates](/docs/self-hosting/updates)). Then start the app again:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+```
+
+</Step>
+
+</Steps>
+
+## In-app backups
+
+Every organization also has **Settings**, **Backups**, where owners can make a backup, download it as JSON, or restore one. With [background jobs](/docs/self-hosting/background-jobs) running, dubbl makes one for every organization each night at 04:00 UTC. See [Backups](/docs/guides/backups) for how people use them.
+
+They're useful, but they're not a backup of your instance:
+
+- Each one covers a single organization and only its main records: accounts, contacts, invoices, bills, journal entries, products, bank accounts, expenses, payments, quotes, credit and debit notes, purchase orders, recurring templates, projects, budgets, fixed assets, loans, tax rates, cost centers and the document list. Users, settings, bank transactions, payroll and the files themselves aren't in it.
+- Restoring brings back every record type in the backup, with their lines, in one go: if any record can't be restored, the restore fails with a message naming it and nothing is changed. Records of those types added after the backup was made move to the trash.
+- The snapshots are stored in your bucket under `backups/`. In unlimited mode (no Stripe, or **Self-hosted unlimited mode** set to **Always on**) there's no retention limit, so they're kept until someone deletes them.
+
+## Related
+
+<Cards>
+  <Card title="Updates" href="/docs/self-hosting/updates" description="Back up, then update." />
+  <Card title="Storage" href="/docs/self-hosting/storage" description="The bucket and what's in it." />
+  <Card title="Backups in the app" href="/docs/guides/backups" description="Settings, Backups, for each organization." />
+</Cards>

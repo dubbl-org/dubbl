@@ -1,0 +1,137 @@
+---
+title: Expenses
+description: Claim back money your team spent for the business, get it approved, and record paying them back.
+icon: Wallet
+---
+
+An expense claim is for money someone paid out of their own pocket for the business: a train ticket, a client lunch, a software subscription on a personal card. They list what they spent, attach receipts, and submit it. Once it's approved, the business owes them that money until you pay it back.
+
+<Shot name="expenses" alt="The expense claims list with totals awaiting approval and to reimburse, a chart by month and top people" pins />
+
+## Submit an expense claim
+
+<Steps>
+
+<Step>
+
+Open **Purchases**, then **Expenses**, and choose **New Expense**.
+
+</Step>
+
+<Step>
+
+Give the claim a **Title**, such as "Client visit, Boston", and an optional **Description**.
+
+</Step>
+
+<Step>
+
+For each thing you paid for, fill in the **Date**, **Description** and **Amount**, which is the full amount you paid, tax included. Add a **Category**, the **Account** it belongs to and the **Tax** rate shown on the receipt, and drop the receipt onto **Receipt**. Choose **Add Item** for the next one.
+
+</Step>
+
+<Step>
+
+Choose **Create Expense Claim**. It's saved as a draft.
+
+</Step>
+
+<Step>
+
+On the claim, choose **Submit**. It waits as **Awaiting approval** until someone approves or rejects it.
+
+</Step>
+
+</Steps>
+
+<Shot name="expenses-new" alt="The New Expense Claim drawer with a title and one item for train tickets" narrow />
+
+## Good to know
+
+- For driving, tick **Mileage claim** on an item and enter the **Distance (miles)**. The amount is worked out from the **Rate per mile**, which starts at 0.67.
+- Nothing reaches your books until the claim is approved. Approving records the cost and what you owe the person.
+- An item with no account is recorded as Miscellaneous Expense, so pick the account if you can.
+- When an item has a **Tax** rate, its amount includes the tax. The claim shows the tax on each item in the **Tax** column, and approving splits it out so you can reclaim it. Leave **Tax** on **No tax** if the receipt shows none.
+- Rejecting needs a reason. The person can **Edit** the claim and **Resubmit** it.
+- Approved by mistake? **Reverse** undoes the approval (and the payment, if there was one) and moves the claim back to a draft.
+
+## How a claim moves
+
+<Lifecycle
+  steps={[
+    { name: "Draft", note: "Being filled in. Edit freely." },
+    { name: "Awaiting approval", t: "info", note: "Submitted. Waiting for a yes or no." },
+    { name: "To reimburse", t: "watch", note: "Approved. You owe the person." },
+    { name: "Paid back", t: "good", note: "You've paid them." },
+  ]}
+  caption="A rejected claim shows as Rejected with the reason, until it's edited and resubmitted."
+/>
+
+<Shot name="expenses-claim" alt="A submitted expense claim with Recall to edit, Approve and Reject, and its three items" pins />
+
+<Fold>
+
+## Approving and paying back
+
+On a claim that's **Awaiting approval**, choose **Approve**, or **Reject** with a reason. If an [approval workflow](/docs/guides/approvals) covers the claim, only the person whose turn it is can approve or reject, and the claim is approved (and booked) after the last step. Until someone decides, **Recall to edit** pulls it back to a draft so it can be changed.
+
+When you've paid the person, open the approved claim, choose **Mark as Paid**, pick the **Payment Date** and choose **Confirm Payment**. To deal with many at once, select claims in the list and choose **Approve**, or **Mark paid today**.
+
+</Fold>
+
+<Fold>
+
+## What gets recorded in your books
+
+Approving a claim records each item's cost in its account, any tax you can reclaim in Input VAT / GST Receivable, and a debt to the person in Employee Reimbursements Payable. Here the train ticket (186.40) has a 20% tax rate and the lunch (62.00) has no tax:
+
+<JournalEntry
+  title="Expense claim approved: Client visit, Boston"
+  date="Oct 14, 2026"
+  lines={[
+    { account: "Travel Expense", debit: 15533 },
+    { account: "Meals & Entertainment", debit: 6200 },
+    { account: "Input VAT / GST Receivable", debit: 3107 },
+    { account: "Employee Reimbursements Payable", credit: 24840 },
+  ]}
+  caption="Each item's account gets its amount before tax. You still owe the person the full amount they paid. The entry is dated the day the claim is approved."
+/>
+
+Tax you can't reclaim, such as a blocked rate or US sales tax, stays in the item's account instead. A reverse charge rate records the tax on both sides, in Input VAT / GST Receivable and Output VAT / GST Payable, the same way it works on a [bill](/docs/guides/bills).
+
+Marking it as paid clears that debt from your bank account:
+
+<JournalEntry
+  title="Expense claim paid"
+  date="Oct 20, 2026"
+  lines={[
+    { account: "Employee Reimbursements Payable", debit: 24840 },
+    { account: "Checking Account", credit: 24840 },
+  ]}
+/>
+
+</Fold>
+
+<Fold>
+
+## Expenses that repeat
+
+For a cost someone claims every month, open **Recurring expenses** and choose **New Recurring Expense**. Give it a **Name**, the **Frequency** (weekly to annual), a **Start Date**, and optionally an **End Date** or **Max Occurrences**, then the lines. On each date dubbl creates a draft claim for you to check and submit.
+
+</Fold>
+
+<Fold>
+
+## Paid with a company card instead?
+
+If the business paid directly, from a company card or bank account, it isn't an expense claim: nobody needs paying back. Import the card or bank statement and [categorize the line](/docs/guides/categorizing-transactions) instead. For a supplier's invoice you'll pay later, record a [bill](/docs/guides/bills).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bills" href="/docs/guides/bills" description="Supplier invoices you'll pay later." />
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Costs paid straight from a business account." />
+  <Card title="Approvals" href="/docs/guides/approvals" description="Set up who signs off on what." />
+</Cards>

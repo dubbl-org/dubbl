@@ -1,0 +1,116 @@
+---
+title: Tags and cost centers
+description: Split your profit by department with cost centers, and label records with colour-coded tags you can filter your profit by.
+icon: Tags
+---
+
+Cost centers are the parts of your business you want to see separately: departments, teams or locations. Pick one when you categorize a bank transaction, and the **Profit by team or project** report shows money in and out for each. Tags are lighter: a shared, colour-coded list of labels like "Marketing" or "Q4 campaign" that you add to invoices, bills, expenses, journal entries, contacts and projects, then use to filter your profit.
+
+<Shot name="tags-and-cost-centers-list" alt="The Cost Centers page with codes, names, parents and status" pins />
+
+## Set up cost centers
+
+<Steps>
+
+<Step>
+
+Open **Settings > Cost Centers** and choose **New Cost Center**.
+
+</Step>
+
+<Step>
+
+Give it a short **Code** (like `DEPT-SUP`) and a **Name** (like Customer Support).
+
+</Step>
+
+<Step>
+
+To group it under another one, pick a **Parent Cost Center**. Leave it on **None (top-level)** otherwise.
+
+</Step>
+
+<Step>
+
+Choose **Create**.
+
+</Step>
+
+</Steps>
+
+<Shot name="tags-and-cost-centers-new" alt="The New Cost Center drawer with a code, a name and no parent" narrow />
+
+## Good to know
+
+- You pick a cost center in the **Cost centre (optional)** field when you categorize a bank transaction or create an expense from one, next to **Project (optional)**.
+- Anything without a cost center shows up as **Unassigned** in the report.
+- Each code can only be used once in your organization.
+- Only admins and the owner can create and change cost centers.
+- To stop using a cost center, edit it and switch off **Active**. It drops out of the **Cost centre (optional)** list and can't be picked for new invoice, journal or bank lines (through the API or an AI agent either), but records that already have it keep it and can still be edited, and it still shows on the Cost Centers page (as **Inactive**) and in reports. Switch **Active** back on to offer it again.
+
+## Cost centers or tags?
+
+<TagsVsCostCenters />
+
+<Fold>
+
+## See profit by cost center
+
+Open **Reports > Tracking** (**Profit by team or project**). Choose **Split by: Department** for a column per cost center, or **Project** for a column per project. Pick a period, and whether to count income and costs **When invoiced or billed** or **When money moves**. Click any amount to open the transactions behind it in the general ledger.
+
+<Shot name="tags-and-cost-centers-report" alt="The Profit by team or project report split by department" />
+
+</Fold>
+
+<Fold>
+
+## Create tags
+
+Open **Settings > Tags** and choose **Add Tag**. Give it a **Name**, pick one of the colours and add a **Description** if it helps. You can also create a tag straight from a record, below.
+
+<Shot name="tags-and-cost-centers" alt="The Tags page with four colour-coded tags, Follow up, Hardware, Recurring and VIP, each with a description" pins />
+
+</Fold>
+
+## Tag a record
+
+Open the record and choose **Add tags**. Pick a tag from the list, or type a new name and choose **Create** to make it and add it in one go. To take a tag off, choose the **x** on it. Changes save straight away.
+
+<Shot name="tags-and-cost-centers-picker" alt="The Add tags list open on a draft invoice, with a search box and the shared tags to pick from" pins />
+
+You'll find **Add tags** in these places:
+
+| Record | Where |
+| --- | --- |
+| Invoice | At the top, under the customer |
+| Bill | At the top, under the supplier |
+| Expense claim | At the top, under who submitted it |
+| Journal entry | At the top, under the description |
+| Contact | **Tags** in the **General** section of the contact's details |
+| Project | At the top, next to the project name |
+
+You can also ask [Tilly](/docs/guides/tilly) ("tag invoice INV-00037 as VIP"), or use `attach_tag`, `detach_tag` and `list_record_tags` over [MCP](/docs/developers/mcp) or the [API](/docs/developers/api-reference).
+
+<Fold>
+
+## See profit for one tag
+
+Open **Reports > Money in vs money out** and pick a tag in the **No tag filter** box. The report now counts only what's tagged:
+
+- invoices, bills, expense claims and journal entries with the tag, including their payments, cancellations and reversals
+- everything invoiced to or billed by a contact with the tag
+- lines on a project with the tag
+
+**Download PDF** keeps the filter and names the tag in the title. Choose **No tag filter** to see everything again. Drafts don't count until they're posted, as with the rest of the report.
+
+<Shot name="tags-and-cost-centers-pnl" alt="Money in vs money out with the tag filter open" pins />
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Where you pick a cost center and project." />
+  <Card title="Projects" href="/docs/guides/projects" description="Track profit per job or client." />
+  <Card title="Reports" href="/docs/guides/reports" description="Every report, and how to read it." />
+</Cards>

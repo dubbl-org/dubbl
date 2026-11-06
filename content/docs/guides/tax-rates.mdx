@@ -1,0 +1,127 @@
+---
+title: Tax rates
+description: Set up the VAT, GST or sales tax rates you charge and pay, and decide how much of the tax on purchases you claim back.
+icon: Percent
+---
+
+A tax rate is the percentage you add to a line on an invoice, bill or expense. dubbl works out the tax on every line, keeps what you charged separate from what you paid, and adds it all up for your return. Each rate also has a treatment that says whether the tax you pay on purchases comes back to you.
+
+<Shot name="tax-rates" alt="The Tax Rates page with totals for sales and purchase rates and a card for each rate, with Texas Sales Tax 8.25% as the default" pins />
+
+## Add a tax rate
+
+<Steps>
+
+<Step>
+
+Open **Tax** in the sidebar. You land on **Tax Rates**.
+
+</Step>
+
+<Step>
+
+Choose **Add Tax Rate**.
+
+</Step>
+
+<Step>
+
+Give it a **Name** your team will recognise (for example "VAT 20%") and the **Rate (%)**.
+
+</Step>
+
+<Step>
+
+Pick what it **Applies to**: **Sales**, **Purchase** or **Both**.
+
+</Step>
+
+<Step>
+
+Pick the **Tax treatment**. For **Standard (fully reclaimable)** or **Partly reclaimable**, set the **Reclaimable amount (%)**: 100 means all of it, 50 means half.
+
+</Step>
+
+<Step>
+
+Choose **Create**. The rate is now in the tax picker on every invoice, bill and expense line.
+
+</Step>
+
+</Steps>
+
+<Shot name="tax-rates-new" alt="The New Tax Rate drawer filled in for a 20% rate that is only half reclaimable" narrow />
+
+## Good to know
+
+- You may not need to type anything. dubbl knows the standard rates for 38 countries, and the first time you open **Tax Rates** with no rates yet, it adds your country's set for you. If it can't tell your country, **Quick setup: add my country's tax rates** lets you pick one.
+- Rates are percentages with two decimals, so 7.25% works.
+- **Applies to** keeps the list tidy. Expense claims only offer rates that apply to purchases or both.
+- To change a rate, hover over its card and choose the pencil. Lines you already saved keep the tax amount they were worked out with.
+- Rates can't be deleted from this page. Rename one you no longer use (for example "Old VAT 17.5%") so nobody picks it by mistake.
+
+## What the treatment decides
+
+The treatment only matters for tax you pay on purchases. On sales, the tax is always money you collect for the tax office.
+
+<TaxTreatmentSplit />
+
+| Treatment | What it's for |
+| --- | --- |
+| **Standard (fully reclaimable)** | Normal VAT or GST you can claim back in full. |
+| **Partly reclaimable** | You can only claim back part of the tax, for example on business meals in some countries. |
+| **Not reclaimable** | Tax you can't claim back. It's absorbed into the cost of what you bought. |
+| **Reverse charge** | Cross-border or domestic reverse charge: you account for both sides of the tax yourself. |
+| **Exempt** | An exempt supply: no tax charged and none reclaimable. |
+| **No tax** | Outside the scope of VAT or GST. |
+| **US sales tax** | Charged on sales, not reclaimable on purchases. |
+
+<Fold>
+
+## What gets recorded in your books
+
+Tax on an invoice is money you owe the tax office, so it goes to **Output VAT / GST Payable**, a liability. In the US, and on any **US sales tax** rate, it goes to **Sales Tax Payable** instead. The reclaimable part of tax on a bill goes to **Input VAT / GST Receivable**, an asset. Any part you can't reclaim is added to the expense, because it's part of what the purchase really cost.
+
+<JournalEntry
+  title="Bill for a $1,000 client dinner, 20% tax, half reclaimable"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Meals and entertainment", debit: 110000, note: "$1,000 + $100 you can't reclaim" },
+    { account: "Input VAT / GST Receivable", debit: 10000 },
+    { account: "Accounts payable", credit: 120000 },
+  ]}
+  caption="The supplier is owed the full $1,200. Only $100 of the tax comes back on your return."
+/>
+
+Those two tax accounts are what the [VAT return](/docs/guides/vat-return) and [BAS](/docs/guides/bas) read, so tax recorded any way (invoices, bills, bank transactions you categorize, manual journals) ends up on the return.
+
+</Fold>
+
+<Fold>
+
+## Compound taxes
+
+Some places charge two taxes on the same line, such as GST and PST in parts of Canada. Under **Compound parts (optional)**, choose **Add part** for each one and give it a **Part name**, a **Rate (%)** and, if it needs its own ledger account, **Posts to account (optional)**. Leave the account empty to use the default tax account. The rate's total is the sum of its parts. When you post an invoice, bill or cash sale, each part's share of the tax goes to its own account, so you can see how much of each tax you owe.
+
+</Fold>
+
+<Fold>
+
+## The Tax area at a glance
+
+**Tax** holds more than rates:
+
+- **Currencies**: exchange rates for the currencies you invoice and pay in. See [Multi-currency](/docs/guides/multi-currency).
+- **Tax Periods**: the returns you file and when they're due. See [VAT return](/docs/guides/vat-return#tax-periods-filing-and-paying).
+- Your country's return: **VAT Return** for the UK and EU countries, **BAS** for Australia, **Sales Tax** and **Schedule C** for the US. These tabs follow the country in your [organization settings](/docs/guides/organization).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="VAT return" href="/docs/guides/vat-return" description="Turn the tax you charged and paid into a return." />
+  <Card title="Sales tax" href="/docs/guides/sales-tax" description="US sales tax collected, rate by rate." />
+  <Card title="Invoices" href="/docs/guides/invoices" description="Where sales tax gets charged." />
+  <Card title="Sales tax and VAT, explained" href="/docs/learn/sales-tax-and-vat" description="Why tax you collect isn't your income." />
+</Cards>

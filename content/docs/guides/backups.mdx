@@ -1,0 +1,89 @@
+---
+title: Backups
+description: Keep daily snapshots of your organization, make your own before big changes, and download a copy to keep somewhere safe.
+icon: DatabaseBackup
+---
+
+dubbl takes a snapshot of your organization's data every day and keeps it for as long as your plan allows. You can also make one yourself before a big change, download a copy to keep off dubbl, or upload one you saved earlier. Backups are under **Settings > Backups**.
+
+<Shot name="backups" alt="The Backups page with Download Snapshot, Upload Backup and Create Backup" pins />
+
+## Make a backup before a big change
+
+<Steps>
+
+<Step>
+
+Open **Settings > Backups**.
+
+</Step>
+
+<Step>
+
+Choose **Create Backup**, then **Create backup** to confirm. It appears in the list as a manual backup, with its size, how many records it holds and when it expires.
+
+</Step>
+
+<Step>
+
+To keep a copy outside dubbl, choose **Download** on its row, or **Download Snapshot** at the top for a fresh copy of everything right now. Both are a JSON file.
+
+</Step>
+
+</Steps>
+
+<Shot name="backups-create" alt="The Create backup confirmation" narrow />
+
+## Good to know
+
+- Automatic backups run about once a day. How long they're kept depends on your plan: 7, 30, 90 or 365 days. See [Billing](/docs/guides/billing).
+- Admins and the owner can see, create and download backups. Only the owner can restore, upload or delete one.
+- A backup holds your records, not your files. Attachments and documents stay in Documents.
+- Restoring replaces your current data, but dubbl saves a snapshot of it first, so you can go back.
+- A restore is all or nothing. If any record can't be put back, it stops with a message naming that record, and nothing is changed.
+
+## What a restore brings back
+
+<BackupRestoreScope />
+
+<Fold>
+
+## Restore a backup
+
+Choose **Restore** on the backup's row. The warning explains that this replaces all current data, and that a snapshot of your current data is saved first. Confirm, and every record in the left-hand list above is put back as it was in the backup, lines included. Records of those kinds that you added after the backup was made move to [Trash](/docs/guides/trash), so you can still bring one back.
+
+For a single deleted record, [Trash](/docs/guides/trash) is quicker.
+
+</Fold>
+
+<Fold>
+
+## Upload a backup
+
+**Upload Backup** takes a `.json` file you downloaded from dubbl earlier and adds it to the list as an uploaded backup. You can then restore it like any other. Only the owner can upload.
+
+</Fold>
+
+<Fold>
+
+## Delete a backup
+
+**Delete** on a backup's row moves it to [Trash](/docs/guides/trash), where it stays for 30 days in case you change your mind. Manual backups count toward your plan's limit of 3, 10, 25 or 50 until they're deleted.
+
+</Fold>
+
+<Fold>
+
+## Running your own server?
+
+These backups cover one organization's records. If you host dubbl yourself, back up the database and file storage too. See [Self-hosting: backups](/docs/self-hosting/backups).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Trash" href="/docs/guides/trash" description="Bring back a single deleted record." />
+  <Card title="Audit log" href="/docs/guides/audit-log" description="See what changed and who changed it." />
+  <Card title="Import and export" href="/docs/developers/import-export" description="Move data in and out as CSV." />
+</Cards>

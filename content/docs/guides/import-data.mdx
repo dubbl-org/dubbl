@@ -1,0 +1,118 @@
+---
+title: Import your data
+description: Move your chart of accounts, contacts, products, invoices, bills and more into dubbl from a CSV, and export everything back out.
+icon: Upload
+---
+
+Coming from QuickBooks, Xero, FreshBooks or Wave, or from a spreadsheet? Export a CSV from your old app and bring it into dubbl one kind of record at a time. dubbl recognises the column names each app uses, shows you every row before anything is saved, and keeps a history of each import.
+
+<Shot name="import-data" alt="The Import and Export settings page with source systems, the record types you can import and the bank statement note" pins />
+
+## Import a file
+
+<Steps>
+
+<Step>
+
+Go to **Settings › Import & Export**.
+
+</Step>
+
+<Step>
+
+Under **Select your source system**, pick where the file came from: **QuickBooks**, **Xero**, **FreshBooks**, **Wave** or **Custom CSV**. This tells dubbl which column names to expect.
+
+</Step>
+
+<Step>
+
+Choose what you're importing, for example **Contacts**. Each card shows what has to be in dubbl first.
+
+</Step>
+
+<Step>
+
+Drop your CSV on **Drop your CSV file here**, or click to browse for it.
+
+</Step>
+
+<Step>
+
+Check the **Map** step. Each column in your file is matched to a dubbl field where the names line up. Change any that are wrong, and set columns you don't need to **Skip**. Fields marked with * must be mapped before you can go on.
+
+</Step>
+
+<Step>
+
+Choose **Preview**. You'll see how many rows are valid and invalid, with the problem next to each bad row. When it looks right, choose the import button. It counts only the valid rows, for example **Import 42 rows**.
+
+</Step>
+
+</Steps>
+
+<Shot name="import-data-map" alt="The Map step for a QuickBooks contacts file: Display Name mapped to Name, Email, Phone, Tax ID to Tax Number, Billing City, and Notes set to Skip" narrow />
+
+## Good to know
+
+- Import in order: accounts first, then contacts, then everything that points at them. Each card tells you what it needs.
+- Rows with a problem are skipped and the rest are imported. The results list each skipped row with its row number and the reason, so you can fix just those and import them again.
+- Quoted values can hold commas, quotes and line breaks, as spreadsheet apps write them. Files separated by semicolons or tabs work too.
+- Contacts aren't checked for duplicates. If you import a customer you already have, tidy up afterwards with [duplicate contacts](/docs/guides/duplicate-contacts).
+- Imported invoices and bills arrive as drafts, so you can check them before they reach your books.
+- The preview shows the first 50 rows. The counts cover the whole file.
+- Bank statements have their own importer. See the note below.
+
+## What to import first
+
+<ImportOrder />
+
+<Fold>
+
+## What each import expects
+
+| Import | Required columns | Notes |
+| --- | --- | --- |
+| Chart of Accounts | Code, Name, Type | Sub Type and Description are optional. |
+| Contacts | Name | Type is customer unless you say supplier or both. Email, phone, tax number and billing address are optional. |
+| Products | Name | SKU, prices, type and quantity on hand are optional. |
+| Invoices | Contact Name (or Contact Email), Issue Date, Line Description | One row per line. Rows with the same Invoice Number become one invoice. The customer must already exist. Due Date, Currency, Line Account Code (code or name) and Line Tax Rate (name or percentage) are optional. |
+| Bills | Contact Name, Issue Date, Due Date, Line Description | Rows with the same Bill Number become one bill with several lines. The contact must already exist. |
+| Journal Entries | Date, Description, Account Code | Add Debit or Credit amounts on each line. |
+| Bank Transactions | Date, Description, Amount, Bank Account | For plain ledger-style rows. |
+
+Imported invoices get the next dubbl invoice number. The number from your old app is kept as the **Reference**, unless the file has its own. Without a Due Date, the customer's payment terms set it, or your default terms. Lines without an account or tax rate get the customer's defaults from **Bookkeeping**, and otherwise your Sales account. If one line of an invoice has a problem, that invoice is skipped as a whole and the others still come in.
+
+</Fold>
+
+<Fold>
+
+## Importing a bank statement
+
+To bring in a statement from your bank, don't use this page. Open the account under **Accounting › Banking** and choose **Import Statement**. It reads CSV, OFX, QFX, QBO, CAMT, MT940, BAI2 and more, works out the format on its own, and skips transactions you already have. See [Importing transactions](/docs/guides/importing-transactions).
+
+</Fold>
+
+<Fold>
+
+## Checking past imports
+
+Once you've imported something, **Recent Imports** appears under the cards, with the type, the file name, its status, how many rows it had and how many failed.
+
+</Fold>
+
+<Fold>
+
+## Export your data
+
+Under **Export Data**, tick what you want (or **Select all**) and choose **Export Selected**. One kind of record downloads as a CSV; several come as a ZIP with a CSV for each. Invoices, bills, journal entries and bank transactions can be limited to a date range with the From and To dates. **Export All as ZIP** downloads everything at once.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Set up your organization" href="/docs/guides/setup" description="Country, currency and tax before you import." />
+  <Card title="Opening balances" href="/docs/guides/opening-balances" description="Start your books from where they really stand." />
+  <Card title="Chart of accounts" href="/docs/guides/chart-of-accounts" description="The accounts everything is recorded in." />
+  <Card title="Importing transactions" href="/docs/guides/importing-transactions" description="Bring in bank statements." />
+</Cards>

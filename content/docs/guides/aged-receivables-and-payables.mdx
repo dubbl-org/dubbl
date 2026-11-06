@@ -1,0 +1,87 @@
+---
+title: Aged receivables and payables
+description: See who owes you money and how late they are, and which bills you owe and how overdue they are.
+icon: Clock
+---
+
+Aged reports sort everything that's still unpaid by how late it is. **Who owes you (and how late)** lists your customers' unpaid invoices (aged receivables). **What you owe (and when it's due)** lists your unpaid supplier bills (aged payables). Both use the same buckets, so you can see at a glance where money is stuck.
+
+<Shot name="aged-receivables" alt="Who owes you (and how late), with the as-of date, a total for each aging bucket and the list of unpaid invoices" pins />
+
+## See who owes you
+
+<Steps>
+
+<Step>
+
+Open **Reports** and choose **Who owes you (and how late)** under **Getting paid & paying**.
+
+</Step>
+
+<Step>
+
+Leave **As of date:** on today, or pick an earlier date to see what was owed back then.
+
+</Step>
+
+<Step>
+
+Read the five buckets: **Current**, **1-30 days**, **31-60 days**, **61-90 days** and **90+ days**. Each shows the total and how many invoices are in it.
+
+</Step>
+
+<Step>
+
+Check **Total owed to you**, then the list underneath: **Invoice**, **Customer**, **Due Date**, **Days Overdue** and **Amount Due** for every open invoice.
+
+</Step>
+
+<Step>
+
+Choose **Export CSV** to work through the list, or to share it with whoever chases payments.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Lateness is counted from each invoice's due date, not the date you sent it. **Current** means not due yet.
+- Only what's still unpaid counts. A half-paid invoice shows the half that's left. Drafts and voided invoices are left out.
+- Picking an earlier **As of date:** rebuilds the past: invoices issued after that date drop out, and payments received after it are ignored. Handy for a year-end list for your accountant.
+- **Total owed to you** should match **Accounts Receivable** on your [balance sheet](/docs/guides/balance-sheet) for the same date. If it doesn't, look for a payment or journal posted straight to that account instead of against an invoice.
+- **Export CSV** writes amounts in dollars and cents (12.50), ready to add up in a spreadsheet.
+
+## Reading the buckets
+
+<AgingBuckets />
+
+The further right the money sits, the less likely it is to arrive on its own. Anything in **61-90 days** or **90+ days** usually needs a phone call, not another email. [Payment reminders](/docs/guides/payment-reminders) can nudge the earlier buckets for you.
+
+## What you owe
+
+**What you owe (and when it's due)** works the same way for bills. It has the same **As of date:**, the same five buckets, **Total you owe**, and a list of **Bill**, **Supplier**, **Due Date**, **Days Overdue** and **Amount Due**.
+
+<Shot name="aged-payables" alt="What you owe (and when it's due), with the aging buckets and the total you owe" />
+
+Use it to plan payments: pay what's overdue first, and look at **Current** to see what's coming. When you're ready, see [Paying bills](/docs/guides/paying-bills).
+
+<Fold>
+
+## Acting on the list
+
+- **A customer is in 90+ days:** open the invoice, check it was sent to the right person, and send a reminder or a [statement](/docs/guides/statements) with everything they owe.
+- **You'll never be paid:** write the invoice off with a [credit note](/docs/guides/credit-notes) so it stops counting as money owed to you.
+- **The customer already paid:** record the payment against the invoice. See [Payments received](/docs/guides/payments-received).
+- **Patterns over time:** **How fast you get paid** in Reports shows how many days customers usually take, and how long you take to pay suppliers.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Payment reminders" href="/docs/guides/payment-reminders" description="Nudge customers before invoices go stale." />
+  <Card title="Statements" href="/docs/guides/statements" description="Send a customer everything they owe in one document." />
+  <Card title="Paying bills" href="/docs/guides/paying-bills" description="Clear what you owe, oldest first." />
+  <Card title="Receivables and payables, explained" href="/docs/learn/receivables-and-payables" description="What money owed to you and by you really means." />
+</Cards>

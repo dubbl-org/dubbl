@@ -1,0 +1,88 @@
+---
+title: Audit log
+description: See who created, changed, approved, deleted or restored what in your books, and when.
+icon: History
+---
+
+The audit log is dubbl's record of every change: who did it, what they did, which record it was, and when. Use it to answer "who deleted this contact?" or to show your accountant how the books got to where they are. It's under **Settings > Audit Log**.
+
+<Shot name="audit-log" alt="The Audit Log with action tabs, search, an entity filter, dates and a timeline of changes" pins />
+
+## Find a change
+
+<Steps>
+
+<Step>
+
+Open **Settings > Audit Log**.
+
+</Step>
+
+<Step>
+
+Pick an action tab at the top, such as **Delete** or **Update**. Each tab shows how many entries it has, and **All** shows the total. The counts follow your other filters and search.
+
+</Step>
+
+<Step>
+
+Narrow it down: pick a record type in **All entities**, or set **From** and **To** dates (both days included). **Search user, entity...** searches the whole log, not just the page you're on: a person's name or email, an action, a record type such as `journal entry`, or the start of a record's id.
+
+</Step>
+
+<Step>
+
+Read the timeline. Entries are grouped by day, newest first, each with who did it, what they did, the record type and the start of its id.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Only admins and the owner can see the audit log.
+- Changes made by Tilly, the API and MCP are logged under the person (or API key's owner) they acted for.
+- How far back you can look depends on your plan: 90 days on Free, 1 year on Standard, 3 years on Premium and everything on Ultimate. See [Billing](/docs/guides/billing).
+- The log can't be edited or deleted from dubbl. It's only removed when the whole [organization is deleted](/docs/guides/organization#delete-the-organization).
+- Each entry can include the IP address it came from, shown faintly next to the time.
+
+## What an entry tells you
+
+<Frame caption="One line of the log, taken apart.">
+  <div className="rounded-lg border border-border bg-background px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="text-[13.5px] text-foreground">
+        <b className="font-medium">Priya Shah</b> <span className="text-muted-foreground">update</span> invoice
+      </div>
+      <div className="text-right text-[12px] text-muted-foreground">2:41 PM</div>
+    </div>
+    <div className="mt-1.5 flex items-center gap-2">
+      <Pill t="info">Update</Pill>
+      <span className="font-mono text-[11px] text-muted-foreground">4c1e9a2b</span>
+    </div>
+  </div>
+  <div className="mt-3 grid gap-2 text-[12.5px] md:grid-cols-4">
+    <Box title="Who">The person, or the owner of the API key used.</Box>
+    <Box title="What">Created, updated, deleted, restored, approved, merged and more.</Box>
+    <Box title="Which record">Its type, and the first characters of its id.</Box>
+    <Box title="When">The time, grouped under the day.</Box>
+  </div>
+</Frame>
+
+<Fold>
+
+## Questions the log answers
+
+- **Who deleted a record?** Pick the **Delete** tab and search for the record type. Then bring it back from [Trash](/docs/guides/trash) if it's within 30 days.
+- **What happened during the month-end close?** Set **From** and **To** to the days you closed, before you [lock the period](/docs/guides/periods-and-closing).
+- **What did someone change?** Search for their name to see everything they did, newest first.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Decide who can change what in the first place." />
+  <Card title="Trash" href="/docs/guides/trash" description="Undo a deletion within 30 days." />
+  <Card title="Backups" href="/docs/guides/backups" description="Roll back a bigger change." />
+</Cards>

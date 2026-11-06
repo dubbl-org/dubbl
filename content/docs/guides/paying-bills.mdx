@@ -1,0 +1,114 @@
+---
+title: Paying bills
+description: Pay several supplier bills in one batch, or set a bill's payment for a later date, and send remittance advice.
+icon: Banknote
+---
+
+You can pay a bill on its own with **Record Payment** (pick the bank account under **Paid from**), but when it's time for the weekly or monthly supplier run, paying them one by one is slow. A payment batch pays a group of bills in one go and tells each supplier what you paid. A scheduled payment parks a bill's payment for a date you choose.
+
+<Shot name="paying-bills-scheduled" alt="The Scheduled Payments page with Process Due, Schedule Payment and one pending payment to Marketing Agency" pins />
+
+## Pay several bills at once
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Payment batches**, and choose **Create Batch**.
+
+</Step>
+
+<Step>
+
+Give the batch a **Batch Name**, like "Month-end supplier run".
+
+</Step>
+
+<Step>
+
+Under **Paid from**, pick the bank account the money leaves. Leave it on **Default bank account** to pay from your main checking account.
+
+</Step>
+
+<Step>
+
+Under **Select Bills**, tick each bill to pay. The full amount due is filled in; change it to pay less than the full bill.
+
+</Step>
+
+<Step>
+
+Check the **Total** and choose **Create Batch**. The batch is saved as a draft, nothing is paid yet.
+
+</Step>
+
+<Step>
+
+Open the batch and choose **Submit Batch**. Each bill is paid and the batch shows as completed. Until you submit, you can still change **Paid from** on the batch page.
+
+</Step>
+
+</Steps>
+
+<Shot name="paying-bills-batch" alt="The Create Payment Batch dialog with a name, Default bank account under Paid from, and a City Power & Water bill ticked" narrow />
+
+## Good to know
+
+- Every bill that still has money owing appears in the list: bills in your books, **Part paid** bills and **Overdue** bills.
+- Submitting can't be undone. Each payment is dated today and recorded as a bank transfer from the account in **Paid from**.
+- The bank account has to be in the bill's currency or your base currency. dubbl tells you if it isn't when you create the batch.
+- If one bill can't be paid, it's marked as failed and the rest still go through. The message after you submit says why.
+- Scheduled payments don't go out by themselves. They wait until you choose **Process Due** or **Pay now**.
+
+## What a batch does
+
+<PaymentBatchRun />
+
+<Fold>
+
+## Sending remittance advice
+
+Once a batch is submitted, choose **View / email remittance advice**. You'll see one remittance per supplier, listing the bills you paid them and how much. Choose **Email to suppliers** to send them. Suppliers without an email address are marked **No email on file** and are skipped, so add their email on the [contact](/docs/guides/contacts) first.
+
+</Fold>
+
+<Fold>
+
+## Scheduling a payment for later
+
+Open **Accounting**, then **Scheduled payments**, and choose **Schedule Payment**. Pick the **Bill**, enter the **Amount** and the **Scheduled Date**, choose the bank account under **Paid from**, add a note if you like, and choose **Schedule**. The payment waits as **Pending**.
+
+<Shot name="paying-bills-schedule" alt="The Schedule Payment dialog with bill, amount, scheduled date, paid from and notes" narrow />
+
+When a scheduled date arrives, a banner tells you how many payments are due. Choose **Pay now**, or **Process Due** at the top, to pay every pending payment dated today or earlier. Each one is recorded against its bill on its scheduled date, from the bank account you picked, and shows as **Completed**, or **Failed** if it couldn't go through. You can cancel a pending payment before it's paid.
+
+The list groups payments that are still waiting by date: **Overdue**, **Today**, **This Week**, **Next Week**, **This Month** and **Later**. Payments that couldn't go through get their own **Failed** group near the top, and finished ones sit under **Completed** and **Cancelled** at the bottom, so a payment made last month never shows as overdue.
+
+</Fold>
+
+<Fold>
+
+## What gets recorded in your books
+
+Each payment, whether from a batch, a schedule or **Record Payment**, posts the same entry: what you owe the supplier goes down, and so does the balance of the bank account you paid from. The example below was paid from the default bank account.
+
+<JournalEntry
+  title="Payment for a City Power & Water bill"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Accounts Payable - Trade", debit: 38103 },
+    { account: "Checking Account", credit: 38103 },
+  ]}
+/>
+
+When the money leaves your bank and the line arrives in your statement import, link it to the payment with **Find a match…** rather than categorizing it again. See [Categorizing transactions](/docs/guides/categorizing-transactions).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Bills" href="/docs/guides/bills" description="Record and pay a single bill." />
+  <Card title="Aged payables" href="/docs/guides/aged-receivables-and-payables" description="Decide what to pay first." />
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Match payments to your bank lines." />
+</Cards>

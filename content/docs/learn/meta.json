@@ -1,0 +1,26 @@
+{
+  "title": "Learn",
+  "root": true,
+  "pages": [
+    "index",
+    "---Foundations---",
+    "double-entry",
+    "debits-and-credits",
+    "chart-of-accounts",
+    "accrual-vs-cash",
+    "financial-statements",
+    "---Money in and out---",
+    "receivables-and-payables",
+    "bank-reconciliation",
+    "sales-tax-and-vat",
+    "multi-currency",
+    "---Assets and people---",
+    "depreciation",
+    "inventory-costing",
+    "payroll-basics",
+    "---Running the books---",
+    "closing-the-books",
+    "for-solopreneurs",
+    "glossary"
+  ]
+}

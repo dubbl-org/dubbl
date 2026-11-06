@@ -1,0 +1,83 @@
+---
+title: Customer portal
+description: Give each customer a private link where they can see their invoices, statement, quotes and payments, download PDFs and pay.
+icon: Globe
+---
+
+The customer portal is a private page for one customer. They open a link, with no account or password, and see every invoice you've sent them, their statement, quotes waiting for an answer and the payments you've received. It saves the "can you resend that invoice?" emails, and customers can accept quotes and pay from there.
+
+<Shot name="customer-portal" alt="The portal links page with three active links, two of them opened, when each link stops working and recent portal activity" pins />
+
+## Invite a customer
+
+<Steps>
+
+<Step>
+
+Open **Contacts › Customer portal** and choose **Invite a customer** in the top bar. You can also choose **Invite to portal** from a contact's preview.
+
+</Step>
+
+<Step>
+
+Pick the customer, and choose how long the **Link works for**: 1 week, 30 days, 90 days or 1 year.
+
+</Step>
+
+<Step>
+
+Leave **Email them the link** on to send it from your email settings, and add a **Personal note** if you like. Turn it off to share the link yourself.
+
+</Step>
+
+<Step>
+
+Choose **Create link**. When **Portal link ready** appears, **Copy** it or **Open portal** to see what they'll see.
+
+</Step>
+
+</Steps>
+
+<Shot name="customer-portal-invite" alt="The Invite a customer to the portal dialog for TechStart Inc with a 30 day link, email on and a personal note" narrow />
+
+## What your customer sees
+
+<CustomerPortalPreview />
+
+- **Overview** of where they stand.
+- **Invoices**, each with a PDF to download, and **Pay now** on unpaid ones when you've connected online payments.
+- **Statements**, their **Statement of Account** with the total outstanding.
+- **Quotes**, with an **Accept** button on any quote you've sent that's still open.
+- **Payments**, a history of what they've paid you.
+
+## Good to know
+
+- Customers only see what you've sent them. Draft invoices, invoices waiting for approval and draft quotes never appear in the portal, its statement or its PDFs.
+- Anyone with the link can open the portal, so send it only to the customer. Switch it off if it goes to the wrong person.
+- A link stops working on its end date. Send a fresh one whenever they need it.
+- Quote emails include a **View quote** button that opens the portal. If the customer has no live link, sending a quote creates a 30-day one.
+- **Pay now** needs Stripe connected. See [Integrations](/docs/guides/integrations).
+- What customers open and do is logged, so you can see who's looked at their invoices.
+
+<Fold>
+
+## Managing links
+
+Click a customer in the list to see their link and **Their portal activity**. From there:
+
+- **Copy link** puts it on your clipboard to paste into an email or chat.
+- **Open portal** shows you their page.
+- **Replace link** makes a new 30-day link, copies it and switches the old one off. On an expired link it's **Send new link**.
+- **Switch off** stops the link working straight away.
+
+The tiles show how many links are **Active links**, how many have been **Opened**, who **Visited this week**, links **Expiring soon**, and those that have **Expired** or been **Switched off**. **Recent portal activity** shows what customers looked at and did across all links.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Quotes" href="/docs/guides/quotes" description="Customers accept them in the portal." />
+  <Card title="Statements" href="/docs/guides/statements" description="Send a statement by email instead." />
+  <Card title="Payments received" href="/docs/guides/payments-received" description="Where online payments land." />
+</Cards>

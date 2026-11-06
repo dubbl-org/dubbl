@@ -1,0 +1,115 @@
+---
+title: Documents
+description: Keep receipts, contracts and statements in one place, file them in folders, and attach them to the records they belong to.
+icon: FolderOpen
+---
+
+Documents is your company's filing cabinet. Upload receipts, bills, contracts and statements, sort them into folders, and attach each file to the invoice, bill or expense it belongs to, so the paper trail sits right next to the numbers. Files you drop on Tilly land here too.
+
+<Shot name="documents" alt="The Documents page with quick views, folders, the search box and the New menu" pins />
+
+## Upload and file a document
+
+<Steps>
+
+<Step>
+
+Open **Documents** from the rail and pick the folder you want, or stay in **All files**.
+
+</Step>
+
+<Step>
+
+Choose **New**, then **Upload files** (or press **U**). You can also drag files from your computer straight onto the page. **Upload a folder** brings in a whole folder and keeps its structure.
+
+</Step>
+
+<Step>
+
+Right-click the file and choose **Attach to a record**. Pick the invoice, bill, expense or other record it belongs to. The file now shows up on that record, and moves from **Not attached** to **Attached**.
+
+</Step>
+
+</Steps>
+
+<Shot name="documents-new" alt="The New menu with Upload files, Upload a folder and New folder" narrow />
+
+## Good to know
+
+- **Not attached** is your to-do pile: every file that isn't linked to a record yet.
+- A file can be attached to more than one record. Detach it from the **Details** pane (press **I**) without deleting it.
+- Files are shared with everyone in the workspace. Choose **Make private** to keep one to yourself; it then appears under **Only me**.
+- **Copy link** gives a link only people in your workspace can open.
+- Deleted files go to the Documents **Trash** and stay there for 30 days, so you can bring them back.
+- dubbl doesn't read the text of a file on its own. To turn a receipt into a bill or expense, ask [Tilly](/docs/guides/tilly).
+
+## Where a file goes
+
+<Lifecycle
+  steps={[
+    { name: "Uploaded", note: "From the page, a folder upload, or a file dropped on Tilly." },
+    { name: "Not attached", t: "watch", note: "Saved, but not linked to any record yet." },
+    { name: "Attached", t: "good", note: "Shows up on the invoice, bill or expense it belongs to." },
+    { name: "Trash", t: "bad", note: "Kept for 30 days, then removed for good." },
+  ]}
+  caption="Moving a file to Trash doesn't touch the records it was attached to."
+/>
+
+<Fold>
+
+## Hand files to Tilly
+
+Select one or more files and choose **Ask Tilly** in the selection bar, or right-click and choose **Ask Tilly to book it**. Tilly reads them, checks your books for a match, and offers to book a bill or expense with the file attached. Nothing changes until you approve. Tilly takes up to 8 PDFs, images, CSV or text files at once.
+
+<TillyReceiptFlow />
+
+</Fold>
+
+<Fold>
+
+## Find a file
+
+- **Search all files** (press **/**) matches file and folder names across the whole workspace.
+- The kind filter narrows the view to **PDFs**, **Images**, **Spreadsheets** or **Other**.
+- Sort by **Name**, **Date added**, **Size** or **Kind**, and switch between grid and list.
+- **Recent** shows files added in the last 30 days. **Starred** shows files you starred (press **S**).
+- **Attached** groups files by the kind of record they're on, under **Attached to** in the sidebar.
+
+Press **?** for every keyboard shortcut: **Space** previews a file, **F2** renames it, and the arrow keys move around.
+
+</Fold>
+
+<Fold>
+
+## Folders
+
+Choose **New folder** in the **New** menu or the **+** beside **Folders**. Drag files onto a folder to move them, or **Cut** them and paste into another folder. Right-click a folder to rename it, give it a colour, or delete it.
+
+</Fold>
+
+<Fold>
+
+## Sent emails
+
+**Sent emails** lists every invoice, quote and other document emailed from dubbl, with its delivery status. Use it to check that something actually went out, and to resend it if it failed. Which address the emails come from is set in [Email sending](/docs/guides/email).
+
+<Shot name="documents-emails" alt="The Sent emails view with delivery stats and an empty list" />
+
+</Fold>
+
+<Fold>
+
+## Storage
+
+The meter at the bottom of the sidebar shows how much of your plan's storage you've used. An upload that would go over the limit is refused. See [Billing](/docs/guides/billing) for how much each plan includes; self-hosted servers have no limit.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Tilly" href="/docs/guides/tilly" description="Drop a receipt and have it booked for you." />
+  <Card title="Bills" href="/docs/guides/bills" description="Record what you owe suppliers, with the bill attached." />
+  <Card title="Expenses" href="/docs/guides/expenses" description="Claim back money spent out of pocket." />
+  <Card title="Trash" href="/docs/guides/trash" description="Bring back deleted records within 30 days." />
+</Cards>

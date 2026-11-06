@@ -1,0 +1,273 @@
+---
+title: MCP server
+description: "Connect Claude, Cursor or any MCP client to dubbl so an AI agent can read and work in your books, with 627 tools."
+icon: Bot
+---
+
+dubbl has a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. Point an AI client at it, sign in once in your browser, and the agent can look things up and do the work for you: find overdue invoices, draft a bill, categorize bank transactions, run a profit and loss. It acts as you, inside the one organization you choose, with your role's permissions.
+
+The server lives at:
+
+```
+https://dubbl.dev/api/mcp
+```
+
+If you self-host, use your own address, such as `https://books.example.com/api/mcp`.
+
+<Shot name="dev-mcp-authorize" alt="The Authorize MCP Access screen with what the client can do, the organization and the Authorize button" pins />
+
+## Connect your AI client
+
+<Tabs items={["Claude Code", "Claude desktop and claude.ai", "Cursor", "VS Code", "Other clients"]}>
+
+<Tab value="Claude Code">
+
+```bash
+claude mcp add --transport http dubbl https://dubbl.dev/api/mcp
+```
+
+Then run `/mcp` inside Claude Code and choose **dubbl** to sign in.
+
+</Tab>
+
+<Tab value="Claude desktop and claude.ai">
+
+Open **Settings**, then **Connectors**, and choose **Add custom connector**. Name it dubbl and paste `https://dubbl.dev/api/mcp` as the URL. Choose **Connect** on the new connector to sign in.
+
+A self-hosted dubbl has to be reachable over public HTTPS for claude.ai to connect to it.
+
+</Tab>
+
+<Tab value="Cursor">
+
+Add this to `.cursor/mcp.json` in your project (or `~/.cursor/mcp.json` for every project):
+
+```json
+{
+  "mcpServers": {
+    "dubbl": { "url": "https://dubbl.dev/api/mcp" }
+  }
+}
+```
+
+</Tab>
+
+<Tab value="VS Code">
+
+Add this to `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "dubbl": { "type": "http", "url": "https://dubbl.dev/api/mcp" }
+  }
+}
+```
+
+</Tab>
+
+<Tab value="Other clients">
+
+Any client that speaks MCP over Streamable HTTP and supports OAuth works. Give it the server URL; it finds everything else from dubbl's `/.well-known` metadata. The endpoints are listed under **Endpoints for client authors** below.
+
+</Tab>
+
+</Tabs>
+
+<Steps>
+
+<Step>
+
+Add the server in your client, as above.
+
+</Step>
+
+<Step>
+
+The client opens dubbl in your browser. Sign in if you aren't already.
+
+</Step>
+
+<Step>
+
+On **Authorize MCP Access**, check what the client is asking for and which organization it gets. If you belong to several, choose one under **Select Organization**.
+
+</Step>
+
+<Step>
+
+Choose **Authorize**. Your browser hands the client a code, the client swaps it for its own tokens, and its dubbl tools appear. **Deny** sends it away with nothing.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- One connection works in one organization. To use a second organization, add the server again (with another name) and pick the other one when you authorize.
+- The agent can do exactly what your role allows, no more. A member who can't approve bills can't have an agent approve them either.
+- The MCP server takes only the tokens it hands out (they start with `mcp_at_`). API keys don't work here.
+- Tokens refresh on their own. An access token lasts an hour; the refresh token lasts 30 days and is replaced every time it's used, so a client you use at least once a month stays connected.
+- Money in tool inputs follows the same rules as the API: ledger amounts in cents, document line prices as decimals. Each tool's description says which.
+- Every plan, including Free, includes MCP access.
+
+## How the connection works
+
+<McpConnectFlow />
+
+## What an agent can do
+
+dubbl registers 627 tools, one per operation, grouped here by area. Your client shows each tool's full description and inputs.
+
+<Accordions>
+
+<Accordion title="Sales (64 tools)">
+
+Invoices, quotes, credit notes, receipts, payments received and reminders.
+
+`list_invoices`, `get_invoice`, `create_invoice`, `send_invoice`, `void_invoice`, `pay_invoice`, `request_invoice_signature`, `get_invoice_signature`, `resend_signature_request`, `check_invoice_compliance`, `get_invoice_pdf`, `get_invoice_snapshot`, `update_invoice_snapshot`, `submit_invoice_for_approval`, `approve_invoice`, `reject_invoice`, `convert_quote_to_invoice`, `list_quotes`, `get_quote`, `create_quote`, `update_quote`, `send_quote`, `accept_quote`, `decline_quote`, `list_credit_notes`, `get_credit_note`, `create_credit_note`, `apply_credit_note`, `void_credit_note`, `send_credit_note`, `list_sales_receipts`, `get_sales_receipt`, `get_sales_receipt_pdf`, `create_sales_receipt`, `post_sales_receipt`, `void_sales_receipt`, `list_customer_credits`, `get_customer_credit`, `create_customer_credit`, `apply_customer_credit`, `write_off_invoice`, `recover_written_off_invoice`, `list_payments`, `get_payment`, `create_payment`, `allocate_payment`, `record_payment_batch`, `delete_payment`, `list_recurring_templates`, `get_recurring_template`, `create_recurring_template`, `update_recurring_template`, `pause_recurring_template`, `run_recurring_template`, `list_reminder_rules`, `get_reminder_rule`, `create_reminder_rule`, `update_reminder_rule`, `delete_reminder_rule`, `process_reminders`, `list_portal_access`, `invite_contact_to_portal`, `revoke_portal_access`, `list_portal_activity`
+
+</Accordion>
+
+<Accordion title="Purchases (65 tools)">
+
+Bills, expenses, purchase orders, requisitions, debit notes and landed costs.
+
+`list_bills`, `create_bill`, `update_bill`, `approve_bill`, `pay_bill`, `void_bill`, `delete_bill`, `submit_bill_for_approval`, `reject_bill`, `list_bank_accounts`, `list_payment_batches`, `get_payment_batch`, `create_payment_batch`, `update_payment_batch`, `submit_payment_batch`, `list_scheduled_payments`, `create_scheduled_payment`, `update_scheduled_payment`, `cancel_scheduled_payment`, `delete_scheduled_payment`, `process_scheduled_payments`, `list_expense_claims`, `get_expense_claim`, `create_expense_claim`, `update_expense_claim`, `submit_expense_claim`, `recall_expense_claim`, `approve_expense_claim`, `pay_expense_claim`, `reject_expense_claim`, `create_purchase_order`, `list_purchase_orders`, `get_purchase_order`, `update_purchase_order`, `receive_goods_receipt`, `list_purchase_goods_receipts`, `convert_po_to_bill`, `get_purchasing_supplier_statement`, `generate_remittance`, `send_payment_batch_remittance`, `three_way_match_purchase_order`, `get_procurement_settings`, `update_procurement_settings`, `list_purchase_requisitions`, `get_purchase_requisition`, `create_purchase_requisition`, `update_purchase_requisition`, `submit_purchase_requisition`, `approve_purchase_requisition`, `reject_purchase_requisition`, `convert_purchase_requisition`, `list_debit_notes`, `get_debit_note`, `create_debit_note`, `apply_debit_note`, `void_debit_note`, `list_landed_costs`, `get_landed_cost`, `create_landed_cost`, `allocate_landed_cost`, `update_landed_cost`, `delete_landed_cost`, `submit_purchase_order_for_approval`, `approve_purchase_order`, `reject_purchase_order`
+
+</Accordion>
+
+<Accordion title="Contacts and CRM (32 tools)">
+
+Customers, suppliers, their people, balances, statements and deals.
+
+`list_contacts`, `get_contact`, `create_contact`, `update_contact`, `merge_contacts`, `delete_contact`, `list_contact_people`, `add_contact_person`, `list_customer_balances`, `list_supplier_balances`, `find_duplicate_contacts`, `get_contact_statement`, `email_contact_statement`, `list_pipelines`, `get_pipeline`, `list_deals`, `get_deal`, `create_deal`, `update_deal`, `move_deal_stage`, `mark_deal_won`, `mark_deal_lost`, `list_deal_activities`, `add_deal_activity`, `list_all_deal_activities`, `complete_deal_activity`, `delete_deal_activity`, `delete_deal`, `create_pipeline`, `update_pipeline`, `delete_pipeline`, `get_crm_analytics`
+
+</Accordion>
+
+<Accordion title="Banking (35 tools)">
+
+Transactions, matching, reconciliation, bank rules and the Stripe integration.
+
+`list_bank_transactions`, `categorize_bank_transaction`, `get_match_suggestions`, `match_to_invoice`, `match_to_bill`, `match_to_existing_payment`, `match_transfer`, `split_bank_transaction`, `bulk_cash_code`, `reconcile_bank_transaction`, `unreconcile_bank_transaction`, `exclude_bank_transaction`, `reconciliation_report`, `write_off_reconciliation_difference`, `preview_bank_statement_import`, `import_bank_statement`, `record_bank_transfer`, `list_bank_rules`, `create_bank_rule`, `update_bank_rule`, `delete_bank_rule`, `get_bank_rule_suggestions`, `apply_bank_rules`, `auto_reconcile_bank_transactions`, `set_bank_balance_alert`, `list_stripe_integrations`, `get_stripe_integration_status`, `connect_stripe`, `disconnect_stripe`, `trigger_stripe_sync`, `list_stripe_sync_log`, `import_stripe_csv`, `reconcile_stripe_balance`, `list_stripe_entity_mappings`, `get_stripe_webhook_health`
+
+</Accordion>
+
+<Accordion title="Accounting (100 tools)">
+
+Accounts, journal entries, schedules, assets, loans, budgets, periods and currencies.
+
+`list_accounts`, `get_account`, `create_account`, `update_account`, `delete_account`, `merge_accounts`, `get_special_category_account`, `list_entries`, `get_entry`, `create_entry`, `post_entry`, `void_entry`, `update_entry`, `set_auto_reverse_date`, `recode_entries`, `submit_entry_for_approval`, `approve_entry`, `reject_entry`, `list_recurring_journals`, `get_recurring_journal`, `create_recurring_journal`, `set_recurring_journal_status`, `delete_recurring_journal`, `run_recurring_journals`, `list_accrual_schedules`, `get_accrual_schedule`, `create_accrual_schedule`, `post_accrual_entry`, `cancel_accrual_schedule`, `list_revenue_schedules`, `get_revenue_schedule`, `create_revenue_schedule`, `recognize_revenue_entry`, `cancel_revenue_schedule`, `get_opening_balances`, `set_opening_balances`, `close_fiscal_year`, `reopen_fiscal_year`, `list_fiscal_years`, `list_chart_templates`, `get_chart_template`, `get_country_setup_defaults`, `apply_chart_template`, `find_account_by_role`, `list_fixed_assets`, `create_fixed_asset`, `update_fixed_asset`, `create_asset_category`, `list_asset_categories`, `get_asset_category`, `update_asset_category`, `delete_asset_category`, `run_asset_depreciation`, `dispose_fixed_asset`, `revalue_fixed_asset`, `impair_fixed_asset`, `capitalize_cwip_asset`, `rollback_asset_depreciation`, `list_loans`, `get_loan`, `create_loan`, `post_loan_payment`, `update_loan`, `list_budgets`, `get_budget`, `create_budget`, `update_budget`, `delete_budget`, `budget_vs_actual`, `list_cost_centers`, `get_cost_center`, `create_cost_center`, `update_cost_center`, `delete_cost_center`, `list_tags`, `create_tag`, `update_tag`, `delete_tag`, `attach_tag`, `detach_tag`, `list_record_tags`, `list_currencies`, `list_exchange_rates`, `get_exchange_rate`, `convert_amount`, `set_exchange_rate`, `delete_exchange_rate`, `list_consolidation_groups`, `get_consolidation_report`, `list_consolidation_members`, `add_consolidation_member`, `remove_consolidation_member`, `list_consolidation_elimination_rules`, `create_consolidation_elimination_rule`, `delete_consolidation_elimination_rule`, `create_consolidation_group`, `update_consolidation_group`, `delete_consolidation_group`, `get_period_lock`, `set_period_lock`
+
+</Accordion>
+
+<Accordion title="Tax (18 tools)">
+
+Tax rates, country tax profiles, tax periods and returns.
+
+`list_tax_rates`, `create_tax_rate`, `update_tax_rate`, `file_vat_return`, `record_vat_settlement`, `list_tax_profiles`, `apply_tax_profile`, `report_1099`, `list_tax_periods`, `get_tax_period`, `create_tax_period`, `file_tax_period`, `delete_tax_period`, `vat_return_report`, `bas_report`, `vat_box_transactions`, `sales_tax_report`, `schedule_c_report`
+
+</Accordion>
+
+<Accordion title="Reports (23 tools)">
+
+Financial statements, aged balances, sales reports, saved custom reports and report schedules.
+
+`trial_balance`, `balance_sheet`, `profit_and_loss`, `aged_receivables`, `aged_payables`, `stripe_fee_report`, `cash_flow_statement`, `export_financial_statement`, `tracking_category_report`, `report_pack`, `executive_summary`, `sales_by_customer`, `sales_by_item`, `create_report_schedule`, `list_report_schedules`, `update_report_schedule`, `delete_report_schedule`, `trigger_report_schedule`, `list_saved_reports`, `run_custom_report`, `run_saved_report`, `create_saved_report`, `delete_saved_report`
+
+</Accordion>
+
+<Accordion title="Operations (199 tools)">
+
+Inventory, assemblies, stock takes, transfers, warehouses, price lists, projects, teams, time, payroll, contractors, compensation and leave.
+
+`list_inventory_items`, `adjust_inventory_stock`, `transfer_inventory_stock`, `apply_stock_take`, `build_assembly`, `list_inventory_movements`, `create_inventory_item`, `get_inventory_item`, `update_inventory_item`, `delete_inventory_item`, `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse`, `get_warehouse_stock`, `list_price_lists`, `get_price_list`, `create_price_list`, `update_price_list`, `delete_price_list`, `add_price_list_item`, `update_price_list_item`, `delete_price_list_item`, `resolve_price`, `get_project_profitability`, `list_project_billable_items`, `register_project_billable_item`, `remove_project_billable_item`, `list_teams`, `get_team`, `create_team`, `update_team`, `delete_team`, `add_team_member`, `remove_team_member`, `list_project_team_assignments`, `assign_team_to_project`, `unassign_team_from_project`, `list_time_entries`, `create_time_entry`, `update_time_entry`, `delete_time_entry`, `start_timer`, `stop_timer`, `get_running_timer`, `list_timesheets`, `submit_timesheet`, `approve_timesheet`, `list_payroll_employees`, `create_payroll_employee`, `list_payroll_runs`, `create_payroll_run`, `process_payroll_run`, `generate_payslips`, `list_payslips`, `get_payslip_pdf`, `list_payroll_run_items`, `get_employee_leave_balances`, `generate_tax_forms`, `record_payroll_tax_remittance`, `list_workspace_members`, `link_employee_to_member`, `list_leave_policies`, `list_leave_requests`, `create_leave_request`, `request_my_leave`, `approve_leave_request`, `reject_leave_request`, `cancel_leave_request`, `get_my_leave_balances`, `create_timesheet`, `add_timesheet_entry`, `reject_timesheet`, `pause_timer`, `resume_timer`, `discard_timer`, `delete_payroll_run`, `void_payroll_run`, `submit_payroll_run_for_approval`, `approve_payroll_run`, `reject_payroll_run`, `add_payroll_bonus`, `remove_payroll_bonus`, `create_bonus_payroll_run`, `create_final_pay_run`, `create_correction_payroll_run`, `email_payslips`, `get_payroll_settings`, `update_payroll_settings`, `update_payroll_employee`, `get_employee_tax_config`, `update_employee_tax_config`, `list_deduction_types`, `create_deduction_type`, `list_employee_deductions`, `assign_employee_deduction`, `remove_employee_deduction`, `list_payroll_approval_chains`, `create_payroll_approval_chain`, `update_payroll_approval_chain`, `delete_payroll_approval_chain`, `process_contractor_payment`, `void_contractor_payment`, `list_contractors`, `get_contractor`, `create_contractor`, `update_contractor`, `list_contractor_payments`, `create_contractor_payment`, `list_compensation_bands`, `create_compensation_band`, `update_compensation_band`, `delete_compensation_band`, `list_compensation_reviews`, `get_compensation_review`, `create_compensation_review`, `add_compensation_review_entry`, `remove_compensation_review_entry`, `update_compensation_review_status`, `get_payroll_summary_report`, `get_payroll_tax_report`, `get_payroll_labor_cost_report`, `get_payroll_yoy_report`, `get_payroll_tax_liabilities`, `list_tax_forms`, `get_tax_form`, `list_inventory_categories`, `create_inventory_category`, `update_inventory_category`, `delete_inventory_category`, `list_inventory_variants`, `create_inventory_variant`, `update_inventory_variant`, `delete_inventory_variant`, `list_inventory_item_suppliers`, `link_inventory_item_supplier`, `update_inventory_item_supplier`, `unlink_inventory_item_supplier`, `list_reorder_alerts`, `get_inventory_valuation`, `list_boms`, `get_bom`, `create_bom`, `update_bom`, `delete_bom`, `add_bom_component`, `update_bom_component`, `remove_bom_component`, `list_assembly_orders`, `create_assembly_order`, `start_assembly_order`, `cancel_assembly_order`, `list_stock_takes`, `get_stock_take`, `create_stock_take`, `start_stock_take`, `record_stock_take_count`, `cancel_stock_take`, `list_inventory_transfers`, `get_inventory_transfer`, `create_inventory_transfer`, `send_inventory_transfer`, `complete_inventory_transfer`, `cancel_inventory_transfer`, `list_projects`, `get_project`, `create_project`, `update_project`, `delete_project`, `list_project_tasks`, `create_project_task`, `update_project_task`, `delete_project_task`, `add_task_checklist_item`, `update_task_checklist_item`, `delete_task_checklist_item`, `list_task_comments`, `add_task_comment`, `delete_task_comment`, `list_project_milestones`, `create_project_milestone`, `update_project_milestone`, `delete_project_milestone`, `list_milestone_assignments`, `add_milestone_assignment`, `update_milestone_assignment`, `delete_milestone_assignment`, `list_project_notes`, `create_project_note`, `update_project_note`, `delete_project_note`, `list_project_members`, `add_project_member`, `update_project_member`, `remove_project_member`, `get_project_uninvoiced_work`, `create_project_progress_invoice`, `invoice_project_unbilled`
+
+</Accordion>
+
+<Accordion title="Documents and email (44 tools)">
+
+Files, folders, document templates, sending documents by email, notifications and Tilly conversations.
+
+`list_contact_files`, `upload_contact_file`, `list_entity_files`, `attach_file_to_entity`, `link_document_to_record`, `list_documents`, `list_document_folders`, `create_document_folder`, `update_document_folder`, `delete_document_folder`, `update_document`, `detach_document_from_record`, `delete_document`, `list_trashed_documents`, `restore_document`, `permanently_delete_document`, `star_document`, `unstar_document`, `list_starred_documents`, `get_document_library_summary`, `send_document_email`, `list_document_emails`, `resend_document_email`, `list_sent_document_emails`, `get_email_settings`, `save_email_settings`, `send_test_email`, `remove_email_settings`, `list_notifications`, `mark_notification_read`, `mark_notification_unread`, `mark_all_notifications_read`, `delete_notification`, `get_notification_preferences`, `update_notification_preferences`, `list_assistant_conversations`, `get_assistant_conversation`, `rename_assistant_conversation`, `delete_assistant_conversation`, `list_document_templates`, `get_document_template`, `create_document_template`, `update_document_template`, `delete_document_template`
+
+</Accordion>
+
+<Accordion title="Organization and admin (47 tools)">
+
+Organization details, search, roles, approvals, webhooks, import and export, bulk actions, trash, backups and billing.
+
+`get_organization`, `update_organization`, `delete_organization`, `list_audit_log`, `search_everything`, `list_roles`, `get_role`, `create_role`, `update_role`, `assign_role`, `list_approval_workflows`, `create_approval_workflow`, `update_approval_workflow`, `delete_approval_workflow`, `list_approval_requests`, `get_approval_request`, `approve_request`, `reject_request`, `get_approval_status`, `comment_on_request`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `list_webhook_deliveries`, `test_webhook`, `get_import_template`, `import_csv_data`, `import_journal_entries`, `export_csv_data`, `list_import_jobs`, `bulk_categorize_bank_transactions`, `bulk_mark_invoices_paid`, `bulk_mark_invoices_sent`, `bulk_send_invoice_reminders`, `bulk_set_contacts_type`, `bulk_delete_contacts`, `list_trash`, `restore_trash_item`, `purge_trash_item`, `list_backups`, `create_backup`, `restore_backup`, `delete_backup`, `get_subscription`, `list_plans`, `change_plan`
+
+</Accordion>
+
+</Accordions>
+
+<Fold>
+
+## Things to ask
+
+Once connected, talk to it like a bookkeeper who has the books open:
+
+- "Which invoices are overdue, and who owes us the most?"
+- "Draft an invoice to Acme Corp for 12 hours of consulting at $150 an hour, due in 14 days."
+- "Apply my bank rules to the uncategorized transactions in the checking account, then show me what's left."
+- "Run a profit and loss for last quarter and compare it with the same quarter last year."
+- "Which bills are due this week, and is there enough in the bank to pay them?"
+
+New invoices, quotes and bills start as drafts, so you can check them before anything is sent.
+
+</Fold>
+
+<Fold>
+
+## Endpoints for client authors
+
+dubbl is an OAuth 2.1 authorization server with PKCE (S256 only), dynamic client registration and public clients (no client secret). The scope is `mcp`.
+
+| Endpoint | Method | What it does |
+| --- | --- | --- |
+| `/api/mcp` | `POST`, `GET`, `DELETE` | The MCP server (Streamable HTTP). Send `Authorization: Bearer mcp_at_...` |
+| `/.well-known/oauth-protected-resource/api/mcp` | `GET` | Protected resource metadata; the `401` from `/api/mcp` points here in `WWW-Authenticate` |
+| `/.well-known/oauth-authorization-server` | `GET` | Authorization server metadata |
+| `/api/mcp/oauth/register` | `POST` | Register a client: `redirect_uris` (required) and `client_name`. Returns a `client_id` starting with `mcp_` |
+| `/api/mcp/oauth/authorize` | `GET` | Start sign-in: `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method=S256`, `state`, `response_type=code` |
+| `/api/mcp/oauth/token` | `POST` | `grant_type=authorization_code` with `code`, `redirect_uri`, `code_verifier`, `client_id`; or `grant_type=refresh_token` with `refresh_token`, `client_id` |
+
+A token response looks like this:
+
+```json
+{
+  "access_token": "mcp_at_4f1c9a...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "mcp_rt_b82e07...",
+  "scope": "mcp"
+}
+```
+
+Authorization codes last 5 minutes and work once. Refreshing returns a new pair and retires the old refresh token. Tool results come back as JSON text; a failed tool returns `isError: true` with `{"error": "..."}`. The message says what was wrong (a missing record, a locked period, a value that isn't allowed) so the assistant can fix its request. Unexpected server faults come back as `Internal error`, without details.
+
+</Fold>
+
+<Fold>
+
+## Disconnecting a client
+
+There are three ways to cut a client off. Each takes effect on its next call:
+
+- **Your own clients:** open your profile, go to the **Security** tab and choose **Disconnect** next to the client under **Connected AI assistants**.
+- **Anyone's client in your organization:** an owner or admin opens **Settings**, then **API Keys**, and chooses **Revoke** next to it under **MCP connections**.
+- **Everything at once:** **Revoke all sessions** in the **Security** tab signs you out of every browser, the iOS app and every AI client.
+
+dubbl also checks on every call that the person who connected the client is still a member of the organization, with their current role. If they're removed, the client stops working straight away and can't refresh its token. You can still remove the dubbl server in the client itself (for Claude Code, `claude mcp remove dubbl`).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Ask Tilly" href="/docs/guides/tilly" description="dubbl's own assistant, inside the app." />
+  <Card title="Authentication" href="/docs/developers/authentication" description="API keys for your own scripts." />
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="What a role lets an agent do." />
+</Cards>

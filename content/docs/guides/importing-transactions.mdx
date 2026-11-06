@@ -1,0 +1,109 @@
+---
+title: Importing transactions
+description: Bring your bank's statement into dubbl as a file or pasted text, preview it, and skip anything you've imported before.
+icon: Upload
+---
+
+dubbl doesn't log in to your bank. Instead, you download a statement from your online banking and import it. Each line on the statement becomes a transaction on the bank account, waiting for you to say what it was. Most banks offer at least one of the formats dubbl reads, and CSV works everywhere.
+
+<Shot name="importing-transactions-sheet" alt="The Import Statement sheet with pasted CSV lines and a preview showing format, rows, duplicates and the lines" pins narrow />
+
+## Import a statement
+
+<Steps>
+
+<Step>
+
+Download a statement from your bank's website, for the dates you need.
+
+</Step>
+
+<Step>
+
+In dubbl, open **Accounting**, then **Bank accounts**, pick the account, and choose **Import**.
+
+</Step>
+
+<Step>
+
+Drop the file onto **Drop your statement here**, or click to browse. If your bank only shows the lines on screen, copy them into **Or Paste Content** instead.
+
+</Step>
+
+<Step>
+
+Leave **Format** on **Auto Detect**, or pick it if you know it. Choose **Preview** to check what dubbl found before anything is saved.
+
+</Step>
+
+<Step>
+
+If the rows, dates and amounts look right, choose **Import**. The new lines show up on the account as **To do**, and the message tells you how many your bank rules dealt with.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Lines you've already imported are skipped, so overlapping statements are fine. The preview tells you how many **Duplicates** it found.
+- Money out should be negative and money in positive. If your bank's CSV has separate **debit** and **credit** columns, dubbl reads those instead.
+- After an import, the account's balance is set to the statement's closing balance, or the running balance on its last line.
+- Importing on its own doesn't change your books. A line only counts once it's [categorized](/docs/guides/categorizing-transactions).
+- [Bank rules](/docs/guides/categorizing-transactions#bank-rules-let-dubbl-remember) run on every import. Lines a rule recognises get a suggested category, or are categorized straight away if the rule has **Categorize matching transactions automatically** turned on.
+- Made a rule after importing? **Apply rules** on the **Transactions** tab runs your rules on the lines still to do.
+
+## Where an imported line goes next
+
+<BankingLoop />
+
+<Fold>
+
+## Formats dubbl reads
+
+| Format | Where it comes from |
+| --- | --- |
+| **CSV**, **TSV** | Almost every bank. A spreadsheet of lines. |
+| **OFX**, **QFX**, **QBO** | "Download for Money / Quicken / QuickBooks" options. |
+| **QIF** | Older Quicken exports. |
+| **CAMT.052**, **CAMT.053**, **CAMT.054** | European banks (ISO 20022 XML). |
+| **MT940**, **MT942** | SWIFT statements from business banks. |
+| **BAI2** | US business and treasury banking. |
+
+**Auto Detect** works out the format from the file's contents, so you rarely need to pick one.
+
+</Fold>
+
+<Fold>
+
+## Getting a CSV to import cleanly
+
+dubbl looks for a header row and recognises common column names:
+
+- **Date**: date, transaction date, posting date, posted date, book date.
+- **Description**: description, memo, details, narrative, particulars.
+- **Amount**: amount, value or sum. Or separate debit / withdrawal and credit / deposit columns.
+- **Balance** (optional): balance or running balance.
+- **Reference** (optional): reference, ref, transaction ID, FITID or check number.
+
+If a preview shows zero rows or the wrong amounts, rename the columns in your spreadsheet to match these, save it as CSV, and try again.
+
+</Fold>
+
+<Fold>
+
+## Your import history
+
+The account's **Imports** tab lists every statement you've brought in: the file, its format, when you imported it, how many rows it had and how many duplicates were skipped. **Import Statement** there opens the same import sheet.
+
+<Shot name="importing-transactions-history" alt="A bank account's Imports tab with no imports yet and an Import Statement button" />
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Say what each imported line was." />
+  <Card title="Bank accounts" href="/docs/guides/bank-accounts" description="Add the account you're importing into." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="Check the imported lines against the statement." />
+</Cards>

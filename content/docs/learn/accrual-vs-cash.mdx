@@ -1,0 +1,90 @@
+---
+title: Accrual vs cash
+description: Counting income when you earn it or when the money arrives, and how to see both in dubbl.
+icon: CalendarClock
+---
+
+There are two ways to decide *when* a sale or a cost counts. **Accrual** counts it when it happens: you did the work and sent the invoice, so it's income now. **Cash** counts it when money actually moves: the customer paid, so it's income now. Over a whole year the totals come out the same. Month by month, they can look very different.
+
+<ShortVersion>
+
+- **Accrual basis**: income counts when you invoice, costs count when you're billed.
+- **Cash basis**: income counts when money arrives, costs count when money leaves.
+- dubbl records everything on an accrual basis, and lets you view your profit and loss either way.
+- Pick **When invoiced or billed** (accrual) or **When money moves** (cash) at the top of the report.
+- Accrual tells you how the business is really doing; cash tells you what's happened in the bank.
+
+</ShortVersion>
+
+## Same job, two answers
+
+Say you finish a $3,000 job on March 20 and invoice it that day. Materials for it cost $800, billed on March 28. The customer pays in April and you pay the supplier in May. When did you make the $2,200?
+
+<AccrualCashTimeline />
+
+Accrual says March, because that's when you did the work and incurred the cost. Cash says April for the income and May for the cost, because that's when the money moved. Put the months next to each other:
+
+<BasisProfitBars />
+
+Neither is wrong. They answer different questions:
+
+- **Accrual** answers *"did we make money doing the work we did this month?"* It matches each sale with the costs of making it, so a busy month looks busy even if customers pay late.
+- **Cash** answers *"what happened in the bank?"* It's simple and close to your bank statement, but a month where three big customers happen to pay looks like a great month, even if you did no work.
+
+## How dubbl handles it
+
+dubbl keeps your books on an accrual basis: sending an invoice records the sale, entering a bill records the cost, and payments later move the money. That way both views are possible from the same records.
+
+On the profit and loss, choose how to count:
+
+<Shot name="learn-pnl" alt="The profit and loss report with the Count income and costs toggle set to When invoiced or billed" pins />
+
+- **When invoiced or billed** is the accrual view, and the default.
+- **When money moves** is the cash view. An invoice or bill counts on the date it's paid, not the date it was issued. If a customer pays half, half of each line on the invoice counts. Credit notes and supplier credits (debit notes) count when they're used against an invoice or bill. Bank transactions you've categorized count on their own dates, and unpaid invoices and bills don't count at all.
+
+The same choice appears on the executive summary, tracking reports and [Schedule C](/docs/guides/schedule-c), and on the [VAT return](/docs/guides/vat-return) as **When you record it** or **When money moves**, for businesses that account for VAT on a cash basis.
+
+The balance sheet has no toggle. It's a snapshot of everything you own and owe, including invoices that haven't been paid yet.
+
+## Spreading things over time
+
+Accrual thinking goes one step further. If you pay $1,200 for a year of insurance in January, it isn't really a January cost; it covers twelve months. An **accrual** in dubbl spreads a one-off amount evenly over the months it belongs to. Here the demo company spreads a $4,800 business insurance premium at $400 a month:
+
+<Shot name="learn-accruals" alt="The Accruals page with a $4,800 business insurance premium spread over 12 months at $400 a month, half of it recorded so far" pins />
+
+Each month you choose **Record next month**, and that month's share lands in your books. For the $1,200 premium, your profit and loss shows a steady $100 a month instead of a $1,200 spike in January. See [Accruals](/docs/guides/accruals). For income received up front, [revenue schedules](/docs/guides/revenue-schedules) do the same thing in the other direction.
+
+## Which should you use?
+
+<Accordions>
+<Accordion title="I'm a freelancer and just want to know what came in">
+
+Look at your profit and loss with **When money moves**. It will match your bank more closely. Keep sending invoices in dubbl anyway: the books stay complete, and you can switch views any time.
+
+</Accordion>
+<Accordion title="I need to file taxes">
+
+The method you report on for tax is set by your tax office's rules and your circumstances, not by dubbl. Many small businesses may choose either; larger ones are often required to use accrual. Ask your accountant which applies to you, then read the report that way.
+
+</Accordion>
+<Accordion title="I want to understand how the business is doing">
+
+Use **When invoiced or billed**. It matches income with the costs of earning it, so the trend from month to month means something.
+
+</Accordion>
+</Accordions>
+
+## Good to know
+
+- Switching the toggle doesn't change your books. It only changes which entries the report counts.
+- Unpaid invoices are the biggest difference between the two views. If cash profit is far below accrual profit, look at [aged receivables](/docs/guides/aged-receivables-and-payables).
+- Over a long enough period, both views add up to the same profit.
+
+## Related
+
+<Cards>
+  <Card title="Profit and loss" href="/docs/guides/profit-and-loss" description="Read and filter the report in dubbl." />
+  <Card title="Receivables and payables" href="/docs/learn/receivables-and-payables" description="The invoices and bills that make the two views differ." />
+  <Card title="Financial statements" href="/docs/learn/financial-statements" description="How the three main reports fit together." />
+  <Card title="Accruals" href="/docs/guides/accruals" description="Spread one-off costs over several months." />
+</Cards>

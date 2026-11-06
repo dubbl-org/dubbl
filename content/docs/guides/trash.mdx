@@ -1,0 +1,75 @@
+---
+title: Trash
+description: Bring back a contact, invoice or other record you deleted by mistake, within 30 days.
+icon: Trash2
+---
+
+When you delete a record in dubbl it isn't gone straight away. It moves to the Trash and stays there for 30 days, so a slip of the finger is easy to undo. After 30 days it's removed for good. You'll find it under **Settings > Trash**.
+
+<Shot name="trash" alt="The Trash page with a deleted contact and a deleted quote, each with Restore and Delete permanently buttons" pins />
+
+## Bring something back
+
+<Steps>
+
+<Step>
+
+Open **Settings > Trash**.
+
+</Step>
+
+<Step>
+
+Find the record: type part of its name in **Search deleted items...**, or narrow the list with **All types**.
+
+</Step>
+
+<Step>
+
+Choose **Restore** (the circular arrow) on its row. It's back where it was.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- Everything in the Trash is removed for good 30 days after it was deleted.
+- You can only restore or permanently delete things you're allowed to manage. For example, restoring an invoice needs permission to manage invoices.
+- **Empty Trash** removes everything at once and can't be undone. Only the owner can use it.
+- Deleted backups land here too, and only the owner can restore them.
+- Files deleted in Documents have their own Trash on the Documents page.
+
+## A deleted record's last 30 days
+
+<Lifecycle
+  steps={[
+    { name: "Deleted", t: "watch", note: "Hidden everywhere in dubbl, kept in the Trash." },
+    { name: "Restored", t: "good", note: "Any time in the 30 days. Back as it was." },
+  ]}
+  caption="If nobody restores it, it's removed for good after 30 days, or straight away with Delete permanently or Empty trash."
+/>
+
+<Fold>
+
+## What ends up in the Trash
+
+Contacts, invoices, bills, accounts, journal entries, products, expenses, quotes, credit notes, debit notes, purchase orders, bank accounts, payments, recurring templates, projects, CRM deals, fixed assets, budgets, loans, documents, document templates and backups.
+
+</Fold>
+
+<Fold>
+
+## Delete something for good
+
+Choose **Delete permanently** (the cross) on a row and confirm. It's gone straight away and can't be brought back from the Trash. Restores, permanent deletions and emptying the Trash are all recorded in the [audit log](/docs/guides/audit-log).
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Backups" href="/docs/guides/backups" description="Roll back bigger changes." />
+  <Card title="Audit log" href="/docs/guides/audit-log" description="See who deleted what, and when." />
+  <Card title="Documents" href="/docs/guides/documents" description="Files have their own Trash." />
+</Cards>

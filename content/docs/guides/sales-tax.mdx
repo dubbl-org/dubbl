@@ -1,0 +1,97 @@
+---
+title: Sales tax
+description: See how much US sales tax you collected in a period, rate by rate, ready to copy into your state filing.
+icon: MapPin
+---
+
+In the US you collect sales tax from customers and pass it on to the state. The **Sales Tax Report** adds up what you charged on your invoices and cash sales for a period, less any credit notes, and splits it by tax rate, so each rate's total is ready for the matching line on your filing.
+
+<Shot name="sales-tax" alt="The Sales Tax Report with tax collected, taxable sales, exempt sales and the breakdown by rate" pins />
+
+## Get the numbers for a filing
+
+<Steps>
+
+<Step>
+
+Open **Tax** in the sidebar and choose **Sales Tax**. The tab shows for companies based in the US.
+
+</Step>
+
+<Step>
+
+Pick the filing period at the top: **This Month**, **This Quarter**, **This Year** or **Custom** dates.
+
+</Step>
+
+<Step>
+
+Read the three totals. **Tax Collected** is the tax on your sales and how many documents it came from. **Taxable Sales** is what that tax was charged on. **Exempt Sales** is the value of lines that carried no tax: lines with no tax rate, an exempt or 0% rate, or sold to a customer set to **Don't charge tax**. When some of it went to those customers, a note under the figure says how much.
+
+</Step>
+
+<Step>
+
+Under **Breakdown by Rate**, each card shows a rate, its percentage, the tax collected and the sales it was collected on. **Total Tax Collected** sits at the bottom.
+
+</Step>
+
+<Step>
+
+Choose **Export CSV** to keep the figures, or **Print** for a paper copy. Then file with your state.
+
+</Step>
+
+</Steps>
+
+## Good to know
+
+- The report counts invoices and credit notes by their issue date, whether they've been paid or not, and cash sales on their date. A credit note takes its tax off the rate it used. Drafts and voided documents are left out.
+- Sales in another currency are converted at the rate they were posted at, so the totals match your **Sales Tax Payable** account.
+- Each rate shows separately, so set up one rate per state or district you collect for. See [Tax rates](/docs/guides/tax-rates).
+- Each line counts once: either in **Taxable Sales** and its rate's card, or in **Exempt Sales**. Exempt lines never appear in **Breakdown by Rate**. Pick a rate on every line you mean to tax.
+- Amounts show in your company's currency. **Export CSV** writes plain amounts (1250.00) and adds an exempt sales row.
+- dubbl doesn't file or pay the state for you, and it doesn't work out which places you owe tax in. It adds up what you charged.
+- Want to track when each filing is due? Add it under **Tax Periods**, as described in [VAT return](/docs/guides/vat-return#tax-periods-filing-and-paying).
+
+## Where the numbers come from
+
+<SalesTaxRollup />
+
+Everything comes from your invoices, cash sales and credit notes. Bills and expenses don't change this report.
+
+<Fold>
+
+## What gets recorded in your books
+
+The tax on an invoice isn't income. It's money you're holding for the state, so dubbl records it as a liability, in **Sales Tax Payable**. (Companies charging VAT or GST use **Output VAT / GST Payable** instead.)
+
+<JournalEntry
+  title="Invoice for $1,000 of work, 8.25% sales tax"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 108250 },
+    { account: "Service Revenue", credit: 100000 },
+    { account: "Sales Tax Payable", credit: 8250, note: "Owed to the state" },
+  ]}
+  caption="Your income is $1,000. The $82.50 waits in the tax account until you pay it over."
+/>
+
+</Fold>
+
+<Fold>
+
+## Tax collected vs tax paid
+
+**Reports** also has **Tax collected vs tax paid**, under **Tax time**. It puts the tax you charged on sales next to the tax you paid on purchases, rate by rate, with the sales and purchases before tax. In most US states the tax on your purchases doesn't come back to you, so the sales side is the one you file.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Tax rates" href="/docs/guides/tax-rates" description="Add a rate for each state or district." />
+  <Card title="Invoices" href="/docs/guides/invoices" description="Where sales tax gets charged." />
+  <Card title="Schedule C" href="/docs/guides/schedule-c" description="Your income and expenses, lined up for your tax return." />
+  <Card title="Sales tax and VAT, explained" href="/docs/learn/sales-tax-and-vat" description="Why the tax you collect isn't your money." />
+</Cards>

@@ -1,0 +1,148 @@
+---
+title: Organization
+description: Set your company's name, country, address, currency, fiscal year and late-payment interest, lock past dates once a period is done, or delete the organization.
+icon: Building2
+---
+
+Your organization settings are the facts about your business that show up everywhere else: the name and address on your invoices, the country that decides your tax rules, the currency your books are kept in and when your financial year starts. You'll find them under **Settings > General**.
+
+<Shot name="organization" alt="The General settings page with the organization name, legal details and address" pins />
+
+## Fill in your company details
+
+<Steps>
+
+<Step>
+
+Open **Settings** from the rail. **General** is the first page.
+
+</Step>
+
+<Step>
+
+Check the **Name**, then pick your **Country (sets your tax rules)**. Picking a country also sets your default currency and resets **Business structure**, so choose the structure after the country.
+
+</Step>
+
+<Step>
+
+Add your **Tax ID / VAT** number, **Registration number** and **Industry** if you have them, then your address and contact details. These are printed on your invoices and other documents.
+
+</Step>
+
+<Step>
+
+Under **Financials**, check the **Default currency**, the month your **Fiscal year start**s in and your usual **Payment terms**.
+
+</Step>
+
+<Step>
+
+If you charge customers for paying late, fill in **Late payment interest** (see below).
+
+</Step>
+
+<Step>
+
+Choose **Save changes**. It saves everything above it, including the PEPPOL settings.
+
+</Step>
+
+</Steps>
+
+<Shot name="organization-financials" alt="The Financials, Late payment interest and PEPPOL sections, with Save changes below them" pins />
+
+## Good to know
+
+- The owner and admins can save these settings. Members can see them. A [custom role](/docs/guides/members-and-roles) can be given **Edit organization settings**.
+- Invoices emailed with **Send** keep the company details they went out with. Changing your address only affects invoices you send from then on.
+- **Business structure** stays greyed out until you've chosen a country.
+- **Fiscal year start** is the month new [fiscal years](/docs/guides/periods-and-closing) begin in.
+- **Payment terms** sets the due date of an invoice created without one, when the customer has no terms of their own.
+- The first time you set a country, dubbl sets up that country's chart of accounts and standard tax rates. Changing the country later doesn't replace them.
+- Locking dates is for the owner and your [advisors](/docs/guides/members-and-roles), and it applies to everyone, including Tilly and the API.
+
+## Where the details are used
+
+<Frame caption="One set of details, used across the app.">
+  <div className="grid gap-2 md:grid-cols-3">
+    <Box title="Name, tax ID and address">Printed on the PDFs of invoices, quotes, credit notes, debit notes and purchase orders.</Box>
+    <Box title="Country">Decides the business structures you can pick, and the chart and tax rates you start with.</Box>
+    <Box title="Financials">The currency your books are kept in, when your year starts, and the fallback due date.</Box>
+  </div>
+</Frame>
+
+<Fold>
+
+## Late payment interest
+
+These settings decide what **Charge interest** on an overdue invoice bills the customer. See [Invoices](/docs/guides/invoices).
+
+- **Annual interest rate (%)**: the yearly rate, for example `8` for 8%. Leave it blank if you don't charge interest; **Charge interest** then says no rate is set.
+- **Interest method**: **Simple** charges the same amount for every day late. **Compound (daily)** adds each day's interest to the amount it's worked out on, so it grows a little faster.
+- **Grace period (days)**: how many days after the due date before interest starts. With 10 days, an invoice 25 days late is charged for 15 days.
+
+Interest is worked out on what the customer still owes, not the original total. Choose **Save changes** when you're done.
+
+</Fold>
+
+<Fold>
+
+## Lock past dates
+
+Once you've filed a tax return or closed a month, lock it so nothing can change underneath you. Under **Lock past dates**, pick the last date to protect in **Lock everything up to and including** and choose **Lock dates**. From then on nothing dated on or before that day can be added or changed by your team.
+
+If an accountant or bookkeeper works on your books as an [advisor](/docs/guides/members-and-roles), you can give them a little more room with **Advisor lock date (optional)**: an earlier date that stays locked for them too. For example, lock everything up to 30 June for your team, and up to 31 March for your advisor, so they can still post adjustments for April to June. Leave it blank to hold everyone to the same date.
+
+To make a change in a locked period later, move the lock date back first. [Periods and closing](/docs/guides/periods-and-closing) covers the full month-end routine.
+
+<Shot name="organization-lock" alt="Lock past dates with the advisor lock date, and the Danger zone below it" pins />
+
+</Fold>
+
+<Fold>
+
+## Send invoices electronically (PEPPOL)
+
+PEPPOL is a network for sending invoices straight into another company's accounting system. It's required for some customers in parts of the EU, the UK and Singapore. If you use it, enter your **PEPPOL Participant ID** (for example `0088:1234567890`) and pick its **PEPPOL Scheme**, then choose **Save changes**. Each invoice can then be downloaded as UBL XML from its detail page.
+
+Leave these blank if you don't use PEPPOL.
+
+</Fold>
+
+<Fold>
+
+## Delete the organization
+
+Only the owner can do this, and it can't be undone. It deletes everything in the organization: the books, contacts, invoices, documents and backups. It also cancels a paid subscription and removes everyone's access. [Download a backup](/docs/guides/backups) first if you might need the data.
+
+<Steps>
+
+<Step>
+
+At the bottom of **Settings > General**, under **Danger zone**, choose **Delete**.
+
+</Step>
+
+<Step>
+
+Type the organization's name exactly as it's shown, then choose **Delete organization**.
+
+</Step>
+
+</Steps>
+
+dubbl then opens your next organization, or the setup screen if this was your only one.
+
+<Shot name="organization-delete" alt="The confirmation that asks you to type the organization's name before deleting it" narrow />
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Set up dubbl" href="/docs/guides/setup" description="The first things to do in a new organization." />
+  <Card title="Members and roles" href="/docs/guides/members-and-roles" description="Invite your team and decide what they can do." />
+  <Card title="Periods and closing" href="/docs/guides/periods-and-closing" description="Close a month and keep it closed." />
+  <Card title="Tax rates" href="/docs/guides/tax-rates" description="The rates your country gives you, and your own." />
+</Cards>

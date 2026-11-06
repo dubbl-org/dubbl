@@ -1,0 +1,171 @@
+---
+title: Projects
+description: Plan client work with tasks, track the time it takes, and turn billable hours into invoices.
+icon: FolderKanban
+---
+
+A project is a piece of work for a client: a website, an audit, a fit-out. It holds the tasks to do, the time your team spends, its budget and what you've billed. When it's time to bill, dubbl turns the unbilled hours, milestones or a share of the fixed price into an invoice for you.
+
+<Shot name="projects" alt="The Projects page with active projects, total budget, total billed and hours logged, and a table of projects with their status and budget" pins />
+
+## Start a project
+
+<Steps>
+
+<Step>
+
+Open **Projects** and choose **New Project**.
+
+</Step>
+
+<Step>
+
+Enter a **Project Name** and pick the **Client** it's for. You need a client to invoice from the project.
+
+</Step>
+
+<Step>
+
+Under **Financials**, choose how you bill: **Hourly**, **Fixed Price**, **Milestone** or **Non-Billable**. Add the **Budget** (the most you plan to bill the client), the **Hourly Rate** or **Fixed Price**, and the **Estimated Hours** if you have them. Choosing **Milestone** turns on the **Milestones** tab for you.
+
+</Step>
+
+<Step>
+
+Set the **Start Date** and **End Date**, and choose **Create Project**. dubbl opens its overview and puts you on the team as its **Manager**.
+
+</Step>
+
+</Steps>
+
+<Shot name="projects-new" alt="The New Project drawer with a name, client, hourly billing, a $15,000 budget and a $150 hourly rate" narrow />
+
+## Good to know
+
+- **Invoice** appears on a project that has a client, has billing turned on and isn't **Non-Billable**. You need to be a manager of the project to invoice it.
+- Each time entry takes its rate from the person's rate on the project, or the project's **Hourly Rate** if they don't have one. The rate is saved on the entry, so changing rates later doesn't change past time.
+- Invoicing creates a draft invoice. Nothing reaches your books until you send it.
+- Only billable time earns money. Non-billable time counts toward hours logged but never toward revenue or an invoice.
+- The **Budget** is the most you plan to bill the client. It's compared with what you've billed on sent invoices, so **Left to bill** is what remains.
+- Voiding or deleting an invoice releases the work on it: its time entries, milestones and share of the fixed price can be billed again.
+
+## The project overview
+
+Each project opens on its overview: time logged, tasks done, the value of billable time, budget and team at the top, then the last two weeks of time, how tasks are spread across their statuses, a calendar, and the project's details and financials.
+
+The **Financials** card shows **Total billed** (on sent invoices), **In draft invoices** (billed on drafts not sent yet), **Billable time value**, **Not yet invoiced**, and against the budget, **Left to bill**.
+
+<Shot name="projects-overview" alt="The Mobile App project overview with logged time, tasks, billable time and budget, a time chart, task distribution, a calendar and the Financials card" pins />
+
+## Bill your time
+
+When you're ready to bill, choose **Invoice** at the top of the project. What it offers follows how the project is billed:
+
+- **Hourly**: every billable time entry that hasn't been invoiced, all ticked. Untick any you want to leave for later. Each entry becomes one invoice line, its hours at its rate.
+- **Milestone**: pick the milestones to bill. Each is billed for whatever hasn't been invoiced yet.
+- **Fixed Price**: enter the **Percentage to invoice**. dubbl shows what's already been invoiced and never bills more than what remains.
+
+Billable expenses recorded on the project are listed under **Billable expenses**, ticked, so you can bill them on the same invoice. Add **Invoice notes** if you like, check the **Invoice total** and choose **Create Invoice**. dubbl opens the new draft invoice. Check it, then send it like any other [invoice](/docs/guides/invoices).
+
+<Shot name="projects-invoice" alt="The Invoice project sheet for the Mobile App project with two uninvoiced time entries ticked, invoice notes and an invoice total of $3,465.00" narrow />
+
+<ProjectBillingFlow />
+
+The entries on that invoice are marked **Invoiced**, so they're never billed twice. The project's **Total billed** goes up once the invoice is sent; until then the amount shows as **In draft invoices**. If you void or delete the invoice, the work goes back to unbilled.
+
+<ProjectBudgetBar />
+
+<Fold>
+
+## Tasks
+
+The **Tasks** tab lists the work to do. Choose **Task** to add one: a **Title**, a **Description**, its **Priority** and **Status**, who it's assigned to, and its **Start Date**, **Due Date** and **Estimated Time (minutes)**. Switch between the list and a board; on the board, drag a card to another column to change its status.
+
+<Lifecycle
+  steps={[
+    { name: "Backlog", note: "Not planned yet." },
+    { name: "To Do", note: "Planned." },
+    { name: "In Progress", t: "info", note: "Being worked on." },
+    { name: "In Review", t: "watch", note: "Done, being checked." },
+    { name: "Done", t: "good", note: "Finished." },
+  ]}
+/>
+
+Use the tabs above the list to show one status, including **Backlog** and **Cancelled**. The board shows a column for every status, **Cancelled** included, and follows the same tabs.
+
+Click a task to open it. There you can change its status, priority and assignee, tick off a **Checklist**, and leave **Comments** for the team. **Edit details** changes the title, description, dates and estimate. **Mark Done** finishes it. **Delete** asks you to confirm; time logged against the task stays on the project.
+
+<Shot name="projects-tasks" alt="The Tasks tab with counts by status and overdue, and a list of tasks with estimates, priorities, statuses and due dates" />
+
+</Fold>
+
+<Fold>
+
+## Tracking time
+
+On the **Time** tab, choose **Start Timer** when you start work. While it runs, say what you're working on, link it to a task and choose **Billable** or **Non-billable**. **Pause** and **Resume** as you need; **Save** logs the time as an entry for today. Your timer is yours alone: other people's timers never show on your screen.
+
+To add time afterwards, choose **Log Time** and enter the **Date**, a **Description**, the **Related Task**, the **Hours** (or **Or Minutes**) and whether it's **Billable**. Time is always logged as you.
+
+<Shot name="projects-time" alt="The Time tab with the timer, this week's hours, total time, earned and unbilled amounts, and the list of time entries" pins />
+
+Each entry shows **Billable**, **Non-bill.** or **Invoiced**. Filter the list by member, status or task to see what's still to bill. **Earned** and **Unbilled** only count billable time.
+
+Click an entry to change it. Time that's on an invoice is locked: only its **Description** and **Related Task** can change, and it can't be deleted until the invoice is voided or deleted. You can change your own time; a project manager can change anyone's.
+
+</Fold>
+
+<Fold>
+
+## Milestones and progress invoices
+
+The **Milestones** tab is on for projects billed by **Milestone**; on other projects, turn it on under **Settings**, **Features**. Choose **Milestone** to add one with a **Title**, **Due Date** and **Amount**, and tick it off when it's complete. A milestone that's on an invoice can't be deleted.
+
+**Create Invoice** on the **Milestones** tab opens the same invoice sheet as the **Invoice** button.
+
+To share a milestone's payment with the people who did the work, hover it and open **Manage Assignments**. Add each person with an **Amount**, then choose **Mark Paid** once you've paid them. Click **Paid** to set it back to unpaid.
+
+</Fold>
+
+<Fold>
+
+## The project team
+
+On the **Team** tab, **Add Member** puts someone from your workspace on the project with a role and, optionally, a **Billing Rate per hour** that overrides the project's rate for their time and a **Cost Rate per hour** (what their time costs you, used for project profitability). Click a member to change their role or rates, or to remove them. **Assign Team** adds a whole [team](/docs/guides/teams) at once, with one role for all of them.
+
+The role decides what someone can do on the project:
+
+- **Manager**: everything, including settings, members, milestones, invoicing and deleting tasks.
+- **Contributor**: create and edit tasks, log time, use the timer and add notes.
+- **Viewer**: read only.
+
+Workspace owners and admins can always manage every project. Other people also need the workspace permission to manage projects; without it they can only view. Someone who isn't on a project's team can contribute to it, and can manage it while it has no manager.
+
+</Fold>
+
+<Fold>
+
+## Notes
+
+The **Notes** tab is a running log for the project: decisions, client calls, links. Write a note and choose **Add Note**. Pin the ones that matter so they stay at the top and show on the overview. You can edit or delete your own notes; managers can edit or delete any.
+
+</Fold>
+
+<Fold>
+
+## Settings, features and deleting
+
+**Settings** holds everything you entered when you created the project, plus its **Status**: **Active**, **On Hold**, **Completed**, **Cancelled** or **Archived**. Under **Features** you can turn **Tasks**, **Time Tracking**, **Milestones**, **Notes** and **Billing** on or off; a feature that's off hides its tab. Only project managers can change settings.
+
+**Delete** in the danger zone moves the project, with its tasks, time and notes, to [Trash](/docs/guides/trash). You can restore it from there. Invoices you already created stay as they are.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="Send the invoice a project creates." />
+  <Card title="Teams" href="/docs/guides/teams" description="Group people and put them on projects." />
+  <Card title="Time and leave" href="/docs/guides/time-and-leave" description="Timesheets for payroll." />
+  <Card title="Contacts" href="/docs/guides/contacts" description="The clients your projects are for." />
+</Cards>

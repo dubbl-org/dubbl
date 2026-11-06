@@ -1,0 +1,194 @@
+---
+title: Fixed assets
+description: Track the equipment, vehicles and furniture you own, spread their cost over the years you use them, and record it when you sell or scrap them.
+icon: Package
+---
+
+A fixed asset is something you buy to use for years rather than to sell: a laptop, a van, office furniture. Instead of counting the whole price as a cost the month you buy it, you spread it over the item's useful life. Each month a slice of its value is used up (this is called depreciation), until only the value you expect to get back at the end is left. dubbl keeps the list, works out each month's drop and records it in your books.
+
+<Shot name="fixed-assets" alt="The fixed assets list with what you paid, current value and value used up, and each asset's progress" pins />
+
+## Add an asset
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Fixed assets**, and choose **New Asset**.
+
+</Step>
+
+<Step>
+
+Pick a **Category** if you have one for this kind of asset. It fills in the method, lifespan, leftover value and accounts below; you can still change any of them. Then give it an **Asset Name** and an **Asset Number** (your own tag, such as FA-003). Add a **Description** if it helps to find it later.
+
+</Step>
+
+<Step>
+
+Enter the **Purchase Date** and **Purchase Price**. Leave **Is it in use yet?** on **In use now**, or see [Assets you're still building](#assets-youre-still-building).
+
+</Step>
+
+<Step>
+
+Under **Depreciation**, choose the **Method** (see [How much each month](#how-much-each-month)), then enter the **Residual Value** (what you expect it to be worth when you're done with it) and the **Useful Life (months)**. **The first month** sets how much the month you start takes; see [The first month](#the-first-month).
+
+</Step>
+
+<Step>
+
+Under **Accounts**, pick the **Asset Account** it sits in, the **Depreciation Expense** account and the **Accumulated Dep.** account. Then choose **Create Asset**.
+
+</Step>
+
+</Steps>
+
+<Shot name="fixed-asset-new" alt="The New Fixed Asset drawer: category, a delivery van bought for $36,000 with $6,000 residual value, method, first month and accounts" narrow />
+
+## Good to know
+
+- Adding an asset doesn't record the purchase. That's done by the [bill](/docs/guides/bills) or bank payment you paid it with, coded to the asset account. The asset record tracks its value from then on.
+- Set both **Depreciation Expense** and **Accumulated Dep.**, or the monthly value drops are tracked on the asset but never reach your books.
+- The leftover value is never written off. Only the purchase price minus the residual value is spread over the asset's life.
+- In the last month of its life, the asset takes whatever is left, so the total lands exactly on the residual value.
+- Disposing of an asset is final. Make sure the date and the amount you got are right before you confirm.
+
+## The life of an asset
+
+<FixedAssetLifeFlow />
+
+## How much each month
+
+Pick one of four methods:
+
+- **The same amount each month (straight line).** A $36,000 van with $6,000 left at the end, over 36 months, drops by ($36,000 - $6,000) / 36 = $833.33 a month.
+- **A yearly share of what's left, so more at the start (declining balance).** Each month takes a slice of the value still left. Enter a **Yearly rate (%)**, such as 20, or leave it blank for double the straight-line rate (2 / 3 years = 67% a year for the van).
+- **Front-loaded, a little less each month (sum of years' digits).** The first month takes the biggest share and each month after takes a fixed step less.
+- **Based on how much it's used (units of production).** Enter the **Total units over its life** and the **Unit**, such as 150,000 miles. Each month you enter how much it was used, and that share of the cost is written off.
+
+<DepreciationScheduleChart />
+
+### The first month
+
+**The first month** decides how much the month you start takes:
+
+- **A full first month** charges a normal month, however late in the month you started.
+- **Half the first month** (mid-month, half-year or mid-quarter) charges half a month.
+- **Day by day in the first month** charges only the days from the in-service date.
+- **All of it in the first month** writes the whole cost (minus the leftover value) off at once.
+
+When the first month is shortened, the rest is taken one extra month after the useful life ends, so the total always lands on the leftover value.
+
+The idea, with every method compared, is in [Depreciation](/docs/learn/depreciation).
+
+<Fold>
+
+## Record this month's value drop
+
+There are three ways it happens:
+
+- **Automatically.** Every night dubbl records the month's drop for each asset that's in use and has both its depreciation accounts set.
+- **For every asset at once.** **Record value drops** on the list records this month for all of them.
+- **For one asset.** Open it and choose **Record value drop**. For an asset that loses value by use, it first asks how much it was used this month.
+
+All three work out the amount the same way, and each asset gets one value drop per calendar month, dated the day it's recorded. Pressing again in the same month does nothing; the single-asset button says this month is already recorded. A date that falls on or before your [lock date](/docs/guides/periods-and-closing#lock-past-dates) isn't recorded: the buttons show an error naming the lock date, and the nightly run skips it.
+
+Each drop posts one entry:
+
+<JournalEntry
+  title="Depreciation - Delivery van (FA-003)"
+  date="Nov 30, 2026"
+  lines={[
+    { account: "5500 Depreciation Expense", debit: 83333 },
+    { account: "1730 Accumulated Depreciation - Vehicles", credit: 83333 },
+  ]}
+  caption="The cost goes on your profit and loss a month at a time. The asset's value on the balance sheet goes down by the same amount."
+/>
+
+Recorded one by mistake? **More actions**, then **Undo last value drop** reverses the most recent one and removes its entry.
+
+</Fold>
+
+<Fold>
+
+## The asset's own page
+
+Click an asset to see what you paid, its current value, how much is used up, the accounts its entries post to, and every value drop with the entry it made.
+
+<Shot name="fixed-asset" alt="An asset's page with Record value drop, More actions, its values and its bookkeeping accounts" pins />
+
+**More actions** holds everything else:
+
+<Shot name="fixed-asset-more" alt="The More actions menu: record a higher value, write down to a lower value, undo last value drop, record as sold or written off" narrow />
+
+</Fold>
+
+<Fold>
+
+## Sell it or write it off
+
+When you sell an asset, give it away or throw it out, choose **More actions**, then **Record as sold or written off**. Enter the **Amount you got for it** (0 if you got nothing) and the **Date it was sold or stopped being used**.
+
+<Shot name="fixed-asset-dispose" alt="The Record as sold or written off dialog with the amount received and the date" narrow />
+
+dubbl first records any value drop still owed up to that date, then takes the asset off your books. The difference between what you got and what it was still worth is a gain or a loss. Selling a $3,500 laptop for $1,800 when $2,000 of it is used up:
+
+<JournalEntry
+  title="Disposal - MacBook Pro 16&quot; (FA-001)"
+  date="Nov 30, 2026"
+  lines={[
+    { account: "1250 Undeposited Funds", debit: 180000, note: "what you got" },
+    { account: "1720 Accumulated Depreciation - Computers", debit: 200000 },
+    { account: "1620 Computer Equipment", credit: 350000, note: "the original cost" },
+    { account: "4300 Gain on Asset Disposal", credit: 30000 },
+  ]}
+  caption="It was worth $1,500 on paper and sold for $1,800: a $300 gain. A sale below its value would debit 5920 Loss on Asset Disposal instead."
+/>
+
+The money lands in Undeposited Funds; match it to the bank deposit when you [reconcile](/docs/guides/reconciliation).
+
+</Fold>
+
+<Fold>
+
+## Revalue or write down
+
+When an asset is clearly worth something different from its current value, record it:
+
+- **Record a higher value** raises it. The increase goes to 3400 Revaluation Surplus in equity, not to profit (unless it reverses an earlier write-down, which comes back through 5510 Impairment Loss).
+- **Write down to a lower value** lowers it. It uses up any revaluation surplus first, and the rest is a cost in 5510 Impairment Loss.
+
+Both ask for the new value, a date and optional notes, and appear under **Value changes over time** on the asset. If the asset is later sold, any surplus left is moved to retained earnings.
+
+</Fold>
+
+<Fold>
+
+## Asset categories
+
+**Asset categories** (in the **Assets and loans** menu) hold defaults for a kind of asset: how it loses value, the first month, its lifespan and leftover value, the yearly rate for declining balance, and the accounts it uses. Choose **New Category** to add one.
+
+<Shot name="asset-categories-new" alt="The new asset category form for Vehicles: method, start convention, lifespan and accounts" narrow />
+
+Pick the category under **Category** when you add an asset, and its defaults are copied onto the new asset. Changing a category later doesn't change assets already created from it.
+
+</Fold>
+
+<Fold>
+
+## Assets you're still building
+
+An asset that isn't ready yet, like a fit-out or a machine being installed, can be added with **Is it in use yet?** set to **Still being built (work in progress)**. Pick the **Work in progress account** its costs collect in. It shows as **Not in use yet**, and its value doesn't drop. Its page has **Add construction cost** to add each cost as it comes in, and **Bring into use** once it's working. Value drops start from that date.
+
+</Fold>
+
+
+## Related
+
+<Cards>
+  <Card title="Depreciation" href="/docs/learn/depreciation" description="Why and how assets lose value, step by step." />
+  <Card title="Bills" href="/docs/guides/bills" description="Record the purchase you paid for the asset with." />
+  <Card title="Loans" href="/docs/guides/loans" description="Track the finance you bought it with." />
+  <Card title="Balance sheet" href="/docs/guides/balance-sheet" description="Where your assets' value shows up." />
+</Cards>

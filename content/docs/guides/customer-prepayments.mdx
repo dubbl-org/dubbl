@@ -1,0 +1,102 @@
+---
+title: Customer prepayments
+description: Record deposits and money customers pay before you invoice them, then use it against their invoices later.
+icon: PiggyBank
+---
+
+Sometimes a customer pays before there's an invoice: a deposit to book your time, a payment up front for a big order, or more than they owed last time. Record it as a prepayment. The money goes into your bank straight away, but it isn't income yet. It waits as credit on the customer's account until you use it against an invoice.
+
+<Shot name="customer-prepayments" alt="The prepayments page, empty in the demo company" />
+
+## Record a prepayment
+
+<Steps>
+
+<Step>
+
+Open **Sales › Prepayments** and choose **New prepayment** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **Customer**, the **Date** the money arrived and the **Amount**. Leave **Type** on **Prepayment**, or choose **Overpayment** if they paid more than an invoice asked for.
+
+</Step>
+
+<Step>
+
+Under **Payment**, choose the account the money went into in **Paid into**. Add **Notes** about what it's for.
+
+</Step>
+
+<Step>
+
+Choose **Record prepayment**. It's in your books now and shows as **Available**.
+
+</Step>
+
+</Steps>
+
+<Shot name="customer-prepayments-new" alt="The New prepayment drawer for Pinnacle Group, 2,500.00, with notes about a deposit" narrow />
+
+## Good to know
+
+- A prepayment is recorded the moment you save it. There's no draft step.
+- It isn't income until it's used against an invoice. Until then it's money you hold for the customer.
+- You can use one prepayment across several invoices. Each use takes from what's left.
+- Credit can only go against that customer's own invoices, in the same currency. Drafts and invoices waiting for approval aren't offered until they're sent.
+- The customer's open invoices show their prepayments in the **Available credit** box, so you can apply it from either side.
+
+## How a prepayment gets used
+
+<PrepaymentFlow />
+
+## Use it against an invoice
+
+Open the prepayment and choose **Apply to an invoice**. The **Invoice** list only shows this customer's open invoices. Pick one, check the **Amount** and confirm. The invoice's balance goes down, and once the whole prepayment has been used it shows as **Used**.
+
+<Fold>
+
+## What gets recorded in your books
+
+When the money arrives, your bank goes up and so does Customer Deposits, a liability: you owe the customer that money in goods or work.
+
+<JournalEntry
+  title="Prepayment from Pinnacle Group"
+  date="Oct 1, 2026"
+  lines={[
+    { account: "Checking account", debit: 250000 },
+    { account: "Customer deposits", credit: 250000 },
+  ]}
+/>
+
+When you use it against an invoice, the deposit is turned into payment for that invoice:
+
+<JournalEntry
+  title="Prepayment applied to INV-00015"
+  date="Oct 20, 2026"
+  lines={[
+    { account: "Customer deposits", debit: 180000 },
+    { account: "Accounts receivable", credit: 180000 },
+  ]}
+  caption="The income itself was counted when you sent the invoice. Applying the prepayment only settles it."
+/>
+
+</Fold>
+
+<Fold>
+
+## The prepayments list
+
+The tiles show what's **Available to use**, what's been **Used**, what you **Received this month**, the **Total received** and anything **Refunded**. The same list appears under **Contacts › Customer credits**.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Payments received" href="/docs/guides/payments-received" description="Payments against invoices you've already sent." />
+  <Card title="Credit notes" href="/docs/guides/credit-notes" description="Reduce what a customer owes." />
+  <Card title="Receivables and payables" href="/docs/learn/receivables-and-payables" description="Why money owed is tracked separately from income." />
+</Cards>

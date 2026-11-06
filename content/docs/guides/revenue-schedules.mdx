@@ -1,0 +1,108 @@
+---
+title: Revenue schedules
+description: Spread the income from one invoice over the months you actually earn it, a month at a time.
+icon: CalendarRange
+---
+
+When a customer pays up front for a year of support or a six-month project, you haven't earned it all on day one. A revenue schedule takes the invoice's income out of this month and puts it back a month at a time, so your profit and loss shows the money in the months the work was done.
+
+<Shot name="revenue-schedules" alt="The revenue schedules list with what's left to count, periods ready to count and each schedule's progress" pins />
+
+## Set up a schedule
+
+<Steps>
+
+<Step>
+
+Open **Sales › Revenue schedules** and choose **New revenue schedule** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **Invoice** the income comes from. Only sent invoices are listed, shown by number and customer. If the invoice's lines use different income accounts, pick the **Line** to spread; otherwise you can spread the **Whole invoice**.
+
+</Step>
+
+<Step>
+
+Check the **Amount to spread**. It starts at the invoice's (or line's) amount before tax; enter less to spread only part of it. Choose the **Method**, then set the **Start Date** and **End Date**. dubbl makes one period for each month from the start month to the end month.
+
+</Step>
+
+<Step>
+
+Choose **Create revenue schedule**. The amount moves out of income into deferred revenue straight away, and is split evenly across the periods; any leftover cent goes on the last one.
+
+</Step>
+
+</Steps>
+
+<Shot name="revenue-schedules-new" alt="The New revenue schedule drawer with an invoice picker, the amount to spread, the method and start and end dates" narrow />
+
+## Count each month's income
+
+With **Even amounts over time**, dubbl counts each month's share as income overnight once the month has started, so there's nothing to do. A period that has started and isn't counted yet shows **Ready to count**; to count it straight away, open the schedule and choose **Count next period**. That month's share moves out of deferred revenue and into your income. When every period is counted the schedule is **Finished**.
+
+<Shot name="revenue-schedules-preview" alt="A twelve-month schedule for a Riverdale Co invoice, with the past months counted and this month ready to count" narrow />
+
+## Good to know
+
+- **Even amounts over time** is counted automatically each month.
+- **By milestone** is split by month too, but nothing is counted for you. Choose **Count next milestone** when each part of the work is done.
+- **All on completion** keeps the whole amount in deferred revenue and counts it in one go on the end date.
+- Periods are counted one at a time, oldest first. A period is never dated before the invoice or in the future.
+- **Cancel schedule** stops further counting and puts the income that wasn't counted yet back into your income today. Periods already counted stay as they are.
+- An invoice with a schedule in progress can't be cancelled. Cancel the schedule first. Choose **View invoice** on a schedule to open its invoice.
+
+## Income month by month
+
+<RevenueRecognitionChart />
+
+<Fold>
+
+## What gets recorded in your books
+
+Creating a schedule posts one entry on the invoice date that moves the amount out of income and into deferred revenue (money you've been paid but haven't earned yet, a liability). On the standard chart that's **2400 Unearned Revenue**; on a Xero-style chart it's **Income in Advance**. If your chart has no such account, dubbl adds one the first time it's needed. Each period counted then posts one entry: deferred revenue goes down, and income goes up. The income account is the one on the invoice line you spread.
+
+<JournalEntry
+  title="Support contract, schedule created"
+  date="Jan 1, 2026"
+  lines={[
+    { account: "Sales", debit: 600000 },
+    { account: "Deferred revenue", credit: 600000 },
+  ]}
+  caption="The invoice put $6,000 into income when it was sent. The schedule takes it back out."
+/>
+
+<JournalEntry
+  title="Support contract, March period counted"
+  date="Mar 1, 2026"
+  lines={[
+    { account: "Deferred revenue", debit: 100000 },
+    { account: "Sales", credit: 100000 },
+  ]}
+  caption="One sixth of a $6,000 six-month contract."
+/>
+
+Cancelling a schedule posts the same kind of entry for what was left: deferred revenue goes down and income goes up by the amount not counted yet.
+
+Why income is counted when it's earned and not when it's paid is explained in [Accrual vs cash](/docs/learn/accrual-vs-cash).
+
+</Fold>
+
+<Fold>
+
+## The schedules list
+
+The tiles show what's **Left to count** across all schedules, what's been **Counted so far**, what's **Ready to count** now, what comes due in the **Next 30 days**, and the **Total scheduled**. The **Progress** column shows how far each schedule has got.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="The invoice a schedule spreads out." />
+  <Card title="Accruals" href="/docs/guides/accruals" description="Spread costs and income you haven't invoiced." />
+  <Card title="Accrual vs cash" href="/docs/learn/accrual-vs-cash" description="When income counts, and why." />
+</Cards>

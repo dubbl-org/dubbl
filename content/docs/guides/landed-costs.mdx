@@ -1,0 +1,122 @@
+---
+title: Landed costs
+description: Add freight, duty and other costs of getting stock to you onto what that stock cost.
+icon: Ship
+---
+
+The real cost of stock is more than the supplier's price. Shipping, import duty and insurance are part of what it cost to get the goods onto your shelf. A landed cost spreads those extra costs across the lines of a purchase order, so each item's value, and later its cost of sales, includes them.
+
+<Shot name="landed-costs" alt="The Landed costs page under Purchases, before any landed costs, with a New landed cost button" pins />
+
+## Add freight to a purchase order
+
+<Steps>
+
+<Step>
+
+Make sure the purchase order's lines are linked to your stock items: pick the item in **Stock item (optional)** on each line when you create the order, or under **Stock item** when you edit it.
+
+</Step>
+
+<Step>
+
+Open **Purchases**, then **Landed costs**, and choose **New landed cost**.
+
+</Step>
+
+<Step>
+
+Give it a **Name**, such as `Ocean freight for PO-0007`. Under **Purchase order**, pick the order the goods came on. Under **Bill**, you can pick the carrier's or customs bill for these costs.
+
+</Step>
+
+<Step>
+
+Choose the **Split**: **By value**, **By quantity** or **Manual**.
+
+</Step>
+
+<Step>
+
+Under **Costs**, add each cost with a **Description**, an **Amount** and, if you like, the account it's **Booked to**. **Add** adds another, so freight and duty can be separate lines.
+
+</Step>
+
+<Step>
+
+Choose **Create landed cost**. dubbl opens it, marked **Not applied**, with a preview of how it will be split.
+
+</Step>
+
+<Step>
+
+Choose **Apply to stock** and confirm. The costs are spread across the purchase order's lines and the landed cost becomes **Applied**.
+
+</Step>
+
+</Steps>
+
+<Shot name="landed-costs-new" alt="The New landed cost sheet with a name, purchase order and bill pickers, the split, and one cost for ocean freight" narrow />
+
+## Good to know
+
+- You need a purchase order to apply a landed cost: its lines are what the cost is spread across. The bill is for reference.
+- A landed cost can only be applied once. Until then you can still delete it; an applied one can't be undone or deleted.
+- Stock value goes up only for purchase order lines linked to a stock item. A line with no stock item keeps its share on that line's account.
+- If some of the units have already been sold, only the share for the units still on hand is added to stock. The rest goes to cost of sales, since those units' cost of sales has already been recorded.
+- The added cost raises the item's book value and its average cost (or its first in, first out layers), so every unit sold afterwards carries its share.
+- Amounts are in the currency of the purchase order or bill and are converted to your base currency when applied.
+
+## By value, by quantity or manual
+
+**By value** gives each line a share in proportion to what it cost, so expensive lines carry more. **By quantity** gives every unit the same share. Use value for costs like insurance and duty that follow price, and quantity for costs that follow the number of boxes.
+
+<LandedCostSplit />
+
+**Manual** lets you decide. On the landed cost's page, type the amount for each line under **Share**; they must add up to the total before you can apply it. Every cost on the landed cost is split in the same proportions.
+
+There's no split by weight, because items don't have a weight in dubbl.
+
+<Fold>
+
+## What gets recorded in your books
+
+Applying posts one entry: inventory goes up by the share for the units still on hand, cost of sales takes the share for units already sold, and the other side goes to the account each cost is **Booked to**, or Landed Costs Clearing if you left it empty.
+
+<JournalEntry
+  title="Landed cost: Ocean freight for PO-0007"
+  date="Oct 20, 2026"
+  lines={[
+    { account: "Inventory", debit: 24000 },
+    { account: "Cost of Goods Sold", debit: 6000, note: "units already sold" },
+    { account: "Landed Costs Clearing", credit: 30000 },
+  ]}
+  caption="$300.00 of freight on 100 lamps, 80 of which are still on the shelf."
+/>
+
+There are two ways to keep the cost from being counted twice when the carrier's or customs bill arrives:
+
+- Code the bill to Landed Costs Clearing, and leave **Booked to** empty. The clearing account goes back to zero.
+- Or code the bill to an expense account such as Freight, and pick that account as **Booked to**. Applying moves the cost out of that expense and into your stock.
+
+See [Bills](/docs/guides/bills).
+
+</Fold>
+
+<Fold>
+
+## The landed costs list
+
+Once you have landed costs, the list shows each one with what it's linked to, how it's split, whether it's applied and its total. The cards along the top total your extra costs, what's not applied yet, what's applied, this year's costs, the biggest cost type and anything not linked to an order. Click a row to preview it, **Apply** it, or jump to its purchase order or bill.
+
+The landed cost's own page shows the **Costs** with the account each is booked to, and how it's split across the purchase order's lines: which stock item each line is for, its units, its amount and its **Share**. Once applied, it links to the journal entry.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Purchase orders" href="/docs/guides/purchase-orders" description="Order stock from suppliers." />
+  <Card title="Inventory" href="/docs/guides/inventory" description="What your stock is worth." />
+  <Card title="Inventory costing" href="/docs/learn/inventory-costing" description="Why the cost of stock includes getting it to you." />
+</Cards>

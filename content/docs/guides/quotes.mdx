@@ -1,0 +1,97 @@
+---
+title: Quotes
+description: Price up a job, send it for the customer to accept, and turn the yes into an invoice in one click.
+icon: Quote
+---
+
+A quote tells a customer what a job will cost before you do it. You send it, they accept or decline, and an accepted quote becomes an invoice with the same lines, so nothing is typed twice. Quotes never touch your books; only the invoice does.
+
+<Shot name="quotes" alt="The quotes list with totals such as win rate and ready to invoice, and the list of quotes" pins />
+
+## Send a quote
+
+<Steps>
+
+<Step>
+
+Open **Sales › Quotes** and choose **New Quote** in the top bar.
+
+</Step>
+
+<Step>
+
+Pick the **Customer**, add a **Reference** if it helps, and check the **Issue Date** and **Expiry Date**. The expiry date starts 30 days out.
+
+</Step>
+
+<Step>
+
+Add the **Line Items**: what you'll do or supply, the quantity, the price, the income account and any tax. Add **Notes** for the customer, such as what's included.
+
+</Step>
+
+<Step>
+
+Choose **Create Quote**. It's saved as a draft and opens so you can check it.
+
+</Step>
+
+<Step>
+
+Choose **Send**, check the email and choose **Send Email**. The quote becomes **Sent**. Use **Mark as Sent** instead if you shared it another way.
+
+</Step>
+
+</Steps>
+
+<Shot name="quotes-new" alt="The New Quote drawer with Pinnacle Group as the customer and a website redesign line" narrow />
+
+## Good to know
+
+- The email has a **View quote** button that opens the customer's [portal](/docs/guides/customer-portal), where they can read the quote and accept it. No PDF is attached.
+- Once a sent quote passes its expiry date, it's marked **Expired** overnight and can no longer be accepted.
+- When the customer answers, record it: **Accept** or **Decline** on the quote, or **Customer accepted** and **Declined** in the list's preview.
+- Only accepted quotes can become invoices.
+- Quotes are numbered for you: QTE-00001, QTE-00002 and so on.
+
+## From quote to invoice
+
+<QuoteToInvoiceFlow />
+
+<Shot name="quotes-preview" alt="The preview of a sent quote to Pinnacle Group with Customer accepted and Declined buttons, dates and line items" narrow pins />
+
+<Fold>
+
+## Turn an accepted quote into an invoice
+
+Open the accepted quote and choose **Create an invoice from this quote**. dubbl creates a draft invoice and takes you to it. It copies the lines, the reference, the notes and the currency, dates the invoice today, and sets the due date from the customer's payment terms (or your default terms if they have none). Check it and send it like any [invoice](/docs/guides/invoices).
+
+<Shot name="quotes-accepted" alt="An accepted quote for Bright Solutions with the Create an invoice from this quote button" pins />
+
+The quote shows **Invoiced** once it's been billed in full, and its preview links to the invoice with **View invoice**.
+
+</Fold>
+
+<Fold>
+
+## Billing a quote in stages
+
+For bigger jobs you may want to bill a deposit now and the rest later. The [API](/docs/developers/api-reference) and [MCP tools](/docs/developers/mcp) can turn part of a quote into an invoice, by percentage or by quantity on each line, and the quote keeps track of how much has been invoiced so far. In the app, **Create an invoice from this quote** bills everything that's left.
+
+</Fold>
+
+<Fold>
+
+## Finding the quotes that need you
+
+The tiles at the top answer the usual questions. **Waiting on customers** is what's out for an answer, **Expiring this week** is what to chase, **Ready to invoice** is accepted work you haven't billed, and **Win rate** is how many answered quotes you won. Click a tile to filter the list.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Invoices" href="/docs/guides/invoices" description="Send the invoice and get paid." />
+  <Card title="Customer portal" href="/docs/guides/customer-portal" description="Where customers read and accept quotes." />
+  <Card title="Contacts" href="/docs/guides/contacts" description="Payment terms that set the invoice due date." />
+</Cards>

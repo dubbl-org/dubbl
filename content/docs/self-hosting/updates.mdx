@@ -1,0 +1,111 @@
+---
+title: Updates
+description: "Move a self-hosted dubbl to a new version: back up, apply the database migrations, rebuild and check."
+icon: RefreshCw
+---
+
+A dubbl update is new code plus, often, a few database migrations: plain SQL files in the `drizzle/` folder that change the tables to match. Updating means pulling the code, applying the migrations your database hasn't seen yet, and starting the new version. It takes a few minutes.
+
+<MigrationPipeline />
+
+## Update
+
+<Steps>
+
+<Step>
+
+See what's coming, including new migrations and new settings:
+
+```bash
+cd /srv/dubbl
+git fetch
+git log --oneline HEAD..origin/master
+git diff --stat HEAD origin/master -- drizzle/ .env.example
+```
+
+New lines in `.env.example` are new settings. Read them and add the ones you need to `.env.production`.
+
+</Step>
+
+<Step>
+
+Back up the database first. Migrations can't be undone, and the dump is your way back:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  exec -T postgres pg_dump -U dubbl -d dubbl -Fc > dubbl-before-update-$(date +%F).dump
+```
+
+</Step>
+
+<Step>
+
+Get the new code and apply the migrations from your checkout:
+
+```bash
+git pull
+pnpm install --frozen-lockfile
+DATABASE_URL=postgresql://dubbl:a-long-random-password@localhost:5432/dubbl pnpm db:migrate
+```
+
+You'll see `Migrations applied.` If nothing was pending, nothing changed.
+
+</Step>
+
+<Step>
+
+Rebuild the image and restart the app:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+</Step>
+
+<Step>
+
+If you run [background jobs](/docs/self-hosting/background-jobs), deploy them too, so they match the new code and the new tables:
+
+```bash
+TRIGGER_PROJECT_REF=proj_kz81vq3lmt pnpm trigger:deploy
+```
+
+</Step>
+
+<Step>
+
+Check that the app answers, then sign in and open a few pages:
+
+```bash
+curl https://books.example.com/api/health
+# {"status":"ok"}
+```
+
+</Step>
+
+</Steps>
+
+## How migrations are tracked
+
+`pnpm db:migrate` reads `drizzle/meta/_journal.json`, compares it with the `drizzle.__drizzle_migrations` table in your database, and runs the missing files in order, recording each one. Running it twice is safe: the second time there's nothing to do.
+
+A database created with `pnpm db:push` (as older versions of the README and the Docker development setup did) has tables but no migration history. The first `pnpm db:migrate` notices this and adopts it: it goes through every migration change by change, skips the ones the database already has (a table, column, index or type that already exists), applies the ones it's missing, prints `Checked` for each file and then `Adopted existing schema: recorded N migrations as applied.` It doesn't matter how old or new the code was that pushed the database. The history is only recorded once every file has gone through, so if something else fails you can fix it and run `pnpm db:migrate` again.
+
+<Callout type="warn" title="Never run db:push against your server">
+`pnpm db:push` changes the database straight from the code, skipping the migration files. Your database then no longer matches its migration history, and later updates can fail. Always update with `pnpm db:migrate`.
+</Callout>
+
+## Good to know
+
+- Migrations run from your checkout, not from inside the container: the production image contains only the built app, without Drizzle's tools or the `drizzle/` folder. Run them with Node 22 and pnpm against the port PostgreSQL is published on.
+- Apply the migrations before starting the new version. New code expects the new columns; the old code usually keeps working for the minute in between.
+- Migrations have no "down" step. To go back to an older version, check out that version, restore the dump you made in step 2, and rebuild.
+- Changing `.env.production` alone doesn't need a rebuild, only a restart: `docker compose -f docker-compose.prod.yml --env-file .env.production up -d`.
+
+## Related
+
+<Cards>
+  <Card title="Backups" href="/docs/self-hosting/backups" description="Dumping and restoring PostgreSQL." />
+  <Card title="Contributing" href="/docs/developers/contributing" description="How migrations are written." />
+  <Card title="Troubleshooting" href="/docs/self-hosting/troubleshooting" description="If something fails after an update." />
+</Cards>

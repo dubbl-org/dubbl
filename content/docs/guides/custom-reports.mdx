@@ -1,0 +1,139 @@
+---
+title: Custom reports
+description: Build your own list from invoices, contacts, stock, bank transactions and more, save it to run again, and email it on a schedule.
+icon: SlidersHorizontal
+---
+
+When the built-in reports don't show what you need, build your own. A custom report is a list from one kind of data (invoices, contacts, inventory, bank transactions and more) with only the columns you pick. Save it and you can run it again any time with the latest data, export it, or have it emailed on a schedule.
+
+<Shot name="custom-reports" alt="The Custom Reports page with saved report cards and the New Report button" />
+
+## Build a report
+
+<Steps>
+
+<Step>
+
+Open **Reports**, then **Custom reports** in the side panel, and choose **New Report**. The **Report Builder** opens.
+
+</Step>
+
+<Step>
+
+Give it a **Report Name**, such as "Unpaid invoices".
+
+</Step>
+
+<Step>
+
+Pick the **Data Source**. A short note under it says what each row is.
+
+| Data source | One row per |
+|---|---|
+| **Invoices**, **Contacts**, **Inventory**, **Bank transactions**, **Expenses**, **Payroll** | Invoice, contact, item, bank transaction, expense claim or payslip line |
+| **Money in vs money out by month** | Month: income, costs and profit (this year unless the report has dates) |
+| **Who owes you, by age** | Customer: unpaid amounts not yet due, 1-30, 31-60, 61-90 and over 90 days late |
+| **Bank money in and out by month** | Month: money into and out of your bank accounts (the last 12 months unless the report has dates) |
+| **Costs by department** | Cost center: costs and their share of the total |
+
+</Step>
+
+<Step>
+
+Under **Columns**, click each column you want. Click one again to remove it.
+
+</Step>
+
+<Step>
+
+Choose **Run Report** to preview the results. The first 50 rows show in the builder.
+
+</Step>
+
+<Step>
+
+Choose **Save**. The report appears as a card on **Custom Reports** and in **Saved reports**.
+
+</Step>
+
+</Steps>
+
+<Shot name="custom-reports-builder" alt="The Report Builder with a name, the Invoices data source, its columns and a preview of the results" narrow />
+
+## Good to know
+
+- Amounts show as money in the preview, and as plain amounts (1250.00) in exported files, so they add up in a spreadsheet.
+- Each report has one data source. You can't mix invoices and contacts in one report.
+- A saved report keeps its columns, not its results. Every run picks up the latest data.
+- To change a saved report, build a new one with the columns you want and delete the old one from its **...** menu.
+- For money in, money out, balances and tax, use the built-in reports instead. See [Reports](/docs/guides/reports).
+
+## From idea to inbox
+
+<CustomReportPipeline />
+
+<Fold>
+
+## Run, export or delete a saved report
+
+**Saved reports** (in the side panel, or under **Save, schedule & reconcile** in Reports) lists every report you've saved with **Name**, **Based on**, **Columns**, **Last run** and **Updated**. Click one to run it. Its menu has **Export CSV** and **Delete**. On **Custom Reports**, a report card's **...** menu also has **Export spreadsheet** and **Download PDF**.
+
+<Shot name="custom-reports-saved" alt="Saved reports, with each report's data source, columns and when it last ran" />
+
+</Fold>
+
+<Fold>
+
+## Email a report on a schedule
+
+<Steps>
+
+<Step>
+
+Open **Schedules** from the side panel (the page is called **Scheduled report emails**) and choose **Email a report automatically**.
+
+</Step>
+
+<Step>
+
+Pick **Which report to send** from your saved reports.
+
+</Step>
+
+<Step>
+
+Choose **How often**: **Every day**, **Every week**, **Every month** or **Every three months**. For weekly, pick **Which day of the week**; for monthly, **Which day of the month** (1 to 28).
+
+</Step>
+
+<Step>
+
+Choose **Send as** (**PDF**, **Spreadsheet (CSV)** or **Excel (XLSX)**) and the **Time of day**.
+
+</Step>
+
+<Step>
+
+Type the addresses under **Send to (email addresses)**, separated by commas, then choose **Schedule it**.
+
+</Step>
+
+</Steps>
+
+<Shot name="custom-reports-schedule" alt="The Email this report automatically dialog with the Monthly sales report, sent every month as a PDF to an accountant's address" narrow />
+
+The schedule shows in the table with **How often**, **When**, **Sent as**, **Sent to**, **Next send** and **Status**.
+
+Each email has the full report attached in the format you picked, with the first 10 rows shown in the message. It's sent from your own email account if you've set one up in [Email](/docs/guides/email), otherwise from dubbl's mail service with replies going to your company's contact email.
+
+To stop a schedule for a while, choose the pause button at the end of its row; the play button turns it back on. If a send was due while it was paused, it isn't sent straight away: the schedule picks up at its next regular send time. The bin button deletes the schedule after you confirm. The saved report itself stays.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Reports" href="/docs/guides/reports" description="Every built-in report and how to use them." />
+  <Card title="Email" href="/docs/guides/email" description="Set up the email account scheduled reports are sent from." />
+  <Card title="Import and export" href="/docs/developers/import-export" description="Get all your data out in bulk." />
+</Cards>

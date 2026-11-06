@@ -1,0 +1,99 @@
+---
+title: Double-entry bookkeeping
+description: Why every transaction is recorded in two places, and how that keeps your books in balance.
+icon: Scale
+---
+
+Double-entry bookkeeping is the one idea all of accounting is built on: every time money moves, it moves *from* somewhere *to* somewhere, so you write both sides down. It sounds like twice the work. In dubbl it's no work at all, because the app writes both sides for you, and it's the reason your reports can be trusted.
+
+<ShortVersion>
+
+- Every transaction touches at least two accounts: something goes up and something else changes to match.
+- The books always satisfy one equation: **what you own = what you owe + what's yours**.
+- Each transaction is stored as a journal entry whose two sides (debits and credits) add up to the same total.
+- dubbl writes these entries for you when you send an invoice, record a payment, enter a bill or run payroll.
+
+</ShortVersion>
+
+## The accounting equation
+
+Picture everything your business has on one side of a balance: money in the bank, equipment, what customers owe you. On the other side are the claims on those things: what you owe to others (a loan, unpaid bills) and whatever is left over, which belongs to you, the owner.
+
+<EquationScale />
+
+Those two sides are always equal, by definition. Accountants write it like this:
+
+**Assets = Liabilities + Equity**
+
+- **Assets** are things the business owns or is owed: cash, equipment, stock, unpaid invoices.
+- **Liabilities** are what it owes: bills from suppliers, loans, tax collected for the government.
+- **Equity** is what's left for the owners: the money you put in, plus the profit you've kept.
+
+## Every transaction changes two things
+
+Because the equation must always balance, nothing can change on its own. Borrow money and your bank balance goes up, but so does what you owe. Buy a machine with cash and one asset swaps for another. Earn income and your equity grows along with what customers owe you.
+
+Here's a new business's first few weeks, one row at a time:
+
+<EquationLedger />
+
+That's the whole trick. If you record both sides of everything, the equation holds; if the equation stops holding, something was recorded wrong. It's a built-in error check that single-entry lists (like a spreadsheet of expenses) don't have.
+
+## A journal entry: both sides, written down
+
+Each transaction is recorded as a **journal entry**: a date, a description, and two or more lines. Each line names an account and an amount on the left (the **debit** side) or the right (the **credit** side). The left and right always add up to the same total.
+
+<JournalEntry
+  title="Invoice INV-00011 sent to Acme Corp"
+  date="Mar 2, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 450000, note: "Acme owes you more" },
+    { account: "Sales", credit: 450000, note: "you earned it" },
+  ]}
+  caption="A $4,500 invoice. One line on each side, and the two sides match."
+/>
+
+When Acme pays, a second entry moves the money from "owed to you" into the bank:
+
+<JournalEntry
+  title="Payment received for INV-00011"
+  date="Mar 20, 2026"
+  lines={[
+    { account: "Checking account", debit: 450000 },
+    { account: "Accounts receivable", credit: 450000 },
+  ]}
+/>
+
+Accountants often draw each account as a big **T**: debits on the left, credits on the right. Follow the $4,500 through:
+
+<SaleTAccounts />
+
+Don't worry yet about why one side is "debit" and the other "credit". [Debits and credits](/docs/learn/debits-and-credits) covers that next.
+
+## Where you see this in dubbl
+
+You rarely type a journal entry yourself. Sending an [invoice](/docs/guides/invoices), recording a [payment](/docs/guides/payments-received), entering a [bill](/docs/guides/bills), categorizing a [bank transaction](/docs/guides/categorizing-transactions) or finishing a [pay run](/docs/guides/payroll) each posts one for you. They all land in **Accounting**, under **Transactions**:
+
+<Shot name="learn-journal" alt="The journal entries list with totals, a chart by month and every entry with its source and status" pins />
+
+Open any entry to see both sides. This one is a sale: the $7,500 monthly retainer invoice the demo company sends Metro Services.
+
+<Shot name="learn-journal-entry" alt="A retainer invoice's journal entry: Accounts Receivable debited $7,500.00 and Service Revenue credited $7,500.00, with Total Debits, Total Credits and a Difference of $0.00" pins />
+
+dubbl won't let an entry into your books unless it balances. If the debits and credits differ, it stops you with "Debits must equal credits", and every entry needs at least two lines.
+
+## Good to know
+
+- An entry you type yourself starts as a draft. Nothing reaches your reports until it's finalized ("in your books").
+- To undo a finalized entry, you don't delete it: you cancel it, and dubbl posts a mirror-image entry that reverses it. Both stay on record, so the history is never lost.
+- Entries made by invoices, bills and payments are linked back to the document that made them. Change the document (cancel an invoice, say) and dubbl reverses its entry for you.
+- The **Source** on each entry tells you where it came from: typed in by hand, or made by an invoice, payment, bill and so on.
+
+## Related
+
+<Cards>
+  <Card title="Debits and credits" href="/docs/learn/debits-and-credits" description="Which side makes each account go up." />
+  <Card title="The chart of accounts" href="/docs/learn/chart-of-accounts" description="The accounts each line is recorded against." />
+  <Card title="Journal entries" href="/docs/guides/journal-entries" description="Write, finalize and reverse entries in dubbl." />
+  <Card title="General ledger" href="/docs/guides/general-ledger" description="Every entry, grouped by account." />
+</Cards>

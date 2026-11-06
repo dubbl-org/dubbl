@@ -1,0 +1,83 @@
+---
+title: Build on dubbl
+description: "What you can connect to dubbl, and which door to use: the REST API, the MCP server, webhooks or CSV."
+icon: Code
+---
+
+Everything you do in dubbl's screens goes through the same API your own code can call. Scripts and back-office tools use the **REST API** with an API key. AI agents such as Claude connect to the **MCP server** and sign in like a person. **Webhooks** tell your systems when something happens. **Import and export** move data in and out as CSV.
+
+<DevSurfaceMap />
+
+## Make your first call
+
+<Steps>
+
+<Step>
+
+In dubbl, open **Settings**, then **API Keys** under **Developer**, and choose **New Key**. Give it a name and copy the key. It starts with `dk_live_` and is shown only once.
+
+</Step>
+
+<Step>
+
+Send it as a bearer token. This lists your five newest invoices:
+
+```bash
+curl "https://dubbl.dev/api/v1/invoices?limit=5" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE"
+```
+
+</Step>
+
+<Step>
+
+You get JSON back (trimmed here). Amounts are whole cents, so `495000` is $4,950.00:
+
+```json
+{
+  "data": [
+    {
+      "id": "0b7d3a62-58f1-4b8e-9a35-2f6c1d4e8a90",
+      "invoiceNumber": "INV-00011",
+      "status": "sent",
+      "issueDate": "2026-10-13",
+      "dueDate": "2026-11-12",
+      "currencyCode": "USD",
+      "subtotal": 450000,
+      "taxTotal": 45000,
+      "total": 495000,
+      "amountPaid": 0,
+      "amountDue": 495000,
+      "contact": { "id": "5f2c8e14-7a3b-4c19-8d62-1e9b0a7c4f35", "name": "Acme Corp" }
+    }
+  ],
+  "pagination": { "page": 1, "limit": 5, "total": 11, "totalPages": 3 }
+}
+```
+
+</Step>
+
+</Steps>
+
+Self-hosting? Replace `https://dubbl.dev` with your own address everywhere in these pages.
+
+## Good to know
+
+- An API key belongs to one organization and acts as the member who created it. It can do what their role can do, nothing more.
+- Every amount is an integer in cents. Rates and percentages are in basis points. See [Conventions](/docs/developers/conventions).
+- The MCP server doesn't take API keys. AI clients sign in through your browser and get their own short-lived tokens.
+- Every plan, including Free, includes API and MCP access.
+- dubbl is open source. If an endpoint you need is missing, you can read the route in `app/api/v1` or [contribute one](/docs/developers/contributing).
+
+## Pick your door
+
+<Cards>
+  <Card icon={<KeyRound />} title="Authentication" href="/docs/developers/authentication" description="Create API keys and send them with each request." />
+  <Card icon={<Ruler />} title="Conventions" href="/docs/developers/conventions" description="Cents, dates, pages and errors, once for every endpoint." />
+  <Card icon={<Braces />} title="API reference" href="/docs/developers/api-reference" description="Every resource and the endpoints that work on it." />
+  <Card icon={<Bot />} title="MCP server" href="/docs/developers/mcp" description="Let Claude and other agents work in your books." />
+  <Card icon={<Webhook />} title="Webhooks" href="/docs/developers/webhooks" description="Signed POSTs to your endpoint, with retries." />
+  <Card icon={<ArrowLeftRight />} title="Import and export" href="/docs/developers/import-export" description="CSV in from other tools, CSV and ZIP out." />
+  <Card icon={<GitPullRequest />} title="Contributing" href="/docs/developers/contributing" description="Run dubbl locally and send a pull request." />
+  <Card icon={<Server />} title="Self-hosting" href="/docs/self-hosting" description="Run your own dubbl with Docker." />
+</Cards>

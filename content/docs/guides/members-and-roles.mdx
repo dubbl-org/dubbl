@@ -1,0 +1,147 @@
+---
+title: Members and roles
+description: Invite your team, your accountant or an advisor, and decide exactly what each person can see and change.
+icon: Users
+---
+
+Everyone who works in your books is a member of your organization. Each member has a role: **Owner**, **Admin** or **Member**. For finer control, give someone a ready-made role like **Read-only**, or build your own, such as a bookkeeper who can enter bills but not touch settings.
+
+<Shot name="members-and-roles" alt="The Members page with seat usage, the member list, invite links and role descriptions" pins />
+
+## Invite someone
+
+<Steps>
+
+<Step>
+
+Open **Settings > Members** and choose **Invite Member**.
+
+</Step>
+
+<Step>
+
+Enter their **Email** and pick a **Role**: **Member** or **Admin**. You can give them a more specific role after they join.
+
+</Step>
+
+<Step>
+
+Choose **Send Invitation**. They get an email with a link to join, and appear under **Pending Invitations** until they accept.
+
+</Step>
+
+</Steps>
+
+<Shot name="members-and-roles-invite" alt="The Invite Member drawer with an email address and the Member role" narrow />
+
+## Good to know
+
+- Admins can invite, change roles, remove people and edit the organization's settings. Only the owner can manage billing, lock past dates or delete the organization.
+- The owner can't be removed and their role can't be changed.
+- Invitations expire after 7 days. Revoke one from **Pending Invitations** if you sent it to the wrong address.
+- The Free plan has one seat. On paid plans every seat is included; see [Billing](/docs/guides/billing).
+- A ready-made or custom role replaces the person's base role. A member with **Read-only** can only look, even though members can normally add records.
+
+## Who can do what
+
+<RolePermissionMatrix />
+
+The three base roles in plain words:
+
+- **Owner**: full access. Manages billing, members and all settings. Can't be removed.
+- **Admin**: everything except billing, locking dates and deleting the organization. Admins can edit the organization's details on **Settings > General**.
+- **Member**: views and creates records (invoices, bills, expenses, contacts), but can't finalize journal entries, approve, or manage members or settings.
+
+<Fold>
+
+## Give someone a ready-made or custom role
+
+On **Settings > Members**, open the menu on the person's row and choose **Assign:** followed by the role. **Remove custom role** puts them back on their base role. The four ready-made roles are:
+
+- **Read-only**: sees data, pay slips, payroll reports and the activity history. Can't change anything.
+- **Invoice-only**: invoices, credit notes, contacts and payments, nothing else.
+- **Standard**: everyday work (transactions, invoices, bills, expenses, payments, purchases, projects, timesheets and time off) without finalizing, approving or settings.
+- **Advisor**: every permission. Meant for your accountant.
+
+Ready-made roles can't be edited or deleted.
+
+</Fold>
+
+<Fold>
+
+## Create your own role
+
+<Steps>
+
+<Step>
+
+Open **Settings > Roles** and choose **Create Role**.
+
+</Step>
+
+<Step>
+
+Give it a **Name** and a short **Description** so others know what it's for.
+
+</Step>
+
+<Step>
+
+Tick the **Permissions** it should have. They're grouped by area (Accounting, Invoicing, Bills, Banking and so on); the box next to a group ticks everything in it. Every permission in dubbl is on the list, including **Manage approval workflows**, **Approve purchases**, **Manage integrations & email sending** and **Edit organization settings**.
+
+</Step>
+
+<Step>
+
+Choose **Create**, then assign the role to people from **Settings > Members**.
+
+</Step>
+
+</Steps>
+
+<Shot name="members-and-roles-custom" alt="The Custom Roles page listing your own roles and the ready-made system roles" pins />
+
+<Shot name="members-and-roles-new-role" alt="The Create Role drawer with a Bookkeeper role and four permissions ticked" narrow />
+
+</Fold>
+
+<Fold>
+
+## Invite links
+
+Instead of inviting people one by one, choose **Create Link** under **Invite Links**. Pick the **Default Role** new people get, and optionally a **Max Uses** and **Expires In (days)**; leave them blank for unlimited uses and no expiry. Copy the link and share it. You can turn a link off and on again, or delete it.
+
+</Fold>
+
+<Fold>
+
+## Change or remove a member
+
+Open the menu on the person's row:
+
+- **Make admin** or **Make member** switches their base role.
+- **Remove** takes them out of the organization. Their past work stays in your books and in the [audit log](/docs/guides/audit-log).
+
+</Fold>
+
+<Fold>
+
+## Accountants and advisors
+
+**Settings > Advisors** lets you invite an accountant, auditor, tax advisor or bookkeeper by email. Once they accept, they can work in your books with the same rights as a member, plus two more:
+
+- They can lock past dates, like the owner.
+- They're held only to the stricter **Advisor lock date (optional)** on [Settings > General](/docs/guides/organization#lock-past-dates), when you set one. That lets them post adjustments into a period your team can no longer change.
+
+Advisors are listed on their own page, not under **Members**, so you can't give them a custom role. If your accountant needs more, such as approving or finalizing entries, invite them from **Settings > Members** instead and give them the **Advisor** role.
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Approvals" href="/docs/guides/approvals" description="Make records wait for someone's sign-off." />
+  <Card title="Audit log" href="/docs/guides/audit-log" description="See who changed what, and when." />
+  <Card title="Billing" href="/docs/guides/billing" description="Plans, seats and what each one includes." />
+  <Card title="Organization" href="/docs/guides/organization" description="Your company details and locked dates." />
+</Cards>

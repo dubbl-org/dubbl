@@ -1,0 +1,84 @@
+---
+title: Multi-currency
+description: Invoicing and paying in other currencies, and why exchange rates create gains and losses in your books.
+icon: Globe
+---
+
+If you invoice a customer in euros but keep your books in dollars, every amount has two values: the euros on the invoice and what they're worth in dollars. The euros never change. The dollar value moves with the exchange rate, every day, until the money arrives. That movement is a real gain or loss, and your books record it.
+
+<ShortVersion>
+
+- Your **base currency** is the one your books and reports are kept in. Everything is converted into it.
+- A foreign invoice is recorded at the exchange rate on its date.
+- If the rate moves before you're paid, you get more or fewer dollars than you recorded: an **exchange gain or loss**.
+- **Realised** gains and losses happen when the money actually arrives or leaves.
+- **Unrealised** ones are paper gains on invoices and bills still open at month end. They're recorded, then undone the next day.
+
+</ShortVersion>
+
+## One invoice, a moving value
+
+You invoice a customer €10,000 on March 3, when one euro buys $1.08. They pay on May 5, when it buys $1.12:
+
+<FxRateChart />
+
+Nothing about the invoice changed, but the €10,000 you received bought $400 more than it would have on the day you invoiced. That $400 is a gain, and it's real money in your bank.
+
+## The three moments
+
+A foreign invoice is valued at three points in its life:
+
+<FxMoments />
+
+And here's what gets recorded at the first and last of them:
+
+<JournalEntry
+  title="Invoice INV-00051, €10,000 at 1.08"
+  date="Mar 3, 2026"
+  lines={[
+    { account: "Accounts receivable", debit: 1080000 },
+    { account: "Sales", credit: 1080000 },
+  ]}
+  caption="Recorded in dollars at the invoice date's rate. The invoice still shows €10,000."
+/>
+
+<JournalEntry
+  title="Payment received for INV-00051, €10,000 at 1.12"
+  date="May 5, 2026"
+  lines={[
+    { account: "Checking account", debit: 1120000 },
+    { account: "Accounts receivable", credit: 1080000, note: "clears what was recorded" },
+    { account: "Realised currency gains", credit: 40000, note: "the rate moved in your favour" },
+  ]}
+  caption="If the euro had fallen instead, the difference would be a realised currency loss."
+/>
+
+Bills work the same way in reverse: if the currency you owe in gets *stronger* before you pay, you need more dollars to settle, and that's a loss.
+
+## Unrealised gains at month end
+
+On March 31 the invoice is still unpaid, but the rate is 1.10, so it's worth $11,000. To keep the month's balance sheet honest, dubbl revalues every open foreign-currency invoice and bill at month end and records the difference as an **unrealised** currency gain or loss. On the first day of the next month it reverses that entry, so the paper gain never piles up. Only the realised figure, when the money moves, is permanent.
+
+## Currencies in dubbl
+
+Your base currency is set in **Settings**, under **Financials**, as the **Default currency**. Exchange rates live in **Tax**, under **Currencies**:
+
+<Shot name="learn-currencies" alt="Currencies & Exchange Rates: the organization base currency, rate counts, and unrealised FX gains and losses" pins />
+
+dubbl keeps rates up to date for you, and you can add your own with **Add Rate**. A rate you enter by hand wins over the automatic one for the same day. To record a payment in another currency, dubbl needs a rate for that date; if there isn't one, it asks you to add it.
+
+## Good to know
+
+- Reports are always in your base currency. The original currency stays on each invoice and bill.
+- The **Unrealised FX gains & losses** list on the Currencies page shows what your open foreign invoices and bills are worth at today's rate.
+- Exchange differences are part of profit. They appear on the profit and loss as currency gains or losses, not as sales.
+- Want to avoid the swings? Invoice in your own currency, or get paid quickly. The less time an invoice is open, the less the rate can move.
+
+## Related
+
+<Cards>
+  <Card title="Multi-currency guide" href="/docs/guides/multi-currency" description="Turn on currencies and manage rates." />
+  <Card title="Receivables and payables" href="/docs/learn/receivables-and-payables" description="The open invoices and bills that get revalued." />
+  <Card title="Payments received" href="/docs/guides/payments-received" description="Record a payment in another currency." />
+  <Card title="Organization settings" href="/docs/guides/organization" description="Base currency and financial year." />
+</Cards>

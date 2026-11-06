@@ -1,0 +1,106 @@
+---
+title: Conventions
+description: "The rules every endpoint follows for money, dates, lists, errors and retries, so you learn them once."
+icon: Ruler
+---
+
+dubbl's API is plain JSON over HTTPS. Every path starts with `/api/v1`, every request carries your [API key](/docs/developers/authentication), and every number that could be a fraction is stored as a whole number so nothing drifts by a cent.
+
+<ApiUnitsTable />
+
+## Money
+
+Every amount dubbl **sends you** is an integer in the currency's smallest unit: cents for dollars, euros and pounds, whole yen for yen. An invoice for $4,950.00 comes back as `"total": 495000`.
+
+When you **send** amounts, there are two kinds of field:
+
+- **Ledger amounts are cents.** Journal entry lines (`debitAmount`, `creditAmount`), payments (`amount`, and each allocation's `amount`) and recording a payment on an invoice or bill all take integers in cents.
+- **Document line prices are decimals.** On invoices, quotes, bills, credit notes, debit notes, purchase orders, sales receipts and recurring invoices, a line's `unitPrice` and `quantity` are what a person would type: `12.5` means $12.50 and `1.5` means one and a half. dubbl converts them, and they come back in cents and hundredths. Expense claim items work the same way.
+
+```json
+{
+  "contactId": "5f2c8e14-7a3b-4c19-8d62-1e9b0a7c4f35",
+  "issueDate": "2026-10-13",
+  "lines": [
+    { "description": "Brand refresh", "quantity": 1, "unitPrice": 4500, "taxRateId": "9d0e5c7a-2b41-4f3e-8a6d-3c5b1e7f9a20" }
+  ]
+}
+```
+
+This creates a $4,500.00 line. With a 10% tax rate the invoice comes back with `"subtotal": 450000`, `"taxTotal": 45000` and `"total": 495000`.
+
+<Callout title="Check the field, not the endpoint">
+If a field is named `unitPrice` on a document line, send a decimal. Everywhere else, send cents. When in doubt, read the route's schema in `app/api/v1`; the MCP tools say which one each field takes.
+</Callout>
+
+## Rates, percentages and quantities
+
+- **Tax rates and discounts** are basis points: `1000` is 10%, `2500` is 25%. A line's `discountPercent` uses the same scale.
+- **Exchange rates** are the rate times 1,000,000: 1.0845 is `1084500`. A rate of exactly 1 is `1000000`.
+- **Quantities** on stored lines are hundredths: a quantity of 1 comes back as `100`.
+
+## Dates and times
+
+- Calendar dates (issue date, due date, entry date, report periods) are strings in `YYYY-MM-DD`: `"2026-10-13"`.
+- Moments in time (`createdAt`, `sentAt`, `lastUsedAt`) are ISO 8601 timestamps in UTC: `"2026-10-13T09:24:11.418Z"`.
+- Date filters on lists are usually `from` and `to` (by issue date). Reports and exports use `startDate` and `endDate`.
+
+## Lists and pages
+
+List endpoints take `page` (from 1) and `limit` (default 50, at most 100) and wrap results in `data` with a `pagination` block:
+
+```bash
+curl "https://dubbl.dev/api/v1/invoices?status=overdue&page=2&limit=50" \
+  -H "Authorization: Bearer dk_live_q8Xr2LmN4vTz7KpW1sYc9HbJ3fDg6QaE"
+```
+
+```json
+{
+  "data": [ { "id": "...", "invoiceNumber": "INV-00063", "amountDue": 120000 } ],
+  "pagination": { "page": 2, "limit": 50, "total": 137, "totalPages": 3 }
+}
+```
+
+<ApiPaginationPages />
+
+Many lists also take `sortBy` (such as `date`, `due`, `total`, `created`) and `sortOrder` (`asc` or `desc`), and some take `search`, `status` or `contactId`. A few small lists, like accounts and tax rates, return everything at once under a named key (`{"accounts": [...]}`, `{"taxRates": [...]}`) instead of pages.
+
+## Errors
+
+When something goes wrong you get a status code and a JSON body with an `error` message:
+
+```json
+{ "error": "Debits must equal credits" }
+```
+
+| Status | When |
+| --- | --- |
+| `400` | The input is invalid. Messages from several fields are joined with commas. |
+| `401` | The API key is missing, unknown, revoked or expired. |
+| `403` | The key's role can't do this (`Insufficient permissions`), or a plan limit was reached. |
+| `404` | Nothing with that ID in this organization, for example `Invoice not found`. |
+| `409` | A conflict, such as a supplier bill number that already exists. |
+| `422` | The date falls in a locked period or a closed fiscal year, or an exchange rate is missing. |
+| `500` | Something broke on dubbl's side (`Internal error`). |
+
+Branch on the status code. A few errors carry extra fields you can use, such as `duplicate` on a `409` for a repeated bill number, or `creditLimitWarning` when an invoice takes a customer past their credit limit.
+
+<Callout type="warn" title="Always send the Authorization header">
+A request to `/api/v1` with no `Authorization` header is treated like a browser that isn't signed in, and is redirected to the sign-in page with a `307`. If you see HTML where you expected JSON, check the header.
+</Callout>
+
+## Retries and idempotency
+
+The REST API doesn't take idempotency keys. Retrying a `GET`, `PATCH` or `DELETE` is safe, but retrying a `POST` that may have succeeded can create a second invoice or payment. Before you retry a create, look for the record you meant to make (by `reference`, number or date) and only create it if it isn't there.
+
+## Organization scope
+
+Every request works inside one organization: the one your key belongs to. IDs from another organization behave as if they don't exist (`404`). Deleted records go to the trash and stop appearing in lists.
+
+## Related
+
+<Cards>
+  <Card title="Authentication" href="/docs/developers/authentication" description="Keys, headers and what a key can do." />
+  <Card title="API reference" href="/docs/developers/api-reference" description="Every resource and its endpoints." />
+  <Card title="Learn: double-entry" href="/docs/learn/double-entry" description="Why every entry has debits equal to credits." />
+</Cards>

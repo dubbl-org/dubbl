@@ -1,0 +1,123 @@
+---
+title: Bank accounts
+description: Add your bank, card and cash accounts, see their balances in one place, and record money moving between them.
+icon: Landmark
+---
+
+Every account your business keeps money in, or owes money on, gets a bank account in dubbl: current accounts, savings, credit cards, petty cash, a loan. Each one holds the lines from your bank statements, so you can say what every payment was for and check your books against the bank.
+
+<Shot name="bank-accounts" alt="The Bank Accounts page with total balance, money in and out, and three accounts" pins />
+
+## Add a bank account
+
+<Steps>
+
+<Step>
+
+Open **Accounting**, then **Bank accounts**, and choose **New Account**.
+
+</Step>
+
+<Step>
+
+Type the **Account Name** as you want to see it, the **Bank Name**, and pick the **Account Type**: **Checking**, **Savings**, **Credit Card**, **Cash**, **Loan**, **Investment** or **Other**.
+
+</Step>
+
+<Step>
+
+Add the **Account Number / IBAN** if you like. Only the last digits are shown in lists.
+
+</Step>
+
+<Step>
+
+Pick the **Currency** the bank holds the money in, and the **Country**.
+
+</Step>
+
+<Step>
+
+Leave **Books connection** on **Set up automatically** unless you already have an account in your chart for it. Pick an **Accent Color** and choose **Create Account**.
+
+</Step>
+
+</Steps>
+
+<Shot name="bank-accounts-new" alt="The New Bank Account drawer with name, bank, type, currency and books connection" narrow />
+
+## Good to know
+
+- dubbl doesn't connect to your bank directly. You bring transactions in by [importing a statement](/docs/guides/importing-transactions) from your bank.
+- A new account starts with a zero balance in your books. If it had money in it before you started with dubbl, enter that in [Opening balances](/docs/guides/opening-balances).
+- Every bank account is tied to an account in your [chart of accounts](/docs/guides/chart-of-accounts). That's where its money shows up on your balance sheet.
+- An account can hold a currency other than your own. See [Multi-currency](/docs/guides/multi-currency).
+- **Hide** masks every balance on the page, for when someone's looking over your shoulder.
+
+## From statement to checked books
+
+<BankingLoop />
+
+<Fold>
+
+## Inside an account
+
+Choose an account to open it. The top shows its **Balance**, **Money In**, **Money Out**, and **Done**: how much of its statement lines are already in your books. Below that are four tabs:
+
+- **Overview**: how many lines are **To do**, **Done** and **Ignored**, and the most recent ones.
+- **Transactions**: every line, to [categorize](/docs/guides/categorizing-transactions) one by one or in bulk. **Apply rules** runs your bank rules on the lines still to do.
+- **Imports**: each statement you've brought in. See [Importing transactions](/docs/guides/importing-transactions).
+- **Settings**: the account's details.
+
+**Import** brings in a new statement, and **Match statement to your books** starts a [reconciliation](/docs/guides/reconciliation).
+
+<Shot name="bank-accounts-overview" alt="A bank account's overview with balance, money in and out, Done progress and recent transactions" pins />
+
+</Fold>
+
+<Fold>
+
+## Moving money between your accounts
+
+When you move money from one of your accounts to another, it isn't income or a cost. Choose **Move money**, pick **From** and **To**, enter the **Amount**, **Date** and an optional **Memo**, and choose **Record Transfer**.
+
+<Shot name="bank-accounts-transfer" alt="The Move money between accounts drawer with From, To, Amount, Date and Memo" narrow />
+
+dubbl records one entry that moves the money between the two accounts' places in your books, and adds a money-out line to one account and a money-in line to the other, linked together.
+
+<JournalEntry
+  title="Transfer to savings"
+  date="Oct 13, 2026"
+  lines={[
+    { account: "Business Savings", debit: 500000 },
+    { account: "Checking Account", credit: 500000 },
+  ]}
+  caption="Both sides are bank accounts, so your profit doesn't change."
+/>
+
+If the transfer already came in through a statement import, don't use **Move money**: open the line and choose **Record a transfer between accounts** instead, so it isn't recorded twice.
+
+</Fold>
+
+<Fold>
+
+## Changing or deleting an account
+
+On an account's **Settings** tab you can change its name, bank, type, number, currency, country and colour, set a **Low balance alert** amount so owners and admins get a [notification](/docs/guides/notifications) when the balance drops below it, and choose **Save changes**.
+
+**Books connection** is the account in your chart where this bank account's money is recorded. Changing it only affects transactions recorded from then on; what's already in your books stays where it is.
+
+**Delete account**, under **Danger zone**, permanently deletes the account and all its imported transactions.
+
+<Shot name="bank-accounts-settings" alt="A bank account's Settings tab with general details, region and books connection" />
+
+</Fold>
+
+## Related
+
+<Cards>
+  <Card title="Importing transactions" href="/docs/guides/importing-transactions" description="Bring in your bank's statement file." />
+  <Card title="Categorizing transactions" href="/docs/guides/categorizing-transactions" description="Say what each payment was for." />
+  <Card title="Reconciliation" href="/docs/guides/reconciliation" description="Check your books against the statement." />
+  <Card title="Bank reconciliation, explained" href="/docs/learn/bank-reconciliation" description="Why your books and the bank can differ." />
+</Cards>

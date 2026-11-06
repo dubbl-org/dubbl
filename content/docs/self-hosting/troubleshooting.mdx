@@ -1,0 +1,172 @@
+---
+title: Troubleshooting
+description: "The problems people hit when running their own dubbl, what causes them, and the fix."
+icon: LifeBuoy
+---
+
+Most problems on a self-hosted dubbl come from a setting the app reads at startup. Start with the logs, which show the real error behind a generic "Internal error" in the browser:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f web
+```
+
+After changing `.env.production`, restart with `docker compose -f docker-compose.prod.yml --env-file .env.production up -d`.
+
+## Starting up
+
+<Accordions type="single">
+
+<Accordion title='Compose says "Set AUTH_SECRET in .env.production"'>
+
+The compose file reads `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL` and `POSTGRES_PASSWORD` while it starts, and only looks in `.env.production` when you tell it to. Add `--env-file .env.production` to every `docker compose -f docker-compose.prod.yml` command. If you did, check the variable is in the file and spelled exactly.
+
+</Accordion>
+
+<Accordion title='password authentication failed for user "dubbl"'>
+
+The app's `DATABASE_URL` doesn't match the database. Two usual causes:
+
+- `DATABASE_URL` isn't set, so the compose file's default (password `dubbl`) is used. Set `DATABASE_URL` in `.env.production` with the same password as `POSTGRES_PASSWORD`.
+- You changed `POSTGRES_PASSWORD` after the first start. PostgreSQL only reads it when it creates the database, so the old password still applies. Put the old one back, or change it inside PostgreSQL with `ALTER USER dubbl PASSWORD '...'`.
+
+</Accordion>
+
+<Accordion title='Pages fail with relation "..." does not exist'>
+
+The tables haven't been created, or an update added some that haven't been applied. Run the migrations from your checkout; see [Updates](/docs/self-hosting/updates):
+
+```bash
+DATABASE_URL=postgresql://dubbl:a-long-random-password@localhost:5432/dubbl pnpm db:migrate
+```
+
+</Accordion>
+
+<Accordion title='db:migrate fails with "already exists"'>
+
+The database was made with `pnpm db:push` and an older `db:migrate` recorded only the first migration before stopping. Current versions adopt a pushed database themselves, but only when it has no migration history at all. Delete the partial history with `psql "$DATABASE_URL" -c 'delete from drizzle.__drizzle_migrations'` and run `pnpm db:migrate` again: it skips what's already there and records the rest. Take a dump first. See [Updates](/docs/self-hosting/updates).
+
+</Accordion>
+
+</Accordions>
+
+## Signing in
+
+<Accordions type="single">
+
+<Accordion title="Sign-in fails and the log shows UntrustedHost">
+
+In production, sign-in only accepts requests for an address it has been told about. Set `AUTH_URL` to your address (`https://books.example.com`) or set `AUTH_TRUST_HOST=true` if your reverse proxy sets the host headers, then restart.
+
+</Accordion>
+
+<Accordion title="Google or Apple sign-in says redirect_uri_mismatch">
+
+The provider doesn't know your address. Register `https://books.example.com/api/auth/callback/google` (or `.../apple`) with it, exactly, including `https`.
+
+</Accordion>
+
+<Accordion title='"Registration is by invitation only"'>
+
+**Invite only** is on and the person has no invitation. They can sign up with the address an organization invited by email (before the invitation expires), or by opening an organization's invite link and signing up from there. To let people in without one, set **Registration mode** to **Open** in the admin area under **Settings** and use **Allowed email domains** to limit who can join. A message like "Registration is not allowed for this email domain" means the address isn't on that list.
+
+</Accordion>
+
+<Accordion title="Everyone was signed out">
+
+`AUTH_SECRET` changed, so existing sessions can't be read. Put the old value back, or let people sign in again.
+
+</Accordion>
+
+</Accordions>
+
+## Files and email
+
+<Accordions type="single">
+
+<Accordion title="Uploads fail, or hang at 0%">
+
+Browsers upload straight to your bucket, so look at the failing request in the browser's developer tools:
+
+- **A CORS error**: add the bucket CORS rule from [Storage](/docs/self-hosting/storage) with your exact app address as the origin.
+- **The address doesn't resolve or is refused**: the links point at `S3_ENDPOINT`, which may be a container name such as `http://minio:9000` that browsers can't reach. Set `S3_PUBLIC_ENDPOINT` to an address people's computers can reach (using HTTPS if dubbl does) and restart.
+- **A 403 from the bucket**: the access key, secret or bucket name is wrong.
+
+</Accordion>
+
+<Accordion title="Saving a mail server fails; the log shows EMAIL_ENCRYPTION_KEY not set">
+
+Set `EMAIL_ENCRYPTION_KEY` to 64 hex characters (`openssl rand -hex 32`) and restart. The prod compose file won't start without it. Don't change it once organizations have saved passwords.
+
+</Accordion>
+
+<Accordion title="No welcome or invitation emails">
+
+Look for `RESEND_API_KEY environment variable not set` in the log, and set the key. If the key is set and Resend refuses the message, the sender domain isn't verified in your Resend account: account email is sent from `noreply@dubbl.dev` and documents from `invoices@dubbl.dev` unless you set `RESEND_FROM` and `RESEND_DOCUMENTS_FROM` to addresses on your own verified domain. See [Email](/docs/self-hosting/email).
+
+</Accordion>
+
+<Accordion title="Payment reminders never go out">
+
+Reminders are sent by the nightly job, so [background jobs](/docs/self-hosting/background-jobs) must be running. They go through the organization's own mail server once it's verified in **Settings**, **Email sending**, and through Resend otherwise, so without a mail server `RESEND_API_KEY` must be set. Failed sends are listed in the **Reminder Log** with the reason.
+
+</Accordion>
+
+</Accordions>
+
+## Scheduled work
+
+<Accordions type="single">
+
+<Accordion title="Invoices never go overdue; recurring invoices aren't created">
+
+Nothing runs on a schedule without Trigger.dev. Set `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY`, run `pnpm trigger:deploy`, and check the runs in the Trigger.dev dashboard. If runs fail there, the usual cause is that the jobs can't reach your database: they run on Trigger.dev's machines and need a public `DATABASE_URL` in the project's environment variables. See [Background jobs](/docs/self-hosting/background-jobs).
+
+</Accordion>
+
+<Accordion title="Webhook deliveries stay in retrying">
+
+Retries are scheduled through Trigger.dev when a delivery fails. Without `TRIGGER_SECRET_KEY` on the app, or without the jobs deployed, a delivery is marked **retrying** and never sent again. Set the key, deploy the jobs, and use **Send Test** to check.
+
+</Accordion>
+
+</Accordions>
+
+## API, MCP and Stripe
+
+<Accordions type="single">
+
+<Accordion title="The API answers with a redirect to /sign-in">
+
+A request to `/api/v1` without an `Authorization: Bearer ...` header is treated as a browser and sent to the sign-in page (HTTP 307). Send `Authorization: Bearer dk_live_...`, with the word `Bearer`. See [Authentication](/docs/developers/authentication).
+
+</Accordion>
+
+<Accordion title="An AI client signs in at the wrong address">
+
+MCP clients learn where to sign in from `NEXT_PUBLIC_APP_URL`. Set it to the address people use, restart, then remove and add the connector again so the client forgets the old address. Check with:
+
+```bash
+curl https://books.example.com/.well-known/oauth-protected-resource/api/mcp
+```
+
+If you build the app yourself with `pnpm build` instead of the Dockerfile, `NEXT_PUBLIC_` values present at build time are baked in, so rebuild after changing them.
+
+</Accordion>
+
+<Accordion title='Stripe webhooks fail with "Invalid signature"'>
+
+`STRIPE_WEBHOOK_SECRET` (or `STRIPE_CONNECT_WEBHOOK_SECRET` for the integration endpoint) isn't the signing secret of that endpoint. Each endpoint in Stripe has its own, and test and live mode differ. Copy it again from the endpoint's page and restart. See [Payments](/docs/self-hosting/payments).
+
+</Accordion>
+
+<Accordion title="Organizations hit plan limits on a self-hosted instance">
+
+`STRIPE_SECRET_KEY` is set, which turns on plans. In the admin area under **Settings**, set **Self-hosted unlimited mode** to **Always on** to keep the key but drop the limits, or give organizations a plan by hand in the admin area under **Organizations**, **Plan & Limits**.
+
+</Accordion>
+
+</Accordions>
+
+## Still stuck?
+
+Search or open an issue at [github.com/dubbl-org/dubbl](https://github.com/dubbl-org/dubbl/issues) with the error from the log, your dubbl commit (`git rev-parse --short HEAD`) and how you deployed.
