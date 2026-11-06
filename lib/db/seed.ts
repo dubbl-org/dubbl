@@ -1,139 +1,431 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Demo data seed for the "Demo Company" (demo@dubbl.dev / password123).
+ *
+ *   pnpm db:seed            seed a database that has no Demo Company yet
+ *   pnpm db:seed --reset    delete the Demo Company (and everything in it) and rebuild it
+ *
+ * The demo is a small Austin, TX software & hardware reseller with six closed
+ * months of history plus the current month to date. Every date is relative to
+ * the day the seed runs, so the data never goes stale.
+ *
+ * Almost everything is created through the app's own API route handlers
+ * (called in-process with a temporary API key) or its shared helpers, so the
+ * seeded books are exactly what the app itself would post: balanced journal
+ * entries, payroll through the real payroll calculation/posting code,
+ * depreciation through postAssetDepreciation, opening balances through the
+ * Opening balances feature, bank lines imported from statement files and then
+ * matched/categorized, and statement checks that balance. Only things the app
+ * has no write path for (users, the org shell, notification/delivery/reminder
+ * logs, W-9 details) are inserted directly.
+ */
+import { createHash, randomBytes } from "node:crypto";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import path from "node:path";
+import bcrypt from "bcryptjs";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "./index";
 import {
-  currency,
-  users,
-  organization,
-  member,
-  subscription,
+  apiKey,
+  bankTransaction,
   chartAccount,
-  fiscalYear,
-  journalEntry,
-  journalLine,
-  taxRate,
   contact,
-  contactPerson,
+  currency,
+  fixedAsset,
   invoice,
   invoiceLine,
-  creditNote,
-  creditNoteLine,
-  quote,
-  quoteLine,
   bill,
-  billLine,
-  purchaseOrder,
-  purchaseOrderLine,
-  debitNote,
-  debitNoteLine,
-  bankAccount,
-  bankTransaction,
-  bankRule,
-  bankReconciliation,
-  budget,
-  budgetLine,
-  budgetPeriod,
-  project,
-  projectTask,
-  projectLabel,
-  projectMilestone,
-  projectNote,
-  taskChecklist,
-  taskComment,
-  timeEntry,
-  fixedAsset,
-  depreciationEntry,
-  payrollEmployee,
-  payrollSettings,
-  payrollRun,
-  payrollItem,
-  inventoryItem,
-  inventoryCategory,
-  warehouse,
-  warehouseStock,
-  inventoryMovement,
-  inventoryItemSupplier,
-  inventoryVariant,
-  inventoryTransfer,
-  inventoryTransferLine,
-  expenseClaim,
-  expenseItem,
-  payment,
-  paymentAllocation,
-  recurringTemplate,
-  recurringTemplateLine,
-  costCenter,
-  tag,
-  entityTag,
-  periodLock,
-  exchangeRate,
-  numberSequence,
-  customRole,
-  team,
-  teamMember,
-  pipeline,
-  deal,
-  dealActivity,
-  loan,
-  loanSchedule,
-  reminderRule,
+  journalEntry,
+  journalLine,
+  member,
   notification,
-  documentTemplate,
-  documentFolder,
-  savedReport,
-  type ReportConfig,
-  scheduledPayment,
-  revenueSchedule,
-  revenueEntry,
+  organization,
+  payrollRun,
+  reminderLog,
+  subscription,
+  taxRate,
+  users,
+  webhookDelivery,
 } from "./schema";
-import { eq, isNull } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { DEFAULT_ACCOUNTS } from "./default-accounts";
 import { getIsoCurrencies } from "../currency/iso4217";
+import { syncSystemAccounts } from "./system-accounts";
+import { ensureTaxRatesSeeded } from "../api/tax-profiles";
+import { postAssetDepreciation } from "../fixed-assets/post-depreciation";
+import { deleteOrganization } from "../api/delete-organization";
+import { resolveMemberContext, type AuthContext } from "../api/auth-context";
 
-// The full active ISO 4217 set (codes/names/symbols/minor units from ICU),
-// so the demo seed and the runtime self-heal share one source of truth.
-const CURRENCIES = getIsoCurrencies();
+const RESET = process.argv.includes("--reset");
 
-// Chart of Accounts template (imported from shared module)
-const ACCOUNTS = DEFAULT_ACCOUNTS;
+const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
+const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000002";
+const DEMO_EMAIL = "demo@dubbl.dev";
+const ORG = DEMO_ORG_ID;
 
-// Contacts seed data
-const CONTACTS = [
-  { name: "Acme Corp", email: "accounts@acme.com", type: "customer" as const, paymentTermsDays: 30 },
-  { name: "Global Industries", email: "billing@globalind.com", type: "customer" as const, paymentTermsDays: 14 },
-  { name: "TechStart Inc", email: "finance@techstart.io", type: "customer" as const, paymentTermsDays: 30 },
-  { name: "Bright Solutions", email: "ap@brightsolutions.com", type: "customer" as const, paymentTermsDays: 7 },
-  { name: "Metro Services", email: "pay@metroservices.com", type: "customer" as const, paymentTermsDays: 30 },
-  { name: "Pinnacle Group", email: "invoices@pinnacle.com", type: "customer" as const, paymentTermsDays: 45 },
-  { name: "Riverdale Co", email: "ar@riverdale.co", type: "customer" as const, paymentTermsDays: 30 },
-  { name: "Summit Digital", email: "billing@summitdigital.com", type: "customer" as const, paymentTermsDays: 14 },
-  { name: "CloudBase Systems", email: "finance@cloudbase.dev", type: "customer" as const, paymentTermsDays: 30 },
-  { name: "Sterling Enterprises", email: "pay@sterling.com", type: "customer" as const, paymentTermsDays: 60 },
-  { name: "Office Depot", email: "orders@officedepot.com", type: "supplier" as const, paymentTermsDays: 30 },
-  { name: "AWS", email: "billing@aws.amazon.com", type: "supplier" as const, paymentTermsDays: 30 },
-  { name: "Landlord Properties", email: "rent@landlordprop.com", type: "supplier" as const, paymentTermsDays: 1 },
-  { name: "City Power & Water", email: "billing@citypw.com", type: "supplier" as const, paymentTermsDays: 14 },
-  { name: "Insurance Co", email: "premiums@insco.com", type: "supplier" as const, paymentTermsDays: 30 },
-  { name: "Tech Hardware Ltd", email: "sales@techhw.com", type: "supplier" as const, paymentTermsDays: 30 },
-  { name: "Marketing Agency", email: "invoices@marketing.co", type: "supplier" as const, paymentTermsDays: 14 },
-  { name: "Legal Partners LLP", email: "accounts@legalpartners.com", type: "supplier" as const, paymentTermsDays: 30 },
-  { name: "Freelancer Jane", email: "jane@freelance.com", type: "both" as const, paymentTermsDays: 14 },
-  { name: "ConsultCo", email: "billing@consultco.com", type: "both" as const, paymentTermsDays: 30 },
+// ---------------------------------------------------------------------------
+// Dates: six closed months (0..5) plus the current month (6) up to today.
+// ---------------------------------------------------------------------------
+const NOW = new Date();
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+const TODAY = isoDate(NOW);
+const CUR = 6;
+const LAST = CUR - 1;
+
+function monthStart(i: number): Date {
+  return new Date(Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth() - CUR + i, 1));
+}
+function day(i: number, dd: number): string {
+  const s = monthStart(i);
+  const last = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth() + 1, 0)).getUTCDate();
+  return isoDate(new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), Math.min(dd, last))));
+}
+const monthEnd = (i: number) => day(i, 31);
+function addDays(date: string, n: number): string {
+  const d = new Date(date + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return isoDate(d);
+}
+const weekday = (date: string) => new Date(date + "T00:00:00Z").getUTCDay();
+/** A banking day in month i near day dd (weekends roll forward, or back at month end). */
+function bizDay(i: number, dd: number): string {
+  let d = day(i, dd);
+  const wd = weekday(d);
+  if (wd === 6) d = addDays(d, 2);
+  else if (wd === 0) d = addDays(d, 1);
+  if (d.slice(0, 7) !== day(i, 1).slice(0, 7)) {
+    d = day(i, dd);
+    d = addDays(d, weekday(d) === 6 ? -1 : -2);
+  }
+  return d;
+}
+function monthIndexOf(date: string): number {
+  const s = monthStart(0);
+  const [y, m] = date.split("-").map(Number);
+  return (y - s.getUTCFullYear()) * 12 + (m - 1 - s.getUTCMonth());
+}
+const monthName = (i: number) =>
+  monthStart(i).toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+const monthLabel = (i: number) =>
+  monthStart(i).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+const OPENING_DATE = addDays(day(0, 1), -1);
+
+// Deterministic pseudo-random numbers so every seed run looks the same.
+let rngState = 20260401;
+function rand(): number {
+  rngState = (rngState + 0x6d2b79f5) | 0;
+  let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const between = (a: number, b: number) => Math.round(a + rand() * (b - a));
+
+// ---------------------------------------------------------------------------
+// In-process API calls through the real route handlers.
+// ---------------------------------------------------------------------------
+const API_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../app/api/v1");
+let API_TOKEN = "";
+const routeCache = new Map<string, any>();
+
+async function loadRoute(p: string): Promise<any> {
+  let mod = routeCache.get(p);
+  if (!mod) {
+    mod = await import(pathToFileURL(path.join(API_ROOT, p, "route.ts")).href);
+    routeCache.set(p, mod);
+  }
+  return mod;
+}
+
+async function api(
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
+  p: string,
+  body?: unknown,
+  params: Record<string, string> = {},
+  query = ""
+): Promise<any> {
+  const mod = await loadRoute(p);
+  const handler = mod[method];
+  if (!handler) throw new Error(`No ${method} handler for ${p}`);
+  const url =
+    "http://localhost/api/v1/" + p.replace(/\[(\w+)\]/g, (_, k) => params[k] ?? k) + (query ? `?${query}` : "");
+  const req = new Request(url, {
+    method,
+    headers: {
+      authorization: `Bearer ${API_TOKEN}`,
+      "x-organization-id": ORG,
+      "content-type": "application/json",
+    },
+    body: method === "GET" || method === "DELETE" ? undefined : JSON.stringify(body ?? {}),
+  });
+  const res: Response = await handler(req, { params: Promise.resolve(params) });
+  const text = await res.text();
+  let json: any = text;
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    // keep raw text
+  }
+  if (!res.ok) {
+    throw new Error(`${method} /${p} ${JSON.stringify(params)} -> ${res.status}: ${text.slice(0, 600)}`);
+  }
+  return json;
+}
+const post = (p: string, body?: unknown, params?: Record<string, string>) => api("POST", p, body ?? {}, params);
+const patch = (p: string, body: unknown, params?: Record<string, string>) => api("PATCH", p, body, params);
+const get = (p: string, params?: Record<string, string>, query?: string) => api("GET", p, undefined, params, query);
+const del = (p: string, params?: Record<string, string>) => api("DELETE", p, undefined, params);
+
+/** The first object with an id in a response ({ invoice }, { data: {...} }, ...). */
+function ent(json: any): any {
+  if (json && typeof json === "object") {
+    if (typeof json.id === "string") return json;
+    for (const v of Object.values(json)) {
+      if (v && typeof v === "object" && !Array.isArray(v) && typeof (v as any).id === "string") return v;
+    }
+    for (const v of Object.values(json)) {
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        const inner = ent(v);
+        if (inner) return inner;
+      }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Lookups filled in during setup.
+// ---------------------------------------------------------------------------
+const A: Record<string, string> = {}; // account code -> id
+const C: Record<string, string> = {}; // contact key -> id
+const TERMS: Record<string, number> = {};
+const T: Record<string, string> = {}; // tax key -> id
+const I: Record<string, { id: string; sale: number; cost: number }> = {}; // item code -> item
+const W: Record<string, string> = {}; // warehouse key -> id
+const BANK: Record<Bank, string> = { checking: "", savings: "", card: "" };
+const BANK_CODE: Record<Bank, string> = { checking: "1100", savings: "1110", card: "2600" };
+const INV: Record<string, any> = {};
+const BILLS: Record<string, any> = {};
+const PROJ: Record<string, string> = {};
+const CC: Record<string, string> = {};
+const ASSETS: string[] = [];
+let ctx: AuthContext;
+let memberId = "";
+
+const acct = (code: string) => {
+  const id = A[code];
+  if (!id) throw new Error(`Account ${code} not found`);
+  return id;
+};
+
+// ---------------------------------------------------------------------------
+// Dated task queue + bank statement feed.
+// ---------------------------------------------------------------------------
+interface Task {
+  date: string;
+  seq: number;
+  label: string;
+  fn: () => Promise<void>;
+}
+const tasks: Task[] = [];
+let taskSeq = 0;
+function at(date: string, label: string, fn: () => Promise<void>) {
+  if (date > TODAY) return;
+  tasks.push({ date, seq: taskSeq++, label, fn });
+}
+
+type Bank = "checking" | "savings" | "card";
+type Action =
+  | { kind: "invoice"; key: string }
+  | { kind: "bill"; key: string }
+  | { kind: "journal"; jeId: string }
+  | { kind: "payment"; paymentId: string }
+  | { kind: "categorize"; code: string; contact?: string; memo?: string }
+  | { kind: "transfer"; pair: string; to: Bank }
+  | { kind: "counter"; pair: string }
+  | { kind: "open" };
+interface FeedLine {
+  bank: Bank;
+  date: string;
+  description: string;
+  amount: number | null; // signed cents; null = the open amount of the matched document
+  payee: string;
+  ref: string;
+  seq: number;
+  action: Action;
+  txId?: string;
+}
+const feed: FeedLine[] = [];
+let refSeq = 0;
+function bankLine(bank: Bank, date: string, description: string, amount: number | null, action: Action, payee = "") {
+  if (date > TODAY) return;
+  refSeq++;
+  feed.push({
+    bank,
+    date,
+    description,
+    amount,
+    payee,
+    ref: `${bank === "checking" ? "CHK" : bank === "savings" ? "SAV" : "CC"}${String(refSeq).padStart(5, "0")}`,
+    seq: refSeq,
+    action,
+  });
+}
+
+async function bankLeg(jeId: string, code: string): Promise<number> {
+  const rows = await db
+    .select({ d: journalLine.debitAmount, c: journalLine.creditAmount })
+    .from(journalLine)
+    .innerJoin(chartAccount, eq(journalLine.accountId, chartAccount.id))
+    .where(and(eq(journalLine.journalEntryId, jeId), eq(chartAccount.code, code)));
+  return rows.reduce((s, r) => s + r.d - r.c, 0);
+}
+async function lastJeHitting(code: string): Promise<string> {
+  const [row] = await db
+    .select({ id: journalEntry.id })
+    .from(journalEntry)
+    .innerJoin(journalLine, eq(journalLine.journalEntryId, journalEntry.id))
+    .innerJoin(chartAccount, eq(journalLine.accountId, chartAccount.id))
+    .where(and(eq(journalEntry.organizationId, ORG), eq(chartAccount.code, code)))
+    .orderBy(desc(journalEntry.createdAt), desc(journalEntry.entryNumber))
+    .limit(1);
+  if (!row) throw new Error(`No journal entry on ${code}`);
+  return row.id;
+}
+/** Push a checking line for a journal the app just posted to the bank ledger. */
+async function bankLineForJournal(jeId: string, bank: Bank, date: string, description: string, payee = "") {
+  const amount = await bankLeg(jeId, BANK_CODE[bank]);
+  if (amount !== 0) bankLine(bank, date, description, amount, { kind: "journal", jeId }, payee);
+}
+
+// ---------------------------------------------------------------------------
+// Document helpers (prices in the request are decimal dollars, like the UI).
+// ---------------------------------------------------------------------------
+interface Ln {
+  d: string;
+  q?: number;
+  p: number; // unit price, dollars
+  acct: string;
+  tax?: "TX" | "EX" | "NONE";
+  item?: string;
+  wh?: string;
+  project?: string;
+  cc?: string;
+  disc?: number; // basis points
+}
+function docLine(l: Ln) {
+  return {
+    description: l.d,
+    quantity: l.q ?? 1,
+    unitPrice: l.p,
+    accountId: acct(l.acct),
+    taxRateId: l.tax === "TX" ? T.tx : l.tax === "NONE" ? T.none : T.exempt,
+    discountPercent: l.disc ?? 0,
+    ...(l.item ? { inventoryItemId: I[l.item].id, warehouseId: W[l.wh ?? "main"] } : {}),
+    ...(l.project ? { projectId: PROJ[l.project] } : {}),
+    ...(l.cc ? { costCenterId: CC[l.cc] } : {}),
+  };
+}
+
+async function salesInvoice(
+  key: string,
+  o: { contact: string; date: string; lines: Ln[]; ref?: string; notes?: string; currency?: string; terms?: number; send?: boolean }
+) {
+  const created = (
+    await post("invoices", {
+      contactId: C[o.contact],
+      issueDate: o.date,
+      dueDate: addDays(o.date, o.terms ?? TERMS[o.contact] ?? 30),
+      reference: o.ref ?? null,
+      notes: o.notes ?? null,
+      currencyCode: o.currency ?? "USD",
+      lines: o.lines.map(docLine),
+    })
+  ).invoice;
+  INV[key] = o.send === false ? created : (await post("invoices/[id]/send", {}, { id: created.id })).invoice;
+  return INV[key];
+}
+
+async function supplierBill(
+  key: string,
+  o: { contact: string; date: string; lines: Ln[]; ref?: string; notes?: string; terms?: number; po?: string[]; receive?: boolean }
+) {
+  const created = (
+    await post("bills", {
+      contactId: C[o.contact],
+      issueDate: o.date,
+      dueDate: addDays(o.date, o.terms ?? TERMS[o.contact] ?? 30),
+      reference: o.ref ?? null,
+      notes: o.notes ?? null,
+      currencyCode: "USD",
+      purchaseOrderIds: o.po,
+      confirmDuplicate: true,
+      lines: o.lines.map((l) => {
+        const line: any = docLine(l);
+        return line;
+      }),
+    })
+  ).bill;
+  BILLS[key] = o.receive === false ? created : (await post("bills/[id]/receive", {}, { id: created.id })).bill;
+  return BILLS[key];
+}
+
+const invoicePaid = (key: string, bank: Bank, date: string, description: string, payee: string) =>
+  bankLine(bank, date, description, null, { kind: "invoice", key }, payee);
+const billPaid = (key: string, bank: Bank, date: string, description: string, payee: string) =>
+  bankLine(bank, date, description, null, { kind: "bill", key }, payee);
+
+// ---------------------------------------------------------------------------
+// Static data
+// ---------------------------------------------------------------------------
+const CUSTOMERS = [
+  { key: "acme", name: "Acme Corp", email: "accounts@acme.com", terms: 30, phone: "+1 512 555 0101", line1: "1200 Barton Springs Rd", city: "Austin", state: "TX", zip: "78704" },
+  { key: "global", name: "Global Industries", email: "billing@globalind.com", terms: 14, phone: "+1 713 555 0142", line1: "800 Louisiana St", city: "Houston", state: "TX", zip: "77002" },
+  { key: "techstart", name: "TechStart Inc", email: "finance@techstart.io", terms: 30, phone: "+1 415 555 0188", line1: "535 Mission St", city: "San Francisco", state: "CA", zip: "94105" },
+  { key: "bright", name: "Bright Solutions", email: "ap@brightsolutions.com", terms: 7, phone: "+1 303 555 0119", line1: "1600 Wynkoop St", city: "Denver", state: "CO", zip: "80202" },
+  { key: "metro", name: "Metro Services", email: "pay@metroservices.com", terms: 30, phone: "+1 214 555 0170", line1: "2100 Ross Ave", city: "Dallas", state: "TX", zip: "75201" },
+  { key: "pinnacle", name: "Pinnacle Group", email: "invoices@pinnacle.com", terms: 45, phone: "+1 312 555 0133", line1: "233 S Wacker Dr", city: "Chicago", state: "IL", zip: "60606" },
+  { key: "riverdale", name: "Riverdale Co", email: "ar@riverdale.co", terms: 30, phone: "+1 503 555 0107", line1: "1120 NW Couch St", city: "Portland", state: "OR", zip: "97209" },
+  { key: "summit", name: "Summit Digital", email: "billing@summitdigital.com", terms: 14, phone: "+1 512 555 0164", line1: "301 Congress Ave", city: "Austin", state: "TX", zip: "78701" },
+  { key: "cloudbase", name: "CloudBase Systems", email: "finance@cloudbase.dev", terms: 30, phone: "+1 206 555 0125", line1: "400 Pine St", city: "Seattle", state: "WA", zip: "98101" },
+  { key: "sterling", name: "Sterling Enterprises", email: "pay@sterling.com", terms: 60, phone: "+1 212 555 0196", line1: "350 Park Ave", city: "New York", state: "NY", zip: "10022" },
+  { key: "nordlicht", name: "Nordlicht GmbH", email: "buchhaltung@nordlicht.de", terms: 30, phone: "+49 30 5550 1234", line1: "Friedrichstrasse 68", city: "Berlin", state: "", zip: "10117", country: "DE", currency: "EUR", taxNumber: "DE298765432" },
+  { key: "walkin", name: "Walk-in Customer", email: null, terms: 0, phone: null, line1: "", city: "", state: "", zip: "" },
+];
+const SUPPLIERS = [
+  { key: "officedepot", name: "Office Depot", email: "orders@officedepot.com", terms: 30, city: "Austin", state: "TX" },
+  { key: "aws", name: "AWS", email: "billing@aws.amazon.com", terms: 0, city: "Seattle", state: "WA" },
+  { key: "landlord", name: "Landlord Properties", email: "rent@landlordprop.com", terms: 0, city: "Austin", state: "TX" },
+  { key: "citypw", name: "City Power & Water", email: "billing@citypw.com", terms: 14, city: "Austin", state: "TX" },
+  { key: "insurance", name: "Insurance Co", email: "premiums@insco.com", terms: 14, city: "Hartford", state: "CT" },
+  { key: "techhw", name: "Tech Hardware Ltd", email: "sales@techhw.com", terms: 30, city: "San Jose", state: "CA" },
+  { key: "marketing", name: "Marketing Agency", email: "invoices@marketing.co", terms: 14, city: "Austin", state: "TX" },
+  { key: "legal", name: "Legal Partners LLP", email: "accounts@legalpartners.com", terms: 30, city: "Austin", state: "TX" },
+  { key: "jane", name: "Freelancer Jane", email: "jane@freelance.com", terms: 14, city: "Round Rock", state: "TX" },
+  { key: "consultco", name: "ConsultCo", email: "billing@consultco.com", terms: 30, city: "Dallas", state: "TX" },
 ];
 
-const TAX_RATES = [
-  { name: "GST 10%", rate: 1000, type: "both" as const, isDefault: true },
-  { name: "GST 5%", rate: 500, type: "both" as const, isDefault: false },
-  { name: "Sales Tax 8%", rate: 800, type: "sales" as const, isDefault: false },
-  { name: "VAT 20%", rate: 2000, type: "both" as const, isDefault: false },
-  { name: "Tax Exempt", rate: 0, type: "both" as const, isDefault: false },
+const EMPLOYEES = [
+  { name: "Alice Johnson", email: "alice@demo-company.com", num: "EMP-001", position: "Senior Developer", department: "Engineering", salary: 11000000, start: "2023-02-01" },
+  { name: "Bob Smith", email: "bob@demo-company.com", num: "EMP-002", position: "Product Designer", department: "Design", salary: 7800000, start: "2023-06-12" },
+  { name: "Carol Williams", email: "carol@demo-company.com", num: "EMP-003", position: "Project Manager", department: "Operations", salary: 8800000, start: "2024-01-08" },
+  { name: "David Brown", email: "david@demo-company.com", num: "EMP-004", position: "Junior Developer", department: "Engineering", salary: 6200000, start: "2025-03-03" },
 ];
 
-async function seed() {
-  console.log("Seeding dubbl demo data...\n");
+// Monthly drift on the USD base rates (scaled 1e6: 920000 = 0.92 EUR per USD).
+const FX_BASE: Record<string, number> = {
+  EUR: 920000,
+  GBP: 790000,
+  JPY: 150200000,
+  CAD: 1365000,
+  AUD: 1548000,
+  CHF: 885000,
+};
 
-  // 1. Currencies — upsert so codes are present and metadata stays correct.
-  console.log("Seeding currencies...");
-  for (const c of CURRENCIES) {
+// ===========================================================================
+// 1. Bootstrap: currencies, user, organization shell, temporary API key
+// ===========================================================================
+async function bootstrap() {
+  console.log("Currencies...");
+  const currencies = getIsoCurrencies();
+  for (const c of currencies) {
     await db
       .insert(currency)
       .values(c)
@@ -142,2404 +434,2068 @@ async function seed() {
         set: { name: c.name, symbol: c.symbol, decimalPlaces: c.decimalPlaces },
       });
   }
-  console.log(`  ${CURRENCIES.length} currencies`);
 
-  // 2. Find existing user + org, or create demo user
-  console.log("Looking for existing user/organization...");
-
-  // Prefer the dev user's org first, then fall back to any owner membership
-  const devUser = await db.query.users.findFirst({
-    where: eq(users.email, "dev@dubbl.local"),
-    columns: { id: true },
-  });
-
-  const existingMember = devUser
-    ? (await db.query.member.findFirst({
-        where: eq(member.userId, devUser.id),
-        with: { user: true, organization: true },
-      }))
-    : null;
-
-  const resolvedMember = existingMember ??
-    (await db.query.member.findFirst({
-      where: eq(member.role, "owner"),
-      with: { user: true, organization: true },
-    }));
-
-  let userId: string;
-  let org: { id: string; name: string };
-
-  if (resolvedMember) {
-    userId = resolvedMember.userId;
-    org = { id: resolvedMember.organizationId, name: resolvedMember.organization.name };
-    console.log(`  Using existing user: ${resolvedMember.user.email}`);
-    console.log(`  Using existing org: ${org.name}`);
-    // Finish setup on an org that never completed onboarding, so the seeded data is reachable
-    if (resolvedMember.organization.country === null) {
-      await db
-        .update(organization)
-        .set({ country: "United States", countryCode: "US", onboardingCompletedAt: new Date() })
-        .where(eq(organization.id, org.id));
-      console.log("  Marked org as onboarded (United States)");
-    }
-  } else {
-    console.log("  No existing user found, creating demo user...");
+  console.log("Demo user...");
+  let user = await db.query.users.findFirst({ where: eq(users.email, DEMO_EMAIL) });
+  if (!user) {
     const passwordHash = await bcrypt.hash("password123", 12);
-    const [demoUser] = await db
+    [user] = await db
       .insert(users)
-      .values({
-        id: "00000000-0000-0000-0000-000000000001",
-        name: "Demo User",
-        email: "demo@dubbl.dev",
-        passwordHash,
-        isSiteAdmin: true,
-      })
-      .onConflictDoNothing()
+      .values({ id: DEMO_USER_ID, name: "Demo User", email: DEMO_EMAIL, passwordHash, isSiteAdmin: true })
       .returning();
+  }
+  const userId = user.id;
 
-    if (!demoUser) {
-      console.log("  Demo user already exists but no org found. Aborting.");
+  const existing = await db.query.organization.findFirst({ where: eq(organization.id, ORG) });
+  if (existing) {
+    if (!RESET) {
+      console.error(
+        `\n"${existing.name}" already exists. Re-run with --reset to delete it and seed it again:\n  pnpm db:seed --reset\n`
+      );
       process.exit(1);
     }
-
-    const [newOrg] = await db
-      .insert(organization)
-      .values({
-        id: "00000000-0000-0000-0000-000000000002",
-        name: "Demo Company",
-        slug: "demo-company",
-        // Without a country the dashboard sends the user back to onboarding
-        country: "United States",
-        countryCode: "US",
-        defaultCurrency: "USD",
-        fiscalYearStartMonth: 1,
-        onboardingCompletedAt: new Date(),
-      })
-      .returning();
-
-    userId = demoUser.id;
-    org = { id: newOrg.id, name: newOrg.name };
-
-    await db.insert(member).values({
-      organizationId: newOrg.id,
-      userId,
-      role: "owner",
-    });
-
-    await db.insert(subscription).values({
-      organizationId: newOrg.id,
-      plan: "pro",
-      status: "active",
-    });
+    console.log(`Deleting existing "${existing.name}" (--reset)...`);
+    await deleteOrganization(ORG);
   }
 
-  // 4. Fiscal Year
-  console.log("Creating fiscal year...");
-  let fy: { id: string };
-  const existingFy = await db.query.fiscalYear.findFirst({
-    where: eq(fiscalYear.organizationId, org.id),
+  console.log("Demo Company...");
+  await db.insert(organization).values({
+    id: ORG,
+    name: "Demo Company",
+    slug: "demo-company",
+    country: "United States",
+    countryCode: "US",
+    businessType: "company",
+    legalEntityType: "llc",
+    defaultCurrency: "USD",
+    fiscalYearStartMonth: 1,
+    taxId: "84-1234567",
+    addressStreet: "500 Congress Ave, Suite 210",
+    addressCity: "Austin",
+    addressState: "TX",
+    addressPostalCode: "78701",
+    addressCountry: "US",
+    contactPhone: "+1 512 555 0100",
+    contactEmail: "hello@demo-company.com",
+    contactWebsite: "https://demo-company.com",
+    defaultPaymentTerms: "net_30",
+    industrySector: "Software & IT services",
+    taxRegime: "us_sales_tax",
+    onboardingCompletedAt: new Date(),
   });
-  if (existingFy) {
-    fy = existingFy;
-    console.log("  Fiscal year already exists, reusing...");
-  } else {
-    const [newFy] = await db
-      .insert(fiscalYear)
-      .values({
-        organizationId: org.id,
-        name: "FY 2026",
-        startDate: "2026-01-01",
-        endDate: "2026-12-31",
-      })
-      .returning();
-    fy = newFy;
-  }
+  await db.insert(member).values({ organizationId: ORG, userId, role: "owner" });
+  await db.insert(subscription).values({ organizationId: ORG, plan: "premium", status: "active" });
 
-  // 5. Chart of Accounts
-  console.log("Creating chart of accounts...");
-  const accountMap = new Map<string, string>(); // code -> id
-
-  // First load any existing accounts for this org
-  const existingAccounts = await db.query.chartAccount.findMany({
-    where: eq(chartAccount.organizationId, org.id),
+  // Temporary API key: the route handlers authenticate it like any API client.
+  API_TOKEN = `dk_${randomBytes(24).toString("hex")}`;
+  await db.insert(apiKey).values({
+    organizationId: ORG,
+    name: "Demo seed (temporary)",
+    keyHash: createHash("sha256").update(API_TOKEN).digest("hex"),
+    keyPrefix: API_TOKEN.slice(0, 10),
+    createdBy: userId,
   });
-  for (const a of existingAccounts) {
-    accountMap.set(a.code, a.id);
+
+  const resolved = await resolveMemberContext(userId, ORG);
+  if (!resolved) throw new Error("Could not resolve the demo member");
+  ctx = resolved;
+  const m = await db.query.member.findFirst({ where: and(eq(member.organizationId, ORG), eq(member.userId, userId)) });
+  memberId = m!.id;
+  return userId;
+}
+
+// ===========================================================================
+// 2. Setup: chart, tax, contacts, banks, opening balances, catalogs
+// ===========================================================================
+async function setup() {
+  console.log("Chart of accounts and tax rates...");
+  await syncSystemAccounts(ORG, { currencyCode: "USD", countryCode: "US" });
+  const accounts = await db.select({ id: chartAccount.id, code: chartAccount.code }).from(chartAccount).where(eq(chartAccount.organizationId, ORG));
+  for (const a of accounts) A[a.code] = a.id;
+
+  await ensureTaxRatesSeeded(ORG, "US");
+  const tx = ent(
+    await post("tax-rates", {
+      name: "Texas Sales Tax 8.25%",
+      rate: 825,
+      type: "both",
+      kind: "sales_tax_us",
+      recoverablePercent: 0,
+      isDefault: true,
+    })
+  );
+  T.tx = tx.id;
+  const rates = await db.select().from(taxRate).where(eq(taxRate.organizationId, ORG));
+  T.exempt = rates.find((r) => r.name === "Tax Exempt")!.id;
+  T.none = rates.find((r) => r.name === "No Tax")!.id;
+
+  console.log("Fiscal years and exchange rates...");
+  const years = new Set<number>();
+  for (let i = -1; i <= CUR; i++) years.add(Number(day(i, 1).slice(0, 4)));
+  for (const y of [...years].sort()) {
+    await post("fiscal-years", { name: `FY ${y}`, startDate: `${y}-01-01`, endDate: `${y}-12-31` });
   }
-
-  let newAccountCount = 0;
-  for (const acct of ACCOUNTS) {
-    if (accountMap.has(acct.code)) continue; // skip existing
-    const [row] = await db
-      .insert(chartAccount)
-      .values({
-        organizationId: org.id,
-        code: acct.code,
-        name: acct.name,
-        type: acct.type,
-        subType: acct.subType,
-      })
-      .returning();
-    accountMap.set(acct.code, row.id);
-    newAccountCount++;
-  }
-  console.log(`  ${newAccountCount} new accounts (${accountMap.size} total)`);
-
-  // 6. Tax Rates
-  console.log("Creating tax rates...");
-  const existingTaxRates = await db.query.taxRate.findMany({
-    where: eq(taxRate.organizationId, org.id),
-  });
-  const taxRateIds: string[] = existingTaxRates.map((t) => t.id);
-  const existingTaxNames = new Set(existingTaxRates.map((t) => t.name));
-  for (const tr of TAX_RATES) {
-    if (existingTaxNames.has(tr.name)) continue;
-    const [row] = await db
-      .insert(taxRate)
-      .values({
-        organizationId: org.id,
-        name: tr.name,
-        rate: tr.rate,
-        type: tr.type,
-        isDefault: tr.isDefault,
-      })
-      .returning();
-    taxRateIds.push(row.id);
-  }
-  console.log(`  ${taxRateIds.length} tax rates`);
-
-  // 7. Contacts
-  console.log("Creating contacts...");
-  const existingContacts = await db.query.contact.findMany({
-    where: eq(contact.organizationId, org.id),
-  });
-  const existingContactEmails = new Set(existingContacts.map((c) => c.email));
-  const contactIds: string[] = [];
-
-  for (const c of CONTACTS) {
-    const existing = existingContacts.find((ec) => ec.email === c.email);
-    if (existing) {
-      contactIds.push(existing.id);
-      continue;
+  const fxRates: any[] = [];
+  const fxDates = [OPENING_DATE, ...Array.from({ length: CUR + 1 }, (_, i) => day(i, 1)), TODAY];
+  for (const date of [...new Set(fxDates)]) {
+    for (const [code, base] of Object.entries(FX_BASE)) {
+      const drift = 1 + (rand() - 0.5) * 0.02;
+      fxRates.push({ baseCurrency: "USD", targetCurrency: code, rate: Math.round(base * drift), date });
     }
-    const [row] = await db
-      .insert(contact)
-      .values({
-        organizationId: org.id,
+  }
+  await post("exchange-rates", { rates: fxRates });
+
+  console.log("Contacts...");
+  for (const c of CUSTOMERS) {
+    const created = ent(
+      await post("contacts", {
         name: c.name,
         email: c.email,
-        type: c.type,
-        paymentTermsDays: c.paymentTermsDays,
+        phone: c.phone,
+        type: "customer",
+        paymentTermsDays: c.terms,
+        currencyCode: c.currency ?? "USD",
+        taxNumber: c.taxNumber ?? null,
+        addresses: c.line1
+          ? { billing: { line1: c.line1, city: c.city, state: c.state, postalCode: c.zip, country: c.country ?? "US" } }
+          : undefined,
       })
-      .returning();
-    contactIds.push(row.id);
-  }
-  console.log(`  ${contactIds.length} contacts`);
-
-  // Check which data already exists to skip those sections
-  const existingEntries = await db.query.journalEntry.findFirst({
-    where: eq(journalEntry.organizationId, org.id),
-  });
-  const existingInvoices = await db.query.invoice.findFirst({
-    where: eq(invoice.organizationId, org.id),
-  });
-  const existingCreditNotes = await db.query.creditNote.findFirst({
-    where: eq(creditNote.organizationId, org.id),
-  });
-
-  const invoiceIds: { id: string; contactIdx: number; status: string; paid: number; total: number }[] = [];
-
-  if (existingEntries) {
-    console.log("\nJournal entries already exist, skipping...");
-  } else {
-  // 8. Journal Entries (manual entries for opening balances)
-  console.log("Creating journal entries...");
-  let entryNum = 1;
-
-  // Opening balance: Cash + AR + Equity
-  const [openingEntry] = await db
-    .insert(journalEntry)
-    .values({
-      organizationId: org.id,
-      entryNumber: entryNum++,
-      date: "2026-01-01",
-      description: "Opening balances",
-      status: "posted",
-      fiscalYearId: fy.id,
-      sourceType: "manual",
-      createdBy: userId,
-      postedAt: new Date(),
-    })
-    .returning();
-
-  await db.insert(journalLine).values([
-    { journalEntryId: openingEntry.id, accountId: accountMap.get("1100")!, debitAmount: 5000000, creditAmount: 0 }, // $50,000 checking
-    { journalEntryId: openingEntry.id, accountId: accountMap.get("1110")!, debitAmount: 2500000, creditAmount: 0 }, // $25,000 savings
-    { journalEntryId: openingEntry.id, accountId: accountMap.get("1200")!, debitAmount: 1200000, creditAmount: 0 }, // $12,000 AR
-    { journalEntryId: openingEntry.id, accountId: accountMap.get("1620")!, debitAmount: 800000, creditAmount: 0 }, // $8,000 computers
-    { journalEntryId: openingEntry.id, accountId: accountMap.get("3000")!, debitAmount: 0, creditAmount: 9500000 }, // $95,000 equity
-  ]);
-
-  // Monthly revenue/expense entries (Jan-Feb 2026)
-  const months = ["2026-01-15", "2026-01-31", "2026-02-15", "2026-02-28"];
-  const descriptions = [
-    "Service revenue - Acme Corp",
-    "Consulting income - Global Industries",
-    "Service revenue - TechStart",
-    "Software development - Summit Digital",
-  ];
-  for (let i = 0; i < months.length; i++) {
-    const [e] = await db
-      .insert(journalEntry)
-      .values({
-        organizationId: org.id,
-        entryNumber: entryNum++,
-        date: months[i],
-        description: descriptions[i],
-        status: "posted",
-        fiscalYearId: fy.id,
-        sourceType: "manual",
-        createdBy: userId,
-        postedAt: new Date(),
-      })
-      .returning();
-
-    const revenue = 250000 + Math.floor(Math.random() * 300000); // $2,500 - $5,500
-    await db.insert(journalLine).values([
-      { journalEntryId: e.id, accountId: accountMap.get("1200")!, debitAmount: revenue, creditAmount: 0 },
-      { journalEntryId: e.id, accountId: accountMap.get("4010")!, debitAmount: 0, creditAmount: revenue },
-    ]);
-  }
-
-  // Expense entries
-  const expenses = [
-    { date: "2026-01-05", desc: "Office rent - January", account: "5200", amount: 350000 },
-    { date: "2026-01-10", desc: "Internet service", account: "5220", amount: 9900 },
-    { date: "2026-01-15", desc: "Office supplies", account: "5300", amount: 15000 },
-    { date: "2026-01-20", desc: "AWS hosting", account: "5220", amount: 45000 },
-    { date: "2026-01-31", desc: "Payroll - January", account: "5100", amount: 1200000 },
-    { date: "2026-02-05", desc: "Office rent - February", account: "5200", amount: 350000 },
-    { date: "2026-02-10", desc: "Insurance premium", account: "5400", amount: 25000 },
-    { date: "2026-02-15", desc: "Marketing campaign", account: "5600", amount: 75000 },
-    { date: "2026-02-20", desc: "Legal consultation", account: "5710", amount: 50000 },
-    { date: "2026-02-28", desc: "Payroll - February", account: "5100", amount: 1200000 },
-  ];
-
-  for (const exp of expenses) {
-    const [e] = await db
-      .insert(journalEntry)
-      .values({
-        organizationId: org.id,
-        entryNumber: entryNum++,
-        date: exp.date,
-        description: exp.desc,
-        status: "posted",
-        fiscalYearId: fy.id,
-        sourceType: "manual",
-        createdBy: userId,
-        postedAt: new Date(),
-      })
-      .returning();
-
-    await db.insert(journalLine).values([
-      { journalEntryId: e.id, accountId: accountMap.get(exp.account)!, debitAmount: exp.amount, creditAmount: 0 },
-      { journalEntryId: e.id, accountId: accountMap.get("1100")!, debitAmount: 0, creditAmount: exp.amount },
-    ]);
-  }
-  console.log(`  ${entryNum - 1} journal entries`);
-  } // end journal entries
-
-  // 9. Invoices
-  if (existingInvoices) {
-    console.log("Invoices already exist, skipping...");
-  } else {
-  console.log("Creating invoices...");
-  const invoiceData = [
-    { contact: 0, number: "INV-00001", date: "2026-01-10", due: "2026-02-09", status: "paid" as const, desc: "Web Development", qty: 100, price: 15000, paid: 1500000 },
-    { contact: 1, number: "INV-00002", date: "2026-01-15", due: "2026-01-29", status: "paid" as const, desc: "Consulting Services", qty: 100, price: 20000, paid: 2000000 },
-    { contact: 2, number: "INV-00003", date: "2026-01-20", due: "2026-02-19", status: "sent" as const, desc: "API Integration", qty: 100, price: 800000, paid: 0 },
-    { contact: 3, number: "INV-00004", date: "2026-02-01", due: "2026-02-08", status: "overdue" as const, desc: "Support Contract", qty: 100, price: 500000, paid: 0 },
-    { contact: 4, number: "INV-00005", date: "2026-02-05", due: "2026-03-07", status: "sent" as const, desc: "Monthly Retainer", qty: 100, price: 300000, paid: 0 },
-    { contact: 5, number: "INV-00006", date: "2026-02-10", due: "2026-03-27", status: "draft" as const, desc: "Data Migration", qty: 100, price: 1200000, paid: 0 },
-    { contact: 0, number: "INV-00007", date: "2026-02-15", due: "2026-03-17", status: "sent" as const, desc: "Phase 2 Development", qty: 100, price: 2500000, paid: 0 },
-    { contact: 6, number: "INV-00008", date: "2026-02-18", due: "2026-03-20", status: "partial" as const, desc: "Training Sessions", qty: 300, price: 50000, paid: 500000 },
-    { contact: 7, number: "INV-00009", date: "2026-02-20", due: "2026-03-06", status: "sent" as const, desc: "UX Design", qty: 100, price: 350000, paid: 0 },
-    { contact: 8, number: "INV-00010", date: "2026-02-25", due: "2026-03-27", status: "draft" as const, desc: "Cloud Architecture", qty: 100, price: 450000, paid: 0 },
-  ];
-
-  for (const inv of invoiceData) {
-    const lineAmount = (inv.qty / 100) * inv.price;
-    const [row] = await db
-      .insert(invoice)
-      .values({
-        organizationId: org.id,
-        contactId: contactIds[inv.contact],
-        invoiceNumber: inv.number,
-        issueDate: inv.date,
-        dueDate: inv.due,
-        status: inv.status,
-        subtotal: lineAmount,
-        taxTotal: 0,
-        total: lineAmount,
-        amountPaid: inv.paid,
-        amountDue: lineAmount - inv.paid,
-        currencyCode: "USD",
-      })
-      .returning();
-
-    await db.insert(invoiceLine).values({
-      invoiceId: row.id,
-      description: inv.desc,
-      quantity: inv.qty,
-      unitPrice: inv.price,
-      amount: lineAmount,
-      accountId: accountMap.get("4010")!,
-      sortOrder: 0,
-    });
-    invoiceIds.push({ id: row.id, contactIdx: inv.contact, status: inv.status, paid: inv.paid, total: lineAmount });
-  }
-  console.log(`  ${invoiceData.length} invoices`);
-  } // end invoices block
-
-  // 9b. Credit Notes (always check, even on re-run)
-  if (existingCreditNotes) {
-    console.log("Credit notes already exist, skipping...");
-  } else {
-  console.log("Creating credit notes...");
-  const creditNoteData = [
-    {
-      contact: 0,
-      number: "CN-00001",
-      date: "2026-01-25",
-      status: "applied" as const,
-      invoiceIdx: 0,
-      description: "Overcharge correction on web development",
-      qty: 100,
-      price: 20000,
-      subtotal: 20000,
-      total: 20000,
-      amountApplied: 20000,
-      amountRemaining: 0,
-    },
-    {
-      contact: 1,
-      number: "CN-00002",
-      date: "2026-02-05",
-      status: "sent" as const,
-      invoiceIdx: null,
-      description: "Partial refund for consulting services",
-      qty: 100,
-      price: 50000,
-      subtotal: 50000,
-      total: 50000,
-      amountApplied: 0,
-      amountRemaining: 50000,
-    },
-    {
-      contact: 2,
-      number: "CN-00003",
-      date: "2026-02-12",
-      status: "draft" as const,
-      invoiceIdx: null,
-      description: "Discount for delayed delivery",
-      qty: 100,
-      price: 15000,
-      subtotal: 15000,
-      total: 15000,
-      amountApplied: 0,
-      amountRemaining: 15000,
-    },
-  ];
-
-  for (const cn of creditNoteData) {
-    const [row] = await db
-      .insert(creditNote)
-      .values({
-        organizationId: org.id,
-        contactId: contactIds[cn.contact],
-        invoiceId: cn.invoiceIdx !== null && invoiceIds[cn.invoiceIdx] ? invoiceIds[cn.invoiceIdx].id : undefined,
-        creditNoteNumber: cn.number,
-        issueDate: cn.date,
-        status: cn.status,
-        subtotal: cn.subtotal,
-        taxTotal: 0,
-        total: cn.total,
-        amountApplied: cn.amountApplied,
-        amountRemaining: cn.amountRemaining,
-        currencyCode: "USD",
-        createdBy: userId,
-        sentAt: cn.status !== "draft" ? new Date(cn.date) : undefined,
-      })
-      .returning();
-
-    await db.insert(creditNoteLine).values({
-      creditNoteId: row.id,
-      description: cn.description,
-      quantity: cn.qty,
-      unitPrice: cn.price,
-      amount: cn.subtotal,
-      accountId: accountMap.get("4010")!,
-      sortOrder: 0,
-    });
-  }
-  console.log(`  ${creditNoteData.length} credit notes`);
-  } // end credit notes
-
-  const billIds: { id: string; contactIdx: number; status: string; paid: number }[] = [];
-  const existingBills = await db.query.bill.findFirst({
-    where: eq(bill.organizationId, org.id),
-  });
-  if (existingBills) {
-    console.log("Bills already exist, skipping...");
-  } else {
-  // 10. Bills
-  console.log("Creating bills...");
-  const billData = [
-    { contact: 10, number: "BILL-00001", date: "2026-01-03", due: "2026-02-02", status: "paid" as const, desc: "Office Supplies Jan", amount: 15000, paid: 15000 },
-    { contact: 11, number: "BILL-00002", date: "2026-01-10", due: "2026-02-09", status: "paid" as const, desc: "AWS January", amount: 45000, paid: 45000 },
-    { contact: 12, number: "BILL-00003", date: "2026-01-01", due: "2026-01-02", status: "paid" as const, desc: "Rent January", amount: 350000, paid: 350000 },
-    { contact: 13, number: "BILL-00004", date: "2026-01-15", due: "2026-01-29", status: "paid" as const, desc: "Utilities January", amount: 22000, paid: 22000 },
-    { contact: 14, number: "BILL-00005", date: "2026-02-01", due: "2026-03-03", status: "received" as const, desc: "Insurance Q1", amount: 75000, paid: 0 },
-    { contact: 15, number: "BILL-00006", date: "2026-02-05", due: "2026-03-07", status: "received" as const, desc: "New Laptop", amount: 150000, paid: 0 },
-    { contact: 16, number: "BILL-00007", date: "2026-02-10", due: "2026-02-24", status: "overdue" as const, desc: "Marketing Campaign", amount: 75000, paid: 0 },
-    { contact: 17, number: "BILL-00008", date: "2026-02-15", due: "2026-03-17", status: "draft" as const, desc: "Legal Consultation", amount: 50000, paid: 0 },
-    { contact: 11, number: "BILL-00009", date: "2026-02-10", due: "2026-03-12", status: "received" as const, desc: "AWS February", amount: 48000, paid: 0 },
-    { contact: 12, number: "BILL-00010", date: "2026-02-01", due: "2026-02-02", status: "paid" as const, desc: "Rent February", amount: 350000, paid: 350000 },
-  ];
-
-  for (const b of billData) {
-    const [row] = await db
-      .insert(bill)
-      .values({
-        organizationId: org.id,
-        contactId: contactIds[b.contact],
-        billNumber: b.number,
-        issueDate: b.date,
-        dueDate: b.due,
-        status: b.status,
-        subtotal: b.amount,
-        taxTotal: 0,
-        total: b.amount,
-        amountPaid: b.paid,
-        amountDue: b.amount - b.paid,
-        currencyCode: "USD",
-      })
-      .returning();
-
-    await db.insert(billLine).values({
-      billId: row.id,
-      description: b.desc,
-      quantity: 100,
-      unitPrice: b.amount,
-      amount: b.amount,
-      accountId: accountMap.get("5000")!,
-      sortOrder: 0,
-    });
-    billIds.push({ id: row.id, contactIdx: b.contact, status: b.status, paid: b.paid });
-  }
-  console.log(`  ${billData.length} bills`);
-  } // end bills block
-
-  // 11. Bank Accounts + Transactions
-  const existingBankAccounts = await db.query.bankAccount.findFirst({
-    where: eq(bankAccount.organizationId, org.id),
-  });
-  if (existingBankAccounts) {
-    console.log("Bank accounts already exist, skipping...");
-  } else {
-  console.log("Creating bank accounts...");
-  const [checkingBank] = await db
-    .insert(bankAccount)
-    .values({
-      organizationId: org.id,
-      accountName: "Business Checking",
-      accountNumber: "****4567",
-      bankName: "First National Bank",
-      currencyCode: "USD",
-      chartAccountId: accountMap.get("1100")!,
-      balance: 5000000,
-    })
-    .returning();
-
-  await db
-    .insert(bankAccount)
-    .values({
-      organizationId: org.id,
-      accountName: "Business Savings",
-      accountNumber: "****8901",
-      bankName: "First National Bank",
-      currencyCode: "USD",
-      chartAccountId: accountMap.get("1110")!,
-      balance: 2500000,
-    });
-
-  await db
-    .insert(bankAccount)
-    .values({
-      organizationId: org.id,
-      accountName: "Business Credit Card",
-      accountNumber: "****2345",
-      bankName: "Capital One",
-      currencyCode: "USD",
-      chartAccountId: accountMap.get("2600")!,
-      balance: -125000,
-    });
-
-  // Bank transactions for checking account
-  const bankTxns = [
-    { date: "2026-01-02", desc: "Opening deposit", amount: 5000000, ref: "DEP001" },
-    { date: "2026-01-05", desc: "Rent payment", amount: -350000, ref: "CHK001" },
-    { date: "2026-01-10", desc: "Client payment - Acme Corp", amount: 1500000, ref: "DEP002" },
-    { date: "2026-01-12", desc: "Internet bill", amount: -9900, ref: "ACH001" },
-    { date: "2026-01-15", desc: "Office supplies", amount: -15000, ref: "CHK002" },
-    { date: "2026-01-20", desc: "AWS hosting", amount: -45000, ref: "ACH002" },
-    { date: "2026-01-25", desc: "Client payment - Global Industries", amount: 2000000, ref: "DEP003" },
-    { date: "2026-01-31", desc: "Payroll", amount: -1200000, ref: "ACH003" },
-    { date: "2026-02-01", desc: "Transfer to savings", amount: -500000, ref: "TRF001" },
-    { date: "2026-02-05", desc: "Rent payment", amount: -350000, ref: "CHK003" },
-    { date: "2026-02-10", desc: "Insurance", amount: -25000, ref: "ACH004" },
-    { date: "2026-02-12", desc: "Client payment", amount: 800000, ref: "DEP004" },
-    { date: "2026-02-15", desc: "Marketing agency", amount: -75000, ref: "CHK004" },
-    { date: "2026-02-18", desc: "Client payment", amount: 500000, ref: "DEP005" },
-    { date: "2026-02-20", desc: "Legal fees", amount: -50000, ref: "CHK005" },
-    { date: "2026-02-25", desc: "Subscription payment", amount: -2900, ref: "ACH005" },
-    { date: "2026-02-28", desc: "Payroll", amount: -1200000, ref: "ACH006" },
-  ];
-
-  let runBal = 0;
-  for (const tx of bankTxns) {
-    runBal += tx.amount;
-    await db.insert(bankTransaction).values({
-      bankAccountId: checkingBank.id,
-      date: tx.date,
-      description: tx.desc,
-      amount: tx.amount,
-      balance: runBal,
-      reference: tx.ref,
-      status: tx.amount > 0 ? "reconciled" : "unreconciled",
-    });
-  }
-  console.log(`  3 bank accounts, ${bankTxns.length} transactions`);
-
-  // 11b. Payments (received for paid invoices, made for paid bills)
-  console.log("Creating payments...");
-  let payNum = 1;
-
-  // Received payments for paid/partial invoices
-  for (const inv of invoiceIds.filter((i) => i.paid > 0)) {
-    const [p] = await db
-      .insert(payment)
-      .values({
-        organizationId: org.id,
-        contactId: contactIds[inv.contactIdx],
-        paymentNumber: `PAY-R${String(payNum++).padStart(4, "0")}`,
-        type: "received",
-        date: "2026-01-25",
-        amount: inv.paid,
-        method: payNum % 2 === 0 ? "bank_transfer" : "card",
-        reference: `REF-${payNum}`,
-        bankAccountId: checkingBank.id,
-        currencyCode: "USD",
-        createdBy: userId,
-      })
-      .returning();
-
-    await db.insert(paymentAllocation).values({
-      paymentId: p.id,
-      documentType: "invoice",
-      documentId: inv.id,
-      amount: inv.paid,
-    });
-  }
-
-  // Made payments for paid bills
-  for (const b of billIds.filter((b) => b.paid > 0)) {
-    const [p] = await db
-      .insert(payment)
-      .values({
-        organizationId: org.id,
-        contactId: contactIds[b.contactIdx],
-        paymentNumber: `PAY-M${String(payNum++).padStart(4, "0")}`,
-        type: "made",
-        date: "2026-02-01",
-        amount: b.paid,
-        method: "bank_transfer",
-        reference: `CHK-${payNum}`,
-        bankAccountId: checkingBank.id,
-        currencyCode: "USD",
-        createdBy: userId,
-      })
-      .returning();
-
-    await db.insert(paymentAllocation).values({
-      paymentId: p.id,
-      documentType: "bill",
-      documentId: b.id,
-      amount: b.paid,
-    });
-  }
-  console.log(`  ${payNum - 1} payments`);
-
-  // 11c. Recurring Templates
-  console.log("Creating recurring templates...");
-  const recurringData = [
-    { name: "Monthly Retainer - Metro Services", type: "invoice", contactIdx: 4, freq: "monthly" as const, desc: "Monthly Retainer", price: 300000 },
-    { name: "Quarterly Consulting - Pinnacle", type: "invoice", contactIdx: 5, freq: "quarterly" as const, desc: "Quarterly Consulting", price: 600000 },
-    { name: "Monthly Rent", type: "bill", contactIdx: 12, freq: "monthly" as const, desc: "Office Rent", price: 350000 },
-    { name: "Monthly AWS", type: "bill", contactIdx: 11, freq: "monthly" as const, desc: "Cloud Hosting", price: 48000 },
-  ];
-
-  for (const rt of recurringData) {
-    const [tmpl] = await db
-      .insert(recurringTemplate)
-      .values({
-        organizationId: org.id,
-        name: rt.name,
-        type: rt.type,
-        contactId: contactIds[rt.contactIdx],
-        frequency: rt.freq,
-        startDate: "2026-01-01",
-        nextRunDate: "2026-03-01",
-        lastRunDate: "2026-02-01",
-        occurrencesGenerated: 2,
-        status: "active",
-        currencyCode: "USD",
-        createdBy: userId,
-      })
-      .returning();
-
-    await db.insert(recurringTemplateLine).values({
-      templateId: tmpl.id,
-      description: rt.desc,
-      quantity: 100,
-      unitPrice: rt.price,
-      accountId: accountMap.get(rt.type === "invoice" ? "4010" : "5200")!,
-      sortOrder: 0,
-    });
-  }
-  console.log(`  ${recurringData.length} recurring templates`);
-  } // end bank accounts block
-
-  // 12. Budget
-  const existingBudget = await db.query.budget.findFirst({
-    where: eq(budget.organizationId, org.id),
-  });
-  if (existingBudget) {
-    console.log("Budget already exists, skipping...");
-  } else {
-  console.log("Creating budget...");
-  const [bud] = await db
-    .insert(budget)
-    .values({
-      organizationId: org.id,
-      name: "FY 2026 Operating Budget",
-      fiscalYearId: fy.id,
-      startDate: "2026-01-01",
-      endDate: "2026-12-31",
-    })
-    .returning();
-
-  const budgetAccounts = [
-    { code: "4010", monthly: 500000 },  // $5,000/mo revenue
-    { code: "5100", monthly: 1200000 }, // $12,000/mo wages
-    { code: "5200", monthly: 350000 },  // $3,500/mo rent
-    { code: "5220", monthly: 10000 },   // $100/mo internet
-    { code: "5300", monthly: 15000 },   // $150/mo supplies
-    { code: "5400", monthly: 25000 },   // $250/mo insurance
-    { code: "5600", monthly: 50000 },   // $500/mo marketing
-  ];
-
-  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  for (const ba of budgetAccounts) {
-    const [bl] = await db.insert(budgetLine).values({
-      budgetId: bud.id,
-      accountId: accountMap.get(ba.code)!,
-      total: ba.monthly * 12,
-    }).returning();
-
-    await db.insert(budgetPeriod).values(
-      monthLabels.map((label, i) => ({
-        budgetLineId: bl.id,
-        label: `${label} 2026`,
-        startDate: `2026-${String(i + 1).padStart(2, "0")}-01`,
-        endDate: `2026-${String(i + 1).padStart(2, "0")}-${new Date(2026, i + 1, 0).getDate()}`,
-        amount: ba.monthly,
-        sortOrder: i,
-      }))
     );
+    C[c.key] = created.id;
+    TERMS[c.key] = c.terms;
   }
-  console.log(`  1 budget with ${budgetAccounts.length} line items`);
-  } // end budget block
-
-  // 13. Projects + Time Entries + Tasks + Milestones + Notes
-  const existingProjects = await db.query.project.findFirst({
-    where: eq(project.organizationId, org.id),
-  });
-  if (existingProjects) {
-    console.log("Projects already exist, skipping...");
-  } else {
-  console.log("Creating projects...");
-
-  // Get member ID for task assignees
-  const demoMember = await db.query.member.findFirst({
-    where: eq(member.organizationId, org.id),
-  });
-  const memberId = demoMember!.id;
-
-  const projectData = [
-    { name: "Website Redesign", contactIdx: 0, budget: 2000000, rate: 15000, status: "active" as const },
-    { name: "Mobile App MVP", contactIdx: 2, budget: 5000000, rate: 17500, status: "active" as const },
-    { name: "API Integration", contactIdx: 8, budget: 800000, rate: 12500, status: "completed" as const },
-  ];
-
-  const projectIds: string[] = [];
-
-  for (const p of projectData) {
-    const [proj] = await db
-      .insert(project)
-      .values({
-        organizationId: org.id,
-        name: p.name,
-        contactId: contactIds[p.contactIdx],
-        budget: p.budget,
-        hourlyRate: p.rate,
-        status: p.status,
-        startDate: "2026-01-01",
+  for (const s of SUPPLIERS) {
+    const created = ent(
+      await post("contacts", {
+        name: s.name,
+        email: s.email,
+        type: "supplier",
+        paymentTermsDays: s.terms,
+        currencyCode: "USD",
+        addresses: { billing: { city: s.city, state: s.state, country: "US" } },
       })
-      .returning();
-
-    projectIds.push(proj.id);
-
-    // Add some time entries
-    const entries = [
-      { date: "2026-01-15", desc: "Initial setup and planning", mins: 120 },
-      { date: "2026-01-20", desc: "Development work", mins: 480 },
-      { date: "2026-01-25", desc: "Code review and testing", mins: 180 },
-      { date: "2026-02-01", desc: "Feature implementation", mins: 360 },
-      { date: "2026-02-10", desc: "Bug fixes and polish", mins: 240 },
-    ];
-
-    for (const te of entries) {
-      await db.insert(timeEntry).values({
-        projectId: proj.id,
-        userId: userId,
-        date: te.date,
-        description: te.desc,
-        minutes: te.mins,
-        isBillable: true,
-        hourlyRate: p.rate,
-      });
-    }
+    );
+    C[s.key] = created.id;
+    TERMS[s.key] = s.terms;
   }
-  console.log(`  ${projectData.length} projects with time entries`);
-
-  // 13a. Project Labels
-  console.log("Creating project labels...");
-  const labelColors: Record<string, string> = {
-    bug: "#ef4444", feature: "#3b82f6", design: "#8b5cf6", backend: "#10b981",
-    frontend: "#f59e0b", urgent: "#dc2626", documentation: "#6366f1", performance: "#06b6d4",
-  };
-
-  for (const projId of projectIds) {
-    for (const [name, color] of Object.entries(labelColors)) {
-      await db.insert(projectLabel).values({ projectId: projId, name, color });
-    }
+  await patch("contacts/[id]", { creditLimit: 5000000, defaultRevenueAccountId: acct("4010") }, { id: C.acme });
+  await patch("contacts/[id]", { creditLimit: 500000 }, { id: C.bright });
+  await patch("contacts/[id]", { isTaxExempt: true, notes: "Out-of-state customer: no Texas sales tax." }, { id: C.cloudbase });
+  await patch("contacts/[id]", { defaultExpenseAccountId: acct("5230") }, { id: C.aws });
+  await patch("contacts/[id]", { defaultExpenseAccountId: acct("5200") }, { id: C.landlord });
+  for (const k of ["jane", "consultco"]) {
+    await patch("contacts/[id]", { is1099Vendor: true }, { id: C[k] });
   }
-
-  // 13b. Project Milestones
-  console.log("Creating project milestones...");
-  const milestonesPerProject: { title: string; description: string; status: "upcoming" | "in_progress" | "completed" | "overdue"; dueDate: string; amount: number; completedAt?: Date }[][] = [
-    // Website Redesign
-    [
-      { title: "Design Approval", description: "Finalize wireframes and visual design with stakeholder sign-off", status: "completed", dueDate: "2026-01-20", amount: 50000, completedAt: new Date("2026-01-18") },
-      { title: "Frontend Build", description: "Implement responsive pages from approved designs", status: "in_progress", dueDate: "2026-03-15", amount: 80000 },
-      { title: "Content Migration", description: "Migrate all existing content to new templates", status: "upcoming", dueDate: "2026-04-01", amount: 30000 },
-      { title: "Launch", description: "Go live with new website and redirect old URLs", status: "upcoming", dueDate: "2026-04-15", amount: 40000 },
-    ],
-    // Mobile App MVP
-    [
-      { title: "Architecture Review", description: "Define tech stack, API contracts, and data models", status: "completed", dueDate: "2026-01-15", amount: 75000, completedAt: new Date("2026-01-14") },
-      { title: "Core Features", description: "Authentication, dashboard, and primary user flows", status: "in_progress", dueDate: "2026-03-01", amount: 150000 },
-      { title: "Beta Release", description: "Internal beta with TestFlight / Play Store internal track", status: "upcoming", dueDate: "2026-04-15", amount: 100000 },
-      { title: "App Store Submission", description: "Submit to Apple and Google for review", status: "upcoming", dueDate: "2026-05-01", amount: 175000 },
-    ],
-    // API Integration
-    [
-      { title: "API Specification", description: "OpenAPI spec and endpoint documentation", status: "completed", dueDate: "2026-01-10", amount: 20000, completedAt: new Date("2026-01-09") },
-      { title: "Implementation", description: "Build all integration endpoints with error handling", status: "completed", dueDate: "2026-02-01", amount: 40000, completedAt: new Date("2026-01-30") },
-      { title: "Testing & QA", description: "End-to-end integration tests and load testing", status: "completed", dueDate: "2026-02-15", amount: 20000, completedAt: new Date("2026-02-14") },
-    ],
+  // W-9 details have no REST route (the MCP tools set them directly).
+  await db.update(contact).set({ w9TaxClassification: "individual", taxIdentifier: "XXX-XX-4821" }).where(eq(contact.id, C.jane));
+  await db.update(contact).set({ w9TaxClassification: "llc", taxIdentifier: "75-3344556" }).where(eq(contact.id, C.consultco));
+  const people: [string, any][] = [
+    ["acme", { name: "Sarah Chen", email: "sarah.chen@acme.com", phone: "+1 512 555 0102", jobTitle: "Accounts Payable Lead", isPrimary: true }],
+    ["acme", { name: "Tom Becker", email: "tom.becker@acme.com", jobTitle: "VP Engineering" }],
+    ["sterling", { name: "Priya Patel", email: "priya@sterling.com", jobTitle: "Finance Director", isPrimary: true }],
+    ["techstart", { name: "Leo Martins", email: "leo@techstart.io", jobTitle: "CTO", isPrimary: true }],
+    ["nordlicht", { name: "Jonas Weber", email: "j.weber@nordlicht.de", jobTitle: "Leiter Buchhaltung", isPrimary: true }],
   ];
+  for (const [k, p] of people) await post("contacts/[id]/people", p, { id: C[k] });
 
-  for (let i = 0; i < projectIds.length; i++) {
-    for (let j = 0; j < milestonesPerProject[i].length; j++) {
-      const m = milestonesPerProject[i][j];
-      await db.insert(projectMilestone).values({
-        projectId: projectIds[i],
-        title: m.title,
-        description: m.description,
-        status: m.status,
-        dueDate: m.dueDate,
-        amount: m.amount,
-        completedAt: m.completedAt,
-        sortOrder: j,
-      });
-    }
-  }
-
-  // 13c. Project Tasks
-  console.log("Creating project tasks...");
-  type TaskSeed = { title: string; description: string; status: "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled"; priority: "low" | "medium" | "high" | "urgent"; dueDate?: string; estimatedMinutes?: number; labels?: string[]; completedAt?: Date; checklist?: { title: string; done: boolean }[]; comments?: string[] };
-
-  const tasksPerProject: TaskSeed[][] = [
-    // Website Redesign
-    [
-      { title: "Create sitemap", description: "Map out all pages and navigation hierarchy", status: "done", priority: "high", dueDate: "2026-01-12", estimatedMinutes: 120, labels: ["design"], completedAt: new Date("2026-01-11"),
-        checklist: [{ title: "List all current pages", done: true }, { title: "Define new IA structure", done: true }, { title: "Get stakeholder approval", done: true }],
-        comments: ["Mapped 42 pages from the old site", "Consolidated 12 redundant pages into 6"] },
-      { title: "Design homepage mockup", description: "High-fidelity homepage design in Figma", status: "done", priority: "high", dueDate: "2026-01-18", estimatedMinutes: 480, labels: ["design", "frontend"], completedAt: new Date("2026-01-17"),
-        comments: ["Client approved v3 of the design", "Hero section uses the new brand gradient"] },
-      { title: "Implement responsive nav", description: "Build hamburger menu for mobile and sticky header for desktop", status: "done", priority: "high", dueDate: "2026-02-01", estimatedMinutes: 240, labels: ["frontend"], completedAt: new Date("2026-01-31") },
-      { title: "Build contact page", description: "Contact form with validation and Google Maps embed", status: "in_progress", priority: "medium", dueDate: "2026-03-05", estimatedMinutes: 180, labels: ["frontend", "backend"],
-        checklist: [{ title: "Form layout", done: true }, { title: "Validation logic", done: true }, { title: "Email integration", done: false }, { title: "Map embed", done: false }] },
-      { title: "Set up CMS", description: "Configure headless CMS for blog and dynamic pages", status: "in_progress", priority: "high", dueDate: "2026-03-10", estimatedMinutes: 360, labels: ["backend"],
-        comments: ["Going with Sanity for the CMS"] },
-      { title: "SEO optimization", description: "Meta tags, structured data, sitemap.xml, robots.txt", status: "todo", priority: "medium", dueDate: "2026-03-20", estimatedMinutes: 240, labels: ["frontend", "performance"] },
-      { title: "Performance audit", description: "Lighthouse scores, image optimization, lazy loading", status: "todo", priority: "medium", dueDate: "2026-03-25", estimatedMinutes: 180, labels: ["performance"] },
-      { title: "Accessibility review", description: "WCAG 2.1 AA compliance check and fixes", status: "backlog", priority: "low", estimatedMinutes: 300, labels: ["frontend"] },
-      { title: "Analytics setup", description: "Google Analytics 4 + event tracking for key conversions", status: "backlog", priority: "low", labels: ["backend"] },
-      { title: "Dark mode support", description: "Add theme toggle with system preference detection", status: "cancelled", priority: "low", labels: ["design", "frontend"],
-        comments: ["Client decided to skip dark mode for v1"] },
-    ],
-    // Mobile App MVP
-    [
-      { title: "Set up React Native project", description: "Init project with Expo, configure TypeScript, ESLint, Prettier", status: "done", priority: "urgent", dueDate: "2026-01-10", estimatedMinutes: 120, labels: ["frontend"], completedAt: new Date("2026-01-09") },
-      { title: "Design system components", description: "Button, Input, Card, Modal, Toast - reusable component library", status: "done", priority: "high", dueDate: "2026-01-20", estimatedMinutes: 600, labels: ["design", "frontend"], completedAt: new Date("2026-01-19"),
-        checklist: [{ title: "Button variants", done: true }, { title: "Input fields", done: true }, { title: "Card component", done: true }, { title: "Modal/Dialog", done: true }, { title: "Toast notifications", done: true }] },
-      { title: "Authentication flow", description: "Sign up, login, forgot password, biometric auth", status: "done", priority: "urgent", dueDate: "2026-01-25", estimatedMinutes: 480, labels: ["frontend", "backend"], completedAt: new Date("2026-01-24"),
-        comments: ["Using Clerk for auth", "Added Face ID support on iOS"] },
-      { title: "Dashboard screen", description: "Main dashboard with summary cards, recent activity, and quick actions", status: "in_progress", priority: "high", dueDate: "2026-02-28", estimatedMinutes: 360, labels: ["frontend"],
-        checklist: [{ title: "Summary cards", done: true }, { title: "Recent activity list", done: true }, { title: "Quick action buttons", done: false }, { title: "Pull to refresh", done: false }] },
-      { title: "Push notifications", description: "Firebase Cloud Messaging setup for iOS and Android", status: "in_progress", priority: "high", dueDate: "2026-03-05", estimatedMinutes: 300, labels: ["backend"],
-        comments: ["FCM token registration working", "Need to handle notification permissions on iOS"] },
-      { title: "Offline mode", description: "Local SQLite cache for offline data access with sync", status: "todo", priority: "medium", dueDate: "2026-03-15", estimatedMinutes: 480, labels: ["frontend", "backend"] },
-      { title: "Payment integration", description: "Stripe SDK for in-app payments and subscriptions", status: "todo", priority: "high", dueDate: "2026-03-20", estimatedMinutes: 420, labels: ["backend"] },
-      { title: "App icon and splash screen", description: "Design app icon for all sizes, animated splash screen", status: "todo", priority: "medium", dueDate: "2026-03-10", estimatedMinutes: 120, labels: ["design"] },
-      { title: "End-to-end tests", description: "Detox tests for critical user flows", status: "backlog", priority: "medium", estimatedMinutes: 600, labels: ["frontend"] },
-      { title: "Crash reporting", description: "Sentry integration for crash and error tracking", status: "backlog", priority: "high", labels: ["backend", "performance"] },
-      { title: "Localization", description: "i18n setup with English and Spanish translations", status: "backlog", priority: "low", labels: ["frontend"] },
-      { title: "Deep linking", description: "Universal links for iOS, App Links for Android", status: "backlog", priority: "low", labels: ["frontend", "backend"] },
-    ],
-    // API Integration
-    [
-      { title: "Define API contracts", description: "OpenAPI 3.0 specification for all endpoints", status: "done", priority: "urgent", dueDate: "2026-01-08", estimatedMinutes: 180, labels: ["documentation", "backend"], completedAt: new Date("2026-01-07"),
-        comments: ["Spec reviewed and approved by partner team"] },
-      { title: "Auth middleware", description: "OAuth 2.0 client credentials flow with token caching", status: "done", priority: "urgent", dueDate: "2026-01-12", estimatedMinutes: 240, labels: ["backend"], completedAt: new Date("2026-01-11") },
-      { title: "Data sync endpoints", description: "Build CRUD endpoints for contacts, products, and orders sync", status: "done", priority: "high", dueDate: "2026-01-25", estimatedMinutes: 600, labels: ["backend"], completedAt: new Date("2026-01-24"),
-        checklist: [{ title: "Contacts sync", done: true }, { title: "Products sync", done: true }, { title: "Orders sync", done: true }, { title: "Webhook handlers", done: true }] },
-      { title: "Rate limiting", description: "Implement rate limiter respecting partner API limits (100 req/min)", status: "done", priority: "high", dueDate: "2026-01-28", estimatedMinutes: 120, labels: ["backend", "performance"], completedAt: new Date("2026-01-27") },
-      { title: "Error handling & retries", description: "Exponential backoff retry logic with dead letter queue", status: "done", priority: "high", dueDate: "2026-02-05", estimatedMinutes: 180, labels: ["backend"], completedAt: new Date("2026-02-04"),
-        comments: ["Using 3 retries with 1s, 5s, 30s backoff"] },
-      { title: "Integration tests", description: "Test suite against partner sandbox environment", status: "done", priority: "high", dueDate: "2026-02-10", estimatedMinutes: 360, labels: ["backend"], completedAt: new Date("2026-02-09") },
-      { title: "Load testing", description: "K6 load tests simulating 1000 concurrent syncs", status: "done", priority: "medium", dueDate: "2026-02-14", estimatedMinutes: 180, labels: ["performance"], completedAt: new Date("2026-02-13"),
-        comments: ["Handled 1200 concurrent with p99 < 200ms"] },
-      { title: "Monitoring dashboard", description: "Grafana dashboard for sync health, errors, and latency", status: "done", priority: "medium", dueDate: "2026-02-15", estimatedMinutes: 120, labels: ["backend"], completedAt: new Date("2026-02-14") },
-    ],
-  ];
-
-  for (let i = 0; i < projectIds.length; i++) {
-    for (let j = 0; j < tasksPerProject[i].length; j++) {
-      const t = tasksPerProject[i][j];
-      const [task] = await db.insert(projectTask).values({
-        projectId: projectIds[i],
-        title: t.title,
-        description: t.description,
-        status: t.status,
-        priority: t.priority,
-        assigneeId: memberId,
-        createdById: userId,
-        dueDate: t.dueDate,
-        estimatedMinutes: t.estimatedMinutes,
-        labels: t.labels ?? [],
-        sortOrder: j,
-        completedAt: t.completedAt,
-      }).returning();
-
-      // Checklist items
-      if (t.checklist) {
-        for (let k = 0; k < t.checklist.length; k++) {
-          await db.insert(taskChecklist).values({
-            taskId: task.id,
-            title: t.checklist[k].title,
-            isCompleted: t.checklist[k].done,
-            sortOrder: k,
-          });
-        }
-      }
-
-      // Comments
-      if (t.comments) {
-        for (const content of t.comments) {
-          await db.insert(taskComment).values({
-            taskId: task.id,
-            authorId: userId,
-            content,
-          });
-        }
-      }
-    }
-  }
-
-  // 13d. Project Notes
-  console.log("Creating project notes...");
-  const notesPerProject: { content: string; isPinned: boolean }[][] = [
-    // Website Redesign
-    [
-      { content: "Client prefers clean, minimal design. Reference sites: stripe.com, linear.app. No heavy animations - focus on content readability and fast loading.", isPinned: true },
-      { content: "Brand colors updated: primary #2563eb, secondary #7c3aed. New logo files in shared drive under /brand/2026/.", isPinned: true },
-      { content: "Meeting notes (Jan 15): Agreed on 4-page initial scope - Home, About, Services, Contact. Blog to follow in phase 2.", isPinned: false },
-      { content: "Hosting decision: Vercel for frontend, existing AWS for API. Domain transfer scheduled for March.", isPinned: false },
-      { content: "Image assets: Using Unsplash for stock photos initially. Client will provide custom photography by mid-March.", isPinned: false },
-    ],
-    // Mobile App MVP
-    [
-      { content: "Target platforms: iOS 16+ and Android 13+. Using Expo SDK 50 with custom dev client for native modules.", isPinned: true },
-      { content: "Design tokens synced from Figma via Style Dictionary. Run `pnpm generate:tokens` after design updates.", isPinned: true },
-      { content: "API base URL: staging at api-staging.example.com, prod TBD. Auth tokens expire after 24h.", isPinned: false },
-      { content: "Beta testers list: 15 internal, 30 external. TestFlight invites go out March 20th.", isPinned: false },
-      { content: "Performance budget: app launch < 2s, screen transitions < 300ms, API calls < 500ms p95.", isPinned: true },
-      { content: "App Store requirements checklist: privacy policy page, 6.5\" and 12.9\" screenshots, app preview video (optional for v1).", isPinned: false },
-    ],
-    // API Integration
-    [
-      { content: "Partner API docs: https://partner.example.com/docs (login: shared in 1Password). Rate limit: 100 req/min per client.", isPinned: true },
-      { content: "Sandbox credentials rotated monthly. Current ones expire March 1st - set calendar reminder.", isPinned: true },
-      { content: "Data mapping: partner uses 'customer' we use 'contact', partner 'item' = our 'product'. Field mapping spreadsheet in /docs/mapping.xlsx.", isPinned: false },
-      { content: "Post-launch monitoring: alert if sync failure rate > 2% in 5min window. PagerDuty integration configured.", isPinned: false },
-    ],
-  ];
-
-  for (let i = 0; i < projectIds.length; i++) {
-    for (const note of notesPerProject[i]) {
-      await db.insert(projectNote).values({
-        projectId: projectIds[i],
-        authorId: userId,
-        content: note.content,
-        isPinned: note.isPinned,
-      });
-    }
-  }
-  console.log("  Labels, milestones, tasks, and notes created");
-  } // end projects block
-
-  // 14. Fixed Assets
-  const existingAssets = await db.query.fixedAsset.findFirst({
-    where: eq(fixedAsset.organizationId, org.id),
-  });
-  if (existingAssets) {
-    console.log("Fixed assets already exist, skipping...");
-  } else {
-  console.log("Creating fixed assets...");
-  const assetData = [
-    { name: "MacBook Pro 16\"", number: "FA-001", date: "2026-01-15", price: 350000, life: 36, residual: 50000 },
-    { name: "Office Furniture Set", number: "FA-002", date: "2026-01-10", price: 250000, life: 60, residual: 25000 },
-  ];
-
-  for (const a of assetData) {
-    await db.insert(fixedAsset).values({
-      organizationId: org.id,
-      name: a.name,
-      assetNumber: a.number,
-      purchaseDate: a.date,
-      purchasePrice: a.price,
-      residualValue: a.residual,
-      usefulLifeMonths: a.life,
-      depreciationMethod: "straight_line",
-      netBookValue: a.price,
-      assetAccountId: accountMap.get("1620")!,
-      depreciationAccountId: accountMap.get("5500")!,
-      accumulatedDepAccountId: accountMap.get("1720")!,
-    });
-  }
-  console.log(`  ${assetData.length} fixed assets`);
-  } // end fixed assets block
-
-  // 15. Payroll Employees
-  const existingEmployees = await db.query.payrollEmployee.findFirst({
-    where: eq(payrollEmployee.organizationId, org.id),
-  });
-  if (existingEmployees) {
-    console.log("Payroll employees already exist, skipping...");
-  } else {
-  console.log("Creating payroll employees...");
-  const employees = [
-    { name: "Alice Johnson", email: "alice@demo.com", number: "EMP-001", position: "Senior Developer", salary: 12000000, freq: "monthly" as const },
-    { name: "Bob Smith", email: "bob@demo.com", number: "EMP-002", position: "Designer", salary: 9600000, freq: "monthly" as const },
-    { name: "Carol Williams", email: "carol@demo.com", number: "EMP-003", position: "Project Manager", salary: 10800000, freq: "monthly" as const },
-    { name: "David Brown", email: "david@demo.com", number: "EMP-004", position: "Junior Developer", salary: 7200000, freq: "biweekly" as const },
-  ];
-
-  for (const emp of employees) {
-    await db.insert(payrollEmployee).values({
-      organizationId: org.id,
-      name: emp.name,
-      email: emp.email,
-      employeeNumber: emp.number,
-      position: emp.position,
-      salary: emp.salary,
-      payFrequency: emp.freq,
-      taxRate: 2200, // 22%
-      startDate: "2026-01-01",
-    });
-  }
-  console.log(`  ${employees.length} employees`);
-  } // end payroll employees block
-
-  // 17. Expense Claims
-  const existingClaims = await db.query.expenseClaim.findFirst({
-    where: eq(expenseClaim.organizationId, org.id),
-  });
-  if (existingClaims) {
-    console.log("Expense claims already exist, skipping...");
-  } else {
-  console.log("Creating expense claims...");
-  const [claim1] = await db
-    .insert(expenseClaim)
-    .values({
-      organizationId: org.id,
-      title: "January Travel Expenses",
-      description: "Business trip to client site",
-      submittedBy: userId,
-      status: "approved",
-      totalAmount: 85000,
+  console.log("Bank accounts and opening balances...");
+  BANK.checking = ent(
+    await post("bank-accounts", {
+      accountName: "Business Checking",
+      accountNumber: "****4521",
+      bankName: "First National Bank",
       currencyCode: "USD",
-      submittedAt: new Date("2026-01-28"),
-      approvedAt: new Date("2026-01-30"),
-      approvedBy: userId,
+      countryCode: "US",
+      accountType: "checking",
+      color: "#0f766e",
+      chartAccountId: acct("1100"),
+      balance: 4825000,
     })
-    .returning();
-
-  await db.insert(expenseItem).values([
-    {
-      expenseClaimId: claim1.id,
-      date: "2026-01-20",
-      description: "Flight - Round trip",
-      amount: 45000,
-      category: "Travel",
-      accountId: accountMap.get("5800")!,
-      sortOrder: 0,
-    },
-    {
-      expenseClaimId: claim1.id,
-      date: "2026-01-21",
-      description: "Hotel - 2 nights",
-      amount: 30000,
-      category: "Accommodation",
-      accountId: accountMap.get("5800")!,
-      sortOrder: 1,
-    },
-    {
-      expenseClaimId: claim1.id,
-      date: "2026-01-21",
-      description: "Client dinner",
-      amount: 10000,
-      category: "Meals",
-      accountId: accountMap.get("5810")!,
-      sortOrder: 2,
-    },
-  ]);
-
-  const [claim2] = await db
-    .insert(expenseClaim)
-    .values({
-      organizationId: org.id,
-      title: "Software Subscriptions",
-      description: "Monthly tools and services",
-      submittedBy: userId,
-      status: "submitted",
-      totalAmount: 15900,
+  ).id;
+  BANK.savings = ent(
+    await post("bank-accounts", {
+      accountName: "Business Savings",
+      accountNumber: "****8832",
+      bankName: "First National Bank",
       currencyCode: "USD",
-      submittedAt: new Date("2026-02-15"),
+      countryCode: "US",
+      accountType: "savings",
+      color: "#1d4ed8",
+      chartAccountId: acct("1110"),
+      balance: 2500000,
     })
-    .returning();
+  ).id;
+  BANK.card = ent(
+    await post("bank-accounts", {
+      accountName: "Business Credit Card",
+      accountNumber: "****9910",
+      bankName: "Chase",
+      currencyCode: "USD",
+      countryCode: "US",
+      accountType: "credit_card",
+      color: "#b45309",
+      chartAccountId: acct("2600"),
+      balance: -125000,
+    })
+  ).id;
+  stmtBal.checking = 4825000;
+  stmtBal.savings = 2500000;
+  stmtBal.card = -125000;
 
-  await db.insert(expenseItem).values([
-    {
-      expenseClaimId: claim2.id,
-      date: "2026-02-01",
-      description: "GitHub Enterprise",
-      amount: 4900,
-      category: "Software",
-      accountId: accountMap.get("5220")!,
-      sortOrder: 0,
-    },
-    {
-      expenseClaimId: claim2.id,
-      date: "2026-02-01",
-      description: "Figma Pro",
-      amount: 4500,
-      category: "Software",
-      accountId: accountMap.get("5220")!,
-      sortOrder: 1,
-    },
-    {
-      expenseClaimId: claim2.id,
-      date: "2026-02-01",
-      description: "Slack Business+",
-      amount: 6500,
-      category: "Software",
-      accountId: accountMap.get("5220")!,
-      sortOrder: 2,
-    },
-  ]);
-  console.log("  2 expense claims");
-  } // end expense claims block
-
-  // 18. Inventory Items + Warehouses + Movements + Suppliers + Variants
-  const existingInventory = await db.query.inventoryItem.findFirst({
-    where: eq(inventoryItem.organizationId, org.id),
+  await post("opening-balances", {
+    date: OPENING_DATE,
+    balances: [
+      { accountId: acct("1100"), debitAmount: 4825000, creditAmount: 0 },
+      { accountId: acct("1110"), debitAmount: 2500000, creditAmount: 0 },
+      { accountId: acct("2600"), debitAmount: 0, creditAmount: 125000 },
+      { accountId: acct("3000"), debitAmount: 0, creditAmount: 5000000 },
+      { accountId: acct("3100"), debitAmount: 0, creditAmount: 2200000 },
+    ],
   });
 
-  if (!existingInventory) {
-  console.log("Creating inventory...");
+  console.log("Cost centers, tags, teams, roles...");
+  for (const [key, code, name, parent] of [
+    ["eng", "ENG", "Engineering", null],
+    ["infra", "ENG-INFRA", "Engineering - Infrastructure", "eng"],
+    ["sales", "SALES", "Sales & Marketing", null],
+    ["ops", "OPS", "Operations", null],
+  ] as const) {
+    CC[key] = ent(await post("cost-centers", { code, name, parentId: parent ? CC[parent] : null })).id;
+  }
+  for (const [name, color, description] of [
+    ["VIP", "#7c3aed", "Key accounts"],
+    ["Hardware", "#0891b2", "Hardware resale"],
+    ["Recurring", "#16a34a", "Recurring revenue"],
+    ["Follow up", "#dc2626", "Needs a call"],
+  ]) {
+    await post("tags", { name, color, description });
+  }
+  for (const [name, description, color] of [
+    ["Engineering", "Product and client engineering", "#2563eb"],
+    ["Design", "Product and UX design", "#db2777"],
+    ["Sales", "Sales and account management", "#16a34a"],
+  ]) {
+    const team = ent(await post("teams", { name, description, color }));
+    // The demo user leads engineering and helps with sales.
+    if (name !== "Design") await post("teams/[id]/members", { memberId }, { id: team.id });
+  }
+  await post("roles", {
+    name: "Bookkeeper",
+    description: "Day-to-day bookkeeping: entries, banking, invoices and bills",
+    permissions: ["create:entries", "edit:entries", "manage:contacts", "manage:invoices", "manage:bills", "manage:banking", "manage:payments"],
+  });
+  await post("roles", {
+    name: "Sales Rep",
+    description: "Contacts, quotes and invoices",
+    permissions: ["manage:contacts", "manage:invoices"],
+  });
 
-  // Warehouses
-  const [mainWarehouse] = await db.insert(warehouse).values({
-    organizationId: org.id,
-    name: "Main Warehouse",
-    code: "WH-MAIN",
-    address: "123 Industrial Blvd, Suite 100",
-    isDefault: true,
-    isActive: true,
-  }).returning();
-
-  const [eastWarehouse] = await db.insert(warehouse).values({
-    organizationId: org.id,
-    name: "East Distribution Center",
-    code: "WH-EAST",
-    address: "456 Logistics Way, Building B",
-    isDefault: false,
-    isActive: true,
-  }).returning();
-
-  console.log("  2 warehouses");
-
-  // Inventory items with categories
+  console.log("Warehouses and inventory...");
+  W.main = ent(await post("warehouses", { name: "Main Warehouse", code: "MAIN", address: "500 Congress Ave, Austin, TX 78701", isDefault: true })).id;
+  W.east = ent(await post("warehouses", { name: "East Distribution Center", code: "EAST", address: "9800 E Parmer Ln, Manor, TX 78653" })).id;
+  const cats: Record<string, string> = {};
+  for (const [name, color, description] of [
+    ["Displays", "#2563eb", "Monitors and stands"],
+    ["Peripherals", "#16a34a", "Keyboards, mice and docks"],
+    ["Cables", "#64748b", "Cables and adapters"],
+    ["Kits", "#9333ea", "Assembled bundles"],
+  ]) {
+    cats[name] = ent(await post("inventory/categories", { name, color, description })).id;
+  }
   const items = [
-    { code: "ELEC-001", name: "Wireless Mouse", sku: "WM-100", category: "Electronics", purchase: 1200, sale: 2499, qty: 150, reorder: 25 },
-    { code: "ELEC-002", name: "USB-C Hub 7-Port", sku: "UH-200", category: "Electronics", purchase: 2800, sale: 5499, qty: 75, reorder: 15 },
-    { code: "ELEC-003", name: "Bluetooth Keyboard", sku: "BK-300", category: "Electronics", purchase: 3500, sale: 6999, qty: 42, reorder: 10 },
-    { code: "ELEC-004", name: "Webcam HD 1080p", sku: "WC-400", category: "Electronics", purchase: 4500, sale: 8999, qty: 28, reorder: 10 },
-    { code: "FURN-001", name: "Desk Organizer Set", sku: "DO-100", category: "Furniture", purchase: 1800, sale: 3499, qty: 60, reorder: 15 },
-    { code: "FURN-002", name: "Monitor Stand", sku: "MS-200", category: "Furniture", purchase: 2200, sale: 4499, qty: 35, reorder: 10 },
-    { code: "FURN-003", name: "Ergonomic Footrest", sku: "EF-300", category: "Furniture", purchase: 3200, sale: 5999, qty: 18, reorder: 8 },
-    { code: "SUPP-001", name: "Printer Paper A4 (500 sheets)", sku: "PP-100", category: "Supplies", purchase: 450, sale: 899, qty: 300, reorder: 50 },
-    { code: "SUPP-002", name: "Ink Cartridge Black", sku: "IC-200", category: "Supplies", purchase: 2000, sale: 3999, qty: 45, reorder: 20 },
-    { code: "SUPP-003", name: "Sticky Notes (12-Pack)", sku: "SN-300", category: "Supplies", purchase: 350, sale: 799, qty: 120, reorder: 30 },
-    { code: "TOOL-001", name: "Precision Screwdriver Kit", sku: "SK-100", category: "Tools", purchase: 1500, sale: 2999, qty: 55, reorder: 10 },
-    { code: "TOOL-002", name: "Cable Tester Pro", sku: "CT-200", category: "Tools", purchase: 6500, sale: 12999, qty: 12, reorder: 5 },
-    { code: "PKG-001", name: "Shipping Box (Medium)", sku: "SB-100", category: "Packaging", purchase: 150, sale: 349, qty: 500, reorder: 100 },
-    { code: "PKG-002", name: "Bubble Wrap Roll (50m)", sku: "BW-200", category: "Packaging", purchase: 800, sale: 1599, qty: 25, reorder: 10 },
-    { code: "ELEC-005", name: "Noise Cancelling Headphones", sku: "NH-500", category: "Electronics", purchase: 12000, sale: 24999, qty: 5, reorder: 8, inactive: true },
+    { code: "MON-27", name: "27in 4K Monitor", sku: "MON-27-4K", cat: "Displays", cost: 28000, sale: 42000, reorder: 5 },
+    { code: "STAND-01", name: "Monitor Stand", sku: "STD-ALU-01", cat: "Displays", cost: 3500, sale: 6500, reorder: 5 },
+    { code: "KB-01", name: "Wireless Keyboard", sku: "KB-WL-01", cat: "Peripherals", cost: 4500, sale: 7900, reorder: 10 },
+    { code: "MS-01", name: "Wireless Mouse", sku: "MS-WL-01", cat: "Peripherals", cost: 2200, sale: 3900, reorder: 10 },
+    { code: "DOCK-01", name: "USB-C Docking Station", sku: "DCK-USBC-01", cat: "Peripherals", cost: 9500, sale: 15900, reorder: 4 },
+    { code: "CBL-01", name: "HDMI Cable 2m", sku: "CBL-HDMI-2M", cat: "Cables", cost: 600, sale: 1500, reorder: 20 },
+    { code: "KIT-001", name: "Workstation Starter Kit", sku: "KIT-WS-001", cat: "Kits", cost: 0, sale: 79900, reorder: 2 },
   ];
-
-  const createdItems: { id: string; code: string; name: string; qty: number }[] = [];
-  for (const item of items) {
-    const [created] = await db.insert(inventoryItem).values({
-      organizationId: org.id,
-      code: item.code,
-      name: item.name,
-      sku: item.sku,
-      category: item.category,
-      purchasePrice: item.purchase,
-      salePrice: item.sale,
-      quantityOnHand: item.qty,
-      reorderPoint: item.reorder,
-      isActive: !("inactive" in item && item.inactive),
-    }).returning();
-    createdItems.push({ id: created.id, code: item.code, name: item.name, qty: item.qty });
+  for (const it of items) {
+    // Stock arrives through supplier bills, so every item starts at zero.
+    const created = ent(
+      await post("inventory", {
+        code: it.code,
+        name: it.name,
+        sku: it.sku,
+        category: it.cat,
+        categoryId: cats[it.cat],
+        purchasePrice: it.cost,
+        salePrice: it.sale,
+        costAccountId: acct("5000"),
+        revenueAccountId: acct("4000"),
+        inventoryAccountId: acct("1300"),
+        quantityOnHand: 0,
+        reorderPoint: it.reorder,
+      })
+    );
+    I[it.code] = { id: created.id, sale: it.sale, cost: it.cost };
   }
-  console.log(`  ${items.length} inventory items`);
+  for (const [name, sku] of [["US Layout", "KB-WL-01-US"], ["UK Layout", "KB-WL-01-UK"]]) {
+    await post("inventory/[id]/variants", { name, sku, purchasePrice: 4500, salePrice: 7900, options: { Layout: name.replace(" Layout", "") } }, { id: I["KB-01"].id });
+  }
+  for (const code of ["MON-27", "KB-01", "MS-01", "DOCK-01", "CBL-01"]) {
+    await post("inventory/[id]/suppliers", { contactId: C.techhw, supplierCode: `TH-${code}`, leadTimeDays: 7, purchasePrice: I[code].cost, isPreferred: true }, { id: I[code].id });
+  }
+  await post("inventory/[id]/suppliers", { contactId: C.techhw, supplierCode: "TH-STAND-01", leadTimeDays: 7, purchasePrice: 3500, isPreferred: true }, { id: I["STAND-01"].id });
+  await post("inventory/[id]/suppliers", { contactId: C.officedepot, supplierCode: "OD-88412", leadTimeDays: 3, purchasePrice: 3900, isPreferred: false }, { id: I["STAND-01"].id });
+  const bom = await post("inventory/bom", {
+    assemblyItemId: I["KIT-001"].id,
+    name: "Workstation Starter Kit v1",
+    description: "Monitor, stand, keyboard, mouse and cable, boxed",
+    laborCostCents: 2500,
+    overheadCostCents: 500,
+  });
+  BOM_ID = ent(bom).id;
+  for (const [code, qty] of [["MON-27", 1], ["STAND-01", 1], ["KB-01", 1], ["MS-01", 1], ["CBL-01", 1]] as const) {
+    await post("inventory/bom/[id]/components", { componentItemId: I[code].id, quantity: qty }, { id: BOM_ID });
+  }
 
-  // Inventory movements (history for first few items)
-  const movementData = [
-    { itemIdx: 0, type: "initial" as const, qty: 100, prev: 0, reason: "Opening stock" },
-    { itemIdx: 0, type: "purchase" as const, qty: 50, prev: 100, reason: "PO-2026-001" },
-    { itemIdx: 0, type: "sale" as const, qty: -10, prev: 150, reason: "INV-2026-012" },
-    { itemIdx: 0, type: "adjustment" as const, qty: 10, prev: 140, reason: "Found miscounted in warehouse audit" },
-    { itemIdx: 1, type: "initial" as const, qty: 50, prev: 0, reason: "Opening stock" },
-    { itemIdx: 1, type: "purchase" as const, qty: 30, prev: 50, reason: "PO-2026-003" },
-    { itemIdx: 1, type: "sale" as const, qty: -5, prev: 80, reason: "INV-2026-018" },
-    { itemIdx: 2, type: "initial" as const, qty: 30, prev: 0, reason: "Opening stock" },
-    { itemIdx: 2, type: "purchase" as const, qty: 20, prev: 30, reason: "PO-2026-005" },
-    { itemIdx: 2, type: "sale" as const, qty: -8, prev: 50, reason: "INV-2026-022" },
-    { itemIdx: 3, type: "initial" as const, qty: 20, prev: 0, reason: "Opening stock" },
-    { itemIdx: 3, type: "purchase" as const, qty: 15, prev: 20, reason: "PO-2026-007" },
-    { itemIdx: 3, type: "sale" as const, qty: -7, prev: 35, reason: "INV-2026-025" },
+  console.log("Fixed asset categories...");
+  ASSET_CAT.furniture = ent(
+    await post("asset-categories", {
+      name: "Furniture & Fixtures",
+      defaultDepreciationMethod: "straight_line",
+      defaultConvention: "full_month",
+      defaultUsefulLifeMonths: 84,
+      defaultResidualValue: 0,
+      assetAccountId: acct("1610"),
+      depreciationAccountId: acct("5500"),
+      accumulatedDepAccountId: acct("1710"),
+    })
+  ).id;
+  ASSET_CAT.computers = ent(
+    await post("asset-categories", {
+      name: "Computer Equipment",
+      defaultDepreciationMethod: "straight_line",
+      defaultConvention: "full_month",
+      defaultUsefulLifeMonths: 36,
+      defaultResidualValue: 0,
+      assetAccountId: acct("1620"),
+      depreciationAccountId: acct("5500"),
+      accumulatedDepAccountId: acct("1720"),
+    })
+  ).id;
+  ASSET_CAT.equipment = ent(
+    await post("asset-categories", {
+      name: "Office Equipment",
+      defaultDepreciationMethod: "straight_line",
+      defaultConvention: "full_month",
+      defaultUsefulLifeMonths: 60,
+      defaultResidualValue: 0,
+      assetAccountId: acct("1600"),
+      depreciationAccountId: acct("5500"),
+      accumulatedDepAccountId: acct("1700"),
+    })
+  ).id;
+
+  console.log("Payroll setup...");
+  await api("PUT", "payroll/settings", {
+    defaultTaxRate: 2200,
+    defaultCurrency: "USD",
+    salaryExpenseAccountCode: "5100",
+    taxPayableAccountCode: "2220",
+    bankAccountCode: "1100",
+    autoApprovalEnabled: true,
+    sutaRateBp: 270,
+    sutaWageBaseCents: 900000,
+  });
+  for (const e of EMPLOYEES) {
+    await post("payroll/employees", {
+      name: e.name,
+      email: e.email,
+      employeeNumber: e.num,
+      position: e.position,
+      department: e.department,
+      salary: e.salary,
+      payFrequency: "monthly",
+      taxRate: 2200,
+      startDate: e.start,
+      compensationType: "salary",
+      currency: "USD",
+    });
+  }
+  CONTRACTOR_ID = ent(
+    await post("payroll/contractors", {
+      name: "Marco Rossi",
+      email: "marco@rossi-research.com",
+      company: "Rossi UX Research",
+      taxId: "XX-XXX6620",
+      hourlyRate: 9500,
+      currency: "USD",
+    })
+  ).id;
+
+  console.log("Projects, CRM, templates...");
+  PROJ.mobile = ent(
+    await post("projects", {
+      name: "Mobile App",
+      description: "iOS and Android app for TechStart's field teams",
+      contactId: C.techstart,
+      status: "active",
+      priority: "high",
+      billingType: "hourly",
+      color: "#2563eb",
+      budget: 6000000,
+      hourlyRate: 16500,
+      estimatedHours: 360,
+      startDate: day(0, 1),
+      endDate: day(CUR + 3, 28),
+      category: "Client work",
+      enableMilestones: true,
+    })
+  ).id;
+  PROJ.website = ent(
+    await post("projects", {
+      name: "Website Redesign",
+      description: "New marketing site and customer portal for Acme",
+      contactId: C.acme,
+      status: "active",
+      priority: "medium",
+      billingType: "milestone",
+      color: "#16a34a",
+      budget: 4500000,
+      fixedPrice: 4500000,
+      startDate: day(0, 1),
+      endDate: day(CUR, 28),
+      category: "Client work",
+      enableMilestones: true,
+    })
+  ).id;
+  PROJ.internal = ent(
+    await post("projects", {
+      name: "Internal Tools",
+      description: "Ops dashboards and automation",
+      status: "active",
+      priority: "low",
+      billingType: "non_billable",
+      color: "#64748b",
+      startDate: day(2, 1),
+      category: "Internal",
+    })
+  ).id;
+  for (const p of Object.values(PROJ)) {
+    await post("projects/[id]/members", { memberId, role: "manager" }, { id: p }).catch(() => undefined);
+  }
+  const mobileTasks = [
+    ["Auth and onboarding flow", "done", "high"],
+    ["Offline sync for job sheets", "done", "urgent"],
+    ["Push notifications", "in_progress", "medium"],
+    ["Photo capture and upload", "in_review", "medium"],
+    ["App Store submission", "todo", "high"],
+    ["Analytics dashboard", "backlog", "low"],
+  ] as const;
+  for (const [title, status, priority] of mobileTasks) {
+    await post("projects/[id]/tasks", { title, status, priority, estimatedMinutes: 960, dueDate: day(CUR + 1, 15) }, { id: PROJ.mobile });
+  }
+  for (const [title, dueDate, amount] of [
+    ["Milestone 1: Discovery & design", day(0, 8), 1500000],
+    ["Milestone 2: Build", day(2, 3), 2000000],
+    ["Milestone 3: Launch & handover", day(4, 4), 1000000],
+  ] as const) {
+    await post("projects/[id]/milestones", { title, dueDate, amount, description: title }, { id: PROJ.website });
+  }
+  await post("projects/[id]/notes", { content: "Client prefers a weekly status email on Fridays.", isPinned: true }, { id: PROJ.mobile });
+  await post("projects/[id]/labels", { name: "Client", color: "#2563eb" }, { id: PROJ.mobile });
+
+  const stages = [
+    { id: "lead", name: "Lead", color: "#94a3b8" },
+    { id: "qualified", name: "Qualified", color: "#3b82f6" },
+    { id: "proposal", name: "Proposal", color: "#8b5cf6" },
+    { id: "negotiation", name: "Negotiation", color: "#f59e0b" },
+    // Won and Lost (closed_won / closed_lost) are added by the API.
   ];
-
-  for (const m of movementData) {
-    const ci = createdItems[m.itemIdx];
-    await db.insert(inventoryMovement).values({
-      organizationId: org.id,
-      inventoryItemId: ci.id,
-      warehouseId: mainWarehouse.id,
-      type: m.type,
-      quantity: m.qty,
-      previousQuantity: m.prev,
-      newQuantity: m.prev + m.qty,
-      reason: m.reason,
-      createdBy: "seed",
-    });
-  }
-  console.log(`  ${movementData.length} inventory movements`);
-
-  // Link some suppliers (use existing contacts that are suppliers)
-  const supplierContacts = await db.query.contact.findMany({
-    where: eq(contact.organizationId, org.id),
-    limit: 3,
-  });
-
-  if (supplierContacts.length > 0) {
-    const supplierLinks = [
-      { itemIdx: 0, contactIdx: 0, code: "SUP-WM100", lead: 7, price: 1100, preferred: true },
-      { itemIdx: 1, contactIdx: 0, code: "SUP-UH200", lead: 10, price: 2600, preferred: true },
-      { itemIdx: 2, contactIdx: 1 % supplierContacts.length, code: "SUP-BK300", lead: 14, price: 3200, preferred: true },
-      { itemIdx: 0, contactIdx: 1 % supplierContacts.length, code: "ALT-WM100", lead: 21, price: 1250, preferred: false },
-    ];
-
-    for (const sl of supplierLinks) {
-      await db.insert(inventoryItemSupplier).values({
-        organizationId: org.id,
-        inventoryItemId: createdItems[sl.itemIdx].id,
-        contactId: supplierContacts[sl.contactIdx].id,
-        supplierCode: sl.code,
-        leadTimeDays: sl.lead,
-        purchasePrice: sl.price,
-        isPreferred: sl.preferred,
-      });
-    }
-    console.log(`  ${supplierLinks.length} supplier links`);
-  }
-
-  // Variants for a couple of items
-  const variantData = [
-    { itemIdx: 0, name: "Black", sku: "WM-100-BLK", purchase: 1200, sale: 2499, qty: 80, options: { Color: "Black" } as Record<string, string> },
-    { itemIdx: 0, name: "White", sku: "WM-100-WHT", purchase: 1200, sale: 2499, qty: 50, options: { Color: "White" } as Record<string, string> },
-    { itemIdx: 0, name: "Silver", sku: "WM-100-SLV", purchase: 1300, sale: 2699, qty: 20, options: { Color: "Silver" } as Record<string, string> },
-    { itemIdx: 2, name: "Compact", sku: "BK-300-CMP", purchase: 3000, sale: 5999, qty: 22, options: { Size: "Compact" } as Record<string, string> },
-    { itemIdx: 2, name: "Full Size", sku: "BK-300-FUL", purchase: 3500, sale: 6999, qty: 20, options: { Size: "Full" } as Record<string, string> },
+  const pipeline = ent(await post("crm/pipelines", { name: "Sales Pipeline", stages, isDefault: true }));
+  const deals = [
+    { title: "Sterling - process automation phase 2", contact: "sterling", stage: "proposal", value: 1800000, prob: 60, source: "referral" },
+    { title: "Pinnacle - advisory renewal", contact: "pinnacle", stage: "negotiation", value: 4800000, prob: 75, source: "other" },
+    { title: "TechStart - mobile app phase 2", contact: "techstart", stage: "qualified", value: 3500000, prob: 40, source: "referral" },
+    { title: "CloudBase - hardware refresh", contact: "cloudbase", stage: "lead", value: 1200000, prob: 20, source: "website" },
+    { title: "Acme - customer portal", contact: "acme", stage: "won", value: 650000, prob: 100, source: "referral", won: true },
+    { title: "Summit - hardware refresh", contact: "summit", stage: "lost", value: 900000, prob: 0, source: "cold_outreach", lost: "Went with a cheaper supplier" },
   ];
-
-  for (const v of variantData) {
-    await db.insert(inventoryVariant).values({
-      organizationId: org.id,
-      inventoryItemId: createdItems[v.itemIdx].id,
-      name: v.name,
-      sku: v.sku,
-      purchasePrice: v.purchase,
-      salePrice: v.sale,
-      quantityOnHand: v.qty,
-      options: v.options,
-    });
-  }
-  console.log(`  ${variantData.length} variants`);
-
-  // Inventory categories
-  const categoryData = [
-    { name: "Electronics", color: "#3b82f6", description: "Electronic devices and accessories" },
-    { name: "Furniture", color: "#f59e0b", description: "Office furniture and ergonomic equipment" },
-    { name: "Supplies", color: "#10b981", description: "Office and printing supplies" },
-    { name: "Tools", color: "#8b5cf6", description: "Hardware and diagnostic tools" },
-    { name: "Packaging", color: "#ec4899", description: "Shipping and packaging materials" },
-  ];
-
-  const createdCategories: { id: string; name: string }[] = [];
-  for (const cat of categoryData) {
-    const [created] = await db.insert(inventoryCategory).values({
-      organizationId: org.id,
-      name: cat.name,
-      color: cat.color,
-      description: cat.description,
-    }).returning();
-    createdCategories.push({ id: created.id, name: cat.name });
-  }
-
-  // Add subcategories under Electronics
-  const electronicsCat = createdCategories.find((c) => c.name === "Electronics");
-  if (electronicsCat) {
-    await db.insert(inventoryCategory).values([
-      { organizationId: org.id, name: "Input Devices", color: "#60a5fa", parentId: electronicsCat.id },
-      { organizationId: org.id, name: "Audio", color: "#818cf8", parentId: electronicsCat.id },
-    ]);
-  }
-  console.log(`  ${categoryData.length + 2} categories`);
-
-  // Link items to categories via categoryId
-  const categoryMap: Record<string, string> = {};
-  for (const c of createdCategories) categoryMap[c.name] = c.id;
-
-  for (let i = 0; i < items.length; i++) {
-    const catId = categoryMap[items[i].category];
-    if (catId) {
-      await db.update(inventoryItem)
-        .set({ categoryId: catId })
-        .where(eq(inventoryItem.id, createdItems[i].id));
-    }
-  }
-  console.log("  items linked to categories");
-
-  // Per-warehouse stock levels
-  const warehouseStockData = [
-    // Main warehouse gets majority of stock
-    { itemIdx: 0, whId: mainWarehouse.id, qty: 120 },
-    { itemIdx: 1, whId: mainWarehouse.id, qty: 55 },
-    { itemIdx: 2, whId: mainWarehouse.id, qty: 30 },
-    { itemIdx: 3, whId: mainWarehouse.id, qty: 20 },
-    { itemIdx: 4, whId: mainWarehouse.id, qty: 45 },
-    { itemIdx: 5, whId: mainWarehouse.id, qty: 25 },
-    { itemIdx: 7, whId: mainWarehouse.id, qty: 200 },
-    { itemIdx: 8, whId: mainWarehouse.id, qty: 30 },
-    { itemIdx: 10, whId: mainWarehouse.id, qty: 40 },
-    { itemIdx: 12, whId: mainWarehouse.id, qty: 350 },
-    // East warehouse gets some items
-    { itemIdx: 0, whId: eastWarehouse.id, qty: 30 },
-    { itemIdx: 1, whId: eastWarehouse.id, qty: 20 },
-    { itemIdx: 2, whId: eastWarehouse.id, qty: 12 },
-    { itemIdx: 4, whId: eastWarehouse.id, qty: 15 },
-    { itemIdx: 7, whId: eastWarehouse.id, qty: 100 },
-    { itemIdx: 8, whId: eastWarehouse.id, qty: 15 },
-    { itemIdx: 12, whId: eastWarehouse.id, qty: 150 },
-  ];
-
-  for (const ws of warehouseStockData) {
-    await db.insert(warehouseStock).values({
-      organizationId: org.id,
-      inventoryItemId: createdItems[ws.itemIdx].id,
-      warehouseId: ws.whId,
-      quantity: ws.qty,
-    });
-  }
-  console.log(`  ${warehouseStockData.length} warehouse stock entries`);
-
-  // Stock transfers
-  const [completedTransfer] = await db.insert(inventoryTransfer).values({
-    organizationId: org.id,
-    fromWarehouseId: mainWarehouse.id,
-    toWarehouseId: eastWarehouse.id,
-    status: "completed",
-    notes: "Monthly restock of east distribution center",
-    transferredBy: "seed",
-    completedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-  }).returning();
-
-  await db.insert(inventoryTransferLine).values([
-    { transferId: completedTransfer.id, inventoryItemId: createdItems[0].id, quantity: 15, receivedQuantity: 15 },
-    { transferId: completedTransfer.id, inventoryItemId: createdItems[1].id, quantity: 10, receivedQuantity: 10 },
-  ]);
-
-  const [draftTransfer] = await db.insert(inventoryTransfer).values({
-    organizationId: org.id,
-    fromWarehouseId: eastWarehouse.id,
-    toWarehouseId: mainWarehouse.id,
-    status: "draft",
-    notes: "Return excess packaging materials",
-    transferredBy: "seed",
-  }).returning();
-
-  await db.insert(inventoryTransferLine).values([
-    { transferId: draftTransfer.id, inventoryItemId: createdItems[12].id, quantity: 50 },
-  ]);
-
-  const [inTransitTransfer] = await db.insert(inventoryTransfer).values({
-    organizationId: org.id,
-    fromWarehouseId: mainWarehouse.id,
-    toWarehouseId: eastWarehouse.id,
-    status: "in_transit",
-    notes: "Urgent restock - low stock items",
-    transferredBy: "seed",
-  }).returning();
-
-  await db.insert(inventoryTransferLine).values([
-    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[2].id, quantity: 8 },
-    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[3].id, quantity: 5 },
-    { transferId: inTransitTransfer.id, inventoryItemId: createdItems[10].id, quantity: 10 },
-  ]);
-
-  console.log("  3 stock transfers");
-  } else {
-    console.log("\nInventory data already exists, skipping...");
-  }
-
-  // ===== ADDITIONAL SEED DATA =====
-
-  // 19. Cost Centers
-  const existingCostCenters = await db.query.costCenter.findFirst({
-    where: eq(costCenter.organizationId, org.id),
-  });
-  if (!existingCostCenters) {
-    console.log("Creating cost centers...");
-    const ccData = [
-      { code: "DEPT-ENG", name: "Engineering" },
-      { code: "DEPT-SALES", name: "Sales" },
-      { code: "DEPT-MKT", name: "Marketing" },
-      { code: "DEPT-OPS", name: "Operations" },
-      { code: "DEPT-HR", name: "Human Resources" },
-      { code: "DEPT-FIN", name: "Finance" },
-    ];
-    const createdCCs: { id: string; code: string }[] = [];
-    for (const cc of ccData) {
-      const [row] = await db.insert(costCenter).values({
-        organizationId: org.id,
-        code: cc.code,
-        name: cc.name,
-      }).returning();
-      createdCCs.push({ id: row.id, code: cc.code });
-    }
-    // Sub-departments under Engineering
-    const engCC = createdCCs.find((c) => c.code === "DEPT-ENG");
-    if (engCC) {
-      await db.insert(costCenter).values([
-        { organizationId: org.id, code: "ENG-FE", name: "Frontend", parentId: engCC.id },
-        { organizationId: org.id, code: "ENG-BE", name: "Backend", parentId: engCC.id },
-        { organizationId: org.id, code: "ENG-INFRA", name: "Infrastructure", parentId: engCC.id },
-      ]);
-    }
-    console.log(`  ${ccData.length + 3} cost centers`);
-  }
-
-  // 20. Tags
-  const existingTags = await db.query.tag.findFirst({
-    where: eq(tag.organizationId, org.id),
-  });
-  if (!existingTags) {
-    console.log("Creating tags...");
-    const tagData = [
-      { name: "Q1 2026", color: "#3b82f6", description: "First quarter transactions" },
-      { name: "Recurring", color: "#10b981", description: "Recurring transactions" },
-      { name: "Marketing", color: "#f59e0b", description: "Marketing related" },
-      { name: "Client Project", color: "#8b5cf6", description: "Client project expenses" },
-      { name: "Tax Deductible", color: "#ef4444", description: "Tax deductible items" },
-      { name: "Needs Review", color: "#f97316", description: "Items needing review" },
-      { name: "Auto-imported", color: "#6b7280", description: "Automatically imported transactions" },
-    ];
-    for (const t of tagData) {
-      await db.insert(tag).values({
-        organizationId: org.id,
-        name: t.name,
-        color: t.color,
-        description: t.description,
-      });
-    }
-    console.log(`  ${tagData.length} tags`);
-  }
-
-  // 21. Number Sequences
-  const existingSeq = await db.query.numberSequence.findFirst({
-    where: eq(numberSequence.organizationId, org.id),
-  });
-  if (!existingSeq) {
-    console.log("Creating number sequences...");
-    const seqData = [
-      { entityType: "invoice", prefix: "INV-", lastNumber: 10 },
-      { entityType: "bill", prefix: "BILL-", lastNumber: 10 },
-      { entityType: "quote", prefix: "QT-", lastNumber: 5 },
-      { entityType: "credit_note", prefix: "CN-", lastNumber: 3 },
-      { entityType: "debit_note", prefix: "DN-", lastNumber: 2 },
-      { entityType: "purchase_order", prefix: "PO-", lastNumber: 5 },
-      { entityType: "payment", prefix: "PAY-", lastNumber: 15 },
-      { entityType: "journal", prefix: "JE-", lastNumber: 20 },
-      { entityType: "expense_claim", prefix: "EXP-", lastNumber: 2 },
-    ];
-    for (const s of seqData) {
-      await db.insert(numberSequence).values({
-        organizationId: org.id,
-        entityType: s.entityType,
-        prefix: s.prefix,
-        lastNumber: s.lastNumber,
-      });
-    }
-    console.log(`  ${seqData.length} sequences`);
-  }
-
-  // 22. Custom Roles
-  const existingRoles = await db.query.customRole.findFirst({
-    where: eq(customRole.organizationId, org.id),
-  });
-  if (!existingRoles) {
-    console.log("Creating custom roles...");
-    await db.insert(customRole).values([
-      {
-        organizationId: org.id,
-        name: "Bookkeeper",
-        description: "Can manage day-to-day accounting tasks",
-        permissions: ["transactions:read", "transactions:write", "contacts:read", "contacts:write", "reports:read", "banking:read", "banking:write"],
-      },
-      {
-        organizationId: org.id,
-        name: "Sales Manager",
-        description: "Full access to sales, invoices, and CRM",
-        permissions: ["invoices:read", "invoices:write", "contacts:read", "contacts:write", "crm:read", "crm:write", "quotes:read", "quotes:write", "reports:read"],
-      },
-      {
-        organizationId: org.id,
-        name: "Viewer",
-        description: "Read-only access to all financial data",
-        permissions: ["transactions:read", "contacts:read", "invoices:read", "bills:read", "reports:read", "banking:read", "inventory:read"],
-        isSystem: true,
-      },
-    ]);
-    console.log("  3 custom roles");
-  }
-
-  // 23. Teams
-  const existingTeams = await db.query.team.findFirst({
-    where: eq(team.organizationId, org.id),
-  });
-  if (!existingTeams) {
-    console.log("Creating teams...");
-    const [engTeam] = await db.insert(team).values({
-      organizationId: org.id,
-      name: "Engineering",
-      description: "Product engineering team",
-      color: "#3b82f6",
-    }).returning();
-    const [finTeam] = await db.insert(team).values({
-      organizationId: org.id,
-      name: "Finance",
-      description: "Finance and accounting team",
-      color: "#10b981",
-    }).returning();
-    await db.insert(team).values({
-      organizationId: org.id,
-      name: "Leadership",
-      description: "Executive leadership",
-      color: "#8b5cf6",
-    });
-
-    // Add demo member to teams
-    const demoMem = await db.query.member.findFirst({
-      where: eq(member.organizationId, org.id),
-    });
-    if (demoMem) {
-      await db.insert(teamMember).values([
-        { teamId: engTeam.id, memberId: demoMem.id },
-        { teamId: finTeam.id, memberId: demoMem.id },
-      ]);
-    }
-    console.log("  3 teams");
-  }
-
-  // 24. Contact Persons
-  const existingContactPersons = await db.query.contactPerson.findFirst({});
-  if (!existingContactPersons) {
-    console.log("Creating contact persons...");
-    const contacts = await db.query.contact.findMany({
-      where: eq(contact.organizationId, org.id),
-      limit: 6,
-    });
-    const personData = [
-      { name: "John Anderson", email: "john@acme.com", phone: "+1-555-0101", jobTitle: "CFO", isPrimary: true },
-      { name: "Sarah Mitchell", email: "sarah@acme.com", phone: "+1-555-0102", jobTitle: "AP Manager", isPrimary: false },
-      { name: "Michael Chen", email: "michael@globalind.com", phone: "+1-555-0201", jobTitle: "Procurement Director", isPrimary: true },
-      { name: "Emily Davis", email: "emily@techstart.io", phone: "+1-555-0301", jobTitle: "CEO", isPrimary: true },
-      { name: "Robert Wilson", email: "robert@brightsolutions.com", phone: "+1-555-0401", jobTitle: "Finance Manager", isPrimary: true },
-      { name: "Lisa Thompson", email: "lisa@metroservices.com", phone: "+1-555-0501", jobTitle: "Operations Lead", isPrimary: true },
-    ];
-    for (let i = 0; i < Math.min(personData.length, contacts.length); i++) {
-      await db.insert(contactPerson).values({
-        contactId: contacts[i].id,
-        ...personData[i],
-      });
-    }
-    console.log(`  ${Math.min(personData.length, contacts.length)} contact persons`);
-  }
-
-  // 25. Quotes
-  const existingQuotes = await db.query.quote.findFirst({
-    where: eq(quote.organizationId, org.id),
-  });
-  if (!existingQuotes) {
-    console.log("Creating quotes...");
-    const allContacts = await db.query.contact.findMany({
-      where: eq(contact.organizationId, org.id),
-      limit: 10,
-    });
-    const allAccounts = await db.query.chartAccount.findMany({
-      where: eq(chartAccount.organizationId, org.id),
-    });
-    const serviceAcct = allAccounts.find((a) => a.code === "4010");
-
-    const quoteData = [
-      { contact: 0, number: "QT-00001", date: "2026-02-01", expiry: "2026-03-01", status: "accepted" as const, desc: "Website Redesign Phase 3", price: 3500000 },
-      { contact: 2, number: "QT-00002", date: "2026-02-10", expiry: "2026-03-10", status: "sent" as const, desc: "Mobile App Enhancement", price: 2800000 },
-      { contact: 5, number: "QT-00003", date: "2026-02-15", expiry: "2026-03-15", status: "draft" as const, desc: "Data Analytics Dashboard", price: 1500000 },
-      { contact: 8, number: "QT-00004", date: "2026-02-20", expiry: "2026-03-20", status: "sent" as const, desc: "Cloud Migration Project", price: 4200000 },
-      { contact: 9, number: "QT-00005", date: "2026-02-25", expiry: "2026-03-25", status: "declined" as const, desc: "Security Audit", price: 800000 },
-    ];
-
-    for (const q of quoteData) {
-      if (!allContacts[q.contact]) continue;
-      const [row] = await db.insert(quote).values({
-        organizationId: org.id,
-        contactId: allContacts[q.contact].id,
-        quoteNumber: q.number,
-        issueDate: q.date,
-        expiryDate: q.expiry,
-        status: q.status,
-        subtotal: q.price,
-        taxTotal: 0,
-        total: q.price,
-        currencyCode: "USD",
-        createdBy: userId,
-        sentAt: q.status !== "draft" ? new Date(q.date) : undefined,
-      }).returning();
-
-      await db.insert(quoteLine).values({
-        quoteId: row.id,
-        description: q.desc,
-        quantity: 100,
-        unitPrice: q.price,
-        amount: q.price,
-        accountId: serviceAcct?.id,
-        sortOrder: 0,
-      });
-    }
-    console.log(`  ${quoteData.length} quotes`);
-  }
-
-  // 26. Purchase Orders
-  const existingPOs = await db.query.purchaseOrder.findFirst({
-    where: eq(purchaseOrder.organizationId, org.id),
-  });
-  if (!existingPOs) {
-    console.log("Creating purchase orders...");
-    const supplierContacts2 = await db.query.contact.findMany({
-      where: eq(contact.organizationId, org.id),
-    });
-    const suppliers = supplierContacts2.filter((c) => c.type === "supplier" || c.type === "both");
-    const allAccounts2 = await db.query.chartAccount.findMany({
-      where: eq(chartAccount.organizationId, org.id),
-    });
-    const cogsAcct = allAccounts2.find((a) => a.code === "5000");
-
-    const poData = [
-      { contact: 0, number: "PO-00001", date: "2026-02-01", delivery: "2026-02-15", status: "received" as const, desc: "Office Supplies Q1", amount: 45000 },
-      { contact: 1, number: "PO-00002", date: "2026-02-05", delivery: "2026-02-20", status: "sent" as const, desc: "Cloud Services March", amount: 52000 },
-      { contact: 2, number: "PO-00003", date: "2026-02-10", delivery: "2026-03-01", status: "sent" as const, desc: "Office Lease March", amount: 350000 },
-      { contact: 3, number: "PO-00004", date: "2026-02-15", delivery: "2026-03-15", status: "draft" as const, desc: "New Monitors x5", amount: 750000 },
-      { contact: 4, number: "PO-00005", date: "2026-02-20", delivery: "2026-03-20", status: "draft" as const, desc: "Annual Insurance Renewal", amount: 300000 },
-    ];
-
-    for (const po of poData) {
-      if (!suppliers[po.contact]) continue;
-      const [row] = await db.insert(purchaseOrder).values({
-        organizationId: org.id,
-        contactId: suppliers[po.contact].id,
-        poNumber: po.number,
-        issueDate: po.date,
-        deliveryDate: po.delivery,
-        status: po.status,
-        subtotal: po.amount,
-        taxTotal: 0,
-        total: po.amount,
-        currencyCode: "USD",
-        createdBy: userId,
-        sentAt: po.status !== "draft" ? new Date(po.date) : undefined,
-      }).returning();
-
-      await db.insert(purchaseOrderLine).values({
-        purchaseOrderId: row.id,
-        description: po.desc,
-        quantity: 100,
-        unitPrice: po.amount,
-        amount: po.amount,
-        accountId: cogsAcct?.id,
-        sortOrder: 0,
-      });
-    }
-    console.log(`  ${poData.length} purchase orders`);
-  }
-
-  // 27. Debit Notes
-  const existingDNs = await db.query.debitNote.findFirst({
-    where: eq(debitNote.organizationId, org.id),
-  });
-  if (!existingDNs) {
-    console.log("Creating debit notes...");
-    const supplierContacts3 = await db.query.contact.findMany({
-      where: eq(contact.organizationId, org.id),
-    });
-    const suppliers2 = supplierContacts3.filter((c) => c.type === "supplier" || c.type === "both");
-    const allAccounts3 = await db.query.chartAccount.findMany({
-      where: eq(chartAccount.organizationId, org.id),
-    });
-    const cogsAcct2 = allAccounts3.find((a) => a.code === "5000");
-
-    if (suppliers2.length >= 2) {
-      const dnData = [
-        { contact: 0, number: "DN-00001", date: "2026-02-05", status: "sent" as const, desc: "Defective supplies return", amount: 8500 },
-        { contact: 1, number: "DN-00002", date: "2026-02-12", status: "draft" as const, desc: "Overcharge on hosting", amount: 5000 },
-      ];
-
-      for (const dn of dnData) {
-        const [row] = await db.insert(debitNote).values({
-          organizationId: org.id,
-          contactId: suppliers2[dn.contact].id,
-          debitNoteNumber: dn.number,
-          issueDate: dn.date,
-          status: dn.status,
-          subtotal: dn.amount,
-          taxTotal: 0,
-          total: dn.amount,
-          amountApplied: 0,
-          amountRemaining: dn.amount,
-          currencyCode: "USD",
-          createdBy: userId,
-          sentAt: dn.status !== "draft" ? new Date(dn.date) : undefined,
-        }).returning();
-
-        await db.insert(debitNoteLine).values({
-          debitNoteId: row.id,
-          description: dn.desc,
-          quantity: 100,
-          unitPrice: dn.amount,
-          amount: dn.amount,
-          accountId: cogsAcct2?.id,
-          sortOrder: 0,
-        });
-      }
-      console.log("  2 debit notes");
-    }
-  }
-
-  // 28. Bank Rules
-  const existingBankRules = await db.query.bankRule.findFirst({
-    where: eq(bankRule.organizationId, org.id),
-  });
-  if (!existingBankRules) {
-    console.log("Creating bank rules...");
-    const allAccounts4 = await db.query.chartAccount.findMany({
-      where: eq(chartAccount.organizationId, org.id),
-    });
-    const acctMap: Record<string, string> = {};
-    for (const a of allAccounts4) acctMap[a.code] = a.id;
-
-    await db.insert(bankRule).values([
-      { organizationId: org.id, name: "AWS Hosting", priority: 1, matchField: "description", matchType: "contains" as const, matchValue: "AWS", accountId: acctMap["5220"] },
-      { organizationId: org.id, name: "Payroll", priority: 2, matchField: "description", matchType: "contains" as const, matchValue: "Payroll", accountId: acctMap["5100"] },
-      { organizationId: org.id, name: "Rent Payment", priority: 3, matchField: "description", matchType: "contains" as const, matchValue: "Rent", accountId: acctMap["5200"] },
-      { organizationId: org.id, name: "Client Deposits", priority: 4, matchField: "description", matchType: "contains" as const, matchValue: "Client payment", accountId: acctMap["4010"] },
-      { organizationId: org.id, name: "Insurance", priority: 5, matchField: "description", matchType: "contains" as const, matchValue: "Insurance", accountId: acctMap["5400"] },
-    ]);
-    console.log("  5 bank rules");
-  }
-
-  // 29. Bank Reconciliation
-  const existingRecon = await db.query.bankReconciliation.findFirst({});
-  if (!existingRecon) {
-    console.log("Creating bank reconciliation...");
-    const bankAccts = await db.query.bankAccount.findMany({
-      where: eq(bankAccount.organizationId, org.id),
-      limit: 1,
-    });
-    if (bankAccts.length > 0) {
-      await db.insert(bankReconciliation).values({
-        bankAccountId: bankAccts[0].id,
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-        startBalance: 0,
-        endBalance: 5878100,
-        status: "completed",
-      });
-      await db.insert(bankReconciliation).values({
-        bankAccountId: bankAccts[0].id,
-        startDate: "2026-02-01",
-        endDate: "2026-02-28",
-        startBalance: 5878100,
-        endBalance: 5028200,
-        status: "in_progress",
-      });
-      console.log("  2 reconciliations");
-    }
-  }
-
-  // 30. CRM: Pipelines & Deals
-  const existingPipeline = await db.query.pipeline.findFirst({
-    where: eq(pipeline.organizationId, org.id),
-  });
-  if (!existingPipeline) {
-    console.log("Creating CRM pipelines and deals...");
-    const [salesPipeline] = await db.insert(pipeline).values({
-      organizationId: org.id,
-      name: "Sales Pipeline",
-      isDefault: true,
-      stages: [
-        { id: "lead", name: "Lead", color: "#6b7280" },
-        { id: "qualified", name: "Qualified", color: "#3b82f6" },
-        { id: "proposal", name: "Proposal", color: "#f59e0b" },
-        { id: "negotiation", name: "Negotiation", color: "#f97316" },
-        { id: "closed_won", name: "Closed Won", color: "#10b981" },
-        { id: "closed_lost", name: "Closed Lost", color: "#ef4444" },
-      ],
-    }).returning();
-
-    await db.insert(pipeline).values({
-      organizationId: org.id,
-      name: "Partnership Pipeline",
-      stages: [
-        { id: "inquiry", name: "Inquiry", color: "#6b7280" },
-        { id: "evaluation", name: "Evaluation", color: "#3b82f6" },
-        { id: "agreement", name: "Agreement", color: "#f59e0b" },
-        { id: "signed", name: "Signed", color: "#10b981" },
-        { id: "declined", name: "Declined", color: "#ef4444" },
-      ],
-    });
-
-    // Deals
-    const allContacts2 = await db.query.contact.findMany({
-      where: eq(contact.organizationId, org.id),
-      limit: 10,
-    });
-
-    const dealData = [
-      { contact: 0, title: "Acme Corp - Enterprise Package", stage: "negotiation", value: 12000000, prob: 75, source: "referral" as const, close: "2026-04-15" },
-      { contact: 2, title: "TechStart - Annual Contract", stage: "proposal", value: 4800000, prob: 50, source: "website" as const, close: "2026-05-01" },
-      { contact: 5, title: "Pinnacle Group - Consulting", stage: "qualified", value: 2400000, prob: 25, source: "cold_outreach" as const, close: "2026-06-01" },
-      { contact: 7, title: "Summit Digital - Platform License", stage: "lead", value: 3600000, prob: 10, source: "event" as const, close: "2026-07-01" },
-      { contact: 8, title: "CloudBase - Infrastructure", stage: "closed_won", value: 8000000, prob: 100, source: "referral" as const, close: "2026-02-28", won: true },
-      { contact: 1, title: "Global Industries - Migration", stage: "closed_lost", value: 5500000, prob: 0, source: "website" as const, close: "2026-02-15", lost: true },
-      { contact: 6, title: "Riverdale - Support Plan", stage: "proposal", value: 1800000, prob: 50, source: "referral" as const, close: "2026-04-30" },
-      { contact: 9, title: "Sterling - Custom Development", stage: "negotiation", value: 15000000, prob: 75, source: "cold_outreach" as const, close: "2026-05-15" },
-    ];
-
-    const dealIds: string[] = [];
-    for (const d of dealData) {
-      if (!allContacts2[d.contact]) continue;
-      const [row] = await db.insert(deal).values({
-        organizationId: org.id,
-        pipelineId: salesPipeline.id,
-        stageId: d.stage,
-        contactId: allContacts2[d.contact].id,
+  for (const d of deals) {
+    const deal = ent(
+      await post("crm/deals", {
+        pipelineId: pipeline.id,
+        stageId: d.stage === "won" || d.stage === "lost" ? "negotiation" : d.stage,
+        contactId: C[d.contact],
         title: d.title,
         valueCents: d.value,
         currency: "USD",
         probability: d.prob,
-        expectedCloseDate: d.close,
-        assignedTo: userId,
+        expectedCloseDate: day(CUR + 1, 15),
         source: d.source,
-        wonAt: "won" in d ? new Date("2026-02-28") : undefined,
-        lostAt: "lost" in d ? new Date("2026-02-15") : undefined,
-        lostReason: "lost" in d ? "Budget constraints - decided to go with in-house solution" : undefined,
-      }).returning();
-      dealIds.push(row.id);
-    }
-
-    // Deal activities
-    const activities = [
-      { dealIdx: 0, type: "call" as const, content: "Initial discovery call - discussed requirements and timeline" },
-      { dealIdx: 0, type: "email" as const, content: "Sent detailed proposal with pricing tiers" },
-      { dealIdx: 0, type: "meeting" as const, content: "Demo session with stakeholders - very positive feedback" },
-      { dealIdx: 1, type: "note" as const, content: "Contact is evaluating 3 vendors, decision by end of month" },
-      { dealIdx: 1, type: "email" as const, content: "Sent case study and reference contacts" },
-      { dealIdx: 4, type: "meeting" as const, content: "Contract signing meeting - deal closed!" },
-      { dealIdx: 7, type: "call" as const, content: "Scope review call - additional modules requested" },
-      { dealIdx: 7, type: "task" as const, content: "Prepare revised proposal with additional scope" },
-    ];
-
-    for (const act of activities) {
-      if (!dealIds[act.dealIdx]) continue;
-      await db.insert(dealActivity).values({
-        dealId: dealIds[act.dealIdx],
-        userId,
-        type: act.type,
-        content: act.content,
-        completedAt: new Date(),
-      });
-    }
-    console.log(`  2 pipelines, ${dealData.length} deals, ${activities.length} activities`);
+      })
+    );
+    await post("crm/deals/[id]/activities", { type: "call", content: "Intro call: scope, budget and timeline." }, { id: deal.id });
+    if (d.won) await post("crm/deals/[id]/won", {}, { id: deal.id });
+    if (d.lost) await post("crm/deals/[id]/lost", { reason: d.lost }, { id: deal.id });
   }
 
-  // 31. Loans
-  const existingLoans = await db.query.loan.findFirst({
-    where: eq(loan.organizationId, org.id),
+  await post("document-templates", {
+    name: "Standard Invoice",
+    type: "invoice",
+    accentColor: "#0f172a",
+    showTaxBreakdown: true,
+    showPaymentTerms: true,
+    notes: "Thank you for your business.",
+    bankDetails: "First National Bank - Routing 111000025 - Account ****4521",
+    paymentInstructions: "Pay by ACH or wire. Please quote the invoice number.",
+    isDefault: true,
   });
-  if (!existingLoans) {
-    console.log("Creating loans...");
-    const allAccounts5 = await db.query.chartAccount.findMany({
-      where: eq(chartAccount.organizationId, org.id),
-    });
-    const acctMap2: Record<string, string> = {};
-    for (const a of allAccounts5) acctMap2[a.code] = a.id;
-
-    const bankAccts2 = await db.query.bankAccount.findMany({
-      where: eq(bankAccount.organizationId, org.id),
-      limit: 1,
-    });
-
-    const [equipLoan] = await db.insert(loan).values({
-      organizationId: org.id,
-      name: "Equipment Financing",
-      bankAccountId: bankAccts2[0]?.id,
-      principalAmount: 5000000, // $50,000
-      interestRate: 650, // 6.5%
-      termMonths: 36,
-      startDate: "2026-01-01",
-      monthlyPayment: 153300,
-      status: "active",
-      principalAccountId: acctMap2["2700"],
-      interestAccountId: acctMap2["5910"],
-    }).returning();
-
-    // Generate loan schedule (first 6 months)
-    let remaining = 5000000;
-    for (let i = 1; i <= 6; i++) {
-      const interest = Math.round((remaining * 650) / (12 * 10000));
-      const principal = 153300 - interest;
-      remaining -= principal;
-      await db.insert(loanSchedule).values({
-        loanId: equipLoan.id,
-        periodNumber: i,
-        date: `2026-${String(i).padStart(2, "0")}-01`,
-        principalAmount: principal,
-        interestAmount: interest,
-        totalPayment: 153300,
-        remainingBalance: remaining,
-        posted: i <= 2,
-        sortOrder: i,
-      });
-    }
-
-    await db.insert(loan).values({
-      organizationId: org.id,
-      name: "Office Renovation Loan",
-      bankAccountId: bankAccts2[0]?.id,
-      principalAmount: 2500000, // $25,000
-      interestRate: 550, // 5.5%
-      termMonths: 24,
-      startDate: "2026-02-01",
-      monthlyPayment: 110200,
-      status: "active",
-      principalAccountId: acctMap2["2700"],
-      interestAccountId: acctMap2["5910"],
-    });
-
-    console.log("  2 loans with amortization schedule");
+  await post("document-templates", { name: "Quote", type: "quote", accentColor: "#0f172a", showTaxBreakdown: true, notes: "Valid for 30 days." });
+  for (const [name, color] of [["Receipts", "blue"], ["Contracts", "green"], ["Tax filings", "orange"]]) {
+    await post("documents/folders", { name, color }).catch(async () => post("documents/folders", { name }));
   }
+}
+let BOM_ID = "";
+let CONTRACTOR_ID = "";
+const ASSET_CAT: Record<string, string> = {};
+const stmtBal: Record<Bank, number> = { checking: 0, savings: 0, card: 0 };
 
-  // 32. Depreciation Entries
-  const existingDepEntries = await db.query.depreciationEntry.findFirst({});
-  if (!existingDepEntries) {
-    console.log("Creating depreciation entries...");
-    const assets = await db.query.fixedAsset.findMany({
-      where: eq(fixedAsset.organizationId, org.id),
-    });
-    for (const asset of assets) {
-      const monthlyDep = Math.round((asset.purchasePrice - (asset.residualValue ?? 0)) / asset.usefulLifeMonths);
-      for (let m = 1; m <= 2; m++) {
-        await db.insert(depreciationEntry).values({
-          fixedAssetId: asset.id,
-          date: `2026-${String(m).padStart(2, "0")}-28`,
-          amount: monthlyDep,
-        });
-      }
-    }
-    console.log(`  ${assets.length * 2} depreciation entries`);
-  }
-
-  // 33. Reminder Rules
-  const existingReminders = await db.query.reminderRule.findFirst({
-    where: eq(reminderRule.organizationId, org.id),
-  });
-  if (!existingReminders) {
-    console.log("Creating reminder rules...");
-    await db.insert(reminderRule).values([
-      {
-        organizationId: org.id,
-        name: "Invoice Due in 7 Days",
-        triggerType: "before_due",
-        triggerDays: 7,
-        enabled: true,
-        documentType: "invoice",
-        recipientType: "contact_email",
-        subjectTemplate: "Payment reminder: Invoice {{invoiceNumber}} due in 7 days",
-        bodyTemplate: "Dear {{contactName}},\n\nThis is a friendly reminder that invoice {{invoiceNumber}} for {{amount}} is due on {{dueDate}}.\n\nPlease arrange payment at your earliest convenience.\n\nBest regards,\n{{orgName}}",
-      },
-      {
-        organizationId: org.id,
-        name: "Invoice Overdue - 3 Days",
-        triggerType: "after_due",
-        triggerDays: 3,
-        enabled: true,
-        documentType: "invoice",
-        recipientType: "contact_email",
-        subjectTemplate: "Overdue: Invoice {{invoiceNumber}} was due {{dueDate}}",
-        bodyTemplate: "Dear {{contactName}},\n\nInvoice {{invoiceNumber}} for {{amount}} was due on {{dueDate}} and remains unpaid.\n\nPlease process this payment as soon as possible.\n\nBest regards,\n{{orgName}}",
-      },
-      {
-        organizationId: org.id,
-        name: "Invoice Overdue - 14 Days",
-        triggerType: "after_due",
-        triggerDays: 14,
-        enabled: true,
-        documentType: "invoice",
-        recipientType: "contact_email",
-        subjectTemplate: "URGENT: Invoice {{invoiceNumber}} is 14 days overdue",
-        bodyTemplate: "Dear {{contactName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is now 14 days overdue.\n\nPlease contact us immediately if there are any issues with payment.\n\nBest regards,\n{{orgName}}",
-      },
-      {
-        organizationId: org.id,
-        name: "Bill Due Tomorrow",
-        triggerType: "before_due",
-        triggerDays: 1,
-        enabled: true,
-        documentType: "bill",
-        recipientType: "custom",
-        customEmails: ["finance@demo.com"],
-        subjectTemplate: "Bill {{billNumber}} due tomorrow",
-        bodyTemplate: "Bill {{billNumber}} for {{amount}} to {{contactName}} is due tomorrow ({{dueDate}}). Please ensure payment is scheduled.",
-      },
-    ]);
-    console.log("  4 reminder rules");
-  }
-
-  // 34. Notifications
-  const existingNotifs = await db.query.notification.findFirst({
-    where: eq(notification.organizationId, org.id),
-  });
-  if (!existingNotifs) {
-    console.log("Creating notifications...");
-    await db.insert(notification).values([
-      { organizationId: org.id, userId, type: "invoice_overdue", title: "Invoice INV-00004 is overdue", body: "Invoice to Bright Solutions for $5,000.00 was due Feb 8", channel: "in_app" },
-      { organizationId: org.id, userId, type: "payment_received", title: "Payment received from Acme Corp", body: "Payment of $15,000.00 received for INV-00001", channel: "in_app", readAt: new Date() },
-      { organizationId: org.id, userId, type: "inventory_low", title: "Low stock: Noise Cancelling Headphones", body: "Only 5 units remaining (reorder point: 8)", channel: "in_app" },
-      { organizationId: org.id, userId, type: "payroll_due", title: "Payroll run due in 3 days", body: "March 2026 payroll needs to be processed by March 15", channel: "in_app" },
-      { organizationId: org.id, userId, type: "task_assigned", title: "Task assigned: Build contact page", body: "You were assigned to 'Build contact page' in Website Redesign", channel: "in_app", readAt: new Date() },
-      { organizationId: org.id, userId, type: "system_alert", title: "Bank sync completed", body: "17 new transactions imported from Business Checking", channel: "in_app", readAt: new Date() },
-      { organizationId: org.id, userId, type: "approval_needed", title: "Expense claim needs approval", body: "Software Subscriptions claim for $159.00 submitted", channel: "in_app" },
-    ]);
-    console.log("  7 notifications");
-  }
-
-  // 35. Document Templates
-  const existingTemplates = await db.query.documentTemplate.findFirst({
-    where: eq(documentTemplate.organizationId, org.id),
-  });
-  if (!existingTemplates) {
-    console.log("Creating document templates...");
-    await db.insert(documentTemplate).values([
-      {
-        organizationId: org.id,
-        name: "Standard Invoice",
-        type: "invoice",
-        isDefault: true,
-        accentColor: "#10b981",
-        showTaxBreakdown: true,
-        showPaymentTerms: true,
-        notes: "Thank you for your business. Payment is due within the terms specified above.",
-        headerHtml: "<h1 style=\"color: #10b981;\">{{orgName}}</h1>",
-        footerHtml: "<p style=\"color: #6b7280; font-size: 10px;\">{{orgName}} · {{orgAddress}}</p>",
-      },
-      {
-        organizationId: org.id,
-        name: "Professional Quote",
-        type: "quote",
-        isDefault: true,
-        accentColor: "#3b82f6",
-        showTaxBreakdown: true,
-        showPaymentTerms: false,
-        notes: "This quote is valid for 30 days from the issue date.",
-      },
-      {
-        organizationId: org.id,
-        name: "Payment Receipt",
-        type: "receipt",
-        isDefault: true,
-        accentColor: "#10b981",
-        showTaxBreakdown: false,
-        showPaymentTerms: false,
-      },
-      {
-        organizationId: org.id,
-        name: "Purchase Order",
-        type: "purchase_order",
-        isDefault: true,
-        accentColor: "#f59e0b",
-        showTaxBreakdown: true,
-        showPaymentTerms: true,
-        notes: "Please confirm receipt of this purchase order.",
-      },
-    ]);
-    console.log("  4 document templates");
-  }
-
-  // 36. Document Folders
-  const existingFolders = await db.query.documentFolder.findFirst({
-    where: eq(documentFolder.organizationId, org.id),
-  });
-  if (!existingFolders) {
-    console.log("Creating document folders...");
-    const [invoicesFolder] = await db.insert(documentFolder).values({
-      organizationId: org.id,
-      name: "Invoices",
-    }).returning();
-    const [receiptsFolder] = await db.insert(documentFolder).values({
-      organizationId: org.id,
-      name: "Receipts",
-    }).returning();
-    await db.insert(documentFolder).values([
-      { organizationId: org.id, name: "Contracts" },
-      { organizationId: org.id, name: "Tax Documents" },
-      { organizationId: org.id, name: "2026", parentId: invoicesFolder.id },
-      { organizationId: org.id, name: "2025", parentId: invoicesFolder.id },
-      { organizationId: org.id, name: "Expense Receipts", parentId: receiptsFolder.id },
-    ]);
-    console.log("  7 document folders");
-  }
-
-  // 37. Saved Reports
-  const existingReports = await db.query.savedReport.findFirst({
-    where: eq(savedReport.organizationId, org.id),
-  });
-  if (!existingReports) {
-    console.log("Creating saved reports...");
-    const reportData: { name: string; description: string; config: ReportConfig }[] = [
-      { name: "Monthly P&L", description: "Profit & Loss report by month", config: { dataSource: "profit_loss", filters: [], groupBy: ["month"], columns: ["revenue", "expenses", "net"], dateRange: { from: "2026-01-01", to: "2026-12-31" } } },
-      { name: "AR Aging Summary", description: "Accounts receivable aging buckets", config: { dataSource: "ar_aging", filters: [], groupBy: ["contact"], columns: ["current", "30days", "60days", "90days", "120plus"] } },
-      { name: "Cash Flow Forecast", description: "12-month cash flow projection", config: { dataSource: "cash_flow", filters: [], groupBy: ["month"], columns: ["inflows", "outflows", "net"], chartType: "line" } },
-      { name: "Expense by Department", description: "Expenses broken down by cost center", config: { dataSource: "expense_by_cost_center", filters: [], groupBy: ["cost_center"], columns: ["category", "amount", "percentage"], chartType: "bar" } },
-    ];
-    for (const r of reportData) {
-      await db.insert(savedReport).values({
-        organizationId: org.id,
-        name: r.name,
-        description: r.description,
-        config: r.config,
-      });
-    }
-    console.log("  4 saved reports");
-  }
-
-  // 38. Scheduled Payments
-  const existingScheduledPay = await db.query.scheduledPayment.findFirst({
-    where: eq(scheduledPayment.organizationId, org.id),
-  });
-  if (!existingScheduledPay) {
-    console.log("Creating scheduled payments...");
-    const unpaidBills = await db.query.bill.findMany({
-      where: eq(bill.organizationId, org.id),
-    });
-    const pendingBills = unpaidBills.filter((b) => b.status !== "paid" && b.status !== "draft" && b.status !== "void");
-
-    for (const b of pendingBills.slice(0, 3)) {
-      await db.insert(scheduledPayment).values({
-        organizationId: org.id,
-        billId: b.id,
-        contactId: b.contactId,
-        amount: b.amountDue,
-        currencyCode: "USD",
-        scheduledDate: b.dueDate,
-        status: "pending",
-        notes: `Scheduled payment for ${b.billNumber}`,
-      });
-    }
-    console.log(`  ${Math.min(pendingBills.length, 3)} scheduled payments`);
-  }
-
-  // 39. Payroll Settings
-  const existingPayrollSettings = await db.query.payrollSettings.findFirst({
-    where: eq(payrollSettings.organizationId, org.id),
-  });
-  if (!existingPayrollSettings) {
-    console.log("Creating payroll settings and runs...");
-    await db.insert(payrollSettings).values({
-      organizationId: org.id,
-      defaultTaxRate: 2200,
-      overtimeThresholdHours: 40,
-      overtimeMultiplier: 1.5,
-      defaultCurrency: "USD",
-      salaryExpenseAccountCode: "5100",
-      taxPayableAccountCode: "2200",
-      bankAccountCode: "1100",
-    });
-
-    // Payroll runs
-    const demoMem2 = await db.query.member.findFirst({
-      where: eq(member.organizationId, org.id),
-    });
-
-    const [janRun] = await db.insert(payrollRun).values({
-      organizationId: org.id,
-      payPeriodStart: "2026-01-01",
-      payPeriodEnd: "2026-01-31",
-      status: "completed",
-      totalGross: 3300000,
-      totalDeductions: 726000,
-      totalNet: 2574000,
-      processedAt: new Date("2026-01-31"),
-      approvedBy: demoMem2?.id,
-      approvedAt: new Date("2026-01-30"),
-      approvalStatus: "approved",
-    }).returning();
-
-    const [febRun] = await db.insert(payrollRun).values({
-      organizationId: org.id,
-      payPeriodStart: "2026-02-01",
-      payPeriodEnd: "2026-02-28",
-      status: "completed",
-      totalGross: 3300000,
-      totalDeductions: 726000,
-      totalNet: 2574000,
-      processedAt: new Date("2026-02-28"),
-      approvedBy: demoMem2?.id,
-      approvedAt: new Date("2026-02-27"),
-      approvalStatus: "approved",
-    }).returning();
-
-    await db.insert(payrollRun).values({
-      organizationId: org.id,
-      payPeriodStart: "2026-03-01",
-      payPeriodEnd: "2026-03-31",
-      status: "draft",
-      totalGross: 0,
-      totalDeductions: 0,
-      totalNet: 0,
-    });
-
-    // Payroll items for Jan/Feb
-    const empList = await db.query.payrollEmployee.findMany({
-      where: eq(payrollEmployee.organizationId, org.id),
-    });
-
-    for (const run of [janRun, febRun]) {
-      for (const emp of empList) {
-        const monthly = Math.round(emp.salary / 12);
-        const tax = Math.round(monthly * (emp.taxRate ?? 2200) / 10000);
-        await db.insert(payrollItem).values({
-          payrollRunId: run.id,
-          employeeId: emp.id,
-          type: "regular_salary",
-          description: `Monthly salary - ${emp.name}`,
-          grossAmount: monthly,
-          taxAmount: tax,
-          deductions: 0,
-          netAmount: monthly - tax,
-        });
-      }
-    }
-    console.log(`  payroll settings, 3 runs, ${empList.length * 2} items`);
-  }
-
-  // 41. Exchange Rates
-  const existingFx = await db.query.exchangeRate.findFirst({
-    where: eq(exchangeRate.organizationId, org.id),
-  });
-  if (!existingFx) {
-    console.log("Creating exchange rates...");
-    const fxData = [
-      { base: "USD", target: "EUR", rate: 92000, date: "2026-03-01" },
-      { base: "USD", target: "GBP", rate: 79000, date: "2026-03-01" },
-      { base: "USD", target: "JPY", rate: 150200, date: "2026-03-01" },
-      { base: "USD", target: "CAD", rate: 136500, date: "2026-03-01" },
-      { base: "USD", target: "AUD", rate: 154800, date: "2026-03-01" },
-      { base: "USD", target: "CHF", rate: 88500, date: "2026-03-01" },
-    ];
-    for (const fx of fxData) {
-      await db.insert(exchangeRate).values({
-        organizationId: org.id,
-        baseCurrency: fx.base,
-        targetCurrency: fx.target,
-        rate: fx.rate,
-        date: fx.date,
-        source: "manual",
-      });
-    }
-    console.log(`  ${fxData.length} exchange rates`);
-  }
-
-  // 42. Period Lock
-  const existingLock = await db.query.periodLock.findFirst({
-    where: eq(periodLock.organizationId, org.id),
-  });
-  if (!existingLock) {
-    console.log("Creating period lock...");
-    await db.insert(periodLock).values({
-      organizationId: org.id,
-      lockDate: "2025-12-31",
-      lockedBy: userId,
-      reason: "Year-end close for FY 2025",
-    });
-    console.log("  1 period lock (through 2025-12-31)");
-  }
-
-  // 43. Revenue Recognition
-  const existingRevSchedule = await db.query.revenueSchedule.findFirst({
-    where: eq(revenueSchedule.organizationId, org.id),
-  });
-  if (!existingRevSchedule) {
-    console.log("Creating revenue recognition schedules...");
-    const invoices2 = await db.query.invoice.findMany({
-      where: eq(invoice.organizationId, org.id),
-      limit: 2,
-    });
-
-    if (invoices2.length >= 2) {
-      // Service revenue recognized over 3 months
-      const [schedule1] = await db.insert(revenueSchedule).values({
-        organizationId: org.id,
-        invoiceId: invoices2[0].id,
-        totalAmount: invoices2[0].total,
-        recognizedAmount: Math.round(invoices2[0].total * 2 / 3),
-        startDate: "2026-01-01",
-        endDate: "2026-03-31",
-        method: "straight_line",
-        status: "active",
-        createdBy: userId,
-      }).returning();
-
-      const monthlyAmount = Math.round(invoices2[0].total / 3);
-      for (let m = 1; m <= 3; m++) {
-        await db.insert(revenueEntry).values({
-          scheduleId: schedule1.id,
-          periodDate: `2026-${String(m).padStart(2, "0")}-01`,
-          amount: monthlyAmount,
-          recognized: m <= 2,
-          sortOrder: m,
-        });
-      }
-
-      // Second schedule
-      const [schedule2] = await db.insert(revenueSchedule).values({
-        organizationId: org.id,
-        invoiceId: invoices2[1].id,
-        totalAmount: invoices2[1].total,
-        recognizedAmount: Math.round(invoices2[1].total / 6),
-        startDate: "2026-01-15",
-        endDate: "2026-06-15",
-        method: "straight_line",
-        status: "active",
-        createdBy: userId,
-      }).returning();
-
-      const monthly2 = Math.round(invoices2[1].total / 6);
-      for (let m = 1; m <= 6; m++) {
-        await db.insert(revenueEntry).values({
-          scheduleId: schedule2.id,
-          periodDate: `2026-${String(m).padStart(2, "0")}-15`,
-          amount: monthly2,
-          recognized: m <= 1,
-          sortOrder: m,
-        });
-      }
-      console.log("  2 revenue schedules with entries");
-    }
-  }
-
-  console.log(`\nSeed complete! Organization: ${org.name}`);
-  process.exit(0);
+// ===========================================================================
+// 3. The story: dated tasks for each month
+// ===========================================================================
+function schedule() {
+  for (let i = 0; i <= CUR; i++) monthly(i);
+  oneOffs();
 }
 
-seed().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
+function monthly(i: number) {
+  const mn = monthName(i);
+  const closed = i < CUR;
+
+  // Rent, due on the 1st, paid by ACH.
+  at(day(i, 1), "rent", async () => {
+    await supplierBill(`rent-${i}`, {
+      contact: "landlord",
+      date: day(i, 1),
+      terms: 0,
+      ref: `RENT-${day(i, 1).slice(0, 7)}`,
+      lines: [{ d: `Office rent - ${mn}`, p: 3500, acct: "5200" }],
+    });
+    billPaid(`rent-${i}`, "checking", bizDay(i, 1), "ACH DEBIT LANDLORD PROPERTIES RENT", "Landlord Properties");
+  });
+
+  // Metro Services monthly retainer.
+  at(day(i, 1), "metro retainer", async () => {
+    await salesInvoice(`metro-${i}`, {
+      contact: "metro",
+      date: day(i, 1),
+      ref: "Retainer",
+      lines: [{ d: `Monthly retainer - ${mn}`, p: 7500, acct: "4010", cc: "ops" }],
+    });
+    invoicePaid(`metro-${i}`, "checking", bizDay(i, 26), "ACH CREDIT METRO SERVICES", "Metro Services");
+  });
+
+  // AWS, charged to the card.
+  at(day(i, 3), "aws", async () => {
+    const amount = between(118000, 139000) / 100;
+    await supplierBill(`aws-${i}`, {
+      contact: "aws",
+      date: day(i, 3),
+      terms: 0,
+      ref: `AWS-${day(i, 3).replace(/-/g, "").slice(0, 6)}`,
+      lines: [{ d: `AWS usage - ${mn}`, p: amount, acct: "5230", cc: "infra" }],
+    });
+    billPaid(`aws-${i}`, "card", day(i, 3), "AWS EMEA AWS.AMAZON.COM", "AWS");
+  });
+
+  // Global Industries consulting hours.
+  at(day(i, 5), "global consulting", async () => {
+    const hours = between(28, 38);
+    await salesInvoice(`global-${i}`, {
+      contact: "global",
+      date: day(i, 5),
+      lines: [{ d: `Consulting - ${monthName(i - 1)} (${hours} hours)`, q: hours, p: 225, acct: "4020", cc: "eng" }],
+    });
+    invoicePaid(`global-${i}`, "checking", bizDay(i, 19), "ACH CREDIT GLOBAL INDUSTRIES", "Global Industries");
+  });
+
+  // Utilities.
+  at(day(i, 8), "utilities", async () => {
+    await supplierBill(`util-${i}`, {
+      contact: "citypw",
+      date: day(i, 8),
+      ref: `CPW-${String(88000 + i)}`,
+      lines: [{ d: `Electricity and water - ${monthName(i - 1)}`, p: between(36000, 46000) / 100, acct: "5210" }],
+    });
+    billPaid(`util-${i}`, "checking", bizDay(i, 20), "ACH DEBIT CITY POWER & WATER", "City Power & Water");
+  });
+
+  // TechStart Mobile App: weekly time, billed at month end.
+  for (const dd of [3, 10, 17, 24]) {
+    at(day(i, dd), "time entry", async () => {
+      await post(
+        "projects/[id]/time-entries",
+        {
+          date: day(i, dd),
+          description: ["Sprint work: features and fixes", "API integration", "QA and release prep", "Client workshop and planning"][dd % 4],
+          minutes: between(10, 15) * 60,
+          isBillable: true,
+          hourlyRate: 16500,
+        },
+        { id: PROJ.mobile }
+      );
+    });
+  }
+  if (closed) {
+    at(monthEnd(i), "project invoice", async () => {
+      const res = await post("projects/[id]/invoice", { issueDate: monthEnd(i), dueDate: addDays(monthEnd(i), 30), notes: `Mobile App development - ${mn}` }, { id: PROJ.mobile });
+      const created = ent(res);
+      // Project invoices come without an income account on their lines; book
+      // the time to Service Revenue so sending posts a complete entry.
+      await db
+        .update(invoiceLine)
+        .set({ accountId: acct("4010"), taxRateId: T.exempt })
+        .where(and(eq(invoiceLine.invoiceId, created.id), isNull(invoiceLine.accountId)));
+      INV[`techstart-${i}`] = (await post("invoices/[id]/send", {}, { id: created.id })).invoice;
+      invoicePaid(`techstart-${i}`, "checking", bizDay(i + 1, 24), "WIRE IN TECHSTART INC", "TechStart Inc");
+    });
+  }
+
+  // Walk-in counter sales (taxable), deposited the same day.
+  for (const [dd, mix] of [
+    [12, [["KB-01", 2], ["MS-01", 2]]],
+    [22, [["CBL-01", 4], ["MS-01", 1], ["DOCK-01", 1]]],
+  ] as const) {
+    at(day(i, dd), "cash sale", async () => {
+      const receipt = ent(
+        await post("sales-receipts", {
+          contactId: C.walkin,
+          date: day(i, dd),
+          reference: "Counter sale",
+          currencyCode: "USD",
+          bankAccountId: BANK.checking,
+          lines: mix.map(([code, q]) => ({
+            description: itemName(code),
+            quantity: q,
+            unitPrice: I[code].sale / 100,
+            accountId: acct("4000"),
+            taxRateId: T.tx,
+            inventoryItemId: I[code].id,
+            warehouseId: W.main,
+          })),
+        })
+      );
+      await post("sales-receipts/[id]/post", {}, { id: receipt.id });
+      const je = await lastJeHitting("1100");
+      await bankLineForJournal(je, "checking", day(i, dd), "SQUARE DEPOSIT COUNTER SALES", "Square");
+    });
+  }
+
+  // Freelancer Jane (1099): design support, paid the following month.
+  if (closed) {
+    at(day(i, 25), "jane", async () => {
+      await supplierBill(`jane-${i}`, {
+        contact: "jane",
+        date: day(i, 25),
+        ref: `JD-${String(201 + i)}`,
+        lines: [{ d: `UI design support - ${mn}`, p: 1800, acct: "5130", cc: "eng" }],
+      });
+      if (i < LAST) billPaid(`jane-${i}`, "checking", bizDay(i + 1, 8), "ACH DEBIT JANE DOE DESIGN", "Freelancer Jane");
+    });
+  }
+
+  // ConsultCo (1099) every other month.
+  if (i % 2 === 1 && closed) {
+    at(day(i, 15), "consultco", async () => {
+      await supplierBill(`consultco-${i}`, {
+        contact: "consultco",
+        date: day(i, 15),
+        ref: `CC-${String(4410 + i)}`,
+        lines: [{ d: `Finance systems advisory - ${mn}`, p: 2500, acct: "5700" }],
+      });
+      if (i < LAST) billPaid(`consultco-${i}`, "checking", bizDay(i + 1, 12), "ACH DEBIT CONSULTCO LLC", "ConsultCo");
+    });
+  }
+
+  // Card spend categorized straight from the feed.
+  const card = (dd: number, desc: string, cents: number, code: string, payee: string) =>
+    at(day(i, dd), "card spend", async () => {
+      bankLine("card", day(i, dd), desc, -cents, { kind: "categorize", code }, payee);
+    });
+  card(4, "ZOOM.US 888-799-9666", 14990, "5230", "Zoom");
+  card(6, "GOOGLE WORKSPACE", 7200, "5230", "Google");
+  card(9, "SLACK TECHNOLOGIES", 8750, "5230", "Slack");
+  card(11, "STAPLES 00123 AUSTIN TX", between(3500, 9500), "5300", "Staples");
+  card(14, "UBER TRIP HELP.UBER.COM", between(1800, 4200), "5800", "Uber");
+  card(21, "UBER TRIP HELP.UBER.COM", between(1800, 4200), "5800", "Uber");
+  if (i % 2 === 1) card(16, "LINKEDIN ADS", 30000, "5600", "LinkedIn");
+
+  if (!closed) return;
+
+  // Month end: payroll through the real run builder and posting code.
+  at(monthEnd(i), "payroll", async () => {
+    const run = ent(await post("payroll/runs", { payPeriodStart: day(i, 1), payPeriodEnd: monthEnd(i) }));
+    await post("payroll/runs/[id]/process", {}, { id: run.id });
+    const done = await db.query.payrollRun.findFirst({ where: eq(payrollRun.id, run.id) });
+    if (!done?.journalEntryId) throw new Error("Payroll run was not posted");
+    await bankLineForJournal(done.journalEntryId, "checking", monthEnd(i), "ACH PAYROLL NET PAY", "Payroll");
+    // Deposit the withheld income tax and FICA (EFTPS) on the 15th.
+    const incomeTax = -(await bankLeg(done.journalEntryId, "2220"));
+    const fica = -(await bankLeg(done.journalEntryId, "2235"));
+    const depositDate = bizDay(i + 1, 15);
+    if (depositDate <= TODAY) {
+      at(depositDate, "payroll tax deposit", async () => {
+        const allocations = [
+          ...(incomeTax > 0 ? [{ bucket: "income_tax", amount: incomeTax }] : []),
+          ...(fica > 0 ? [{ bucket: "fica", amount: fica }] : []),
+        ];
+        if (!allocations.length) return;
+        const res = await post("payroll/tax-payments", {
+          periodStart: day(i, 1),
+          periodEnd: monthEnd(i),
+          jurisdictionLevel: "federal",
+          taxKind: "941",
+          allocations,
+          bankAccountCode: "1100",
+          paymentDate: depositDate,
+          reference: `EFTPS-${depositDate.replace(/-/g, "")}`,
+        });
+        await bankLineForJournal(res.journalEntryId, "checking", depositDate, "IRS USATAXPYMT EFTPS", "IRS");
+      });
+    }
+  });
+
+  // Depreciation through the shared posting path (one charge per month).
+  at(monthEnd(i), "depreciation", async () => {
+    for (const id of ASSETS) {
+      const asset = await db.query.fixedAsset.findFirst({ where: eq(fixedAsset.id, id) });
+      if (!asset || asset.purchaseDate > monthEnd(i)) continue;
+      await postAssetDepreciation(asset, { date: monthEnd(i), ctx });
+    }
+  });
+
+  // Riverdale's annual plan is earned month by month.
+  at(monthEnd(i), "revenue recognition", async () => {
+    if (REV_SCHEDULE) await post("revenue-schedules/[id]/recognize", {}, { id: REV_SCHEDULE });
+  });
+  // Prepaid insurance amortization.
+  at(monthEnd(i), "insurance amortization", async () => {
+    if (ACCRUAL_SCHEDULE) await post("accrual-schedules/[id]/post", {}, { id: ACCRUAL_SCHEDULE });
+  });
+
+  // Savings interest and bank fees.
+  at(monthEnd(i), "interest and fees", async () => {
+    bankLine("savings", monthEnd(i), "INTEREST PAYMENT", Math.round((stmtBal.savings * 0.04) / 12), { kind: "categorize", code: "4100" }, "First National Bank");
+    bankLine(
+      "checking",
+      monthEnd(i),
+      "MONTHLY SERVICE FEE",
+      -1500,
+      i === LAST ? { kind: "open" } : { kind: "categorize", code: "5900", memo: "Account maintenance fee" },
+      "First National Bank"
+    );
+  });
+
+  // Monthly Texas sales tax return: file at month end, pay on the 20th.
+  at(monthEnd(i), "sales tax return", async () => {
+    const period = ent(await post("tax-periods", { name: `Sales tax - ${monthLabel(i)}`, startDate: day(i, 1), endDate: monthEnd(i), type: "monthly" }));
+    const filed = await post("tax-periods/[id]/file", { mode: "file", filedReference: `TX-${day(i, 1).slice(0, 7)}`, basis: "accrual" }, { id: period.id });
+    const net = Number(filed.net ?? 0);
+    const payDate = bizDay(i + 1, 20);
+    if (net > 0 && payDate <= TODAY) {
+      at(payDate, "sales tax payment", async () => {
+        const res = await post(
+          "tax-periods/[id]/file",
+          { mode: "settle", bankGlAccountId: acct("1100"), amount: net, date: payDate, reference: `TX-${day(i, 1).slice(0, 7)}` },
+          { id: period.id }
+        );
+        await bankLineForJournal(res.settlementJournalEntryId, "checking", payDate, "TX COMPTROLLER SALES TAX", "Texas Comptroller");
+      });
+    }
+  });
+
+  // Loan repayment (first payment one month after the drawdown).
+  if (i >= 1) {
+    at(day(i, 2), "loan payment", async () => {
+      if (!LOAN_ID) return;
+      const res = await post("loans/[id]/post-payment", {}, { id: LOAN_ID });
+      await bankLineForJournal(res.journalEntry.id, "checking", res.entry.date, "FIRST NATIONAL LOAN PMT", "First National Bank");
+    });
+  }
+}
+let REV_SCHEDULE = "";
+let ACCRUAL_SCHEDULE = "";
+let LOAN_ID = "";
+
+function itemName(code: string): string {
+  return (
+    {
+      "MON-27": "27in 4K Monitor",
+      "STAND-01": "Monitor Stand",
+      "KB-01": "Wireless Keyboard",
+      "MS-01": "Wireless Mouse",
+      "DOCK-01": "USB-C Docking Station",
+      "CBL-01": "HDMI Cable 2m",
+      "KIT-001": "Workstation Starter Kit",
+    } as Record<string, string>
+  )[code];
+}
+const stock = (code: string, q: number, wh = "main", price?: number, tax: Ln["tax"] = "EX", acctCode = "1300"): Ln => ({
+  d: itemName(code),
+  q,
+  p: (price ?? I[code].cost) / 100,
+  acct: acctCode,
+  tax,
+  item: code,
+  wh,
 });
+const sale = (code: string, q: number, tax: Ln["tax"] = "TX"): Ln => ({
+  d: itemName(code),
+  q,
+  p: I[code].sale / 100,
+  acct: "4000",
+  tax,
+  item: code,
+  wh: "main",
+});
+
+function oneOffs() {
+  // ---------------- Month 0 ----------------
+  at(day(0, 2), "insurance", async () => {
+    await supplierBill("insurance", {
+      contact: "insurance",
+      date: day(0, 2),
+      ref: "POL-BOP-221804",
+      lines: [{ d: "Business owner's policy - 12 month premium", p: 4800, acct: "1410" }],
+    });
+    billPaid("insurance", "checking", bizDay(0, 15), "ACH DEBIT INSURANCE CO PREMIUM", "Insurance Co");
+    ACCRUAL_SCHEDULE = ent(
+      await post("accrual-schedules", {
+        totalAmount: 4800,
+        startDate: day(0, 1),
+        endDate: addDays(day(12, 1), -1),
+        periods: 12,
+        accountId: acct("1410"),
+        reverseAccountId: acct("5400"),
+        description: "Business insurance - monthly amortization",
+      })
+    ).id;
+  });
+
+  at(day(0, 2), "loan", async () => {
+    const res = await post("loans", {
+      name: "Equipment Financing",
+      bankAccountId: BANK.checking,
+      principalAmount: 50000,
+      interestRate: 650,
+      termMonths: 36,
+      startDate: day(0, 2),
+      principalAccountId: acct("2700"),
+      interestAccountId: acct("5910"),
+    });
+    LOAN_ID = res.loan.id;
+    bankLine("checking", day(0, 2), "LOAN PROCEEDS FIRST NATIONAL BANK", 5000000, { kind: "categorize", code: "2700", memo: "Equipment Financing drawdown" }, "First National Bank");
+  });
+
+  at(day(0, 3), "riverdale annual", async () => {
+    const inv = await salesInvoice("riverdale", {
+      contact: "riverdale",
+      date: day(0, 3),
+      ref: "Annual plan",
+      lines: [{ d: "Annual support & maintenance plan (12 months)", p: 24000, acct: "4010", cc: "ops" }],
+    });
+    REV_SCHEDULE = ent(
+      await post("revenue-schedules", {
+        invoiceId: inv.id,
+        totalAmount: 2400000,
+        startDate: day(0, 1),
+        endDate: addDays(day(12, 1), -1),
+        method: "straight_line",
+      })
+    ).id;
+    invoicePaid("riverdale", "checking", bizDay(0, 28), "ACH CREDIT RIVERDALE CO", "Riverdale Co");
+  });
+
+  at(day(0, 5), "stock purchase 1", async () => {
+    await supplierBill("stock-1", {
+      contact: "techhw",
+      date: day(0, 5),
+      ref: "TH-INV-30211",
+      notes: "Resale certificate on file: exempt from sales tax.",
+      lines: [
+        stock("MON-27", 20),
+        stock("STAND-01", 25),
+        stock("KB-01", 40),
+        stock("MS-01", 40),
+        stock("DOCK-01", 15),
+        stock("CBL-01", 60),
+        { d: "Freight", p: 120, acct: "5310" },
+      ],
+    });
+    billPaid("stock-1", "checking", bizDay(1, 4), "ACH DEBIT TECH HARDWARE LTD", "Tech Hardware Ltd");
+  });
+
+  at(day(0, 8), "acme milestone 1", async () => {
+    await salesInvoice("acme-m1", {
+      contact: "acme",
+      date: day(0, 8),
+      ref: "Website Redesign",
+      lines: [{ d: "Website redesign - Milestone 1: Discovery & design", p: 15000, acct: "4010", project: "website", cc: "eng" }],
+    });
+    invoicePaid("acme-m1", "checking", bizDay(1, 6), "ACH CREDIT ACME CORP", "Acme Corp");
+  });
+
+  at(day(0, 10), "furniture", async () => {
+    const po = ent(
+      await post("purchase-orders", {
+        contactId: C.officedepot,
+        issueDate: day(0, 10),
+        deliveryDate: day(0, 12),
+        reference: "Office fit-out",
+        currencyCode: "USD",
+        lines: [
+          { description: "Standing desk", quantity: 6, unitPrice: 650, accountId: acct("1610"), taxRateId: T.tx },
+          { description: "Ergonomic chair", quantity: 6, unitPrice: 420, accountId: acct("1610"), taxRateId: T.tx },
+        ],
+      })
+    );
+    await post("purchase-orders/[id]/send", {}, { id: po.id });
+    const b = await supplierBill("furniture", {
+      contact: "officedepot",
+      date: day(0, 12),
+      ref: "OD-7781204",
+      po: [po.id],
+      lines: [
+        { d: "Standing desk", q: 6, p: 650, acct: "1610", tax: "TX" },
+        { d: "Ergonomic chair", q: 6, p: 420, acct: "1610", tax: "TX" },
+      ],
+    });
+    await addAsset("Office furniture - desks and chairs", "FA-0001", "furniture", day(0, 12), b.total, "1610", "1710", 84);
+    billPaid("furniture", "checking", bizDay(1, 10), "ACH DEBIT OFFICE DEPOT", "Office Depot");
+  });
+
+  at(day(0, 10), "savings transfer", async () => {
+    bankLine("checking", bizDay(0, 10), "TRANSFER TO SAVINGS ****8832", -1000000, { kind: "transfer", pair: "sav-0", to: "savings" }, "First National Bank");
+    bankLine("savings", bizDay(0, 10), "TRANSFER FROM CHECKING ****4521", 1000000, { kind: "counter", pair: "sav-0" }, "First National Bank");
+  });
+
+  at(day(0, 15), "pinnacle q1", async () => {
+    await salesInvoice("pinnacle-1", {
+      contact: "pinnacle",
+      date: day(0, 15),
+      ref: "Advisory retainer",
+      lines: [{ d: `Quarterly advisory - ${monthName(0)} to ${monthName(2)}`, p: 12000, acct: "4020", cc: "ops" }],
+    });
+    invoicePaid("pinnacle-1", "checking", bizDay(1, 28), "WIRE IN PINNACLE GROUP", "Pinnacle Group");
+  });
+
+  // ---------------- Month 1 ----------------
+  at(day(1, 6), "acme hardware", async () => {
+    await salesInvoice("acme-hw", {
+      contact: "acme",
+      date: day(1, 6),
+      ref: "PO A-55102",
+      lines: [sale("MON-27", 8), sale("STAND-01", 8), sale("KB-01", 8), sale("MS-01", 8)],
+    });
+    invoicePaid("acme-hw", "checking", bizDay(2, 5), "ACH CREDIT ACME CORP", "Acme Corp");
+  });
+
+  at(day(1, 8), "credit note 1", async () => {
+    const cn = ent(
+      await post("credit-notes", {
+        contactId: C.global,
+        invoiceId: INV["global-1"]?.id ?? null,
+        issueDate: day(1, 8),
+        reference: "Billing adjustment",
+        currencyCode: "USD",
+        lines: [{ description: "Hours adjustment - 2 hours billed twice", quantity: 2, unitPrice: 225, accountId: acct("4020"), taxRateId: T.exempt }],
+      })
+    );
+    await post("credit-notes/[id]/send", {}, { id: cn.id });
+    await post("credit-notes/[id]/apply", { invoiceId: INV["global-1"].id, amount: 45000 }, { id: cn.id });
+  });
+
+  at(day(1, 10), "sterling prepayment", async () => {
+    const res = await post("customer-credits", {
+      contactId: C.sterling,
+      date: day(1, 10),
+      amount: 500000,
+      sourceType: "prepayment",
+      currencyCode: "USD",
+      notes: "Deposit for the operations review engagement",
+      bankAccountId: BANK.checking,
+    });
+    STERLING_CREDIT = res.customerCredit.id;
+    await bankLineForJournal(res.customerCredit.journalEntryId, "checking", day(1, 10), "WIRE IN STERLING ENTERPRISES", "Sterling Enterprises");
+  });
+
+  at(day(1, 12), "bright overdue", async () => {
+    await salesInvoice("bright", {
+      contact: "bright",
+      date: day(1, 12),
+      lines: [{ d: "Support hours - integration troubleshooting", q: 8, p: 225, acct: "4010" }],
+    });
+  });
+
+  at(day(1, 14), "voided invoice", async () => {
+    const inv = await salesInvoice("summit-void", {
+      contact: "summit",
+      date: day(1, 14),
+      lines: [{ d: "Website hosting setup", p: 950, acct: "4010" }],
+    });
+    await post("invoices/[id]/void", { reason: "Duplicate - issued in error" }, { id: inv.id });
+  });
+
+  at(day(1, 18), "nordlicht 1", async () => {
+    await salesInvoice("nordlicht-1", {
+      contact: "nordlicht",
+      date: day(1, 18),
+      currency: "EUR",
+      ref: "PO 4500012871",
+      lines: [{ d: `Data platform consulting - ${monthName(1)}`, q: 32, p: 250, acct: "4020" }],
+    });
+  });
+
+  // ---------------- Month 2 ----------------
+  at(day(2, 3), "acme milestone 2", async () => {
+    await salesInvoice("acme-m2", {
+      contact: "acme",
+      date: day(2, 3),
+      ref: "Website Redesign",
+      lines: [{ d: "Website redesign - Milestone 2: Build", p: 20000, acct: "4010", project: "website", cc: "eng" }],
+    });
+    invoicePaid("acme-m2", "checking", bizDay(3, 4), "ACH CREDIT ACME CORP", "Acme Corp");
+  });
+
+  at(day(2, 8), "macbooks", async () => {
+    const po = ent(
+      await post("purchase-orders", {
+        contactId: C.techhw,
+        issueDate: day(2, 8),
+        deliveryDate: day(2, 10),
+        reference: "New hire laptops",
+        currencyCode: "USD",
+        lines: [{ description: "MacBook Pro 16in M4 Pro 48GB", quantity: 2, unitPrice: 3199, accountId: acct("1620"), taxRateId: T.tx }],
+      })
+    );
+    await post("purchase-orders/[id]/send", {}, { id: po.id });
+    const b = await supplierBill("macbooks", {
+      contact: "techhw",
+      date: day(2, 10),
+      ref: "TH-INV-30877",
+      po: [po.id],
+      lines: [{ d: "MacBook Pro 16in M4 Pro 48GB", q: 2, p: 3199, acct: "1620", tax: "TX" }],
+    });
+    await addAsset("MacBook Pro 16in (x2)", "FA-0002", "computers", day(2, 10), b.total, "1620", "1720", 36);
+    billPaid("macbooks", "checking", bizDay(2, 24), "ACH DEBIT TECH HARDWARE LTD", "Tech Hardware Ltd");
+  });
+
+  at(day(2, 9), "cloudbase hardware", async () => {
+    await salesInvoice("cloudbase-hw", {
+      contact: "cloudbase",
+      date: day(2, 9),
+      notes: "Shipped to Seattle, WA: no Texas sales tax.",
+      lines: [sale("MON-27", 4, "EX"), sale("KB-01", 4, "EX"), sale("MS-01", 4, "EX"), sale("DOCK-01", 4, "EX")],
+    });
+    invoicePaid("cloudbase-hw", "checking", bizDay(3, 15), "ACH CREDIT CLOUDBASE SYSTEMS", "CloudBase Systems");
+  });
+
+  at(day(2, 12), "nordlicht payment", async () => {
+    const inv = INV["nordlicht-1"];
+    const res = await post("invoices/[id]/pay", { amount: inv.amountDue, date: bizDay(2, 12), method: "bank_transfer", reference: "SEPA 88124", bankAccountId: BANK.checking }, { id: inv.id });
+    const pay = await db.query.payment.findFirst({ where: (p, { eq: e }) => e(p.id, res.payment.id) });
+    if (pay?.journalEntryId) {
+      const amount = await bankLeg(pay.journalEntryId, "1100");
+      bankLine("checking", bizDay(2, 12), "INTL WIRE IN NORDLICHT GMBH", amount, { kind: "payment", paymentId: pay.id }, "Nordlicht GmbH");
+    }
+  });
+
+  at(day(2, 12), "marketing 1", async () => {
+    await supplierBill("marketing-1", {
+      contact: "marketing",
+      date: day(2, 12),
+      ref: "MA-2291",
+      lines: [{ d: "Paid social campaign - management fee", p: 2200, acct: "5600", cc: "sales" }],
+    });
+    billPaid("marketing-1", "checking", bizDay(3, 2), "ACH DEBIT MARKETING AGENCY", "Marketing Agency");
+  });
+
+  at(day(2, 15), "owner contribution", async () => {
+    bankLine("checking", bizDay(2, 15), "DEPOSIT OWNER CAPITAL CONTRIBUTION", 2000000, { kind: "categorize", code: "3210", memo: "Owner capital contribution" }, "Owner");
+  });
+
+  at(day(2, 18), "sterling invoice", async () => {
+    const inv = await salesInvoice("sterling-1", {
+      contact: "sterling",
+      date: day(2, 18),
+      ref: "Operations review",
+      lines: [{ d: "Operations review & 12-month roadmap", p: 15000, acct: "4020", cc: "ops" }],
+    });
+    await post("customer-credits/[id]/apply", { invoiceId: inv.id, amount: 500000, date: day(2, 18) }, { id: STERLING_CREDIT });
+    invoicePaid("sterling-1", "checking", bizDay(4, 5), "WIRE IN STERLING ENTERPRISES", "Sterling Enterprises");
+  });
+
+  // ---------------- Month 3 ----------------
+  at(day(3, 2), "credit note 2", async () => {
+    const cn = ent(
+      await post("credit-notes", {
+        contactId: C.cloudbase,
+        invoiceId: INV["cloudbase-hw"].id,
+        issueDate: day(3, 2),
+        reference: "RMA-1042",
+        currencyCode: "USD",
+        lines: [{ description: "Returned: Wireless Keyboard (damaged in transit)", quantity: 1, unitPrice: 79, accountId: acct("4000"), taxRateId: T.exempt }],
+      })
+    );
+    await post("credit-notes/[id]/send", {}, { id: cn.id });
+    await post("credit-notes/[id]/apply", { invoiceId: INV["cloudbase-hw"].id, amount: 7900 }, { id: cn.id });
+  });
+
+  at(day(3, 4), "pinnacle q2", async () => {
+    await salesInvoice("pinnacle-2", {
+      contact: "pinnacle",
+      date: day(3, 4),
+      ref: "Advisory retainer",
+      lines: [{ d: `Quarterly advisory - ${monthName(3)} to ${monthName(5)}`, p: 12000, acct: "4020", cc: "ops" }],
+    });
+    invoicePaid("pinnacle-2", "checking", bizDay(4, 20), "WIRE IN PINNACLE GROUP", "Pinnacle Group");
+  });
+
+  at(day(3, 6), "stock purchase 2", async () => {
+    await supplierBill("stock-2", {
+      contact: "techhw",
+      date: day(3, 6),
+      ref: "TH-INV-31452",
+      notes: "Resale certificate on file: exempt from sales tax.",
+      lines: [stock("MON-27", 15), stock("KB-01", 20), stock("MS-01", 20), stock("CBL-01", 40, "east"), { d: "Freight", p: 95, acct: "5310" }],
+    });
+  });
+
+  at(day(3, 9), "debit note", async () => {
+    const dn = ent(
+      await post("debit-notes", {
+        contactId: C.techhw,
+        billId: BILLS["stock-2"].id,
+        issueDate: day(3, 9),
+        reference: "Freight overcharge",
+        currencyCode: "USD",
+        lines: [{ description: "Freight overcharge refund", quantity: 1, unitPrice: 45, accountId: acct("5310"), taxRateId: T.exempt }],
+      })
+    );
+    await post("debit-notes/[id]/send", {}, { id: dn.id });
+    await post("debit-notes/[id]/apply", { billId: BILLS["stock-2"].id, amount: 4500 }, { id: dn.id });
+    billPaid("stock-2", "checking", bizDay(4, 6), "ACH DEBIT TECH HARDWARE LTD", "Tech Hardware Ltd");
+  });
+
+  at(day(3, 10), "legal", async () => {
+    await supplierBill("legal-1", {
+      contact: "legal",
+      date: day(3, 10),
+      ref: "LP-10992",
+      lines: [{ d: "Contract review - customer MSA template", p: 1500, acct: "5710" }],
+    });
+    billPaid("legal-1", "checking", bizDay(4, 10), "ACH DEBIT LEGAL PARTNERS LLP", "Legal Partners LLP");
+  });
+
+  at(day(3, 12), "office supplies", async () => {
+    await supplierBill("supplies", {
+      contact: "officedepot",
+      date: day(3, 12),
+      terms: 0,
+      ref: "OD-7790551",
+      lines: [
+        { d: "Printer paper (10 reams)", p: 64, acct: "5300", tax: "TX" },
+        { d: "Toner cartridges", p: 122, acct: "5300", tax: "TX" },
+      ],
+    });
+    billPaid("supplies", "card", day(3, 13), "OFFICE DEPOT #1142 AUSTIN TX", "Office Depot");
+  });
+
+  at(day(3, 18), "summit quote", async () => {
+    const q = ent(
+      await post("quotes", {
+        contactId: C.summit,
+        issueDate: day(3, 18),
+        expiryDate: addDays(day(3, 18), 30),
+        reference: "Hardware refresh",
+        currencyCode: "USD",
+        lines: [
+          { description: itemName("MON-27"), quantity: 10, unitPrice: 420, accountId: acct("4000"), taxRateId: T.tx, inventoryItemId: I["MON-27"].id },
+          { description: itemName("DOCK-01"), quantity: 10, unitPrice: 159, accountId: acct("4000"), taxRateId: T.tx, inventoryItemId: I["DOCK-01"].id },
+        ],
+      })
+    );
+    await post("quotes/[id]/send", {}, { id: q.id });
+    await post("quotes/[id]/decline", {}, { id: q.id });
+  });
+
+  at(day(3, 20), "nordlicht 2", async () => {
+    await salesInvoice("nordlicht-2", {
+      contact: "nordlicht",
+      date: day(3, 20),
+      currency: "EUR",
+      ref: "PO 4500013340",
+      lines: [{ d: `Data platform consulting - ${monthName(3)}`, q: 26, p: 250, acct: "4020" }],
+    });
+  });
+
+  // ---------------- Month 4 ----------------
+  at(day(4, 4), "acme milestone 3", async () => {
+    await salesInvoice("acme-m3", {
+      contact: "acme",
+      date: day(4, 4),
+      ref: "Website Redesign",
+      lines: [{ d: "Website redesign - Milestone 3: Launch & handover", p: 10000, acct: "4010", project: "website", cc: "eng" }],
+    });
+    invoicePaid("acme-m3", "checking", bizDay(5, 6), "ACH CREDIT ACME CORP", "Acme Corp");
+  });
+
+  at(day(4, 7), "summit hardware", async () => {
+    await salesInvoice("summit-hw", {
+      contact: "summit",
+      date: day(4, 7),
+      lines: [sale("MON-27", 3), sale("DOCK-01", 3)],
+    });
+    invoicePaid("summit-hw", "checking", bizDay(4, 21), "ACH CREDIT SUMMIT DIGITAL", "Summit Digital");
+  });
+
+  at(day(4, 12), "av system", async () => {
+    const b = await supplierBill("av", {
+      contact: "techhw",
+      date: day(4, 12),
+      ref: "TH-INV-31990",
+      lines: [{ d: "Conference room AV system (display, camera, mics)", p: 4200, acct: "1600", tax: "TX" }],
+    });
+    await addAsset("Conference room AV system", "FA-0003", "equipment", day(4, 12), b.total, "1600", "1700", 60);
+    billPaid("av", "checking", bizDay(5, 10), "ACH DEBIT TECH HARDWARE LTD", "Tech Hardware Ltd");
+  });
+
+  at(day(4, 20), "sterling invoice 2", async () => {
+    await salesInvoice("sterling-2", {
+      contact: "sterling",
+      date: day(4, 20),
+      ref: "Process automation",
+      lines: [{ d: "Process automation - phase 1", p: 12500, acct: "4020", cc: "ops" }],
+    });
+  });
+
+  at(day(4, 24), "acme phase 2 quote", async () => {
+    const q = ent(
+      await post("quotes", {
+        contactId: C.acme,
+        issueDate: day(4, 24),
+        expiryDate: addDays(TODAY, 21),
+        reference: "Website Redesign - Phase 2",
+        currencyCode: "USD",
+        lines: [{ description: "Phase 2 - e-commerce integration", quantity: 1, unitPrice: 6500, accountId: acct("4010"), taxRateId: T.exempt }],
+      })
+    );
+    await post("quotes/[id]/send", {}, { id: q.id });
+    ACME_QUOTE = q.id;
+  });
+
+  // ---------------- Month 5 ----------------
+  at(day(5, 1), "marketing 2", async () => {
+    await supplierBill("marketing-2", {
+      contact: "marketing",
+      date: day(5, 1),
+      ref: "MA-2350",
+      lines: [{ d: "Q4 campaign planning and creative", p: 2200, acct: "5600", cc: "sales" }],
+    });
+  });
+
+  at(day(5, 2), "acme accepts quote", async () => {
+    if (ACME_QUOTE) await post("quotes/[id]/accept", {}, { id: ACME_QUOTE });
+  });
+
+  at(day(5, 2), "sterling quote", async () => {
+    const q = ent(
+      await post("quotes", {
+        contactId: C.sterling,
+        issueDate: day(5, 2),
+        expiryDate: addDays(TODAY, 30),
+        reference: "Process automation - phase 2",
+        currencyCode: "USD",
+        lines: [
+          { description: "Process automation - phase 2 build", quantity: 1, unitPrice: 15000, accountId: acct("4020"), taxRateId: T.exempt },
+          { description: "Training and handover", quantity: 1, unitPrice: 3000, accountId: acct("4020"), taxRateId: T.exempt },
+        ],
+      })
+    );
+    await post("quotes/[id]/send", {}, { id: q.id });
+  });
+
+  at(day(5, 5), "cloudbase support", async () => {
+    await salesInvoice("cloudbase-support", {
+      contact: "cloudbase",
+      date: day(5, 5),
+      lines: [{ d: `Platform support - ${monthName(5)}`, p: 2000, acct: "4010" }],
+    });
+  });
+
+  at(day(5, 20), "displays po", async () => {
+    const po = ent(
+      await post("purchase-orders", {
+        contactId: C.techhw,
+        issueDate: day(5, 20),
+        deliveryDate: day(5, 30),
+        reference: "Meeting room displays",
+        currencyCode: "USD",
+        lines: [
+          { description: "55in meeting room display", quantity: 4, unitPrice: 650, accountId: acct("1600"), taxRateId: T.tx },
+          { description: "Wall mount kit", quantity: 4, unitPrice: 45, accountId: acct("1600"), taxRateId: T.tx },
+        ],
+      })
+    );
+    await post("purchase-orders/[id]/send", {}, { id: po.id });
+    DISPLAYS_PO = po.id;
+  });
+
+  at(day(5, 22), "credit note 3", async () => {
+    const cn = ent(
+      await post("credit-notes", {
+        contactId: C.acme,
+        issueDate: day(5, 22),
+        reference: "Service credit",
+        currencyCode: "USD",
+        lines: [{ description: "Service credit - staging downtime", quantity: 1, unitPrice: 250, accountId: acct("4010"), taxRateId: T.exempt }],
+      })
+    );
+    await post("credit-notes/[id]/send", {}, { id: cn.id });
+  });
+
+  at(day(5, 28), "partial goods receipt", async () => {
+    if (!DISPLAYS_PO) return;
+    const po = await get("purchase-orders/[id]", { id: DISPLAYS_PO });
+    const lines = ent(po).lines ?? po.purchaseOrder?.lines ?? [];
+    const display = lines.find((l: any) => String(l.description).startsWith("55in"));
+    const mount = lines.find((l: any) => String(l.description).startsWith("Wall mount"));
+    await post("goods-receipts", {
+      purchaseOrderId: DISPLAYS_PO,
+      date: day(5, 28),
+      notes: "First 2 displays delivered; 2 on back order",
+      lines: [
+        { purchaseOrderLineId: display.id, quantity: 2 },
+        { purchaseOrderLineId: mount.id, quantity: 2 },
+      ],
+    });
+  });
+
+  // ---------------- Current month (to date) ----------------
+  currentMonth();
+}
+let STERLING_CREDIT = "";
+let ACME_QUOTE = "";
+let DISPLAYS_PO = "";
+
+async function addAsset(name: string, assetNumber: string, cat: string, date: string, cost: number, assetCode: string, accumCode: string, life: number) {
+  const res = await post("fixed-assets", {
+    name,
+    assetNumber,
+    categoryId: ASSET_CAT[cat],
+    purchaseDate: date,
+    purchasePrice: cost,
+    residualValue: 0,
+    usefulLifeMonths: life,
+    depreciationMethod: "straight_line",
+    convention: "full_month",
+    assetAccountId: acct(assetCode),
+    depreciationAccountId: acct("5500"),
+    accumulatedDepAccountId: acct(accumCode),
+  });
+  ASSETS.push(res.asset.id);
+}
+
+function currentMonth() {
+  // Today's work happens on today's date (several app actions are dated "today").
+  const d = (dd: number) => (day(CUR, dd) < TODAY ? day(CUR, dd) : TODAY);
+
+  at(d(2), "requisitions", async () => {
+    const draft = ent(
+      await post("purchase-requisitions", {
+        contactId: C.techhw,
+        requestDate: d(2),
+        requiredDate: addDays(TODAY, 21),
+        reference: "Spare chargers",
+        notes: "For the loaner laptop pool",
+        lines: [{ description: "USB-C 96W charger", quantity: 10, unitPrice: 49, accountId: acct("5300"), taxRateId: T.tx }],
+      })
+    );
+    void draft;
+    const submitted = ent(
+      await post("purchase-requisitions", {
+        contactId: C.officedepot,
+        requestDate: d(2),
+        requiredDate: addDays(TODAY, 14),
+        reference: "New starter chairs",
+        notes: "Two new hires next month",
+        lines: [{ description: "Ergonomic chair", quantity: 4, unitPrice: 420, accountId: acct("1610"), taxRateId: T.tx }],
+      })
+    );
+    await post("purchase-requisitions/[id]/submit", {}, { id: submitted.id });
+    const approved = ent(
+      await post("purchase-requisitions", {
+        contactId: C.techhw,
+        requestDate: d(2),
+        requiredDate: addDays(TODAY, 10),
+        reference: "Stock top-up",
+        lines: [
+          { description: "Wireless Keyboard", quantity: 20, unitPrice: 45, accountId: acct("1300"), taxRateId: T.exempt },
+          { description: "Wireless Mouse", quantity: 20, unitPrice: 22, accountId: acct("1300"), taxRateId: T.exempt },
+        ],
+      })
+    );
+    await post("purchase-requisitions/[id]/submit", {}, { id: approved.id });
+    await post("purchase-requisitions/[id]/approve", {}, { id: approved.id });
+    await post("purchase-requisitions/[id]/convert", { contactId: C.techhw }, { id: approved.id });
+  });
+
+  at(TODAY, "quotes", async () => {
+    if (ACME_QUOTE) {
+      const res = await post("quotes/[id]/convert", {}, { id: ACME_QUOTE });
+      const inv = res.invoice ?? null;
+      if (inv?.id && inv.status === "draft") await post("invoices/[id]/send", {}, { id: inv.id });
+    }
+    await post("quotes", {
+      contactId: C.techstart,
+      issueDate: TODAY,
+      expiryDate: addDays(TODAY, 30),
+      reference: "Mobile app - phase 2",
+      currencyCode: "USD",
+      lines: [
+        { description: "Phase 2: offline maps and route planning", quantity: 120, unitPrice: 165, accountId: acct("4010"), taxRateId: T.exempt },
+        { description: "Phase 2: admin web console", quantity: 80, unitPrice: 165, accountId: acct("4010"), taxRateId: T.exempt },
+      ],
+    });
+    const q5 = ent(
+      await post("quotes", {
+        contactId: C.pinnacle,
+        issueDate: TODAY,
+        expiryDate: addDays(TODAY, 30),
+        reference: "Advisory renewal",
+        currencyCode: "USD",
+        lines: [{ description: "Quarterly advisory retainer - next 4 quarters", quantity: 4, unitPrice: 12000, accountId: acct("4020"), taxRateId: T.exempt }],
+      })
+    );
+    await post("quotes/[id]/send", {}, { id: q5.id });
+  });
+
+  // Work in progress on any given day: a draft invoice, an accepted quote, an
+  // order with the supplier, credit still to use, and a few things binned.
+  at(TODAY, "drafts and open documents", async () => {
+    await salesInvoice("cloudbase-draft", {
+      contact: "cloudbase",
+      date: TODAY,
+      ref: "CB-Q4-support",
+      send: false,
+      lines: [
+        { d: "Managed support - November", p: 2400, acct: "4020", cc: "ops" },
+        { d: "Additional support hours", q: 6, p: 150, acct: "4020", cc: "ops" },
+      ],
+    });
+    const accepted = ent(
+      await post("quotes", {
+        contactId: C.bright,
+        issueDate: d(6),
+        expiryDate: addDays(d(6), 30),
+        reference: "Brand refresh",
+        currencyCode: "USD",
+        lines: [
+          { description: "Brand refresh - logo and identity", quantity: 1, unitPrice: 6500, accountId: acct("4010"), taxRateId: T.exempt },
+          { description: "Marketing site templates", quantity: 1, unitPrice: 3200, accountId: acct("4010"), taxRateId: T.exempt },
+        ],
+      })
+    );
+    await post("quotes/[id]/send", {}, { id: accepted.id });
+    await post("quotes/[id]/accept", {}, { id: accepted.id });
+
+    const po = ent(
+      await post("purchase-orders", {
+        contactId: C.techhw,
+        issueDate: d(8),
+        deliveryDate: addDays(TODAY, 7),
+        reference: "Q4 monitor restock",
+        currencyCode: "USD",
+        lines: [
+          { description: '27" 4K Monitor', quantity: 10, unitPrice: 240, accountId: acct("1300"), taxRateId: T.exempt, inventoryItemId: I["MON-27"].id },
+          { description: "HDMI Cable 2m", quantity: 30, unitPrice: 6, accountId: acct("1300"), taxRateId: T.exempt, inventoryItemId: I["CBL-01"].id },
+        ],
+      })
+    );
+    await post("purchase-orders/[id]/send", {}, { id: po.id });
+
+    const aws = BILLS["aws-" + CUR] ?? BILLS["aws-" + LAST];
+    const credit = ent(
+      await post("debit-notes", {
+        contactId: C.aws,
+        billId: aws?.id ?? null,
+        issueDate: d(9),
+        reference: "Service credit - outage",
+        currencyCode: "USD",
+        lines: [{ description: "SLA service credit for the September outage", quantity: 1, unitPrice: 120, accountId: acct("5230"), taxRateId: T.exempt }],
+      })
+    );
+    await post("debit-notes/[id]/send", {}, { id: credit.id });
+
+    await post("inventory/transfers", {
+      fromWarehouseId: W.main,
+      toWarehouseId: W.east,
+      notes: "Keyboards for the east showroom",
+      lines: [{ inventoryItemId: I["KB-01"].id, quantity: 4 }],
+    });
+
+    // Binned this week, still in Trash.
+    const dupe = ent(
+      await post("quotes", {
+        contactId: C.techstart,
+        issueDate: d(5),
+        expiryDate: addDays(d(5), 30),
+        reference: "Duplicate - mobile app phase 2",
+        currencyCode: "USD",
+        lines: [{ description: "Phase 2 estimate", quantity: 1, unitPrice: 18000, accountId: acct("4010"), taxRateId: T.exempt }],
+      })
+    );
+    await del("quotes/[id]", { id: dupe.id });
+    const lead = ent(await post("contacts", { name: "Oakridge Bakery", email: "hello@oakridgebakery.com", type: "customer" }));
+    await del("contacts/[id]", { id: lead.id });
+  });
+
+  at(TODAY, "customer portal", async () => {
+    for (const key of ["acme", "sterling", "techstart"]) {
+      const res = await post("portal/invite", { contactId: C[key], expiresInDays: 60 });
+      // Acme and Sterling have opened their links.
+      if (key !== "techstart") await api("GET", "../portal/[token]", undefined, { token: res.access.token });
+    }
+  });
+
+  at(TODAY, "legal draft bill", async () => {
+    await supplierBill("legal-2", {
+      contact: "legal",
+      date: TODAY,
+      ref: "LP-11240",
+      receive: false,
+      lines: [{ d: "Trademark filing - dubbl wordmark", p: 950, acct: "5710" }],
+    });
+  });
+
+  at(TODAY, "scheduled payment", async () => {
+    const b = BILLS["marketing-2"];
+    if (!b) return;
+    await post("scheduled-payments", {
+      billId: b.id,
+      contactId: C.marketing,
+      amount: b.amountDue ?? b.total,
+      currencyCode: "USD",
+      scheduledDate: addDays(TODAY, 3),
+      notes: "Agreed to pay after the campaign review",
+      bankAccountId: BANK.checking,
+    });
+  });
+
+  at(TODAY, "payment batch", async () => {
+    const items = ["jane-" + LAST, "consultco-" + LAST]
+      .map((k) => BILLS[k])
+      .filter(Boolean)
+      .map((b) => ({ billId: b.id, contactId: b.contactId, amount: b.amountDue ?? b.total, currencyCode: "USD" }));
+    if (!items.length) return;
+    const batch = ent(await post("payment-batches", { name: `Supplier run ${TODAY}`, currencyCode: "USD", bankAccountId: BANK.checking, items }));
+    await post("payment-batches/[id]/submit", {}, { id: batch.id });
+    // The ACH debits already show on today's statement, waiting to be matched.
+    for (const [k, desc, payee] of [
+      ["jane-" + LAST, "ACH DEBIT JANE DOE DESIGN", "Freelancer Jane"],
+      ["consultco-" + LAST, "ACH DEBIT CONSULTCO LLC", "ConsultCo"],
+    ]) {
+      const b = BILLS[k];
+      if (b) bankLine("checking", TODAY, desc, -(b.amountDue ?? b.total), { kind: "open" }, payee);
+    }
+  });
+
+  at(TODAY, "expense claims", async () => {
+    const paid = ent(
+      await post("expenses", {
+        title: "Client visit - Dallas",
+        description: "Metro Services quarterly review",
+        currencyCode: "USD",
+        items: [
+          { date: d(3), description: "Hotel - 1 night", amount: 189, category: "Travel", accountId: acct("5800"), taxRateId: T.none },
+          { date: d(3), description: "Client dinner", amount: 86.4, category: "Meals", accountId: acct("5810"), taxRateId: T.none },
+          { date: d(4), description: "Parking", amount: 24, category: "Travel", accountId: acct("5800"), taxRateId: T.none },
+        ],
+      })
+    );
+    await post("expenses/[id]/submit", {}, { id: paid.id });
+    await post("expenses/[id]/approve", { comment: "OK" }, { id: paid.id });
+    await post("expenses/[id]/pay", { date: TODAY, bankAccountCode: "1100" }, { id: paid.id });
+    const pending = ent(
+      await post("expenses", {
+        title: "SaaS Summit conference",
+        description: "Conference pass and meals",
+        currencyCode: "USD",
+        items: [
+          { date: d(8), description: "Conference pass", amount: 695, category: "Travel", accountId: acct("5800"), taxRateId: T.none },
+          { date: d(9), description: "Team lunch", amount: 64.5, category: "Meals", accountId: acct("5810"), taxRateId: T.none },
+        ],
+      })
+    );
+    await post("expenses/[id]/submit", {}, { id: pending.id });
+    await post("expenses", {
+      title: "Office snacks",
+      currencyCode: "USD",
+      items: [{ date: d(10), description: "Coffee and snacks", amount: 42.75, category: "Office", accountId: acct("5300"), taxRateId: T.none }],
+    });
+  });
+
+  at(TODAY, "inventory today", async () => {
+    // Move stock to the east warehouse; one transfer arrived, one on the road.
+    const t1 = ent(
+      await post("inventory/transfers", {
+        fromWarehouseId: W.main,
+        toWarehouseId: W.east,
+        notes: "Stock for east-side customers",
+        lines: [
+          { inventoryItemId: I["MON-27"].id, quantity: 3 },
+          { inventoryItemId: I["KB-01"].id, quantity: 6 },
+        ],
+      })
+    );
+    await patch("inventory/transfers/[id]", { status: "in_transit" }, { id: t1.id });
+    await post("inventory/transfers/[id]/complete", {}, { id: t1.id });
+    const t2 = ent(
+      await post("inventory/transfers", {
+        fromWarehouseId: W.east,
+        toWarehouseId: W.main,
+        notes: "Return excess cables to main",
+        lines: [{ inventoryItemId: I["CBL-01"].id, quantity: 10 }],
+      })
+    );
+    await patch("inventory/transfers/[id]", { status: "in_transit" }, { id: t2.id });
+
+    // Build three starter kits from components (posts the assembly entry).
+    const order = ent(await post("inventory/assembly-orders", { bomId: BOM_ID, quantity: 3, notes: "Kits for walk-in customers" }));
+    await post("inventory/assembly-orders/[id]/complete", {}, { id: order.id });
+    await post("inventory/assembly-orders", { bomId: BOM_ID, quantity: 5, notes: "Planned build for next month" });
+
+    // Stocktake: counted and applied (small shrinkage), plus one in progress.
+    const st = ent(await post("stock-takes", { name: `Quarterly count - Main Warehouse`, warehouseId: W.main, notes: "Full count" }));
+    await patch("stock-takes/[id]", { status: "in_progress" }, { id: st.id });
+    const full = await get("stock-takes/[id]", { id: st.id });
+    const lines = full.stockTake?.lines ?? full.lines ?? [];
+    for (const l of lines) {
+      const expected = Number(l.expectedQuantity ?? l.systemQuantity ?? 0);
+      const short = l.inventoryItemId === I["CBL-01"].id ? 2 : l.inventoryItemId === I["MS-01"].id ? 1 : 0;
+      await patch("stock-takes/[id]/lines/[lineId]", { countedQuantity: Math.max(0, expected - short) }, { id: st.id, lineId: l.id });
+    }
+    await post("stock-takes/[id]/apply", {}, { id: st.id });
+    const st2 = ent(await post("stock-takes", { name: "Cycle count - East Distribution Center", warehouseId: W.east }));
+    await patch("stock-takes/[id]", { status: "in_progress" }, { id: st2.id });
+  });
+
+  at(TODAY, "contractor", async () => {
+    const p1 = await post("payroll/contractors/[id]/payments", {
+      amount: 342000,
+      currency: "USD",
+      description: "Usability study - field app (36 hours)",
+      invoiceNumber: "RUX-0912",
+      periodStart: day(LAST, 1),
+      periodEnd: monthEnd(LAST),
+    }, { id: CONTRACTOR_ID });
+    await post("payroll/contractors/[id]/payments/[paymentId]/process", {}, { id: CONTRACTOR_ID, paymentId: p1.payment.id });
+    await post("payroll/contractors/[id]/payments", {
+      amount: 190000,
+      currency: "USD",
+      description: "Interview synthesis (20 hours)",
+      invoiceNumber: "RUX-0927",
+      periodStart: day(CUR, 1),
+      periodEnd: TODAY,
+    }, { id: CONTRACTOR_ID });
+  });
+
+  at(TODAY, "draft pay run", async () => {
+    await post("payroll/runs", { payPeriodStart: day(CUR, 1), payPeriodEnd: monthEnd(CUR) });
+  });
+}
+
+// ===========================================================================
+// 4. Bank statements: import, process, statement checks
+// ===========================================================================
+async function importStatements(i: number) {
+  // Card bill from last month's statement, paid from checking on the 26th.
+  if (i >= 0) {
+    const owed = -stmtBal.card;
+    const payDate = bizDay(i, 26);
+    if (owed > 0 && payDate <= TODAY) {
+      bankLine("checking", payDate, "CHASE CARD AUTOPAY", -owed, { kind: "transfer", pair: `card-${i}`, to: "card" }, "Chase");
+      bankLine("card", payDate, "AUTOPAY PAYMENT - THANK YOU", owed, { kind: "counter", pair: `card-${i}` }, "Chase");
+    }
+  }
+
+  const monthLines = feed.filter((l) => monthIndexOf(l.date) === i);
+  for (const bank of ["checking", "savings", "card"] as Bank[]) {
+    const lines = monthLines.filter((l) => l.bank === bank).sort((a, b) => (a.date === b.date ? a.seq - b.seq : a.date < b.date ? -1 : 1));
+    if (!lines.length) continue;
+    for (const l of lines) {
+      if (l.amount === null) l.amount = await openAmount(l);
+    }
+    let bal = stmtBal[bank];
+    const rows = ["Date,Description,Amount,Balance,Reference,Payee"];
+    for (const l of lines) {
+      bal += l.amount!;
+      rows.push([l.date, l.description, (l.amount! / 100).toFixed(2), (bal / 100).toFixed(2), l.ref, l.payee].join(","));
+    }
+    await post(
+      "bank-accounts/[id]/transactions/import",
+      {
+        mode: "commit",
+        fileName: `${bank}-${day(i, 1).slice(0, 7)}.csv`,
+        content: rows.join("\n"),
+        format: "csv",
+        mapping: { date: "Date", description: "Description", amount: "Amount", balance: "Balance", reference: "Reference", payee: "Payee" },
+      },
+      { id: BANK[bank] }
+    );
+    const imported = await db
+      .select({ id: bankTransaction.id, reference: bankTransaction.reference })
+      .from(bankTransaction)
+      .where(and(eq(bankTransaction.bankAccountId, BANK[bank]), inArray(bankTransaction.reference, lines.map((l) => l.ref))));
+    const byRef = new Map(imported.map((r) => [r.reference, r.id]));
+    for (const l of lines) {
+      l.txId = byRef.get(l.ref);
+      if (!l.txId) throw new Error(`Imported line not found: ${l.ref} ${l.description}`);
+    }
+    monthOpen[bank][i] = stmtBal[bank];
+    stmtBal[bank] = bal;
+    monthClose[bank][i] = bal;
+  }
+}
+const monthOpen: Record<Bank, Record<number, number>> = { checking: {}, savings: {}, card: {} };
+const monthClose: Record<Bank, Record<number, number>> = { checking: {}, savings: {}, card: {} };
+
+async function openAmount(l: FeedLine): Promise<number> {
+  if (l.action.kind === "invoice") {
+    const key = l.action.key;
+    const row = await db.query.invoice.findFirst({ where: eq(invoice.id, INV[key].id) });
+    return row!.amountDue;
+  }
+  if (l.action.kind === "bill") {
+    const key = l.action.key;
+    const row = await db.query.bill.findFirst({ where: eq(bill.id, BILLS[key].id) });
+    return -row!.amountDue;
+  }
+  throw new Error(`Line ${l.description} has no amount`);
+}
+
+async function processStatements(i: number) {
+  // Leave the newest few days of the current month in the To do list.
+  const cutoff = i === CUR ? [addDays(TODAY, -5), day(CUR, 7)].sort()[0] : "9999-12-31";
+  const lines = feed
+    .filter((l) => monthIndexOf(l.date) === i && l.txId)
+    .sort((a, b) => (a.date === b.date ? a.seq - b.seq : a.date < b.date ? -1 : 1));
+  const pairs = new Map<string, FeedLine>();
+  for (const l of lines) if (l.action.kind === "counter") pairs.set(l.action.pair, l);
+
+  for (const l of lines) {
+    if (l.date > cutoff) continue;
+    const a = l.action;
+    const id = l.txId!;
+    switch (a.kind) {
+      case "invoice":
+        await post("bank-transactions/[id]/match", { matchType: "invoice", invoiceId: INV[a.key].id, amount: Math.abs(l.amount!), date: l.date, method: "bank_transfer" }, { id });
+        break;
+      case "bill":
+        await post("bank-transactions/[id]/match", { matchType: "bill", billId: BILLS[a.key].id, amount: Math.abs(l.amount!), date: l.date, method: l.bank === "card" ? "card" : "bank_transfer" }, { id });
+        break;
+      case "journal":
+        await post("bank-transactions/[id]/match", { matchType: "existing_journal", journalEntryId: a.jeId }, { id });
+        break;
+      case "payment":
+        await post("bank-transactions/[id]/match", { matchType: "existing_payment", paymentId: a.paymentId }, { id });
+        break;
+      case "categorize":
+        await post("bank-transactions/[id]/categorize", { accountId: acct(a.code), memo: a.memo ?? null }, { id });
+        break;
+      case "transfer": {
+        const counter = pairs.get(a.pair);
+        await post("bank-transactions/[id]/match-transfer", { targetBankAccountId: BANK[a.to], counterTransactionId: counter?.txId ?? null }, { id });
+        break;
+      }
+      case "counter":
+      case "open":
+        break;
+    }
+  }
+}
+
+const recDifferences: string[] = [];
+async function statementChecks(i: number) {
+  for (const bank of ["checking", "savings", "card"] as Bank[]) {
+    if (monthClose[bank][i] === undefined) continue;
+    const rec = ent(
+      await post(
+        "bank-accounts/[id]/reconciliations",
+        { startDate: day(i, 1), endDate: monthEnd(i), startBalance: monthOpen[bank][i], endBalance: monthClose[bank][i] },
+        { id: BANK[bank] }
+      )
+    );
+    const status = await get("bank-accounts/[id]/reconciliation", { id: BANK[bank] }, `reconciliationId=${rec.id}`);
+    const diff = Number(status.difference ?? status.reconciliation?.difference ?? 0);
+    recDifferences.push(`${bank} ${day(i, 1).slice(0, 7)}: difference ${diff}`);
+    const keepOpen = bank === "checking" && i === LAST;
+    if (!keepOpen) {
+      await post("bank-accounts/[id]/reconciliation", { action: "complete", reconciliationId: rec.id }, { id: BANK[bank] });
+    }
+  }
+}
+
+// ===========================================================================
+// 5. Finishing touches: templates, rules, reports, reminders, webhooks
+// ===========================================================================
+async function finish(userId: string) {
+  console.log("Recurring templates, rules, budgets, reports...");
+  const next = (dd: number) => day(CUR + 1, dd);
+  await post("recurring-invoices", {
+    name: "Monthly Retainer - Metro Services",
+    contactId: C.metro,
+    frequency: "monthly",
+    startDate: next(1),
+    reference: "Retainer",
+    currencyCode: "USD",
+    createAsApproved: true,
+    lines: [{ description: "Monthly retainer", quantity: 1, unitPrice: 7500, accountId: acct("4010"), taxRateId: T.exempt }],
+  });
+  await post("recurring", {
+    name: "Monthly AWS",
+    type: "bill",
+    contactId: C.aws,
+    frequency: "monthly",
+    startDate: next(3),
+    lines: [{ description: "AWS usage (estimate)", quantity: 1, unitPrice: 1250, accountId: acct("5230"), taxRateId: T.exempt }],
+  });
+  await post("recurring", {
+    name: "Office rent",
+    type: "bill",
+    contactId: C.landlord,
+    frequency: "monthly",
+    startDate: next(1),
+    lines: [{ description: "Office rent", quantity: 1, unitPrice: 3500, accountId: acct("5200"), taxRateId: T.exempt }],
+  });
+  await post("recurring-journals", {
+    name: "Accrued audit fee",
+    frequency: "monthly",
+    startDate: next(28),
+    maxOccurrences: 12,
+    lines: [
+      { description: "Year-end audit fee accrual", accountId: acct("5720"), debitAmount: 50000, creditAmount: 0 },
+      { description: "Year-end audit fee accrual", accountId: acct("2300"), debitAmount: 0, creditAmount: 50000 },
+    ],
+  }).catch((err) => console.warn(`  recurring journal skipped: ${err.message}`));
+
+  // Rules cover some recurring card lines; Staples, Uber, Slack, LinkedIn and
+  // savings interest stay uncovered so the rule suggestions have something to show.
+  await post("bank-rules", { name: "Zoom subscription", priority: 10, matchField: "description", matchType: "contains", matchValue: "ZOOM.US", accountId: acct("5230") });
+  await post("bank-rules", { name: "Google Workspace", priority: 10, matchField: "description", matchType: "contains", matchValue: "GOOGLE WORKSPACE", accountId: acct("5230") });
+  await post("bank-rules", { name: "Bank service fee", priority: 5, matchField: "description", matchType: "contains", matchValue: "SERVICE FEE", accountId: acct("5900") });
+
+  const year = Number(TODAY.slice(0, 4));
+  const fy = await db.query.fiscalYear.findFirst({ where: (f, { and: a, eq: e }) => a(e(f.organizationId, ORG), e(f.name, `FY ${year}`)) });
+  const monthsOfYear = Array.from({ length: 12 }, (_, m) => {
+    const start = `${year}-${String(m + 1).padStart(2, "0")}-01`;
+    const end = isoDate(new Date(Date.UTC(year, m + 1, 0)));
+    return { label: new Date(Date.UTC(year, m, 1)).toLocaleString("en-US", { month: "short", timeZone: "UTC" }), startDate: start, endDate: end, sortOrder: m };
+  });
+  const budgetLine = (code: string, monthly: number) => ({
+    accountId: acct(code),
+    total: monthly * 12,
+    periods: monthsOfYear.map((p) => ({ ...p, amount: monthly })),
+  });
+  await post("budgets", {
+    name: `FY ${year} Operating Budget`,
+    fiscalYearId: fy?.id ?? null,
+    startDate: `${year}-01-01`,
+    endDate: `${year}-12-31`,
+    periodType: "monthly",
+    lines: [
+      budgetLine("4010", 2500000),
+      budgetLine("4020", 1500000),
+      budgetLine("5100", 2850000),
+      budgetLine("5200", 350000),
+      budgetLine("5230", 160000),
+      budgetLine("5600", 150000),
+    ],
+  });
+
+  const reports = [
+    { name: "Open invoices", description: "Sent invoices still waiting for payment", config: { dataSource: "invoices", filters: [{ field: "status", operator: "equals", value: "sent" }], groupBy: [], columns: ["invoiceNumber", "contactName", "issueDate", "dueDate", "total", "amountDue"], chartType: "table" } },
+    { name: "Monthly sales", description: "Invoices issued this year", config: { dataSource: "invoices", filters: [], groupBy: [], columns: ["issueDate", "contactName", "subtotal", "taxTotal", "total"], dateRange: { from: `${year}-01-01`, to: `${year}-12-31` }, chartType: "bar" } },
+    { name: "Customer directory", description: "Customers with terms and credit limits", config: { dataSource: "contacts", filters: [{ field: "type", operator: "equals", value: "customer" }], groupBy: [], columns: ["name", "email", "phone", "paymentTermsDays", "creditLimit"], chartType: "table" } },
+    { name: "Stock levels", description: "On-hand quantity against reorder points", config: { dataSource: "inventory", filters: [], groupBy: [], columns: ["code", "name", "category", "quantityOnHand", "reorderPoint", "salePrice"], chartType: "table" } },
+    { name: "Large bank movements", description: "Bank lines over $5,000", config: { dataSource: "transactions", filters: [{ field: "amount", operator: "gt", value: "500000" }], groupBy: [], columns: ["date", "description", "payee", "amount", "status"], chartType: "table" } },
+  ];
+  for (const r of reports) await post("reports/saved", r);
+
+  // Reminder rules use the canonical placeholders from lib/email/reminder-processor.ts.
+  const sign = "<p>Thanks,<br/>{{organizationName}}</p>";
+  const r1 = ent(
+    await post("reminder-rules", {
+      name: "Invoice Due in 7 Days",
+      triggerType: "before_due",
+      triggerDays: 7,
+      enabled: true,
+      documentType: "invoice",
+      recipientType: "contact_email",
+      subjectTemplate: "Invoice {{documentNumber}} from {{organizationName}} is due on {{dueDate}}",
+      bodyTemplate: `<p>Hi {{contactName}},</p><p>A quick heads-up that invoice <strong>{{documentNumber}}</strong> for <strong>{{amountDue}}</strong> is due on {{dueDate}}.</p>${sign}`,
+    })
+  );
+  const r2 = ent(
+    await post("reminder-rules", {
+      name: "Invoice overdue - 7 days",
+      triggerType: "after_due",
+      triggerDays: 7,
+      enabled: true,
+      documentType: "invoice",
+      recipientType: "contact_email",
+      subjectTemplate: "Reminder: invoice {{documentNumber}} is {{daysOverdue}} days overdue",
+      bodyTemplate: `<p>Hi {{contactName}},</p><p>Invoice <strong>{{documentNumber}}</strong> for <strong>{{amountDue}}</strong> was due on {{dueDate}} and is now {{daysOverdue}} days overdue. If you've already paid, please ignore this note.</p>${sign}`,
+    })
+  );
+  await post("reminder-rules", {
+    name: "Final notice - 30 days overdue",
+    triggerType: "after_due",
+    triggerDays: 30,
+    enabled: false,
+    documentType: "invoice",
+    recipientType: "contact_persons",
+    subjectTemplate: "Final notice: invoice {{documentNumber}} from {{organizationName}}",
+    bodyTemplate: `<p>Hi {{contactName}},</p><p>Invoice <strong>{{documentNumber}}</strong> for <strong>{{amountDue}}</strong> is {{daysOverdue}} days overdue. Please arrange payment this week.</p>${sign}`,
+  });
+  await post("reminder-rules", {
+    name: "Bill due tomorrow",
+    triggerType: "before_due",
+    triggerDays: 1,
+    enabled: true,
+    documentType: "bill",
+    recipientType: "custom",
+    customEmails: ["ap@demo-company.com"],
+    subjectTemplate: "Bill {{documentNumber}} for {{contactName}} is due on {{dueDate}}",
+    bodyTemplate: "<p>Bill <strong>{{documentNumber}}</strong> from {{contactName}} for <strong>{{amountDue}}</strong> is due on {{dueDate}}.</p>",
+  });
+  // Reminder history for the overdue Bright Solutions invoice.
+  const bright = INV.bright;
+  if (bright) {
+    const due = bright.dueDate as string;
+    const brightRow = await db.query.invoice.findFirst({ where: eq(invoice.id, bright.id) });
+    const log = (rule: string, date: string, subject: string) => ({
+      organizationId: ORG,
+      reminderRuleId: rule,
+      documentType: "invoice",
+      documentId: bright.id,
+      recipientEmail: "ap@brightsolutions.com",
+      subject,
+      status: "sent" as const,
+      sentAt: new Date(date + "T14:00:00Z"),
+    });
+    await db.insert(reminderLog).values([
+      log(r1.id, addDays(due, -7), `Invoice ${brightRow!.invoiceNumber} from Demo Company is due on ${due}`),
+      log(r2.id, addDays(due, 7), `Reminder: invoice ${brightRow!.invoiceNumber} is 7 days overdue`),
+    ]);
+  }
+
+  const webhookEvents = ["invoice.created", "invoice.paid", "payment.received"];
+  const hook = ent(
+    await post("webhooks", {
+      url: "https://hooks.demo-company.com/dubbl/sales",
+      events: webhookEvents,
+      description: "Sales events to the CRM sync service",
+      isActive: true,
+    })
+  );
+  await post("webhooks", {
+    url: "https://erp.example.com/webhooks/dubbl",
+    events: ["bill.created", "bill.due", "approval.requested"],
+    description: "Legacy ERP bridge (paused)",
+    isActive: false,
+  });
+  const recentPayments = await db.query.payment.findMany({
+    where: (p, { eq: e }) => e(p.organizationId, ORG),
+    orderBy: (p, { desc: d }) => d(p.date),
+    limit: 3,
+  });
+  const deliveries = recentPayments.map((p, idx) => ({
+    webhookId: hook.id,
+    event: "payment.received",
+    payload: { event: "payment.received", data: { id: p.id, paymentNumber: p.paymentNumber, amount: p.amount, currencyCode: p.currencyCode, date: p.date } },
+    responseStatus: idx === 1 ? 502 : 200,
+    responseBody: idx === 1 ? "Bad Gateway" : '{"ok":true}',
+    status: idx === 1 ? ("retrying" as const) : ("success" as const),
+    attempts: idx === 1 ? 2 : 1,
+    deliveredAt: idx === 1 ? null : new Date(),
+    nextRetryAt: idx === 1 ? new Date(Date.now() + 15 * 60 * 1000) : null,
+  }));
+  if (deliveries.length) await db.insert(webhookDelivery).values(deliveries);
+
+  const brightRow = INV.bright ? await db.query.invoice.findFirst({ where: eq(invoice.id, INV.bright.id) }) : null;
+  const notes: (typeof notification.$inferInsert)[] = [
+    { organizationId: ORG, userId, type: "approval_needed", title: "Expense claim waiting for approval", body: "SaaS Summit conference: $759.50", entityType: "expense_claim" },
+    { organizationId: ORG, userId, type: "inventory_low", title: "Low stock: USB-C Docking Station", body: "On hand is below the reorder point.", entityType: "inventory_item", entityId: I["DOCK-01"].id },
+    { organizationId: ORG, userId, type: "payroll_due", title: "Pay run ready to review", body: `${monthLabel(CUR)} pay run is in draft.`, entityType: "payroll_run" },
+  ];
+  const acmePayment = await db.query.payment.findFirst({
+    where: (p, { and: a, eq: e }) => a(e(p.organizationId, ORG), e(p.contactId, C.acme), e(p.type, "received")),
+    orderBy: (p, { desc: d }) => d(p.date),
+  });
+  if (acmePayment) {
+    notes.push({ organizationId: ORG, userId, type: "payment_received", title: "Payment received from Acme Corp", body: `${acmePayment.paymentNumber}: $${(acmePayment.amount / 100).toFixed(2)}`, entityType: "payment", entityId: acmePayment.id });
+  }
+  if (brightRow) {
+    notes.push({ organizationId: ORG, userId, type: "invoice_overdue", title: `Invoice ${brightRow.invoiceNumber} is overdue`, body: "Bright Solutions", entityType: "invoice", entityId: brightRow.id, readAt: new Date() });
+  }
+  await db.insert(notification).values(notes);
+
+  await api("PUT", "period-lock", { lockDate: OPENING_DATE, reason: "Opening balances" });
+}
+
+// ===========================================================================
+// Main
+// ===========================================================================
+async function main() {
+  console.log(`Seeding the demo company (history ${day(0, 1)} to ${TODAY})...\n`);
+  const userId = await bootstrap();
+  try {
+    await setup();
+    schedule();
+
+    console.log("Running the timeline...");
+    for (let i = 0; i <= CUR; i++) {
+      // Tasks can add more tasks (e.g. a deposit the month after a pay run).
+      for (;;) {
+        const due = tasks
+          .filter((t) => monthIndexOf(t.date) === i && !(t as any).done)
+          .sort((a, b) => (a.date === b.date ? a.seq - b.seq : a.date < b.date ? -1 : 1));
+        if (!due.length) break;
+        const t = due[0];
+        (t as any).done = true;
+        try {
+          await t.fn();
+        } catch (err) {
+          throw new Error(`[${t.date} ${t.label}] ${(err as Error).message}`);
+        }
+      }
+      await importStatements(i);
+      await processStatements(i);
+      if (i < CUR) await statementChecks(i);
+      console.log(`  ${monthLabel(i)} done`);
+    }
+
+    await finish(userId);
+  } finally {
+    await db.delete(apiKey).where(eq(apiKey.keyHash, createHash("sha256").update(API_TOKEN).digest("hex")));
+  }
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)`.mapWith(Number) })
+    .from(journalEntry)
+    .where(eq(journalEntry.organizationId, ORG));
+  console.log(`\nStatement checks:\n  ${recDifferences.join("\n  ")}`);
+  console.log(`\nDone: ${total} journal entries. Sign in as ${DEMO_EMAIL} / password123`);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("\nSeed failed:", err);
+    process.exit(1);
+  });
